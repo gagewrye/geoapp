@@ -50,7 +50,8 @@ export const BAND_GROUP = 8;
  * C tile columns across the AOI, at most group x (C + ceil(256 / tile height) x (ceil(256 / tile
  * width) + 1)) tiles are held, which is group x (C + 2) for tiles of 256 px or more, plus the
  * decoded tiles under one window (group x 4 for those sizes). Real AEF COGs are band-separate
- * with 1024 px tiles: at the 2048 px cap, 8 x 5 compressed and 32 decoded 1 MiB tiles.
+ * with 1024 px tiles: at the 2048 px cap, 8 x 5 compressed and 32 decoded 1 MiB tiles. If any COG
+ * is pixel-interleaved, the whole download is one 64-band pass and the bound is 64 x the per-band count.
  */
 export async function fetchEntries(aoi: Aoi, entries: AefEntry[], store: CacheStore, opts: Options = {}): Promise<RasterSource> {
   const fetchFn = opts.fetch ?? fetch;
