@@ -36,5 +36,7 @@ export function aoiGrid(ring: [number, number][]): Aoi | "zones" | "size" {
 export function selectEntries(index: AefEntry[], aoi: Aoi, year: number): AefEntry[] {
   const ax0 = aoi.gt[0], ay1 = aoi.gt[3];
   const ax1 = ax0 + aoi.gt[1] * aoi.width, ay0 = ay1 + aoi.gt[5] * aoi.height;
-  return index.filter((e) => e.year === year && e.epsg === aoi.epsg && e.x0 < ax1 && e.x1 > ax0 && e.y0 < ay1 && e.y1 > ay0);
+  // the overlap is [max(x0), min(x1)] x [max(y0), min(y1)]; both sides must be positive
+  return index.filter((e) => e.year === year && e.epsg === aoi.epsg
+    && Math.max(e.x0, ax0) < Math.min(e.x1, ax1) && Math.max(e.y0, ay0) < Math.min(e.y1, ay1));
 }

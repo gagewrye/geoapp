@@ -84,9 +84,8 @@ describe("selectEntries edges (tester, criterion 4)", () => {
     expect(selectEntries(index, aoi, 2021)).toEqual([index[4], index[5]]);
   });
 
-  // FOLLOW-UP (tester): a degenerate entry (zero width) inside the AOI shares no area with it
-  // but is selected. Real index rows are 8192 px squares, so this only matters for a bad index.
-  it.fails("BUG: a zero-area entry inside the AOI is not selected", () => {
+  // Tester found a degenerate entry (zero width) inside the AOI was selected (F4).
+  it("a zero-area entry inside the AOI is not selected", () => {
     expect(selectEntries([e(1200, 1600, 1200, 1700), e(1200, 1600, 1300, 1600)], aoi, 2021)).toEqual([]);
   });
 
