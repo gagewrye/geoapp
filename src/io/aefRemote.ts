@@ -80,13 +80,30 @@ class RangeSource {
     }
     // a 200 would mean the host ignored Range and is sending the whole multi-GB file
     if (res.status !== 206) throw new AefDownloadError(this.host, new Error(`HTTP ${res.status} for ${this.url}`));
-    const total = Number(/\/(\d+)$/.exec(res.headers.get("Content-Range") ?? "")?.[1]);
-    if (total) this.size = total;
+    const want = this.expected(start, end, res.headers.get("Content-Range"));
+    let body: ArrayBuffer;
     try {
-      return await res.arrayBuffer();
+      body = await res.arrayBuffer();
     } catch (e) {
       throw new AefDownloadError(this.host, e); // connection lost mid-body
     }
+    if (body.byteLength !== want) throw new AefDownloadError(this.host, new Error(`${body.byteLength} bytes for a ${want}-byte range of ${this.url}`));
+    return body;
+  }
+
+  /**
+   * Byte count a 206 must carry. Its Content-Range must start where asked, end where asked (or at
+   * the last byte when the range runs past the file), and give the same file size every time;
+   * otherwise its bytes are not the asked ones and would be decoded as the wrong pixels.
+   */
+  private expected(start: number, end: number, contentRange: string | null): number {
+    const m = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(contentRange ?? "");
+    const [s, e, total] = m ? [Number(m[1]), Number(m[2]), Number(m[3])] : [NaN, NaN, NaN];
+    if (s !== start || start >= total || e !== Math.min(end, total - 1) || (this.size !== null && total !== this.size)) {
+      throw new AefDownloadError(this.host, new Error(`Content-Range ${JSON.stringify(contentRange)} for bytes=${start}-${end} of ${this.url}`));
+    }
+    this.size = total;
+    return e - s + 1;
   }
 
   private evict(): void {

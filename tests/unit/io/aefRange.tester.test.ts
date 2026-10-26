@@ -58,10 +58,9 @@ describe("Range handling (tester, criterion 12)", () => {
     await expect(run).rejects.toThrow(MSG);
   });
 
-  // FOLLOW-UP (tester): RangeSource never checks Content-Range or the body length of a 206.
-  // A short or shifted 206 is pasted as if it were the asked bytes; uncompressed tiles then cache
-  // wrong pixels silently, and compressed ones fail with a decoder error instead of the message.
-  it.fails("BUG: a 206 whose Content-Range starts elsewhere than asked is a download failure", async () => {
+  // Tester found RangeSource never checked Content-Range or the body length of a 206 (F2):
+  // a short or shifted 206 was pasted as if it were the asked bytes.
+  it("a 206 whose Content-Range starts elsewhere than asked is a download failure", async () => {
     const { run, store } = await attempt((url, range, data) => {
       if (!eastPixels(url, range)) return undefined;
       const [s, e] = [range![0] - 4096, range![1] - 4096]; // the bytes one block earlier
@@ -71,7 +70,7 @@ describe("Range handling (tester, criterion 12)", () => {
     expect(store.discarded).toBe(true);
   });
 
-  it.fails("BUG: a short 206 body in the middle of the file is a download failure", async () => {
+  it("a short 206 body in the middle of the file is a download failure", async () => {
     const { run, store } = await attempt((url, range, data) => {
       if (!eastPixels(url, range)) return undefined;
       const end = Math.min(range![1], data.length - 1);
