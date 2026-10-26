@@ -17,8 +17,17 @@ class WrappingAdapter extends TerraDrawMapLibreGLAdapter<MapLibreMap> {
   }
 }
 
+/**
+ * terra-draw ends a drag only on a pointerup over the canvas, so a release elsewhere (e.g. over
+ * the panel) leaves it dragging with the button up. Capturing the pointer routes that release here.
+ */
+function captureDrags(canvas: HTMLCanvasElement) {
+  canvas.addEventListener("pointerdown", (e) => { if (e.isPrimary) canvas.setPointerCapture(e.pointerId); });
+}
+
 /** terra-draw with polygon drawing and select-mode editing, both behind one validation (ADR 0003). */
 export function createDraw(map: MapLibreMap, onBlocked: (reason: BlockReason) => void): TerraDraw {
+  captureDrags(map.getCanvas());
   const ref: { draw?: TerraDraw } = {};
   const validation = guardDrags(map, () => ref.draw, ringValidation(onBlocked), onBlocked);
   const draw = new TerraDraw({
