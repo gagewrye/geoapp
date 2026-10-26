@@ -1,9 +1,9 @@
 # 0001: Hand-rolled tiled Uint8 GeoTIFF writer
 
-**Status:** Proposed
+**Status:** Accepted (Gage, 2026-10-26)
 
 **Context:** I checked geotiff 3.0.5 on npm and `src/geotiffwriter.js` at tag v3.0.5 and on master (3.1.0), and they behave the same. `writeGeotiff` takes the whole raster as one array, allocates the full output buffer before writing, writes one uncompressed strip ("we are only writing one strip"), and only writes classic TIFF (`data[3] = 42`, 32-bit offsets). It has no streaming API, so it breaks the tile-by-tile rule. I looked at three options. (a) Write our own small tiled writer that streams to a sink. (b) Accept a whole-raster buffer and set a maximum raster size. (c) Use GDAL-wasm, which is a heavy dependency and a large download.
 
 **Decision:** Option (a). `io/` gets a writer for single-band Uint8 GeoTIFFs. Files are little-endian, uncompressed, use 256x256 tiles, and are classic TIFF. Every tile has a fixed byte size, so all tile offsets are known up front. The writer writes the header and IFD first, then each tile once, in row-major order. The georeferencing tags (ModelTiepoint, ModelPixelScale or ModelTransformation, and the GeoKey tags) are copied from the input unchanged, and GDAL_NODATA is set to "255". The sink is a `FileSystemWritableFileStream`. On Chromium it comes from `showSaveFilePicker`. Elsewhere it is an OPFS file that the browser then downloads as a `File` (OPFS `createWritable` has been MDN Baseline since 2025).
 
-**Consequences:** Adds no dependency, and memory stays at about one tile. Output is limited to under 4 GiB, roughly 65k x 65k pixels. Larger rasters are rejected before any byte is written. BigTIFF and compression come later (open question in spec 001). The OPFS fallback temporarily uses disk space equal to the output size.
+**Consequences:** Adds no dependency, and memory stays at about one tile. Output is limited to under 4 GiB, roughly 65k x 65k pixels. Larger rasters are rejected before any byte is written. BigTIFF and compression come later, so offset width (4 vs 8 bytes) lives in one place and IFD layout is kept separate from tile encoding. Compression will make tile sizes unknown up front, so it will need the IFD written after the tiles; that is a contained change, not a redesign. The OPFS fallback temporarily uses disk space equal to the output size.
