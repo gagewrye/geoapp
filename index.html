@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Geoplatform</title>
+  </head>
+  <body>
+    <aside id="panel">
+      <h1>Geoplatform</h1>
+      <label>Open GeoTIFF <input id="open-raster" type="file" accept=".tif,.tiff,image/tiff" /></label>
+      <p id="raster-info"></p>
+      <fieldset>
+        <legend>Labels</legend>
+        <label>Class name <input id="class-name" type="text" value="class 1" /></label>
+        <div class="row">
+          <button id="mode-draw" type="button">Draw polygon</button>
+          <button id="mode-select" type="button">Edit</button>
+        </div>
+        <ul id="polygons"></ul>
+      </fieldset>
+      <fieldset>
+        <legend>Model</legend>
+        <button id="train" type="button">Train</button>
+        <button id="classify" type="button">Classify and export</button>
+        <button id="save-model" type="button">Save model</button>
+        <label>Load model <input id="load-model" type="file" accept=".json,application/json" /></label>
+      </fieldset>
+      <p id="message" role="status" aria-live="polite"></p>
+    </aside>
+    <main id="map"></main>
+    <script type="module" src="/src/ui/main.ts"></script>
+  </body>
+</html>

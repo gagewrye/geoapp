@@ -1,0 +1,13 @@
+html, body { margin: 0; height: 100%; font: 14px system-ui, sans-serif; }
+body { display: flex; }
+#panel { width: 280px; padding: 12px; overflow-y: auto; box-sizing: border-box; background: #f4f4f4; }
+#panel h1 { font-size: 18px; margin: 0 0 12px; }
+#panel label, #panel button { display: block; margin: 6px 0; }
+#panel .row { display: flex; gap: 6px; }
+#panel .row button { margin: 0; }
+#panel fieldset { margin: 12px 0; }
+#polygons { list-style: none; padding: 0; }
+#polygons li { display: flex; gap: 4px; margin: 4px 0; }
+#polygons input { flex: 1; min-width: 0; }
+#message { color: #a40000; min-height: 2em; }
+#map { flex: 1; height: 100%; }
