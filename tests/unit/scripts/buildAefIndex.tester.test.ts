@@ -64,9 +64,9 @@ describe("index build script edges (tester, criterion 16)", () => {
     expect(JSON.parse(await readFile(join(out, "years.json"), "utf8"))).toEqual([999, 2017, 2018, 2025, 2100]);
   });
 
-  // FOLLOW-UP (tester): a header-only CSV (e.g. a truncated download) succeeds, writes
-  // years.json [] and deletes every existing {year}/ shard directory in the output.
-  it.fails("BUG: a header-only CSV fails instead of wiping the index", async () => {
+  // Tester found a header-only CSV (e.g. a truncated download) succeeded, wrote years.json []
+  // and deleted every existing {year}/ shard directory in the output (F5).
+  it("a header-only CSV fails instead of wiping the index", async () => {
     const dir = await mkdtemp(join(tmpdir(), "aef-tester-"));
     const file = join(dir, "in.csv"), out = join(dir, "out");
     await mkdir(join(out, "2021"), { recursive: true });

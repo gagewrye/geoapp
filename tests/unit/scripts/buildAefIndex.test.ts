@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -66,5 +66,40 @@ describe("index build script (criterion 16)", () => {
     const text = await readFile(CSV, "utf8");
     await writeFile(bad, text.replace(`${PREFIX}2018/1S/x274oc2wyfxts9juj-0000008192`, "s3://elsewhere/2018/1S/x274oc2wyfxts9juj-0000008192"));
     await expect(build(bad)).rejects.toThrow(/line 5.*s3:\/\/elsewhere/s);
+  });
+
+  /** An out dir holding a stale 2019 shard, an old years.json and a file the script does not own. */
+  async function existingOut() {
+    const parent = await mkdtemp(join(tmpdir(), "aef-out-"));
+    const out = join(parent, "out");
+    await mkdir(join(out, "2019"), { recursive: true });
+    await writeFile(join(out, "2019", "32617.json"), "[]");
+    await writeFile(join(out, "years.json"), "[2019]");
+    await writeFile(join(out, "keep.txt"), "not ours");
+    return { parent, out };
+  }
+
+  it("leaves the existing index and its parent dir untouched when the build fails part-way", async () => {
+    const { parent, out } = await existingOut();
+    const bad = join(parent, "bad.csv");
+    await writeFile(bad, (await readFile(CSV, "utf8")).trimEnd() + "\n\"POLYGON((0 0,1 0,1 1,0 0))\",EPSG:32617,s3://elsewhere/x.tiff,2021,17N,0,0,10,10\n");
+    await expect(run("node", [SCRIPT, bad, out])).rejects.toThrow(/does not start with/);
+    expect((await readdir(out)).sort()).toEqual(["2019", "keep.txt", "years.json"]);
+    expect(await readFile(join(out, "years.json"), "utf8")).toBe("[2019]");
+    expect((await readdir(parent)).sort()).toEqual(["bad.csv", "out"]); // no temp dir left behind
+  });
+
+  it("on success replaces stale shards and years.json, keeps files it does not write, and leaves no temp dir", async () => {
+    const { parent, out } = await existingOut();
+    await run("node", [SCRIPT, CSV, out]);
+    expect((await readdir(out)).sort()).toEqual(["2017", "2018", "2021", "2025", "NOTICE", "keep.txt", "years.json"]);
+    expect(JSON.parse(await readFile(join(out, "years.json"), "utf8"))).toEqual([2017, 2018, 2021, 2025]);
+    expect(await readdir(parent)).toEqual(["out"]);
+  });
+
+  it("creates a missing out dir", async () => {
+    const out = join(await mkdtemp(join(tmpdir(), "aef-out-")), "a", "b");
+    await run("node", [SCRIPT, CSV, out]);
+    expect((await readdir(out)).sort()).toEqual(["2017", "2018", "2021", "2025", "NOTICE", "years.json"]);
   });
 });

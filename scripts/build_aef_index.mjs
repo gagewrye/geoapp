@@ -4,8 +4,8 @@
 // Writes {out}/years.json, {out}/{year}/{epsg}.json (AefEntry[], spec 002) and {out}/NOTICE.
 // The CSV is ~800 MB, so it is streamed line by line.
 import { createReadStream } from "node:fs";
-import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, mkdtemp, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { Readable } from "node:stream";
 
@@ -95,20 +95,36 @@ async function main() {
     shards.get(key).push(e);
   }
   if (!col) throw new Error(`${src}: empty CSV`);
+  // a truncated download can end right after the header; it must not replace a good index
+  if (rows === 0) throw new Error(`${src}: no data rows`);
 
   await mkdir(out, { recursive: true });
-  // Remove only what this script writes, so stale shards go but a mistyped out dir is not wiped.
-  for (const d of await readdir(out, { withFileTypes: true })) {
-    if (d.isDirectory() && /^\d{4}$/.test(d.name)) await rm(join(out, d.name), { recursive: true });
+  // Build next to out (same filesystem, so rename works) and swap in only once it is complete.
+  const tmp = await mkdtemp(join(dirname(resolve(out)), ".aef-index-tmp-"));
+  try {
+    for (const [key, list] of shards) {
+      const [year, epsg] = key.split("/");
+      await mkdir(join(tmp, year), { recursive: true });
+      await writeFile(join(tmp, year, `${epsg}.json`), JSON.stringify(list));
+    }
+    await writeFile(join(tmp, "years.json"), JSON.stringify([...years].sort((a, b) => a - b)));
+    await writeFile(join(tmp, "NOTICE"), NOTICE);
+    await swapIn(tmp, out);
+  } finally {
+    await rm(tmp, { recursive: true, force: true });
   }
-  for (const [key, list] of shards) {
-    const [year, epsg] = key.split("/");
-    await mkdir(join(out, year), { recursive: true });
-    await writeFile(join(out, year, `${epsg}.json`), JSON.stringify(list));
-  }
-  await writeFile(join(out, "years.json"), JSON.stringify([...years].sort((a, b) => a - b)));
-  await writeFile(join(out, "NOTICE"), NOTICE);
   console.log(`${rows} rows -> ${shards.size} shards, years ${[...years].sort().join(", ")}`);
+}
+
+/** Replace what this script owns in out ({year}/, years.json, NOTICE) with tmp's; other files stay. */
+async function swapIn(tmp, out) {
+  const old = join(tmp, ".old");
+  await mkdir(old);
+  // Move only what this script writes, so stale shards go but a mistyped out dir is not wiped.
+  for (const d of await readdir(out, { withFileTypes: true })) {
+    if ((d.isDirectory() && /^\d{4}$/.test(d.name)) || d.name === "years.json" || d.name === "NOTICE") await rename(join(out, d.name), join(old, d.name));
+  }
+  for (const name of await readdir(tmp)) if (name !== ".old") await rename(join(tmp, name), join(out, name));
 }
 
 main().catch((e) => {

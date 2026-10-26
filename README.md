@@ -20,5 +20,5 @@ npm run check        # lint + typecheck + unit tests (Vitest)
 npx playwright install chromium
 npm run e2e          # builds, serves on :4173, runs Playwright
 ```
-`node scripts/build_aef_index.mjs [csv] [out] [--epsg=N,...]` rebuilds the static AlphaEarth index in `public/aef-index/` (only the EPSG:32617 shards are committed; deploys generate the full set). `scripts/fixtures/` regenerates `tests/fixtures/aef/` (Python with numpy and scikit-learn; see each script's header).
+`node scripts/build_aef_index.mjs [csv] [out] [--epsg=N,...]` rebuilds the static AlphaEarth index in `public/aef-index/`, replacing it only when the whole CSV parses and has data rows (only the EPSG:32617 shards are committed; deploys generate the full set). `scripts/fixtures/` regenerates `tests/fixtures/aef/` (Python with numpy and scikit-learn; see each script's header).
 Layout and rules: see `CLAUDE.md`. Features are specified in `docs/specs/` and decisions in `docs/adr/`.
