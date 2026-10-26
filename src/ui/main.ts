@@ -25,9 +25,10 @@ let model: Model | undefined;
 
 map.on("load", () => {
   // terra-draw also fires "finish" at the end of a blocked drag, so only an unblocked gesture
-  // clears a block message left over from an earlier edit.
+  // (pointer press or key) clears a block message left over from an earlier edit.
   let blocked = false;
   map.getCanvasContainer().addEventListener("pointerdown", (e) => { if (e.isPrimary) blocked = false; }, { capture: true });
+  window.addEventListener("keydown", () => { blocked = false; }, { capture: true }); // Enter finishes a polygon too
   draw = createDraw(map, (reason) => { blocked = true; say(MESSAGES[reason]); });
   const d = draw;
   d.on("finish", (id, ctx) => {

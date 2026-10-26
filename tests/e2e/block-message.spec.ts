@@ -7,7 +7,7 @@ import {
 } from "./helpers";
 
 // Tester: the block message is cleared only by a later unblocked finish (src/ui/main.ts `blocked`
-// flag, reset on a primary pointerdown). Try other input paths than a plain mouse click or drag.
+// flag, reset on a primary pointerdown or a keydown). Try other input paths than a plain mouse click or drag.
 
 test("draw mode: a block from hovering alone (provisional update) shows the message, and a valid closing click clears it", async ({ page }) => {
   const errors = collectErrors(page);
@@ -25,6 +25,25 @@ test("draw mode: a block from hovering alone (provisional update) shows the mess
   const s = await snapshot(page);
   expect(s).toHaveLength(1);
   expect(s[0].geometry.coordinates[0]).toHaveLength(4); // three clicked vertices, closed; nothing from the hover
+  for (const [, lat] of s[0].geometry.coordinates[0]) expect(Math.abs(lat)).toBeLessThan(MAX_LAT);
+  await expect(message(page)).toHaveText("");
+  expect(errors).toEqual([]);
+});
+
+test("draw mode: a block from hovering, then finishing with Enter, stores a valid polygon and clears the message", async ({ page }) => {
+  const errors = collectErrors(page);
+  await openApp(page);
+  await jumpTo(page, [0, 80], 1.5);
+  await setMode(page, "draw");
+  for (const p of [[-10, 78], [10, 78], [0, 82]] as LngLat[]) await clickAt(page, await toScreen(page, p));
+  await clickAt(page, await toScreen(page, [0, 88]));
+  await expect(message(page)).toHaveText(MESSAGES.latitude);
+  const back = await toScreen(page, [-5, 80]);
+  await page.mouse.move(back.x, back.y, { steps: 5 });
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(80);
+  const s = await snapshot(page);
+  expect(s).toHaveLength(1);
   for (const [, lat] of s[0].geometry.coordinates[0]) expect(Math.abs(lat)).toBeLessThan(MAX_LAT);
   await expect(message(page)).toHaveText("");
   expect(errors).toEqual([]);
