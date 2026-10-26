@@ -83,3 +83,32 @@ test("Open GeoTIFF refuses an AlphaEarth file, so it is never labelled", async (
   await page.click("#train");
   await expect(message(page)).toHaveText("Open a raster first.");
 });
+
+test.describe("the AlphaEarth preview sits below local imagery and drawn shapes", () => {
+  const order = (page: Page) => page.evaluate(() => (window as any).__geoapp.map.getStyle().layers.map((l: any) => l.id)
+    .filter((id: string) => id === "aef-preview" || id === "preview" || id.startsWith("td-")));
+  const below = (ids: string[]) => {
+    expect(ids).toContain("aef-preview");
+    expect(ids).toContain("preview");
+    expect(ids[0]).toBe("aef-preview");
+  };
+
+  test("AlphaEarth first, then local imagery", async ({ page }) => {
+    await openApp(page);
+    await page.setInputFiles("#open-aef", westFile());
+    await expect(message(page)).toHaveText("AlphaEarth file opened.");
+    await openRaster(page, rgbFixture());
+    await expect(message(page)).toHaveText("Raster opened.");
+    below(await order(page));
+  });
+
+  test("local imagery first, then AlphaEarth", async ({ page }) => {
+    await openApp(page);
+    await openRaster(page, rgbFixture());
+    await expect(message(page)).toHaveText("Raster opened.");
+    await page.setInputFiles("#open-aef", westFile());
+    await expect(message(page)).toHaveText("AlphaEarth file opened.");
+    below(await order(page));
+    await expect(page.locator("#train")).toBeEnabled(); // local imagery is open
+  });
+});
