@@ -42,7 +42,9 @@ export async function getRange(g: RangeGet): Promise<{ body: ArrayBuffer; total:
     progress();
     const init: RequestInit = { method: "GET", headers: { Range: `bytes=${g.start}-${g.end}` }, credentials: "omit", signal: ctl.signal };
     // browsers report CORS failures as network errors
-    const res = await Promise.race([g.fetchFn(g.url, init), ended]).catch((e: unknown) => { throw fail(e); });
+    // called unbound: as g.fetchFn(...) the browser's fetch would get `this` = g and throw Illegal invocation
+    const fetchFn = g.fetchFn;
+    const res = await Promise.race([fetchFn(g.url, init), ended]).catch((e: unknown) => { throw fail(e); });
     progress();
     // a 200 would mean the host ignored Range and is sending the whole multi-GB file
     if (res.status !== 206) throw fail(new Error(`HTTP ${res.status} for ${g.url}`));
