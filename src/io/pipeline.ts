@@ -65,10 +65,16 @@ function concat<T extends Float32Array | Uint8Array>(parts: T[], C: new (n: numb
   return out;
 }
 
-/** Predict window by window and stream the classified GeoTIFF to the sink. */
-export async function classify(source: RasterSource, model: Model, sink: Sink): Promise<void> {
+/** Throw if the model doesn't fit the raster or the output exceeds classic TIFF; reads nothing. */
+export function checkClassify(source: RasterSource, model: Model): void {
   const { width, height, bandCount, geoTags } = source.meta;
   validate(model, bandCount);
-  tiffLayout(width, height, geoTags); // reject oversize output before any read
+  tiffLayout(width, height, geoTags);
+}
+
+/** Predict window by window and stream the classified GeoTIFF to the sink. */
+export async function classify(source: RasterSource, model: Model, sink: Sink): Promise<void> {
+  const { width, height, geoTags } = source.meta;
+  checkClassify(source, model); // reject before any read or write
   await writeTiff(sink, width, height, geoTags, async (w) => predictTile(model, await source.readWindow(w.x0, w.y0, w.width, w.height)));
 }

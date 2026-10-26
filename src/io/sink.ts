@@ -19,6 +19,10 @@ export async function openSink(name: string): Promise<Sink> {
       await writable.close();
       downloadBlob(await fileHandle.getFile(), name);
     },
+    async abort() {
+      await writable.abort();
+      await dir.removeEntry(name);
+    },
   };
 }
 

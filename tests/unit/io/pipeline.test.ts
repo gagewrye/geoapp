@@ -4,7 +4,7 @@ import { applyAffine, toLonLat } from "../../../src/core/crs";
 import { predictTile } from "../../../src/core/predict";
 import type { Affine, Model } from "../../../src/core/types";
 import { openGeoTiff } from "../../../src/io/geotiffSource";
-import { buildPreview, classify, openRaster, RasterRefusedError, train } from "../../../src/io/pipeline";
+import { buildPreview, checkClassify, classify, openRaster, RasterRefusedError, train } from "../../../src/io/pipeline";
 import { fakeSource, geotiffBuffer, recordingSink } from "../helpers/sources";
 
 type Feature = GeoJSON.Feature<GeoJSON.Polygon, { label: number }>;
@@ -87,6 +87,16 @@ describe("export read back with geotiff.js (criterion 9)", () => {
     await expect(classify(source, model1(["a", "b"], [[1], [-1]]), rec.sink)).rejects.toThrow(/too large/);
     expect(reads).toHaveLength(0);
     expect(rec.writes).toHaveLength(0);
+  });
+
+  it("checkClassify rejects an oversize raster or invalid model without a sink or any read (criterion 9)", async () => {
+    const big = fakeSource({ width: 70000, height: 70000 }, value);
+    expect(() => checkClassify(big.source, model1(["a", "b"], [[1], [-1]]))).toThrow(/too large/);
+    const small = fakeSource({ width: 300, height: 200, bandCount: 1 }, value);
+    expect(() => checkClassify(small.source, { ...model1(["a", "b"], [[1], [-1]]), bands: [2] })).toThrow(/bands/);
+    expect(() => checkClassify(small.source, model1(["a", "b"], [[1], [-1]]))).not.toThrow();
+    expect(big.reads).toHaveLength(0);
+    expect(small.reads).toHaveLength(0);
   });
 });
 

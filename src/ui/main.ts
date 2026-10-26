@@ -4,7 +4,7 @@ import { labelFeatures } from "../core/labels";
 import { parseModel, serializeModel } from "../core/modelio";
 import type { Model } from "../core/types";
 import { openFile } from "../io/geotiffSource";
-import { buildPreview, classify, openRaster, RasterRefusedError, train } from "../io/pipeline";
+import { buildPreview, checkClassify, classify, openRaster, RasterRefusedError, train } from "../io/pipeline";
 import { downloadBlob, openSink } from "../io/sink";
 import type { RasterSource } from "../io/source";
 import { createDraw } from "../map/draw";
@@ -75,9 +75,15 @@ $("train").addEventListener("click", () => run(async () => {
 $("classify").addEventListener("click", () => run(async () => {
   if (!source) return say("Open a raster first.");
   if (!model) return say("Train or load a model first.");
+  checkClassify(source, model); // before the Save dialog, so a rejected export leaves no empty file
   const sink = await openSink("classified.tif");
   say("Classifying...");
-  await classify(source, model, sink);
+  try {
+    await classify(source, model, sink);
+  } catch (e) {
+    await sink.abort?.();
+    throw e;
+  }
   say("Export complete.");
 }));
 
