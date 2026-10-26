@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkRing } from "../../../src/core/ring";
+import { checkRing, normalizeLon } from "../../../src/core/ring";
 import { MAX_LAT } from "../../../src/core/types";
 
 describe("checkRing (criterion 13)", () => {
@@ -22,5 +22,18 @@ describe("checkRing (criterion 13)", () => {
   it("accepts edges of exactly 180 degrees and vertices at exactly +-MAX_LAT", () => {
     expect(checkRing([[-90, MAX_LAT], [90, MAX_LAT], [90, -MAX_LAT], [-90, -MAX_LAT], [-90, MAX_LAT]])).toBeNull();
     expect(checkRing([[-180, 0], [0, 10], [0, 0]])).toBeNull();
+  });
+});
+
+describe("normalizeLon", () => {
+  it("wraps longitudes into [-180, 180] and keeps +-180", () => {
+    expect(normalizeLon(181)).toBeCloseTo(-179, 12);
+    expect(normalizeLon(-540.5)).toBeCloseTo(179.5, 12);
+    expect(normalizeLon(180)).toBe(180);
+    expect(normalizeLon(-180)).toBe(-180);
+    expect(normalizeLon(12.25)).toBe(12.25);
+  });
+  it("lets checkRing see a world-copy ring crossing 180", () => {
+    expect(checkRing([[179.5, 0], [181, 0], [181, 1]].map(([x, y]) => [normalizeLon(x!), y!] as [number, number]))).toBe("antimeridian");
   });
 });

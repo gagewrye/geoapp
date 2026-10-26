@@ -11,3 +11,9 @@ export function checkRing(ring: [number, number][]): "antimeridian" | "latitude"
   for (const [, lat] of ring) if (Math.abs(lat) > MAX_LAT) return "latitude";
   return null;
 }
+
+/** Wrap a longitude into [-180, 180]; MapLibre world copies can unproject beyond it. */
+export function normalizeLon(lon: number): number {
+  if (lon >= -180 && lon <= 180) return lon;
+  return ((((lon + 180) % 360) + 360) % 360) - 180;
+}
