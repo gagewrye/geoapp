@@ -4,7 +4,7 @@ import { BACKGROUND } from "../../src/map/style";
 import {
   ATTRIBUTION, cacheFiles, chip, chipBox, chipCentre, cogRequests, drawArea, fetchChip, HOST, lonLatBox, logRequests, refChip, serveAef, type Fault,
 } from "./aef";
-import { holdCogs } from "./aefTester";
+import { holdCogs, serveYears } from "./aefTester";
 import { jumpTo, message, openApp, pixelAt, toScreen } from "./helpers";
 
 // Spec 002 criteria 9, 11, 12, 13 and 14 (fetched data), on fixtures (a) and (b).
@@ -141,5 +141,35 @@ test("after a fetch, a newly drawn area says it isn't fetched yet until Fetch is
   await expect(page.locator("#aef-info")).toHaveText(/^Area: \d+ x \d+ px, EPSG:32617 \(not fetched yet; the loaded data is another area\)$/);
   await page.click("#aef-fetch");
   await expect(message(page)).toHaveText("Embeddings downloaded.");
+  await expect(page.locator("#aef-info")).toHaveText(/^Area: \d+ x \d+ px, EPSG:32617$/);
+});
+
+test("after a fetch, picking another year says it isn't fetched yet, and picking the loaded year again clears that (tester F11)", async ({ page }) => {
+  await serveAef(page);
+  await serveYears(page, [2020, 2021]);
+  await openApp(page);
+  await fetchChip(page, "2021");
+  await expect(message(page)).toHaveText("Embeddings downloaded.");
+  const info = page.locator("#aef-info");
+  await expect(info).toHaveText(/^Area: \d+ x \d+ px, EPSG:32617$/);
+  await page.selectOption("#aef-year", "2020");
+  await expect(info).toHaveText(/^Area: \d+ x \d+ px, EPSG:32617 \(not fetched yet; the loaded data is for 2021\)$/);
+  await page.selectOption("#aef-year", "2021");
+  await expect(info).toHaveText(/^Area: \d+ x \d+ px, EPSG:32617$/);
+});
+
+test("while a fetch runs, picking another year says the area isn't fetched yet for it (tester F11)", async ({ page }) => {
+  await serveAef(page);
+  await serveYears(page, [2020, 2021]);
+  const gate = await holdCogs(page);
+  await openApp(page);
+  await fetchChip(page, "2021");
+  await expect(message(page)).toHaveText("Downloading embeddings...");
+  await page.selectOption("#aef-year", "2020");
+  await expect(page.locator("#aef-info")).toHaveText(/\(not fetched yet; the loaded data is for 2021\)$/);
+  gate.release();
+  await expect(message(page)).toHaveText("Embeddings downloaded.");
+  await expect(page.locator("#aef-info")).toHaveText(/\(not fetched yet; the loaded data is for 2021\)$/);
+  await page.selectOption("#aef-year", "2021");
   await expect(page.locator("#aef-info")).toHaveText(/^Area: \d+ x \d+ px, EPSG:32617$/);
 });

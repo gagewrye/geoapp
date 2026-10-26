@@ -15,7 +15,7 @@ import { MESSAGES } from "./messages";
 
 /** "busy" while fetching or opening; "failed" after a fetch failed and nothing replaced it. */
 export type AefState = "none" | "busy" | "loaded" | "failed";
-type Loaded = { aoi: Aoi; source: RasterSource; store?: CacheStore };
+type Loaded = { aoi: Aoi; source: RasterSource; store?: CacheStore; year?: number }; // a local file has no year
 type Deps = {
   map: MapLibreMap; draw: () => TerraDraw | undefined; previewMaxSide: number;
   say: (text: string) => void; run: (task: () => Promise<void>) => Promise<void>; onState: (s: AefState) => void;
@@ -35,17 +35,18 @@ export function initAef({ map, draw, previewMaxSide, say, run, onState }: Deps) 
   let refused = false; // the last area drawn was refused, so its message is showing
   let noIndex = false; // years.json failed or listed no years: nothing can be fetched
   let data: Loaded | undefined;
-  let fetching: Aoi | undefined; // the area a running fetch is for
+  let fetching: { aoi: Aoi; year: number } | undefined; // what a running fetch is for
   let state: AefState = "none";
   // the only place the AlphaEarth controls are enabled: while busy, nothing else can start (one operation at a time)
   const setState = (s: AefState) => {
     state = s;
     fetchBtn.disabled = !area || !year.value || s === "busy";
     openAef.disabled = s === "busy";
-    // a new area replaces nothing until fetched, so say so while other data is loaded or loading
-    const other = data?.aoi ?? fetching;
+    // a new area or year replaces nothing until fetched, so say so while other data is loaded or loading
+    const other = data ?? fetching;
     info.textContent = !area ? "" : `Area: ${area.width} x ${area.height} px, EPSG:${area.epsg}`
-      + (other && !sameAoi(other, area) ? " (not fetched yet; the loaded data is another area)" : "");
+      + (!other ? "" : !sameAoi(other.aoi, area) ? " (not fetched yet; the loaded data is another area)"
+        : other.year !== undefined && String(other.year) !== year.value ? ` (not fetched yet; the loaded data is for ${other.year})` : "");
     onState(s);
   };
 
@@ -84,7 +85,7 @@ export function initAef({ map, draw, previewMaxSide, say, run, onState }: Deps) 
   fetchBtn.addEventListener("click", () => {
     if (state === "busy" || !area || !year.value) return;
     const aoi = area, y = Number(year.value);
-    fetching = aoi;
+    fetching = { aoi, year: y };
     setState("busy"); // before any await, so a second click finds Fetch disabled
     return run(async () => {
       let store: CacheStore | undefined;
@@ -92,7 +93,7 @@ export function initAef({ map, draw, previewMaxSide, say, run, onState }: Deps) 
         await unload();
         say("Downloading embeddings...");
         store = await opfsStore();
-        await show({ aoi, source: await downloadAoi(aoi, y, store), store }, false);
+        await show({ aoi, source: await downloadAoi(aoi, y, store), store, year: y }, false);
       } catch (e) {
         await store?.discard().catch(() => {}); // downloadAoi discards a partial cache; this covers the rest
         fetching = undefined;

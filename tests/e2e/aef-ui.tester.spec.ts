@@ -157,7 +157,9 @@ test.describe("year picker and Fetch states (criteria 11, 13)", () => {
     await expect(page.locator("#train")).toBeDisabled();
     await page.selectOption("#aef-year", "2020");
     await expect(page.locator("#aef-fetch")).toBeDisabled();
-    const fetchedInfo = (await page.locator("#aef-info").textContent())!;
+    // F11: the fetch is for 2021, so the info line says so; the area part is the fetched area's
+    await expect(page.locator("#aef-info")).toHaveText(/ \(not fetched yet; the loaded data is for 2021\)$/);
+    const fetchedInfo = (await page.locator("#aef-info").textContent())!.replace(/ \(not fetched yet; the loaded data is for 2021\)$/, "");
     const fetchedIds = await rectIds(page);
     // zoom 13 keeps the 200 m-margin box on screen, so the redraw registers (at zoom 15 it ran off the map)
     await jumpTo(page, chipCentre, 13);
