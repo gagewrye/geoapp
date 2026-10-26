@@ -8,6 +8,7 @@ Reads <chips>/<region>/index.csv (x0,y1 = upper-left corner; optional chip, epsg
 and <chips>/<region>/chip_NNNN.npz (x float16 [64,128,128], invalid pixels all zero; y uint8 1..11,
 255 = ignore). Without a chip column, row i is chip i; without a split column, even chips train.
 A standin.json in <chips> marks ADR 0008 stand-ins and switches the NOTICE.
+Over 200 lines because it writes the tiled GeoTIFFs by hand (struct, zlib), so it needs no GDAL or tifffile.
 """
 import argparse
 import csv
