@@ -1,0 +1,9 @@
+# 0009: Paint-brush labels for local imagery; polygons stay for AlphaEarth
+
+**Status:** Proposed
+
+**Context:** Gage wants a paint brush instead of polygons for labelling local imagery (spec 001's GeoTIFF flow). AlphaEarth embeddings aren't human readable, so spec 002 keeps polygons. terra-draw 1.38.0 draws vectors only, so it can't paint raster pixels. In the maplibre-gl 6.16.0 source, mouse pan is the left button without Ctrl, and rotate and pitch are the right button or Ctrl+left (`src/ui/handler/mouse.ts`). `map.dragPan` wraps mouse pan and touch pan together (`handler_manager.ts`: `new DragPanHandler(el, mousePan, touchPan)`), and the mouse handlers listen for `mousedown` on the canvas container. The keyboard handler binds only `=`/`+`, `-` and the arrow keys (`keyboard.ts`), so `[`, `]`, `1`-`9` and Space are free. `transform.isPointOnMapSurface` tells whether a screen point is on the globe. proj4 2.22.0 wraps longitude (`adjust_lon`) in `etmerc` (UTM) and `merc`, but our EPSG:4326 path passes longitude through unchanged.
+
+**Decision:** The active source picks the label tool. Local imagery uses a brush, hand-rolled in `map/` with no new dependency. With no source, or with an AlphaEarth source, terra-draw polygons work as before, and ADR 0003 now covers only that path and spec 002's AOI rectangle. In Paint mode, `map/` keeps mouse and pen `mousedown` from reaching MapLibre instead of calling `dragPan.disable()`, which would also stop touch pan. It also disables `dragRotate`, `doubleClickZoom` and `boxZoom`.
+
+**Consequences:** No new dependency. The app keeps two labelling paths. `checkRing` and the drag guards stay for polygons, and the brush doesn't need them (spec 003). Brush code must normalize longitude before projecting. Existing e2e tests that draw polygons over a local raster must move to the no-source state, move to an AlphaEarth fixture, or become paint tests.
