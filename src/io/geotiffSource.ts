@@ -1,5 +1,5 @@
 import { fromBlob, type GeoTIFF } from "geotiff";
-import type { Affine } from "../core/types";
+import { affineFromTags } from "../core/geotags";
 import type { GeoTags, RasterSource } from "./source";
 
 const stripNul = (s: unknown) => (typeof s === "string" ? s.replace(/\0+$/, "") : undefined);
@@ -20,12 +20,7 @@ export async function openGeoTiff(tiff: GeoTIFF): Promise<RasterSource> {
     GeoAsciiParams: stripNul(fd.getValue("GeoAsciiParams")),
   };
   for (const k of Object.keys(geoTags) as (keyof GeoTags)[]) if (geoTags[k] === undefined) delete geoTags[k];
-  const gt = affineOf(geoTags, image.getOrigin(), image.getResolution());
-  if (keys.GTRasterTypeGeoKey === 2) {
-    // PixelIsPoint: tie point is a pixel centre, shift to the corner as GDAL does
-    gt[0] -= 0.5 * (gt[1] + gt[2]);
-    gt[3] -= 0.5 * (gt[4] + gt[5]);
-  }
+  const gt = affineFromTags(geoTags, keys.GTRasterTypeGeoKey === 2);
   const width = image.getWidth();
   const height = image.getHeight();
   const bandCount = image.getSamplesPerPixel();
@@ -47,12 +42,6 @@ function gdalNoData(parsed: number | null, raw: string | undefined): number | nu
   if (parsed === null || !Number.isNaN(parsed) || raw === undefined) return parsed;
   const t = raw.trim();
   return /^-inf/i.test(t) ? -Infinity : /^\+?inf/i.test(t) ? Infinity : parsed;
-}
-
-function affineOf(tags: GeoTags, origin: number[], res: number[]): Affine {
-  const m = tags.ModelTransformation;
-  if (m && m.length >= 8) return [m[3]!, m[0]!, m[1]!, m[7]!, m[4]!, m[5]!];
-  return [origin[0]!, res[0]!, 0, origin[1]!, 0, res[1]!];
 }
 
 export async function openFile(file: Blob): Promise<RasterSource> {
