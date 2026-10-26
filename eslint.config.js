@@ -12,6 +12,11 @@ export default tseslint.config(
     rules: { "@typescript-eslint/no-explicit-any": "off" },
   },
   {
+    // dev scripts run under Node
+    files: ["scripts/**/*.mjs"],
+    languageOptions: { globals: { process: "readonly", console: "readonly", fetch: "readonly", URL: "readonly", Buffer: "readonly" } },
+  },
+  {
     // core/ is pure: no DOM, no I/O layers.
     files: ["src/core/**/*.ts"],
     rules: {

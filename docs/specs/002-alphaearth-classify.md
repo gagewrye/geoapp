@@ -50,6 +50,7 @@ aefPreview(tile: Tile): Tile  // 3 bands = A01, A16, A09 (1-based 2, 17, 10), li
 - **Reading COGs.** `io/` derives each COG's geotransform from its own GeoTIFF tags and does not use geotiff.js `getResolution`, which negates y. Rows of a bottom-up COG (positive y scale, the Source Cooperative layout) are flipped into the north-up AOI grid. A COG whose origin is not a multiple of 10 m from the AOI grid is refused. Pixels covered by no COG are NaN, and `Tile.nodata` is null.
 - **Cache.** The fetch streams the whole AOI into an OPFS cache in row-major 256x256 windows. Each window is stored as raw Int8 (4 MiB) and dequantized on read. Preview, training and classification read only the cache, so the requests depend only on AOI and year.
 - **Model.** The model is spec 001's `Model`, unchanged (`bands` 1..64).
+- **Index.** `scripts/build_aef_index.mjs` parses `crs` "EPSG:N" to `epsg` and strips `s3://us-west-2.opendata.source.coop/tge-labs/aef/v1/annual/` from `path`; any other prefix fails the build. The full set is 43 MB, so only `years.json` and the EPSG:32617 shards are committed; deploys generate the rest with the script.
 
 **Test data (ADR 0007; interim source ADR 0008).**
 - Until Gage regenerates them from his chips, the committed fixtures are built by the same script from ADR 0008's stand-in chips: same format, AEF 2021 over the Everglades, labeled by ESA WorldCover 2021 (mangrove = class 10). The NOTICE then names that source and credits AlphaEarth and ESA WorldCover instead of the label sources below.

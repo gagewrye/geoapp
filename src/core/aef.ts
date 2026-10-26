@@ -1,6 +1,8 @@
 import type { Affine, Tile } from "./types";
 
 /** AlphaEarth Foundations annual embeddings (spec 002, ADR 0005). */
+/** COG host (ADR 0005); index paths are relative to it. scripts/build_aef_index.mjs keeps a copy. */
+export const AEF_BASE = "https://data.source.coop/tge-labs/aef/v1/annual/";
 export const AEF_RES = 10; // m
 export const MAX_AOI_SIDE = 2048; // px
 export const AEF_BANDS = 64;
