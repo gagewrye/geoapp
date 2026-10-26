@@ -20,9 +20,12 @@ export class AefGridError extends Error {
   }
 }
 
+// GeoTIFF's "user-defined" key value: the file has a CRS, but no EPSG code for it.
+const USER_DEFINED = 32767;
+
 export class AefCrsError extends Error {
   constructor(readonly path: string, epsg: number, aoiEpsg: number) {
-    super(`AlphaEarth file ${path} is in ${epsg ? `EPSG:${epsg}` : "an unknown CRS"}, not the area's EPSG:${aoiEpsg}.`);
+    super(`AlphaEarth file ${path} is in ${epsg && epsg !== USER_DEFINED ? `EPSG:${epsg}` : "an unknown CRS"}, not the area's EPSG:${aoiEpsg}.`);
   }
 }
 
