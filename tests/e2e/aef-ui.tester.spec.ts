@@ -1,28 +1,18 @@
 import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
-import type { AefEntry } from "../../src/core/aef";
 import { MESSAGES } from "../../src/ui/messages";
 import { ATTRIBUTION, cacheFiles, chip, chipBox, chipCentre, cogRequests, drawArea, drawSmallArea, fetchChip, HOST, logRequests, lonLatBox, serveAef } from "./aef";
-import { chipMismatches, holdCogs, quiet, serveYears } from "./aefTester";
+import { chipMismatches, files64, holdCogs, quiet, serveYears, westFile } from "./aefTester";
 import { clickAt, collectErrors, drawPolygon, jumpTo, message, moveTo, openApp, openRaster, rgbFixture, toScreen, type LngLat } from "./helpers";
 
 // Tester e2e for spec 002's UI: the area tool, the year picker and Fetch states, concurrent
 // fetches and file opens, and the Train/Classify rule (criteria 3, 11, 12, 13, 14; Scope).
 const FIX = "tests/fixtures/aef";
 const REF = readFileSync(`${FIX}/ref_chip.i8`);
-const west = (JSON.parse(readFileSync(`${FIX}/aef-index/2021/32617.json`, "utf8")) as AefEntry[])[0]!;
-const westFile = () => ({ name: "west.tiff", mimeType: "image/tiff", buffer: readFileSync(`${FIX}/cogs/${west.path}`) });
 const areas = (page: Page) => page.evaluate(() => (window as any).__geoapp.draw.getSnapshot().filter((f: any) => f.properties.mode === "rectangle").length);
 const rectIds = (page: Page) => page.evaluate(() => (window as any).__geoapp.draw.getSnapshot().filter((f: any) => f.properties.mode === "rectangle").map((f: any) => f.id));
 const rect = (page: Page, [w, s, e, n]: number[]) => Promise.all(([[w, n], [e, n], [e, s], [w, s]] as LngLat[]).map((p) => toScreen(page, p)));
 const box = lonLatBox(chip.epsg, chipBox, 30);
-const files64 = async (page: Page) => {
-  const f = await cacheFiles(page);
-  const aoi = await page.evaluate(() => (window as any).__geoapp.aef()?.aoi);
-  if (!f || !aoi) return { ok: false, f, aoi };
-  const want = Math.ceil(aoi.width / 256) * Math.ceil(aoi.height / 256) * 65536;
-  return { ok: Object.keys(f).length === 64 && Object.values(f).every((s) => s === want), f, aoi };
-};
 
 test.describe("area tool (criterion 3, Scope)", () => {
   // Tester F3: a refused area is removed, so the outline on the map is always the area; the earlier one stays.
@@ -167,7 +157,16 @@ test.describe("year picker and Fetch states (criteria 11, 13)", () => {
     await expect(page.locator("#train")).toBeDisabled();
     await page.selectOption("#aef-year", "2020");
     await expect(page.locator("#aef-fetch")).toBeDisabled();
+    const fetchedInfo = (await page.locator("#aef-info").textContent())!;
+    const fetchedIds = await rectIds(page);
+    // zoom 13 keeps the 200 m-margin box on screen, so the redraw registers (at zoom 15 it ran off the map)
+    await jumpTo(page, chipCentre, 13);
     await drawArea(page, lonLatBox(chip.epsg, chipBox, 200));
+    const NOTE = " (not fetched yet; the loaded data is another area)";
+    await expect(page.locator("#aef-info"), "the redraw replaced the area (F7 note)").toHaveText(/^Area: \d+ x \d+ px, EPSG:32617 \(not fetched yet; the loaded data is another area\)$/);
+    expect(await rectIds(page), "one rectangle, the new one").toHaveLength(1);
+    expect(await rectIds(page)).not.toEqual(fetchedIds);
+    expect(await page.locator("#aef-info").textContent()).not.toBe(fetchedInfo + NOTE);
     await expect(page.locator("#aef-fetch")).toBeDisabled();
     gate.release();
     await expect(message(page)).toHaveText("Embeddings downloaded.");
@@ -175,7 +174,12 @@ test.describe("year picker and Fetch states (criteria 11, 13)", () => {
     const r = await chipMismatches(page, REF);
     expect(r.mismatches).toBe(0);
     expect(r.outsideNaN).toBe(true);
+    // the loaded data is the area fetched, not the one redrawn: its size is the one shown before the redraw
+    const loaded = await page.evaluate(() => (window as any).__geoapp.aef().aoi);
+    expect(`Area: ${loaded.width} x ${loaded.height} px, EPSG:${loaded.epsg}`).toBe(fetchedInfo);
+    await expect(page.locator("#aef-info")).toHaveText(/\(not fetched yet; the loaded data is another area\)$/);
     await expect(page.locator("#aef-fetch")).toBeEnabled();
+    await expect(page.locator("#aef-year")).toHaveValue("2020"); // the next Fetch is for the redrawn area and 2020
   });
 
   test("fetching twice in a row: one cache of 64 band files, tiles equal the chip, preview and attribution shown", async ({ page }) => {

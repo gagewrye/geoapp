@@ -1,9 +1,24 @@
+import { readFileSync } from "node:fs";
 import type { Page } from "@playwright/test";
-import { AEF_BASE } from "../../src/core/aef";
-import { chip } from "./aef";
+import { AEF_BASE, type AefEntry } from "../../src/core/aef";
+import { cacheFiles, chip } from "./aef";
 
 // Shared by the spec 002 tester e2e files: holding COG answers, and checking the loaded cache.
 const N = chip.width;
+const FIX = "tests/fixtures/aef";
+const west = (JSON.parse(readFileSync(`${FIX}/aef-index/2021/32617.json`, "utf8")) as AefEntry[])[0]!;
+
+/** The west fixture (a) COG, as a file to open (64 px wide). */
+export const westFile = () => ({ name: "west.tiff", mimeType: "image/tiff", buffer: readFileSync(`${FIX}/cogs/${west.path}`) });
+
+/** Whether the OPFS cache holds exactly 64 band files of (window count x 64 KiB) for the loaded AOI. */
+export async function files64(page: Page) {
+  const f = await cacheFiles(page);
+  const aoi = await page.evaluate(() => (window as any).__geoapp.aef()?.aoi);
+  if (!f || !aoi) return { ok: false, f, aoi };
+  const want = Math.ceil(aoi.width / 256) * Math.ceil(aoi.height / 256) * 65536;
+  return { ok: Object.keys(f).length === 64 && Object.values(f).every((s) => s === want), f, aoi };
+}
 
 /** Hold every COG answer until release(); the requests themselves are still sent and logged. */
 export async function holdCogs(page: Page): Promise<{ release: () => void; held: () => number }> {
@@ -58,4 +73,25 @@ export async function quiet(page: Page, log: unknown[], ms = 1500): Promise<stri
   let n = -1;
   while (n !== log.length) { n = log.length; await page.waitForTimeout(ms); }
   return (await page.locator("#message").textContent()) ?? "";
+}
+
+/**
+ * Hold every OPFS removeEntry (the cache's discard and its drop of an earlier cache) while the page's
+ * `__holdRemove` is set, so a test can act while a previous cache is still being unloaded.
+ */
+export async function holdRemoves(page: Page): Promise<{ hold: () => Promise<void>; release: () => Promise<void>; held: () => Promise<number> }> {
+  await page.addInitScript(() => {
+    const w = window as any;
+    w.__removesHeld = 0;
+    const orig = FileSystemDirectoryHandle.prototype.removeEntry;
+    FileSystemDirectoryHandle.prototype.removeEntry = async function (this: FileSystemDirectoryHandle, ...a: Parameters<typeof orig>) {
+      if (w.__holdRemove) { w.__removesHeld++; await w.__holdRemove; }
+      return orig.apply(this, a);
+    };
+  });
+  return {
+    hold: () => page.evaluate(() => { const w = window as any; w.__holdRemove = new Promise<void>((r) => { w.__releaseRemove = r; }); }),
+    release: () => page.evaluate(() => { const w = window as any; w.__holdRemove = undefined; w.__releaseRemove?.(); }),
+    held: () => page.evaluate(() => (window as any).__removesHeld as number),
+  };
 }
