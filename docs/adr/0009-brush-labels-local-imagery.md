@@ -1,6 +1,6 @@
 # 0009: The paint brush is the only labelling tool; terra-draw stays only for the AOI rectangle
 
-**Status:** Proposed
+**Status:** Accepted (Gage, 2026-10-26)
 
 **Context:** Gage (2026-10-26) wants a paint brush in place of polygon drawing. He also decided that AlphaEarth is never hand-labelled. Labels are painted on local imagery and can train a model on AlphaEarth (spec 004), so no polygon labelling is left. terra-draw 1.38.0 draws vectors only. Its `terra-draw.ts` at tag `terra-draw@1.38.0` exports `TerraDrawRectangleMode`, which spec 002 uses for its AOI. It starts in a built-in `"static"` mode, and `setMode` stops the old mode before it starts the new one. maplibre-gl 6.16.0 (`src/ui/handler/mouse.ts`, `handler_manager.ts`, `keyboard.ts`): mouse pan is the left button without Ctrl, and rotate is the right button or Ctrl+left. `dragPan` wraps mouse pan and touch pan together. The mouse handlers listen for `mousedown` on the canvas container. The keyboard handler binds only `=`/`+`, `-` and the arrow keys. `transform.isPointOnMapSurface` tells whether a screen point is on the globe.
 

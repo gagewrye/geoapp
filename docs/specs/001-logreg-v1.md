@@ -2,7 +2,7 @@
 
 **Goal:** Classify a local GeoTIFF in the browser with a logistic regression model trained on user-drawn labels.
 
-**Status:** Approved (Gage, 2026-10-26). Partly superseded by spec 003 once it's approved: the brush replaces polygon labelling, and criteria 2, 3, 5 and 13-15, plus the polygon parts of 8 and 12, no longer apply (see spec 003, "Polygons removed").
+**Status:** Approved (Gage, 2026-10-26). Partly superseded by spec 003 (approved 2026-10-26): the brush replaces polygon labelling, and criteria 2, 3, 5 and 13-15, plus the polygon parts of 8 and 12, no longer apply (see spec 003, "Polygons removed").
 
 **ADRs (all Accepted):** 0001 tiled TIFF writer, 0002 proj4 + warped preview, 0003 terra-draw, 0004 MapLibre >= 6.16 with globe.
 
