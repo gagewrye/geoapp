@@ -24,9 +24,14 @@ let source: RasterSource | undefined;
 let model: Model | undefined;
 
 map.on("load", () => {
-  draw = createDraw(map, (reason) => say(MESSAGES[reason]));
+  // terra-draw also fires "finish" at the end of a blocked drag, so only an unblocked gesture
+  // clears a block message left over from an earlier edit.
+  let blocked = false;
+  map.getCanvasContainer().addEventListener("pointerdown", (e) => { if (e.isPrimary) blocked = false; }, { capture: true });
+  draw = createDraw(map, (reason) => { blocked = true; say(MESSAGES[reason]); });
   const d = draw;
   d.on("finish", (id, ctx) => {
+    if (!blocked) say("");
     if (ctx.mode === "polygon" && ctx.action === "draw") d.updateFeatureProperties(id, { className: $<HTMLInputElement>("class-name").value.trim() });
     renderPolygonList($("polygons"), d);
   });

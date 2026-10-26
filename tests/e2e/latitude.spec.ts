@@ -25,6 +25,19 @@ for (const sign of [1, -1]) {
       for (const f of await snapshot(page)) for (const [, lat] of f.geometry.coordinates[0]) expect(Math.abs(lat)).toBeLessThan(MAX_LAT);
     });
 
+    test("finishing a valid polygon after a blocked vertex clears the message", async ({ page }) => {
+      const first = await toScreen(page, [-10, sign * 78]);
+      await setMode(page, "draw");
+      await clickAt(page, first);
+      await clickAt(page, await toScreen(page, [10, sign * 78]));
+      await clickAt(page, await toScreen(page, [0, sign * 88]));
+      await expect(message(page)).toHaveText(MESSAGES.latitude);
+      await clickAt(page, await toScreen(page, [0, sign * 82]));
+      await clickAt(page, first);
+      expect(await snapshot(page)).toHaveLength(1);
+      await expect(message(page)).toHaveText("");
+    });
+
     test("dragging a vertex beyond MAX_LAT is blocked and nothing is clamped", async ({ page }) => {
       const corners: [number, number][] = [[-10, sign * 76], [10, sign * 76], [10, sign * 82], [-10, sign * 82]];
       await drawPolygon(page, await Promise.all(corners.map((p) => toScreen(page, p))), "ice");
@@ -119,9 +132,10 @@ for (const sign of [1, -1]) {
       const blocked = await ringOf(page);
       await drag(page, await toScreen(page, [40, sign * 82]), await toScreen(page, [40, sign * 88]));
       expect(await ringOf(page)).toEqual(blocked);
-      await page.evaluate(() => { document.getElementById("message")!.textContent = ""; });
+      await expect(message(page)).toHaveText(MESSAGES.latitude);
 
       await drag(page, await toScreen(page, [40, sign * 82]), await toScreen(page, [40, sign * 84]));
+      await expect(message(page)).toHaveText(""); // a successful edit clears the stale block message
       const moved = await ringOf(page);
       expect(moved).toHaveLength(blocked.length);
       expect(maxAbsLat(moved)).toBeGreaterThan(83);
