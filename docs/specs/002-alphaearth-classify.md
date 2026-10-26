@@ -2,7 +2,7 @@
 
 **Goal:** Fetch Google AlphaEarth annual embeddings for a user-drawn area and year, and classify them with spec 001's logistic regression.
 
-**Status:** Approved (Gage, 2026-10-26). **ADRs (all Accepted):** 0005 AlphaEarth COGs from Source Cooperative + local AOI cache, 0006 static per-zone index, 0007 Python fixture script.
+**Status:** Approved (Gage, 2026-10-26). **ADRs (all Accepted):** 0005 AlphaEarth COGs from Source Cooperative + local AOI cache, 0006 static per-zone index, 0007 Python fixture script, 0008 interim fixtures from public data (pending Gage's review).
 
 **Decided (Gage, 2026-10-26):**
 - Models are simple regression only.
@@ -51,11 +51,12 @@ aefPreview(tile: Tile): Tile  // 3 bands = A01, A16, A09 (1-based 2, 17, 10), li
 - **Cache.** The fetch streams the whole AOI into an OPFS cache in row-major 256x256 windows. Each window is stored as raw Int8 (4 MiB) and dequantized on read. Preview, training and classification read only the cache, so the requests depend only on AOI and year.
 - **Model.** The model is spec 001's `Model`, unchanged (`bands` 1..64).
 
-**Test data (ADR 0007).**
+**Test data (ADR 0007; interim source ADR 0008).**
+- Until Gage regenerates them from his chips, the committed fixtures are built by the same script from ADR 0008's stand-in chips: same format, AEF 2021 over the Everglades, labeled by ESA WorldCover 2021 (mangrove = class 10). The NOTICE then names that source and credits AlphaEarth and ESA WorldCover instead of the label sources below.
 - `scripts/fixtures/make_aef_fixtures.py` reads mangrove-embed `data/chips/*/chip_NNNN.npz`: `x` float16 [64,128,128] (invalid pixels all zero), `y` uint8 1..11 with 255 = ignore, 10 m north-up UTM, and `index.csv` `x0,y1` as the upper-left corner. It writes `tests/fixtures/aef/`, at most 5 MB in total:
   - (a) One everglades chip (EPSG:32617), re-quantized to Int8 (all-zero vector -> -128) and split into three COGs: west half bottom-up, NE quarter top-down, SE quarter bottom-up. Plus an extra copy of the NE quarter shifted 5 m. Plus the reference chip as raw Int8.
   - (b) Index shards for these COGs.
-  - (c) A labeled pixel sample: 1,000 train and 1,000 test pixels per region from disjoint chips, Int8 + label. Plus `ref.json` with mangrove IoU and accuracy from sklearn `LogisticRegression(max_iter=3000)`, the logreg in mangrove-embed `pixel.py`.
+  - (c) A labeled pixel sample: 1,000 train and 1,000 test pixels per region from disjoint chips, Int8 + label. Plus `ref.json` with the mangrove class value, mangrove IoU and accuracy from sklearn `LogisticRegression(max_iter=3000)`, the logreg in mangrove-embed `pixel.py`.
   - (d) The first 256 KiB and the `.vrt` of one real Source Cooperative COG.
 - The script also writes `tests/fixtures/aef/NOTICE`. It credits AlphaEarth and states each label source's licence and citation: GMW v3 (CC BY 4.0), ESA WorldCover v200 (CC BY 4.0), GWL_FCS30 (CC BY 4.0), JRC GSW 1.4 (Copernicus, "Source: EC JRC/Google") and GHSL (EC reuse with the source acknowledged). It also states that labels were derived by mangrove-embed's v3 rules.
 - CI never touches the network. e2e serves (a) and (b) through a Playwright route that answers Range requests with 206.
