@@ -1,6 +1,6 @@
 # Geoplatform
 
-Local-first browser app for classifying geospatial imagery. User data never leaves the user's device. We host only static files and, later, a catalog index.
+Local-first browser app for classifying geospatial imagery. User data (local rasters, labels, polygons, models) never leaves the user's device. The app may fetch public datasets such as AlphaEarth embeddings; those requests reveal only the area and year requested (ADR 0005). We host only static files, including a catalog index.
 
 ## Stack
 - TypeScript (strict), Vite, MapLibre GL, geotiff.js
