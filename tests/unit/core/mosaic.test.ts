@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Aoi } from "../../../src/core/aef";
-import { overlapWindow, pasteBand, placeCog } from "../../../src/core/mosaic";
+import { tileWindows } from "../../../src/core/grid";
+import { overlapWindow, pasteBand, placeCog, tileLastWindow, type Placement } from "../../../src/core/mosaic";
 
 const aoi: Aoi = { epsg: 32617, gt: [1000, 10, 0, 5000, 0, -10], width: 300, height: 300 };
 
@@ -62,5 +63,51 @@ describe("pasteBand", () => {
     const dst = Int8Array.from([5, -128, -128, 7]); // 4 wide, 1 row
     pasteBand(dst, 4, Int8Array.from([1, 2, -128, -128]), { src: [0, 0, 4, 1], dx: 0, dy: 0, w: 4, h: 1, bottomUp: false });
     expect(Array.from(dst)).toEqual([5, 2, -128, 7]);
+  });
+});
+
+describe("tileLastWindow", () => {
+  /** Brute force: for each tile, every row-major window whose overlap with the COG touches it. */
+  function readers(p: Placement, tw: number, th: number, aoiW: number, aoiH: number): Map<number, number[]> {
+    const across = Math.ceil(p.width / tw);
+    const out = new Map<number, number[]>();
+    tileWindows(aoiW, aoiH).forEach((win, i) => {
+      const o = overlapWindow(p, win);
+      if (!o) return;
+      const [c0, r0, c1, r1] = o.src;
+      for (let ty = Math.floor(r0 / th); ty < Math.ceil(r1 / th); ty++) for (let tx = Math.floor(c0 / tw); tx < Math.ceil(c1 / tw); tx++) {
+        const t = ty * across + tx;
+        out.set(t, [...(out.get(t) ?? []), i]);
+      }
+    });
+    return out;
+  }
+  const layouts: [string, Placement, number, number, number, number][] = [
+    ["bottom-up, 288 px tiles straddling window rows", { col: -20, row: -30, width: 576, height: 576, bottomUp: true }, 288, 288, 500, 520],
+    ["top-down, partial last tiles", { col: 37, row: 11, width: 700, height: 650, bottomUp: false }, 320, 320, 900, 700],
+    ["real-like: 1024 px tiles, 2048 px AOI at an odd offset", { col: -1023, row: -517, width: 8192, height: 8192, bottomUp: true }, 1024, 1024, 2048, 2048],
+    ["COG inside one window", { col: 10, row: 10, width: 50, height: 40, bottomUp: false }, 32, 32, 300, 300],
+  ];
+
+  it.each(layouts)("%s: matches the last window that reads each tile", (_name, p, tw, th, w, h) => {
+    const last = tileLastWindow(p, tw, th, w, h);
+    const want = new Map([...readers(p, tw, th, w, h)].map(([t, ws]) => [t, Math.max(...ws)]));
+    expect(new Map([...last].sort((a, b) => a[0] - b[0]))).toEqual(new Map([...want].sort((a, b) => a[0] - b[0])));
+  });
+
+  const realLike: typeof layouts = [
+    ...layouts.slice(0, 3),
+    ["1024 px tiles, AOI on tile corners", { col: -2048, row: -1024, width: 8192, height: 8192, bottomUp: false }, 1024, 1024, 2048, 2048],
+    ["1024 px tiles, AOI past the COG's south-east corner", { col: -7000, row: -7500, width: 8192, height: 8192, bottomUp: true }, 1024, 1024, 2048, 2048],
+  ];
+  // the download's memory bound: per band and COG, at most (tile columns across the AOI + 2) tiles
+  it.each(realLike)("%s: tiles kept from first to last read never exceed the tile columns across plus 2", (_name, p, tw, th, w, h) => {
+    const uses = readers(p, tw, th, w, h);
+    const across = new Set([...uses.keys()].map((t) => t % Math.ceil(p.width / tw))).size;
+    let peak = 0;
+    for (let i = 0; i < tileWindows(w, h).length; i++) {
+      peak = Math.max(peak, [...uses.values()].filter((ws) => ws[0]! <= i && i <= ws[ws.length - 1]!).length);
+    }
+    expect(peak).toBeLessThanOrEqual(across + 2);
   });
 });

@@ -1,6 +1,7 @@
 import { AEF_NODATA_Q, AEF_RES, type Aoi } from "./aef";
 import { northUpAffine } from "./geotags";
 import type { Window } from "./grid";
+import { TILE_SIZE } from "./types";
 import type { Affine } from "./types";
 
 /** A COG in AOI pixels: north-up offset of its top-left corner, its size, and its row order. */
@@ -43,4 +44,27 @@ export function pasteBand(dst: Int8Array, dstWidth: number, src: Int8Array, o: O
     const at = (o.dy + (o.bottomUp ? o.h - 1 - i : i)) * dstWidth + o.dx;
     for (let j = 0; j < o.w; j++) if (dst[at + j] === AEF_NODATA_Q) dst[at + j] = src[i * o.w + j]!;
   }
+}
+
+/**
+ * For each file tile (index ty * tilesAcross + tx within one band) overlapping the AOI, the
+ * row-major index of the last AOI window that reads it; after that window its bytes can go.
+ */
+export function tileLastWindow(p: Placement, tileW: number, tileH: number, aoiW: number, aoiH: number, size = TILE_SIZE): Map<number, number> {
+  const across = Math.ceil(p.width / tileW), down = Math.ceil(p.height / tileH);
+  const windowsAcross = Math.ceil(aoiW / size);
+  const out = new Map<number, number>();
+  for (let ty = 0; ty < down; ty++) {
+    const f0 = ty * tileH, f1 = Math.min(f0 + tileH, p.height); // file rows
+    const n0 = p.bottomUp ? p.height - f1 : f0, n1 = p.bottomUp ? p.height - f0 : f1; // north-up rows
+    const r1 = Math.min(p.row + n1, aoiH);
+    if (r1 <= Math.max(p.row + n0, 0)) continue;
+    for (let tx = 0; tx < across; tx++) {
+      const c0 = Math.max(p.col + tx * tileW, 0), c1 = Math.min(p.col + Math.min((tx + 1) * tileW, p.width), aoiW);
+      if (c1 <= c0) continue;
+      // row-major order: the window holding the tile's last AOI row and column comes last
+      out.set(ty * across + tx, Math.floor((r1 - 1) / size) * windowsAcross + Math.floor((c1 - 1) / size));
+    }
+  }
+  return out;
 }
