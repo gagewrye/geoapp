@@ -19,18 +19,22 @@ class WrappingAdapter extends TerraDrawMapLibreGLAdapter<MapLibreMap> {
 
 /**
  * terra-draw ends a drag only on a pointerup over the canvas, so a release elsewhere (e.g. over
- * the panel) or a pointercancel (touch) leaves it dragging, and the drag guard never restores.
- * Capture routes off-canvas releases here; a cancelled feature drag gets a pointerup instead.
+ * the panel), a pointercancel (touch) or a lost mouseup (focus lost mid-drag) leaves it dragging,
+ * and the drag guard never restores. Capture routes off-canvas releases here; a cancelled drag,
+ * or a move that reports no button held, gets a pointerup instead.
  */
 function endDragsAnywhere(map: MapLibreMap) {
   const canvas = map.getCanvas();
-  canvas.addEventListener("pointerdown", (e) => { if (e.isPrimary) canvas.setPointerCapture(e.pointerId); });
-  canvas.addEventListener("pointercancel", (e) => {
-    // terra-draw disables map panning only while it drags a feature; otherwise a pointerup would be a click
+  // terra-draw disables map panning only while it drags a feature; otherwise a pointerup would be a click
+  const endFeatureDrag = (e: PointerEvent) => {
     if (!e.isPrimary || map.dragPan.isEnabled()) return;
     const { pointerId, pointerType, clientX, clientY } = e;
     canvas.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, isPrimary: true, pointerId, pointerType, clientX, clientY }));
-  });
+  };
+  canvas.addEventListener("pointerdown", (e) => { if (e.isPrimary) canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener("pointercancel", endFeatureDrag);
+  // window capture phase runs before terra-draw's canvas listener, so the button-up move edits nothing
+  window.addEventListener("pointermove", (e) => { if (e.buttons === 0) endFeatureDrag(e); }, { capture: true });
 }
 
 /** terra-draw with polygon drawing and select-mode editing, both behind one validation (ADR 0003). */
