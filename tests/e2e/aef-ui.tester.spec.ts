@@ -263,14 +263,16 @@ test.describe("opening an AlphaEarth file during a fetch (Scope: one set of Alph
     await expect(page.getByText(ATTRIBUTION)).toBeVisible();
   });
 
-  // FOLLOW-UP (tester F2): the spec is silent; today the download finishing later silently replaces the file the
-  // user opened after starting it. Marked as an expected failure so a fix shows up as a pass to update.
-  test("the file opened during a fetch is the data left loaded (the user's last action wins)", async ({ page }) => {
-    test.fail();
+  // Tester F2, resolved by F1: a file can't be opened during a fetch, so the download never silently replaces it.
+  test("the open control is disabled during a fetch: no file is opened, and the fetched data is what is left loaded", async ({ page }) => {
     const { log, gate } = await fileDuringFetch(page);
+    expect(await page.evaluate(() => (window as any).__geoapp.aef())).toBeNull();
     gate.release();
-    await quiet(page, log);
-    expect(await page.evaluate(() => (window as any).__geoapp.aef()?.aoi.width)).toBe(64);
+    const text = await quiet(page, log);
+    expect(text).toBe("Embeddings downloaded.");
+    expect(await page.evaluate(() => (window as any).__geoapp.aef()?.aoi.width)).not.toBe(64);
+    expect((await chipMismatches(page, REF)).mismatches).toBe(0);
+    await expect(page.locator("#open-aef")).toBeEnabled();
   });
 });
 
