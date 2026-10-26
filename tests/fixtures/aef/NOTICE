@@ -1,0 +1,7 @@
+AlphaEarth Foundations Satellite Embedding dataset, produced by Google and Google DeepMind,
+licensed under CC BY 4.0. COG headers and embeddings were read from the Source Cooperative copy
+(https://data.source.coop/tge-labs/aef/v1/annual/), which is not officially supported by Google.
+Labels: ESA WorldCover 10 m 2021 v200, CC BY 4.0 (DOI 10.5281/zenodo.7254221).
+(c) ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by
+ESA WorldCover consortium. WorldCover classes 10..100 were mapped to labels 1..11 (mangroves = 10).
+These are interim stand-in fixtures (ADR 0008), not mangrove-embed chips.

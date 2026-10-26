@@ -1,0 +1,23 @@
+{
+ "mangrove": 10,
+ "labels": [
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  8,
+  9,
+  10,
+  11
+ ],
+ "regions": {
+  "everglades": 1000
+ },
+ "bands": 64,
+ "mangrove_iou": 0.4569247546346783,
+ "accuracy": 0.419,
+ "model": "sklearn LogisticRegression(max_iter=3000) on dequantized Int8"
+}
