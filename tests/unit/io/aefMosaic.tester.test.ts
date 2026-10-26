@@ -80,13 +80,25 @@ describe("mosaic orientation and partial windows (tester, criterion 7)", () => {
     expect(await mismatch(aoi, memoryStore(), [b, a], fromPattern(aoi, cover))).toBeNull();
   });
 
-  // FOLLOW-UP (tester): a later COG's no-data (-128) overwrites an earlier COG's valid pixels,
-  // so a covered pixel turns NaN depending on index order. Flip to `it` once fixed.
-  it.fails("BUG: no data in an overlapping COG does not erase another COG's valid pixels", async () => {
+  // Tester found a later COG's no-data (-128) overwrote an earlier COG's valid pixels (F1).
+  it("no data in an overlapping COG does not erase another COG's valid pixels", async () => {
     const a = cog(OX, OY, 200, 200);
     const b = cog(OX + 1000, OY, 200, 200, { value: (bd, r, c) => (c < 100 ? -128 : pattern(bd, 100 + c, r)) }); // padded west half
     const aoi = aoiAt(OX, OY, 300, 200);
     expect(await mismatch(aoi, memoryStore(), [a, b], fromPattern(aoi, () => true))).toBeNull();
+  });
+
+  // Implementer (F1): where overlapping COGs disagree, valid beats -128, and among valid values
+  // the COG whose path sorts first wins, whatever the index order.
+  it("overlapping COGs with different valid values: the first path wins in either index order", async () => {
+    const other = (bd: number, r: number, c: number) => ((pattern(bd, 100 + c, r) + 128 + 50) % 255) - 127; // never -128
+    const z = cog(OX, OY, 200, 200, { value: (bd, r, c) => (c >= 150 ? -128 : pattern(bd, c, r)) }); // east quarter no data
+    const y = cog(OX + 1000, OY, 200, 200, { value: other });
+    z.entry.path = "2021/17N/z.tiff"; y.entry.path = "2021/17N/y.tiff"; // y sorts first
+    const aoi = aoiAt(OX, OY, 300, 200);
+    const want = (bd: number, r: number, c: number) => deq(c >= 100 ? other(bd, r, c - 100) : pattern(bd, c, r));
+    expect(await mismatch(aoi, memoryStore(), [z, y], want)).toBeNull();
+    expect(await mismatch(aoi, memoryStore(), [y, z], want)).toBeNull();
   });
 });
 

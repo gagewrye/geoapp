@@ -1,4 +1,4 @@
-import { AEF_RES, type Aoi } from "./aef";
+import { AEF_NODATA_Q, AEF_RES, type Aoi } from "./aef";
 import { northUpAffine } from "./geotags";
 import type { Window } from "./grid";
 import type { Affine } from "./types";
@@ -33,10 +33,14 @@ export function overlapWindow(p: Placement, win: Window): Overlap | null {
   return { src: [c0 - p.col, fr0, c1 - p.col, fr0 + (r1 - r0)], dx: c0 - win.x0, dy: r0 - win.y0, w: c1 - c0, h: r1 - r0, bottomUp: p.bottomUp };
 }
 
-/** Copy one band of a file window (row-major, file row order) into a window band, north-up. */
+/**
+ * Paste one band of a file window (row-major, file row order) into a window band, north-up,
+ * filling only pixels that are still no data: valid values are never overwritten, so the first
+ * COG pasted with a valid value wins and a COG's -128 never erases another's pixel.
+ */
 export function pasteBand(dst: Int8Array, dstWidth: number, src: Int8Array, o: Overlap): void {
   for (let i = 0; i < o.h; i++) {
-    const r = o.dy + (o.bottomUp ? o.h - 1 - i : i);
-    dst.set(src.subarray(i * o.w, (i + 1) * o.w), r * dstWidth + o.dx);
+    const at = (o.dy + (o.bottomUp ? o.h - 1 - i : i)) * dstWidth + o.dx;
+    for (let j = 0; j < o.w; j++) if (dst[at + j] === AEF_NODATA_Q) dst[at + j] = src[i * o.w + j]!;
   }
 }

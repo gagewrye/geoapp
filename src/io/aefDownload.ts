@@ -34,13 +34,16 @@ export async function downloadAoi(aoi: Aoi, year: number, store: CacheStore, opt
 /**
  * Open every COG, refuse any off the AOI grid, then fill the cache window by window in row-major
  * order. The requests depend only on the AOI and the entries. On failure the cache is discarded.
+ * Where COGs overlap, a valid value beats no data, and among valid values the COG whose path
+ * sorts first wins, so the result does not depend on index order.
  */
 export async function fetchEntries(aoi: Aoi, entries: AefEntry[], store: CacheStore, opts: Options = {}): Promise<RasterSource> {
   const fetchFn = opts.fetch ?? fetch;
   const base = opts.base ?? AEF_BASE;
   try {
     const cogs: { cog: RemoteCog; at: Placement }[] = [];
-    for (const e of entries) {
+    const byPath = [...entries].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+    for (const e of byPath) {
       const cog = await openRemoteCog(base + e.path, fetchFn, opts.blockSize);
       const { gt, width, height, bandCount, epsg } = cog.meta;
       const at = placeCog(aoi, gt, width, height);

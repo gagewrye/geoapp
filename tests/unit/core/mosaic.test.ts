@@ -57,4 +57,10 @@ describe("pasteBand", () => {
     pasteBand(down, 4, src, { src: [0, 0, 3, 2], dx: 0, dy: 2, w: 3, h: 2, bottomUp: false });
     expect(Array.from(down.subarray(8))).toEqual([1, 2, 3, -128, 4, 5, 6, -128]);
   });
+
+  it("fills only no-data pixels, so an earlier valid value stays and a source -128 never erases one", () => {
+    const dst = Int8Array.from([5, -128, -128, 7]); // 4 wide, 1 row
+    pasteBand(dst, 4, Int8Array.from([1, 2, -128, -128]), { src: [0, 0, 4, 1], dx: 0, dy: 0, w: 4, h: 1, bottomUp: false });
+    expect(Array.from(dst)).toEqual([5, 2, -128, 7]);
+  });
 });
