@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
-import { chip, chipCentre, drawArea, lonLatBox } from "./aef";
+import { chip, chipCentre, drawArea, drawSmallArea, lonLatBox } from "./aef";
 import { drawPolygon, jumpTo, message, openApp, openRaster, rgbFixture, snapshot, toScreen, type LngLat } from "./helpers";
 
 // Spec 002 criterion 3 in the UI, and the area rectangle kept apart from spec 001's labels.
@@ -22,6 +22,7 @@ test.describe("refused areas (criterion 3)", () => {
       await drawArea(page, c.box);
       await expect(message(page)).toHaveText(c.text);
       await expect(page.locator("#aef-fetch")).toBeDisabled();
+      expect(await areas(page), "the refused outline is removed").toBe(0);
     });
   }
 
@@ -42,8 +43,8 @@ test("the area is one rectangle, never a labelled polygon", async ({ page }) => 
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
-  await drawArea(page, [12, 44, 14, 47]);
-  await drawArea(page, [14, 44, 16, 47]); // replaces the first
+  await drawSmallArea(page, [13, 45.5]);
+  await drawSmallArea(page, [15, 45.5]); // replaces the first
   expect(await areas(page)).toBe(1);
   await drawPolygon(page, await rect(page, [11, 43, 13, 46]), "left");
   await drawPolygon(page, await rect(page, [17, 43, 19, 46]), "right");
@@ -53,7 +54,7 @@ test("the area is one rectangle, never a labelled polygon", async ({ page }) => 
   await expect(message(page)).toHaveText(/^Trained on \d+ pixels, 2 classes\.$/);
   // select mode edits polygons only: clicking the area's edge selects nothing
   await page.click("#mode-select");
-  const edge = await toScreen(page, [15, 47]);
+  const edge = await toScreen(page, [15, 45.51]);
   await page.mouse.click(edge.x, edge.y);
   expect(await page.evaluate(() => (window as any).__geoapp.draw.getSnapshot().some((f: any) => f.properties.selected))).toBe(false);
 });

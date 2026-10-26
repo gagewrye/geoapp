@@ -4,7 +4,7 @@
 
 **Status:** Approved (Gage, 2026-10-26). **ADRs (Accepted):** 0005 AlphaEarth COGs from Source Cooperative + local AOI cache, 0006 static per-zone index, 0007 Python fixture script, 0008 interim fixtures from public data. Related: 0011, see spec 005.
 
-**Build status (2026-10-26):** Built and tested on this branch: criteria 1–17, including the per-band Cache rule, the UI (criteria 3, 8, 11–14 in e2e) and the decoded-tile cache. After tester review: one fetch or file open runs at a time, with Fetch and "Open AlphaEarth file" disabled while it runs, and the OPFS cache refuses a second live store on its folder.
+**Build status (2026-10-26):** Built and tested on this branch: criteria 1–17, including the per-band Cache rule, the UI (criteria 3, 8, 11–14 in e2e) and the decoded-tile cache. After tester review: one fetch or file open runs at a time, with Fetch and "Open AlphaEarth file" disabled while it runs, and the OPFS cache refuses a second live store on its folder. A refused area is removed from the map, and the earlier area, if any, stays the area.
 
 **Decided (Gage, 2026-10-26):**
 - Simple regression models only.

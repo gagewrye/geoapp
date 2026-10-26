@@ -10,7 +10,7 @@ Classify a local GeoTIFF in your browser. Draw labelled polygons, train a logist
 5. **Save model** or **Load model** as JSON. A loaded model must match the open raster's bands.
 
 **AlphaEarth embeddings** (view only for now: training on them comes in a later version):
-- **Draw area**, then click two opposite corners. The area must lie in one UTM zone and hemisphere and be at most 20 km (2048 px at 10 m) on a side. Pick a **Year** and click **Fetch embeddings**. The 64-band embeddings stream from Source Cooperative's copy of the dataset into your browser's private storage (OPFS, about 256 MiB at the largest area), and a false-colour preview appears below any local imagery.
+- **Draw area**, then click two opposite corners. The area must lie in one UTM zone and hemisphere and be at most 20 km (2048 px at 10 m) on a side. An area that isn't is removed, and the earlier area stays. Pick a **Year** and click **Fetch embeddings**. The 64-band embeddings stream from Source Cooperative's copy of the dataset into your browser's private storage (OPFS, about 256 MiB at the largest area), and a false-colour preview appears below any local imagery.
 - Or **Open AlphaEarth file**: a local AlphaEarth COG (64 Int8 bands, nodata -128) of any size, read with no network request.
 - **AlphaEarth preview** shows or hides it, and the dataset's attribution (CC BY 4.0) shows while it is loaded. Only one set of AlphaEarth data is loaded at a time, and one fetch or file open runs at a time: both controls are disabled until it ends. AlphaEarth data is never labelled: Train and Classify use local imagery only, so they are disabled while AlphaEarth is in use and no GeoTIFF is open.
 

@@ -101,3 +101,15 @@ export function cacheFiles(page: Page): Promise<Record<string, number> | null> {
 }
 
 export const ATTRIBUTION = "The AlphaEarth Foundations Satellite Embedding dataset is produced by Google and Google DeepMind.";
+
+/**
+ * Draw an accepted area (about 1.6 x 2.2 km) centred on `c`, zoomed in so it can be drawn, then
+ * return to the earlier view: refused areas are removed (tester F3), so tests that just need an area draw this.
+ */
+export async function drawSmallArea(page: Page, c: LngLat): Promise<void> {
+  const view = await page.evaluate(() => { const { map } = (window as any).__geoapp; const p = map.getCenter(); return { center: [p.lng, p.lat] as LngLat, zoom: map.getZoom() as number }; });
+  await jumpTo(page, c, 12);
+  await drawArea(page, [c[0] - 0.01, c[1] - 0.01, c[0] + 0.01, c[1] + 0.01]);
+  await expect(page.locator("#aef-info")).toHaveText(/^Area: /);
+  await jumpTo(page, view.center, view.zoom);
+}

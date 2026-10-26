@@ -125,25 +125,25 @@ export function initAef({ map, draw, previewMaxSide, say, run, onState }: Deps) 
     /** The loaded AlphaEarth data, or null. */
     current: (): { aoi: Aoi; source: RasterSource } | null => (data ? { aoi: data.aoi, source: data.source } : null),
     state: () => state,
-    /** A rectangle finished: it becomes the one area, if aoiGrid accepts it. */
+    /** A rectangle finished: it replaces the area if aoiGrid accepts it; otherwise it is removed and the area kept. */
     areaDrawn(id: string | number): void {
       const d = draw();
       if (!d) return;
-      const old = d.getSnapshot().filter((f) => f.properties.mode === "rectangle" && f.id !== id).map((f) => f.id!);
-      if (old.length) d.removeFeatures(old);
       const f = d.getSnapshotFeature(id);
       if (f?.geometry.type !== "Polygon") return;
       const g = aoiGrid(f.geometry.coordinates[0]!.map(([lon, lat]) => [normalizeLon(lon!), lat!] as [number, number]));
       if (g === "zones" || g === "size") {
-        area = undefined;
-        info.textContent = "";
+        d.removeFeatures([id]); // the outline on the map is always the area
         say(MESSAGES[g]);
-      } else {
-        area = g;
-        info.textContent = `Area: ${g.width} x ${g.height} px, EPSG:${g.epsg}`;
-        if (refused) say("");
+        refused = true;
+        return;
       }
-      refused = !area;
+      const old = d.getSnapshot().filter((o) => o.properties.mode === "rectangle" && o.id !== id).map((o) => o.id!);
+      if (old.length) d.removeFeatures(old);
+      area = g;
+      info.textContent = `Area: ${g.width} x ${g.height} px, EPSG:${g.epsg}`;
+      if (refused) say("");
+      refused = false;
       setState(state);
     },
   };
