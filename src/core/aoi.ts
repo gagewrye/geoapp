@@ -44,3 +44,8 @@ export function selectEntries(index: AefEntry[], aoi: Aoi, year: number): AefEnt
   return index.filter((e) => e.year === year && e.epsg === aoi.epsg
     && Math.max(e.x0, ax0) < Math.min(e.x1, ax1) && Math.max(e.y0, ay0) < Math.min(e.y1, ay1));
 }
+
+/** Whether two AOIs are the same grid: CRS, geotransform and size. */
+export function sameAoi(a: Aoi, b: Aoi): boolean {
+  return a.epsg === b.epsg && a.width === b.width && a.height === b.height && a.gt.every((v, i) => v === b.gt[i]);
+}

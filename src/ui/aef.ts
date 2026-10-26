@@ -1,7 +1,7 @@
 import type { Map as MapLibreMap } from "maplibre-gl";
 import type { TerraDraw } from "terra-draw";
 import type { Aoi } from "../core/aef";
-import { aoiGrid } from "../core/aoi";
+import { aoiGrid, sameAoi } from "../core/aoi";
 import { normalizeLon } from "../core/ring";
 import { opfsStore, type CacheStore } from "../io/aefCache";
 import { downloadAoi } from "../io/aefDownload";
@@ -35,12 +35,17 @@ export function initAef({ map, draw, previewMaxSide, say, run, onState }: Deps) 
   let refused = false; // the last area drawn was refused, so its message is showing
   let noIndex = false; // years.json failed or listed no years: nothing can be fetched
   let data: Loaded | undefined;
+  let fetching: Aoi | undefined; // the area a running fetch is for
   let state: AefState = "none";
   // the only place the AlphaEarth controls are enabled: while busy, nothing else can start (one operation at a time)
   const setState = (s: AefState) => {
     state = s;
     fetchBtn.disabled = !area || !year.value || s === "busy";
     openAef.disabled = s === "busy";
+    // a new area replaces nothing until fetched, so say so while other data is loaded or loading
+    const other = data?.aoi ?? fetching;
+    info.textContent = !area ? "" : `Area: ${area.width} x ${area.height} px, EPSG:${area.epsg}`
+      + (other && !sameAoi(other, area) ? " (not fetched yet; the loaded data is another area)" : "");
     onState(s);
   };
 
@@ -79,6 +84,7 @@ export function initAef({ map, draw, previewMaxSide, say, run, onState }: Deps) 
   fetchBtn.addEventListener("click", () => {
     if (state === "busy" || !area || !year.value) return;
     const aoi = area, y = Number(year.value);
+    fetching = aoi;
     setState("busy"); // before any await, so a second click finds Fetch disabled
     return run(async () => {
       let store: CacheStore | undefined;
@@ -89,9 +95,11 @@ export function initAef({ map, draw, previewMaxSide, say, run, onState }: Deps) 
         await show({ aoi, source: await downloadAoi(aoi, y, store), store }, false);
       } catch (e) {
         await store?.discard().catch(() => {}); // downloadAoi discards a partial cache; this covers the rest
+        fetching = undefined;
         setState("failed");
         throw e;
       }
+      fetching = undefined; // show() made the fetched data the loaded data
       say("Embeddings downloaded.");
     });
   });
@@ -143,7 +151,6 @@ export function initAef({ map, draw, previewMaxSide, say, run, onState }: Deps) 
       const old = d.getSnapshot().filter((o) => o.properties.mode === "rectangle" && o.id !== id).map((o) => o.id!);
       if (old.length) d.removeFeatures(old);
       area = g;
-      info.textContent = `Area: ${g.width} x ${g.height} px, EPSG:${g.epsg}`;
       if (noIndex) say(MESSAGES.aefIndex); // the reason Fetch stays disabled for this area
       else if (refused) say("");
       refused = false;

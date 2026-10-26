@@ -129,3 +129,17 @@ test("one AlphaEarth operation at a time: a double-clicked first Fetch runs one 
   const asked = cogRequests(log).map((r) => `${r.url()} ${r.headers().range ?? ""}`);
   expect(new Set(asked).size, "each COG range requested once").toBe(asked.length);
 });
+
+test("after a fetch, a newly drawn area says it isn't fetched yet until Fetch is clicked (tester F7)", async ({ page }) => {
+  await serveAef(page);
+  await openApp(page);
+  await fetchChip(page);
+  await expect(message(page)).toHaveText("Embeddings downloaded.");
+  await expect(page.locator("#aef-info")).toHaveText(/^Area: \d+ x \d+ px, EPSG:32617$/);
+  await jumpTo(page, chipCentre, 13);
+  await drawArea(page, lonLatBox(chip.epsg, chipBox, 200));
+  await expect(page.locator("#aef-info")).toHaveText(/^Area: \d+ x \d+ px, EPSG:32617 \(not fetched yet; the loaded data is another area\)$/);
+  await page.click("#aef-fetch");
+  await expect(message(page)).toHaveText("Embeddings downloaded.");
+  await expect(page.locator("#aef-info")).toHaveText(/^Area: \d+ x \d+ px, EPSG:32617$/);
+});

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aoiGrid, selectEntries, utmEpsg } from "../../../src/core/aoi";
+import { aoiGrid, sameAoi, selectEntries, utmEpsg } from "../../../src/core/aoi";
 import { fromLonLat, toLonLat } from "../../../src/core/crs";
 import type { AefEntry, Aoi } from "../../../src/core/aef";
 
@@ -92,4 +92,13 @@ describe("aoiGrid input (F6)", () => {
   ] as [string, [number, number][]][])("throws on %s instead of reporting zones", (_name, ring) => {
     expect(() => aoiGrid(ring)).toThrow("aoiGrid needs a ring of finite lon/lat vertices");
   });
+});
+
+describe("sameAoi (tester F7)", () => {
+  const a: Aoi = { epsg: 32617, gt: [500000, 10, 0, 2800000, 0, -10], width: 128, height: 64 };
+  it("is true for an equal grid, even as another object", () => expect(sameAoi(a, { ...a, gt: [...a.gt] })).toBe(true));
+  it.each([
+    ["epsg", { ...a, epsg: 32616 }], ["width", { ...a, width: 129 }], ["height", { ...a, height: 63 }],
+    ["origin", { ...a, gt: [500010, 10, 0, 2800000, 0, -10] as Aoi["gt"] }],
+  ])("is false for another %s", (_n, b) => expect(sameAoi(a, b)).toBe(false));
 });
