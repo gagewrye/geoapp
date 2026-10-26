@@ -29,13 +29,13 @@ export async function openRaster(source: RasterSource): Promise<void> {
   if (crossesAntimeridian(epsg, gt, width, height)) throw new RasterRefusedError("antimeridian", "Raster extent crosses 180 degrees");
 }
 
-/** Decimate window by window, then warp to a Mercator-aligned RGBA preview. */
-export async function buildPreview(source: RasterSource, maxSide: number) {
+/** Decimate window by window, then warp to a Mercator-aligned RGBA preview (stretch: see warpPreview). */
+export async function buildPreview(source: RasterSource, maxSide: number, stretch?: [number, number]) {
   const { width, height, bandCount, gt, epsg, nodata } = source.meta;
   const f = decimationFactor(width, height, maxSide);
   const dec = decimatedTile(width, height, f, bandCount >= 3 ? 3 : 1, nodata);
   for (const w of tileWindows(width, height)) decimateInto(dec, await source.readWindow(w.x0, w.y0, w.width, w.height), f, width, height);
-  return warpPreview(dec, decimatedAffine(gt, f), epsg, maxSide);
+  return warpPreview(dec, decimatedAffine(gt, f), epsg, maxSide, stretch);
 }
 
 type Feature = GeoJSON.Feature<GeoJSON.Polygon, { label: number }>;
