@@ -2,7 +2,8 @@ import { expect, test } from "@playwright/test";
 import { MAX_LAT } from "../../src/core/types";
 import { MESSAGES } from "../../src/ui/messages";
 import {
-  clickAt, collectErrors, jumpTo, lerp, message, openApp, polarSetup, polarVertex, rawPointer, rings, setMode, snapshot, toScreen, toucher,
+  clickAt, collectErrors, drawPolygon, jumpTo, lerp, message, openApp, openRaster, polarSetup, polarVertex, rawPointer, rgbFixture, rings,
+  setMode, snapshot, toScreen, toucher, type LngLat,
 } from "./helpers";
 
 // Tester: the block message is cleared only by a later unblocked finish (src/ui/main.ts `blocked`
@@ -26,6 +27,21 @@ test("draw mode: a block from hovering alone (provisional update) shows the mess
   expect(s[0].geometry.coordinates[0]).toHaveLength(4); // three clicked vertices, closed; nothing from the hover
   for (const [, lat] of s[0].geometry.coordinates[0]) expect(Math.abs(lat)).toBeLessThan(MAX_LAT);
   await expect(message(page)).toHaveText("");
+  expect(errors).toEqual([]);
+});
+
+test("an unblocked finish leaves a non-block message alone", async ({ page }) => {
+  const errors = collectErrors(page);
+  const rect = ([w, s, e, n]: number[]) => Promise.all(([[w, n], [e, n], [e, s], [w, s]] as LngLat[]).map((p) => toScreen(page, p)));
+  await openApp(page);
+  await openRaster(page, rgbFixture());
+  await expect(message(page)).toHaveText("Raster opened.");
+  await drawPolygon(page, await rect([11, 43, 13, 46]), "left");
+  await page.click("#train");
+  await expect(message(page)).toHaveText("Draw polygons for at least two classes.");
+  await drawPolygon(page, await rect([17, 43, 19, 46]), "right");
+  expect(await snapshot(page)).toHaveLength(2);
+  await expect(message(page)).toHaveText("Draw polygons for at least two classes.");
   expect(errors).toEqual([]);
 });
 

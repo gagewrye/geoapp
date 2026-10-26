@@ -31,7 +31,7 @@ map.on("load", () => {
   draw = createDraw(map, (reason) => { blocked = true; say(MESSAGES[reason]); });
   const d = draw;
   d.on("finish", (id, ctx) => {
-    if (!blocked) say("");
+    if (!blocked && (message.textContent === MESSAGES.antimeridian || message.textContent === MESSAGES.latitude)) say("");
     if (ctx.mode === "polygon" && ctx.action === "draw") d.updateFeatureProperties(id, { className: $<HTMLInputElement>("class-name").value.trim() });
     renderPolygonList($("polygons"), d);
   });
