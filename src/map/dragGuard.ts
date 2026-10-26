@@ -32,7 +32,9 @@ export function guardDrags(map: MapLibreMap, getDraw: () => TerraDraw | undefine
   const screen = (p: Pt): Pt => { const { x, y } = map.project(p); return [x, y]; };
 
   // Capture phase on the container runs before terra-draw's canvas listener, so this is pre-edit.
+  // Like terra-draw, only the primary pointer counts: a second finger must not restart the session.
   map.getCanvasContainer().addEventListener("pointerdown", (e) => {
+    if (!e.isPrimary) return;
     const draw = getDraw();
     session = null;
     if (!draw || draw.getMode() !== "select") return;
@@ -50,6 +52,7 @@ export function guardDrags(map: MapLibreMap, getDraw: () => TerraDraw | undefine
   }, { capture: true });
 
   window.addEventListener("pointermove", (e) => {
+    if (!e.isPrimary) return;
     const drag = session?.bodyDrag;
     if (!session || !drag || session.blocked || map.dragPan.isEnabled()) return; // not dragging the body
     if (translatedPastAntimeridian(drag.ring, map.unproject(local(e)).lng - drag.startLon)) {
@@ -59,7 +62,8 @@ export function guardDrags(map: MapLibreMap, getDraw: () => TerraDraw | undefine
   });
 
   // Bubbling on window runs after terra-draw has finished the drag on the canvas.
-  window.addEventListener("pointerup", () => {
+  window.addEventListener("pointerup", (e) => {
+    if (!e.isPrimary) return;
     const s = session;
     session = null;
     const draw = getDraw();
