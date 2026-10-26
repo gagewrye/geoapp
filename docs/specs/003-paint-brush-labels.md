@@ -2,20 +2,20 @@
 
 **Goal:** Label a local GeoTIFF by painting classes onto its pixel grid with a resizable brush, and train spec 001's logistic regression on the painted pixels.
 
-**Status:** Approved (Gage, 2026-10-26). **ADRs (Accepted):** 0009, the brush is the only labelling tool; 0010, sparse label tiles. Build order: after spec 002, before spec 004, which trains on AlphaEarth from these labels.
+**Status:** Approved (Gage, 2026-10-26). **ADRs (Accepted):** 0009, the brush is the only labelling tool; 0010, sparse label tiles. Build order: after spec 002, before spec 004 (label seeding and label GeoTIFF export) and spec 005, which trains on AlphaEarth from these labels.
 
 **Decided (Gage, 2026-10-26):**
 - The brush replaces polygon drawing, and polygon labelling and its code are deleted everywhere, not hidden behind a flag.
 - Only local or uploaded imagery is labelled. AlphaEarth is never hand-labelled, and AlphaEarth files are refused in "Open raster".
 - Erase clears only the selected class.
-- Saving and loading labels is deferred; labels last for the session.
+- Saving and loading labels is deferred; labels last for the session. Spec 004 (proposed) fills this with "Export labels" and "Import labels" (ADR 0013); this spec still keeps labels in memory only.
 - A square brush, sizes 1-127, default 7. Touch doesn't paint.
 - At most 256 label tiles (16 MiB), held in memory.
 - No undo and no deleting classes in v1.
 
 ## Scope
 In: a brush with a hover preview; left button paints, right button erases; size controls; Paint and Pan modes; a class list (add, rename, recolour, select); labels stored as sparse tiles on the raster grid and shown on the map; training on the raster's own bands; removing polygon labelling.
-Out: saving and loading labels (deferred); labelling AlphaEarth; training on AlphaEarth (spec 004); undo; flood fill; disc brushes; deleting classes; painting by touch; label GeoTIFF export; showing the classified result.
+Out: saving and loading labels, and label GeoTIFF export (spec 004); labelling AlphaEarth; training on AlphaEarth (spec 005); undo; flood fill; disc brushes; deleting classes; painting by touch; showing the classified result.
 
 ## Interfaces (`core/`)
 ```ts
@@ -44,7 +44,7 @@ paintOverlay(index: Int32Array, labels: Uint8Array, colours: string[], rgba: Uin
 - **Brush.** The brush is a square measured in raster pixels at every zoom, so a stroke labels the same pixels at any zoom, and zooming out doesn't make one dab cover thousands of pixels. "−"/"+" and `[`/`]` step through `BRUSH_SIZES` and stop at either end. The panel shows "Brush: 7 px". Keys `1`-`9` select the first nine classes. Shortcuts are ignored while focus is in a text field.
 - **Storage.** Labels live on the full-resolution source grid, never on the preview, and only in memory for the session. A tile is created on its first paint and deleted when its last label is erased. Painting reads no raster window. When `brush` returns `"full"`, nothing changes and ui shows "Label limit reached (256 tiles of 256 x 256 px). Erase elsewhere first." This caps the labelled area, not the training samples. The e2e hook `__geoapp.labels` exposes `{ store, classes }`.
 - **Display.** Each stored tile gets its own canvas source, built with `overlayIndex(w, grid, TILE_SIZE)` and `paintOverlay` and drawn with nearest resampling and `raster-opacity` 0.6. The index is built once per tile. Layers from bottom to top: spec 002's AlphaEarth preview, the imagery preview, label overlays, hover. A colour change repaints every overlay.
-- **Classes.** The list starts as "Class 1" and "Class 2", with Class 1 selected. Colours cycle through a fixed 10-colour palette. Users can add classes (Add is disabled at 255), rename, recolour and select. A name that is empty or duplicated is refused with "Class names must be unique and not empty." and the old name stays. `model.classes` holds the names in list order. `Model` is spec 001's; spec 004 adds optional tags.
+- **Classes.** The list starts as "Class 1" and "Class 2", with Class 1 selected. Colours cycle through a fixed 10-colour palette. Users can add classes (Add is disabled at 255), rename, recolour and select. A name that is empty or duplicated is refused with "Class names must be unique and not empty." and the old name stays. `model.classes` holds the names in list order. `Model` is spec 001's; spec 005 adds optional tags.
 - **Training.** Training needs painted pixels in at least two classes, otherwise ui shows "Paint at least two classes." It reads each window of `labelWindows(store)` once, applies `labelSamples` on all bands, and fits every class in the list. If every painted pixel is nodata, ui shows "No training samples: every painted pixel is nodata."
 - **180° and MAX_LAT.** No guard is needed, because painting edits clipped pixels and creates no geometry. `pixelAt` normalizes longitude, so every world copy hits the same pixel. Rings and overlay corners use `toLonLat`, as the preview does. Pixels beyond ±`MAX_LAT` can be labelled by an overhanging footprint. They train normally but aren't drawn.
 - **Polygons removed.** Delete `checkRing`, `toPixelPolygons`, `samplePixels`, `PixelPolygon`, terra-draw's polygon and select modes, and their UI and tests. Rewrite README's polygon steps and limits for the brush. Spec 001 criteria that still hold: 1, 4, 6, 7, 9-11 and 16, plus criterion 8's 256x256 and sink-write limits and criterion 12's globe checks. Superseded criteria: 2 (by 10 and 14 here), 3 (by 1), 5 (by 5), criterion 8's bounding-box part (by 8) and criterion 12's polygon check (by 9). Criteria 13-15 are removed.
