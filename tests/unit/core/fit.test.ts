@@ -52,4 +52,10 @@ describe("fit (criterion 6)", () => {
     expect(() => fit(new Float32Array(0), new Uint8Array(0), [1], ["a", "b"])).toThrow(/sample/);
     expect(() => fit(new Float32Array([1, 2]), new Uint8Array([0, 2]), [1], ["a", "b"])).toThrow(/label/);
   });
+  it("rejects fewer than 2 or more than 255 classes", () => {
+    const cls = (n: number) => Array.from({ length: n }, (_, i) => `c${i}`);
+    expect(() => fit(new Float32Array([1]), new Uint8Array([0]), [1], cls(1))).toThrow(/2\.\.255 classes/);
+    expect(() => fit(new Float32Array([1, 2]), new Uint8Array([0, 1]), [1], cls(256))).toThrow(/2\.\.255 classes/);
+    expect(() => fit(new Float32Array([1, 2]), new Uint8Array([0, 1]), [1], cls(255), { epochs: 1 })).not.toThrow();
+  });
 });
