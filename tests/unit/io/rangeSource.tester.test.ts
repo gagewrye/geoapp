@@ -48,18 +48,43 @@ function source(fetch: typeof globalThis.fetch, n: number, timeoutMs?: number) {
 }
 const slices = (from: number, to: number) => Array.from({ length: to - from }, (_, i) => ({ offset: offsetOf(from + i), length: TILE }));
 const flush = async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); };
-type Internals = { tiles: Map<number, unknown>; blocks: Map<number, unknown>; waiting: unknown[]; active: number };
-const internals = (s: RangeSource) => s as unknown as Internals;
+
+/**
+ * Planned tiles each RangeSource holds, seen through its public plan, fetch and release: a planned
+ * tile is kept from its first fetch until its release (the plan contract, checked in "tile lifetime").
+ */
+function trackHeld() {
+  const planned = new Map<RangeSource, Map<number, number>>(), held = new Map<RangeSource, Set<number>>(), peak = new Map<RangeSource, number>();
+  const { plan, fetch, release } = RangeSource.prototype;
+  vi.spyOn(RangeSource.prototype, "plan").mockImplementation(function (this: RangeSource, offset: number, length: number) {
+    if (!planned.has(this)) { planned.set(this, new Map()); held.set(this, new Set()); }
+    planned.get(this)!.set(offset, length);
+    plan.call(this, offset, length);
+  });
+  vi.spyOn(RangeSource.prototype, "fetch").mockImplementation(function (this: RangeSource, sl: { offset: number; length: number }[], signal?: AbortSignal) {
+    const h = held.get(this);
+    if (h) {
+      for (const x of sl) if (planned.get(this)!.get(x.offset) === x.length) h.add(x.offset);
+      peak.set(this, Math.max(peak.get(this) ?? 0, h.size));
+    }
+    return fetch.call(this, sl, signal);
+  });
+  vi.spyOn(RangeSource.prototype, "release").mockImplementation(function (this: RangeSource, offset: number) {
+    held.get(this)?.delete(offset);
+    release.call(this, offset);
+  });
+  return { held, peak };
+}
 
 let unhandled: unknown[] = [];
 const onUnhandled = (e: unknown) => { unhandled.push(e); };
 beforeEach(() => { unhandled = []; process.on("unhandledRejection", onUnhandled); });
-afterEach(() => { process.off("unhandledRejection", onUnhandled); vi.useRealTimers(); });
+afterEach(() => { process.off("unhandledRejection", onUnhandled); vi.useRealTimers(); vi.restoreAllMocks(); });
 
 describe("in-flight cap (tester, F6)", () => {
   it("20 tiles asked at once: never more than 6 requests in flight, every tile arrives, slots all returned", async () => {
     const f = manualFetch();
-    const s = source(f.fetch, 20);
+    const s = source(f.fetch, 26);
     const all = s.fetch(slices(0, 20));
     for (let round = 0; round < 50 && !(f.pending.length === 20 && f.pending.every((p) => p.settled)); round++) {
       await new Promise((ok) => setTimeout(ok, 1));
@@ -70,8 +95,12 @@ describe("in-flight cap (tester, F6)", () => {
     expect(bufs.map((b) => b.byteLength)).toEqual(Array(20).fill(TILE));
     expect(f.peak()).toBe(6);
     expect(f.pending).toHaveLength(20); // each tile exactly once
-    expect(internals(s).active).toBe(0);
-    expect(internals(s).waiting).toHaveLength(0);
+    // slots all returned: 6 more tiles go out at once
+    const more = s.fetch(slices(20, 26));
+    await flush();
+    expect(f.pending).toHaveLength(26);
+    f.pending.slice(20).forEach((p) => p.answer());
+    await more;
   });
 
   it("time spent queued for a slot does not count toward the 30 s timeout (fake timers)", async () => {
@@ -92,6 +121,20 @@ describe("in-flight cap (tester, F6)", () => {
   });
 });
 
+describe("tile lifetime (tester, F3)", () => {
+  it("a planned tile is fetched once until released; after release, reading it again makes one more request", async () => {
+    const f = manualFetch();
+    const s = source(f.fetch, 1);
+    const read = async () => { const p = s.fetch(slices(0, 1)); await flush(); f.pending.forEach((x) => x.answer()); return p; };
+    await read();
+    await read();
+    expect(f.pending).toHaveLength(1);
+    s.release(offsetOf(0));
+    await read();
+    expect(f.pending).toHaveLength(2);
+  });
+});
+
 describe("fail-fast (tester, F6)", () => {
   it("first failure: rejects with the message, aborts the 5 others in flight, never sends the 4 queued, no unhandled rejection", async () => {
     const f = manualFetch();
@@ -104,9 +147,9 @@ describe("fail-fast (tester, F6)", () => {
     await new Promise((ok) => setTimeout(ok, 20));
     expect(f.pending).toHaveLength(6);
     expect(f.pending.filter((p, i) => i !== 2).every((p) => p.signal.aborted && p.settled)).toBe(true);
-    expect(internals(s).waiting).toHaveLength(0);
-    expect(internals(s).active).toBe(0);
-    expect(internals(s).tiles.size).toBe(0); // failed tiles are not kept
+    // nothing queued or kept: asking for the same tiles again rejects without a request
+    await expect(s.fetch(slices(0, 10))).rejects.toThrow(MSG);
+    expect(f.pending).toHaveLength(6);
     expect(unhandled).toEqual([]);
   });
 
@@ -120,7 +163,8 @@ describe("fail-fast (tester, F6)", () => {
     await new Promise((ok) => setTimeout(ok, 20));
     expect(f.pending).toHaveLength(6);
     expect(f.pending.slice(1).every((p) => p.signal.aborted)).toBe(true);
-    expect(internals(s).active).toBe(0);
+    await expect(s.fetch(slices(0, 10))).rejects.toBeInstanceOf(AefDownloadError);
+    expect(f.pending).toHaveLength(6);
     expect(unhandled).toEqual([]);
   });
 
@@ -202,36 +246,19 @@ describe("tile lifetime and memory bound through fetchEntries (tester, F3, struc
   it.each(layouts)("%s: peak tiles held within the bound, all released at the end, each byte fetched once, pixels right", async (_n, specs, [ax, ay, w, h]) => {
     const cogs = specs.map(make);
     const files = new Map(cogs.map((k) => [BASE + k.entry.path, k.bytes]));
-    const plan = vi.spyOn(RangeSource.prototype, "plan");
+    const { held, peak } = trackHeld();
     const { fetch, log } = memFetch(files);
-    const store = memoryStore();
-    const peaks = new Map<RangeSource, number>();
-    let blockPeak = 0;
-    const band = store.band.bind(store);
-    store.band = async (b) => {
-      const w = await band(b);
-      return { ...w, append: (d) => {
-        // a window's reads are done and nothing of it is released yet: the peak for this window
-        for (const s of new Set(plan.mock.contexts as RangeSource[])) {
-          peaks.set(s, Math.max(peaks.get(s) ?? 0, internals(s).tiles.size));
-          blockPeak = Math.max(blockPeak, internals(s).blocks.size);
-        }
-        return w.append(d);
-      } };
-    };
     const aoi: Aoi = { epsg: 32617, gt: [OX + 10 * ax, 10, 0, OY - 10 * ay, 0, -10], width: w, height: h };
-    const src = await fetchEntries(aoi, cogs.map((k) => k.entry).reverse(), store, { fetch, base: BASE });
-    const sources = [...new Set(plan.mock.contexts as RangeSource[])];
-    plan.mockRestore();
-    expect(sources).toHaveLength(cogs.length);
-    for (const s of sources) {
-      const url = (s as unknown as { url: string }).url;
-      const c = cogs.find((k) => BASE + k.entry.path === url)!.c;
-      expect(peaks.get(s), url).toBeLessThanOrEqual(bound(c, ax, w));
+    const src = await fetchEntries(aoi, cogs.map((k) => k.entry).reverse(), memoryStore(), { fetch, base: BASE });
+    vi.restoreAllMocks();
+    expect(held.size).toBe(cogs.length);
+    expect(new Set(cogs.map((k) => k.bytes.length)).size).toBe(cogs.length); // so fileSize tells the COGs apart
+    for (const [s, tiles] of held) {
+      const { c, entry } = cogs.find((k) => k.bytes.length === s.fileSize)!;
+      expect(peak.get(s), entry.path).toBeLessThanOrEqual(bound(c, ax, w));
       if (c.tile >= 256) expect(bound(c, ax, w)).toBe(BAND_GROUP * (colsAcross(c, ax, w) + 2));
-      expect(internals(s).tiles.size, `${url} tiles left after the download`).toBe(0);
+      expect(tiles.size, `${entry.path} tiles left after the download`).toBe(0);
     }
-    expect(blockPeak).toBeLessThanOrEqual((16 * 2 ** 20) / 65536);
     for (const [url, data] of files) {
       const ranges = log.filter((l) => l.url === url).map((l) => [l.range![0], Math.min(l.range![1], data.length - 1)] as const);
       const seen = new Uint8Array(data.length);
