@@ -1,15 +1,7 @@
-import { expect, test, type Page } from "@playwright/test";
-import { checkRing, normalizeLon } from "../../src/core/ring";
+import { expect, test } from "@playwright/test";
+import { normalizeLon } from "../../src/core/ring";
 import { MESSAGES } from "../../src/ui/messages";
-import { clickAt, dragFromTo, drawPolygon, jumpTo, message, openApp, renderedPolygons, setMode, snapshot, toScreen } from "./helpers";
-
-const valid = (ring: [number, number][]) => checkRing(ring.map(([x, y]) => [normalizeLon(x), y])) === null;
-
-/** Nothing invalid is stored or rendered. */
-async function expectNothingInvalid(page: Page) {
-  for (const f of await snapshot(page)) expect(valid(f.geometry.coordinates[0]), JSON.stringify(f.geometry)).toBe(true);
-  for (const f of await renderedPolygons(page)) for (const ring of f.coordinates) expect(valid(ring), JSON.stringify(ring)).toBe(true);
-}
+import { clickAt, dragFromTo, drawPolygon, expectNothingInvalid, jumpTo, message, openApp, renderedPolygons, setMode, snapshot, toScreen } from "./helpers";
 
 for (const zoom of [3, 14]) {
   test.describe(`antimeridian at zoom ${zoom} (criterion 14)`, () => {

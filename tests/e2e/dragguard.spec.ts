@@ -1,21 +1,17 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MAX_LAT } from "../../src/core/types";
-import { checkRing, normalizeLon } from "../../src/core/ring";
 import { MESSAGES } from "../../src/ui/messages";
-import { clickAt, drawPolygon, jumpTo, message, openApp, renderedPolygons, setMode, snapshot, toScreen, type LngLat } from "./helpers";
+import {
+  clickAt, drawPolygon, jumpTo, message, moveTo, openApp, renderedPolygons, rings, setMode, toScreen, valid, type LngLat, type Ring, type Xy,
+} from "./helpers";
 
 // Tester additions: try to break the select-mode drag guard (criteria 14 and 15).
 
-type Xy = { x: number; y: number };
-type Ring = LngLat[];
-const rings = async (page: Page): Promise<Ring[]> => (await snapshot(page)).map((f) => f.geometry.coordinates[0]);
 const clearMessage = (page: Page) => page.evaluate(() => { document.getElementById("message")!.textContent = ""; });
+const STEPS = 30; // moves per drag path unless a test says otherwise
 
-/** Pointer path a -> b in `steps` moves with the button held; optionally no release. */
+/** Move to a and press the button; release separately. */
 async function press(page: Page, a: Xy) { await page.mouse.move(a.x, a.y); await page.mouse.down(); }
-async function moveTo(page: Page, a: Xy, b: Xy, steps = 30) {
-  for (let i = 1; i <= steps; i++) await page.mouse.move(a.x + ((b.x - a.x) * i) / steps, a.y + ((b.y - a.y) * i) / steps);
-}
 
 for (const sign of [1, -1]) {
   const hemi = sign > 0 ? "north" : "south";
@@ -40,8 +36,8 @@ for (const sign of [1, -1]) {
       const panel = await page.locator("#panel").boundingBox();
       const outside = { x: panel!.x + panel!.width / 2, y: beyond.y };
       await press(page, v);
-      await moveTo(page, v, beyond);
-      await moveTo(page, beyond, outside);
+      await moveTo(page, v, beyond, STEPS);
+      await moveTo(page, beyond, outside, STEPS);
       expect(await page.evaluate(([x, y]) => document.elementFromPoint(x!, y!)?.closest("#panel") !== null, [outside.x, outside.y])).toBe(true);
       await page.mouse.up();
       await page.waitForTimeout(100);
@@ -59,7 +55,7 @@ for (const sign of [1, -1]) {
       const beyond = await toScreen(page, [vertex[0], sign * 88]);
       const panel = await page.locator("#panel").boundingBox();
       const outside = { x: panel!.x + panel!.width / 2, y: beyond.y };
-      await press(page, v); await moveTo(page, v, beyond); await moveTo(page, beyond, outside); await page.mouse.up();
+      await press(page, v); await moveTo(page, v, beyond, STEPS); await moveTo(page, beyond, outside, STEPS); await page.mouse.up();
       await page.waitForTimeout(100);
       expect(await rings(page), "right after release outside the canvas").toEqual([before]);
       // button up: back over the map, through valid latitudes to beyond the limit, no click
@@ -113,7 +109,7 @@ for (const sign of [1, -1]) {
       const v = await toScreen(page, vertex);
       const beyond = await toScreen(page, [vertex[0], sign * 88]);
       const back = await toScreen(page, [vertex[0], sign * 80]);
-      await press(page, v); await moveTo(page, v, beyond); await moveTo(page, beyond, back); await page.mouse.up();
+      await press(page, v); await moveTo(page, v, beyond, STEPS); await moveTo(page, beyond, back, STEPS); await page.mouse.up();
       await page.waitForTimeout(100);
       await expect(message(page)).toHaveText(MESSAGES.latitude);
       expect(await rings(page)).toEqual([before]);
@@ -148,7 +144,7 @@ test.describe("drag guard with several polygons (criterion 15, tester)", () => {
     // blocked drag on the west polygon
     await clickAt(page, await toScreen(page, [-26, 70]));
     let a = await toScreen(page, [-45, 82]);
-    await press(page, a); await moveTo(page, a, await toScreen(page, [-45, 88])); await page.mouse.up();
+    await press(page, a); await moveTo(page, a, await toScreen(page, [-45, 88]), STEPS); await page.mouse.up();
     await page.waitForTimeout(100);
     await expect(message(page)).toHaveText(MESSAGES.latitude);
     expect(await rings(page)).toEqual(start);
@@ -157,7 +153,7 @@ test.describe("drag guard with several polygons (criterion 15, tester)", () => {
     // valid drag on the east polygon
     await clickAt(page, await toScreen(page, [26, 70]));
     a = await toScreen(page, [45, 82]);
-    await press(page, a); await moveTo(page, a, await toScreen(page, [45, 84])); await page.mouse.up();
+    await press(page, a); await moveTo(page, a, await toScreen(page, [45, 84]), STEPS); await page.mouse.up();
     await page.waitForTimeout(100);
     const edited = await rings(page);
     expect(edited[0]).toEqual(start[0]);
@@ -167,7 +163,7 @@ test.describe("drag guard with several polygons (criterion 15, tester)", () => {
     // blocked drag on the east polygon keeps its valid edit and the west polygon
     const polar = edited[1]!.reduce((p, q) => (q[1] > p[1] ? q : p));
     a = await toScreen(page, polar);
-    await press(page, a); await moveTo(page, a, await toScreen(page, [polar[0], 88])); await page.mouse.up();
+    await press(page, a); await moveTo(page, a, await toScreen(page, [polar[0], 88]), STEPS); await page.mouse.up();
     await page.waitForTimeout(100);
     await expect(message(page)).toHaveText(MESSAGES.latitude);
     expect(await rings(page)).toEqual(edited);
@@ -185,7 +181,7 @@ test.describe("deleting a vertex (criterion 14 'editing', tester extra)", () => 
     await setMode(page, "select");
     await clickAt(page, await toScreen(page, [0, 74]));
     const sixty = await toScreen(page, (await rings(page))[0]!.find(([lon]) => lon > 30)!);
-    await press(page, sixty); await moveTo(page, sixty, await toScreen(page, [91, 70])); await page.mouse.up();
+    await press(page, sixty); await moveTo(page, sixty, await toScreen(page, [91, 70]), STEPS); await page.mouse.up();
     await page.waitForTimeout(100);
     const [before] = await rings(page);
     expect(before).toHaveLength(5);
@@ -195,7 +191,6 @@ test.describe("deleting a vertex (criterion 14 'editing', tester extra)", () => 
     const del = await toScreen(page, before!.reduce((p, q) => (q[1] < p[1] ? q : p)));
     await page.mouse.click(del.x, del.y, { button: "right" });
     await page.waitForTimeout(150);
-    const valid = (r: Ring) => checkRing(r.map(([x, y]) => [normalizeLon(x), y])) === null;
     for (const r of await rings(page)) expect(valid(r), JSON.stringify(r)).toBe(true);
     for (const f of await renderedPolygons(page)) for (const r of f.coordinates) expect(valid(r), JSON.stringify(r)).toBe(true);
     expect(await rings(page)).toEqual([before]);

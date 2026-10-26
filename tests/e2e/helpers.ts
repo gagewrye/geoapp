@@ -1,9 +1,11 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type CDPSession, type Page } from "@playwright/test";
 import { geotiffBuffer, type Value } from "../unit/helpers/sources";
+import { checkRing, normalizeLon } from "../../src/core/ring";
 import type { Affine } from "../../src/core/types";
 
 export type LngLat = [number, number];
-type Xy = { x: number; y: number };
+export type Ring = LngLat[];
+export type Xy = { x: number; y: number };
 
 /** Fixture GeoTIFF as a Playwright upload payload. */
 export function tiff(name: string, width: number, height: number, nb: number, f: Value, geo: { epsg: number; gt: Affine; nodata?: string }) {
@@ -128,3 +130,74 @@ export async function jumpDrag(page: Page, a: Xy, b: Xy): Promise<void> {
 export const lonDiff = (a: number, b: number) => { const d = (((a - b) % 360) + 540) % 360 - 180; return d === -180 ? 180 : d; };
 
 export const message = (page: Page) => page.locator("#message");
+
+/** Outer rings of the stored polygons. */
+export const rings = async (page: Page): Promise<Ring[]> => (await snapshot(page)).map((f) => f.geometry.coordinates[0]);
+
+/** A ring that checkRing accepts, after wrapping longitudes. */
+export const valid = (r: Ring) => checkRing(r.map(([x, y]) => [normalizeLon(x), y])) === null;
+
+/** Nothing invalid is stored or rendered. */
+export async function expectNothingInvalid(page: Page): Promise<void> {
+  for (const r of await rings(page)) expect(valid(r), JSON.stringify(r)).toBe(true);
+  for (const f of await renderedPolygons(page)) for (const r of f.coordinates) expect(valid(r), JSON.stringify(r)).toBe(true);
+}
+
+export const lerp = (a: Xy, b: Xy, t: number): Xy => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+
+export const dragPanEnabled = (page: Page) => page.evaluate(() => (window as any).__geoapp.map.dragPan.isEnabled() as boolean);
+
+/** Uncaught page errors, collected from now on. */
+export function collectErrors(page: Page): string[] {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  return errors;
+}
+
+/** Mouse path a -> b in `steps` moves, button state unchanged. */
+export async function moveTo(page: Page, a: Xy, b: Xy, steps = 20): Promise<void> {
+  for (let i = 1; i <= steps; i++) await page.mouse.move(a.x + ((b.x - a.x) * i) / steps, a.y + ((b.y - a.y) * i) / steps);
+}
+
+/** Raw CDP touch: each point is [id, xy]; an empty list ends (or cancels) every touch. */
+export function toucher(cdp: CDPSession) {
+  return (type: "touchStart" | "touchMove" | "touchEnd" | "touchCancel", pts: [number, Xy][] = []) =>
+    cdp.send("Input.dispatchTouchEvent", { type, touchPoints: pts.map(([id, p]) => ({ id, x: p.x, y: p.y })) });
+}
+
+/**
+ * Raw CDP mouse or pen, so coordinates may lie outside the viewport. `held` false sends buttons 0
+ * (a lost release when no mouseReleased came).
+ */
+export function rawPointer(cdp: CDPSession, pointerType: "mouse" | "pen" = "mouse") {
+  return (type: "mousePressed" | "mouseMoved" | "mouseReleased", p: Xy, held: boolean) =>
+    cdp.send("Input.dispatchMouseEvent", {
+      type, x: p.x, y: p.y, pointerType,
+      button: type === "mouseMoved" && !held ? "none" : "left", buttons: held ? 1 : 0, clickCount: type === "mouseMoved" ? 0 : 1,
+    });
+}
+
+/** Large polar polygon whose body point is > 40 px (terra-draw's grab distance) from every handle. */
+export const polar: Ring = [[-40, 60], [40, 60], [40, 82], [-40, 82]];
+export const polarBody: LngLat = [0, 72];
+export const polarVertex: LngLat = [40, 82];
+
+/** Draw `polar` on the globe near the north pole and select it. */
+export async function polarSetup(page: Page): Promise<void> {
+  await openApp(page);
+  await jumpTo(page, [0, 75], 1.5);
+  await drawPolygon(page, await Promise.all(polar.map((p) => toScreen(page, p))), "ice");
+  await setMode(page, "select");
+  await clickAt(page, await toScreen(page, polarBody));
+}
+
+/** A valid polygon just west of 180 at the current view, selected in select mode; returns its screen corners and body. */
+export async function westOf180(page: Page): Promise<{ c: Xy; pts: Xy[]; body: Xy }> {
+  const c = await toScreen(page, [180, 0]);
+  const pts = [{ x: c.x - 200, y: c.y - 80 }, { x: c.x - 30, y: c.y - 80 }, { x: c.x - 30, y: c.y + 80 }, { x: c.x - 200, y: c.y + 80 }];
+  await drawPolygon(page, pts, "a");
+  await setMode(page, "select");
+  const body = { x: c.x - 115, y: c.y };
+  await clickAt(page, body);
+  return { c, pts, body };
+}

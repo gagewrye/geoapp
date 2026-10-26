@@ -1,14 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
-import { clickAt, drawPolygon, jumpTo, message, openApp, setMode, snapshot, toScreen } from "./helpers";
+import { clickAt, drawPolygon, jumpTo, message, moveTo, openApp, setMode, snapshot, toScreen } from "./helpers";
 
 // A drag ends wherever, or however, the pointer is released (criteria 14-15).
 
-type Xy = { x: number; y: number };
 const ring = async (page: Page) => (await snapshot(page)).map((f) => f.geometry.coordinates[0]);
-async function moveTo(page: Page, a: Xy, b: Xy, steps = 20) {
-  for (let i = 1; i <= steps; i++) await page.mouse.move(a.x + ((b.x - a.x) * i) / steps, a.y + ((b.y - a.y) * i) / steps);
-}
 
 test("a body drag across 180 released over the panel snaps back, and hovering back across 180 edits nothing", async ({ page }) => {
   const errors: string[] = [];
