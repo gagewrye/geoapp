@@ -72,6 +72,7 @@ $("train").addEventListener("click", () => run(async () => {
   if (!source || !draw) return say("Open a raster first.");
   const { classes, features } = labelFeatures(draw.getSnapshot());
   if (classes.length < 2) return say("Draw polygons for at least two classes.");
+  if (classes.length > 255) return say("At most 255 classes are supported."); // before sampling; fit checks too
   say("Training...");
   const result = await train(source, features, classes);
   model = result.model;

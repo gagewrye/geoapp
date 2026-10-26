@@ -149,8 +149,7 @@ test.describe("class limit 2..255 through the UI (criteria 6, 11, tester)", () =
     await expect(message(page)).toHaveText("Raster opened.");
     await addClasses(page, 256);
     await page.click("#train");
-    await expect(message(page)).toHaveText(/255 classes/);
-    await expect(message(page)).toHaveText(/256/);
+    await expect(message(page)).toHaveText("At most 255 classes are supported.");
     await page.click("#save-model");
     await expect(message(page)).toHaveText("Train or load a model first.");
   });
