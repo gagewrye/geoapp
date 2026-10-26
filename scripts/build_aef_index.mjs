@@ -143,7 +143,13 @@ async function swapIn(tmp, out) {
     await rm(old, { recursive: true, force: true });
     throw e;
   }
-  await rm(old, { recursive: true, force: true });
+  await dropOld(old);
+}
+
+/** Delete the old-index folder; failing leaves only a stray folder, so it is a warning, not an error. */
+async function dropOld(old) {
+  await rm(old, { recursive: true, force: true })
+    .catch((e) => console.warn(`build_aef_index: warning: couldn't delete ${old} (${e.message}); delete it by hand.`));
 }
 
 main().catch((e) => {
