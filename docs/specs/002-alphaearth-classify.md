@@ -18,7 +18,7 @@
 - The file name stays `002-alphaearth-classify.md`.
 - Fetch passes of 8 bands, with a single 64-band pass as the fallback for pixel-interleaved COGs.
 
-**Follow-on specs:** 003 paint-brush labels on local imagery. 004 label seeding from a classified GeoTIFF or a model, with label GeoTIFF export. 005 train on AlphaEarth from imagery labels. 006 change detection (per-pixel cosine similarity between years, plus a threshold mask). 007 change prediction (logreg on [E(t-1), E(t)] predicting the class at t+1). AT Protocol: opt-in publishing and discovery of models, label sets and catalog entries under user-owned DIDs; large files are linked off-protocol and private data stays local.
+**Follow-on specs:** 003 paint-brush labels on local imagery. 004 label seeding from a classified GeoTIFF or a model, with label GeoTIFF export. 005 train on AlphaEarth from imagery labels. 006 localhost GPU inference server for large models (ADR 0012). 007 change detection (per-pixel cosine similarity between years, plus a threshold mask). 008 change prediction (logreg on [E(t-1), E(t)] predicting the class at t+1). AT Protocol: opt-in publishing and discovery of models, label sets and catalog entries under user-owned DIDs; large files are linked off-protocol and private data stays local.
 
 ## Scope
 In:
@@ -28,7 +28,7 @@ In:
 - Show the dataset's attribution.
 - Instead of fetching, open a local AlphaEarth COG (64 bands, Int8, GDAL_NODATA -128) with its own "Open AlphaEarth file" control, through the same dequantizing reader, with no `MAX_AOI_SIDE` limit since nothing is fetched. Its north-up grid is the `Aoi`. Only one set of AlphaEarth data is loaded at a time.
 
-Out: labelling AlphaEarth in any form; training, classifying or exporting on it (spec 005); change detection and change prediction (006, 007); AOIs spanning two UTM zones or hemispheres (blocked with a message); multiple AOIs, Earth Engine, any basemap, showing results on the map, and models other than spec 001 logreg.
+Out: labelling AlphaEarth in any form; training, classifying or exporting on it (spec 005); change detection and change prediction (007, 008); AOIs spanning two UTM zones or hemispheres (blocked with a message); multiple AOIs, Earth Engine, any basemap, showing results on the map, and models other than spec 001 logreg.
 
 ## Interfaces (`core/`)
 ```ts
