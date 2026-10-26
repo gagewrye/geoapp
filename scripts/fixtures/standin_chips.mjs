@@ -2,7 +2,7 @@
 // Stand-in mangrove-embed chips from public data (ADR 0008). Dev-only; the output is never committed.
 // Usage: node scripts/fixtures/standin_chips.mjs <out dir>
 // Writes <out>/everglades/chip_NNNN.x.i8 (Int8 [64][128][128], north-up), chip_NNNN.y.u8
-// (uint8 [128][128], 1..11, 255 = ignore), index.csv (chip,x0,y1,epsg,split) and standin.json.
+// (uint8 [128][128], 1..11, 255 = ignore), index.csv (chip,x0,y1,epsg) and standin.json.
 // Then run scripts/fixtures/pack_standin_chips.py <out dir> to write chip_NNNN.npz.
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -21,15 +21,18 @@ const COGS = [
   { path: "2021/17N/xfk4o0rlcuy087dyb-0000008192-0000000000.tiff", x0: 500000, y0: 2703360, x1: 581920, y1: 2785280 },
 ];
 // Chip upper-left corners on a 1280 m grid around Whitewater Bay, picked from a WorldCover scan
-// for mixed mangrove cover. Train chips lie north of the test chips, so the splits are disjoint.
+// for mixed mangrove cover. Northern chips are mostly wetland and mangrove, southern ones mangrove
+// and open water, so they alternate: make_aef_fixtures.py's default split (even chips train, odd
+// test) then keeps the splits on disjoint chips with a similar class mix.
 // AEF has no data only offshore here, so the last chip is open water on the coverage edge.
 const col = (i) => 500000 + 1280 * i;
+const NORTH = [[5, 2810880], [6, 2808320], [7, 2807040], [9, 2807040], [9, 2805760], [10, 2805760], [11, 2805760], [9, 2804480]];
+const SOUTH = [[1, 2801920], [2, 2801920], [3, 2799360], [4, 2799360], [3, 2798080], [4, 2798080], [5, 2796800], [8, 2796800], [9, 2794240]];
 const CHIPS = [
-  ...[[5, 2810880], [6, 2808320], [7, 2807040], [9, 2807040], [9, 2805760], [10, 2805760], [11, 2805760], [9, 2804480]].map((c) => [...c, "train"]),
-  ...[[1, 2801920], [2, 2801920], [3, 2799360], [4, 2799360], [3, 2798080], [4, 2798080], [5, 2796800], [8, 2796800]].map((c) => [...c, "test"]),
-  [9, 2794240, "test"],
-  [2, 2717440, "test"], // open water on the edge of AEF coverage (~30% no data), for invalid pixels
-].map(([i, y1, split]) => ({ x0: col(i), y1, split }));
+  // N0 S0 S1 N1 N2 S2 ...: each split gets northern and southern chips
+  ...SOUTH.flatMap((c, k) => (!NORTH[k] ? [c] : k % 2 ? [c, NORTH[k]] : [NORTH[k], c])),
+  [2, 2717440], // ~30% no data, for invalid pixels
+].map(([i, y1]) => ({ x0: col(i), y1 }));
 // WorldCover 10..100 -> mangrove-embed labels 1..11 (mangroves 95 -> 10); anything else -> 255.
 const WC_CLASSES = [10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 100];
 
@@ -96,16 +99,16 @@ async function main() {
   if (!out) throw new Error("usage: standin_chips.mjs <out dir>");
   const dir = join(out, "everglades");
   await mkdir(dir, { recursive: true });
-  const rows = ["chip,x0,y1,epsg,split"];
-  for (const [n, { x0, y1, split }] of CHIPS.entries()) {
+  const rows = ["chip,x0,y1,epsg"];
+  for (const [n, { x0, y1 }] of CHIPS.entries()) {
     const id = String(n).padStart(4, "0");
     const x = await readChip(x0, y1);
     const y = await labelChip(x0, y1, x);
     await writeFile(join(dir, `chip_${id}.x.i8`), x);
     await writeFile(join(dir, `chip_${id}.y.u8`), y);
-    rows.push(`${id},${x0},${y1},${EPSG},${split}`);
+    rows.push(`${id},${x0},${y1},${EPSG}`);
     const mangrove = y.filter((v) => v === 10).length, nodata = x.subarray(0, N * N).filter((v) => v === -128).length;
-    console.log(`chip_${id} ${split} ${x0},${y1}: mangrove ${mangrove}, ignore ${y.filter((v) => v === 255).length}, aef nodata ${nodata}`);
+    console.log(`chip_${id} ${x0},${y1}: mangrove ${mangrove}, ignore ${y.filter((v) => v === 255).length}, aef nodata ${nodata}`);
   }
   await writeFile(join(dir, "index.csv"), rows.join("\n") + "\n");
   await writeFile(join(out, "standin.json"), JSON.stringify({ source: "standin", adr: "0008", aef: "2021", labels: "ESA WorldCover 10m 2021 v200" }, null, 2));
