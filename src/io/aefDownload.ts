@@ -40,10 +40,11 @@ export const BAND_GROUP = 8;
  * window in row-major order within each. The requests depend only on the AOI and the entries. On
  * failure the cache is discarded. Where COGs overlap, a valid value beats no data, and among valid
  * values the COG whose path sorts first wins, so the result does not depend on index order.
- * Each compressed tile is fetched once and kept until its last window in its pass: for tiles at
- * least 256 px on a side, per COG at most group x (tile columns across the AOI + 2) tiles, plus
- * group x 4 decoded tiles while one window is read. Real AEF COGs are band-separate (1024 px
- * tiles), so that is 8 x 5 compressed and 32 decoded 1 MiB tiles at the 2048 px cap.
+ * Each compressed tile is fetched once and kept until its last window in its pass. Per COG with
+ * C tile columns across the AOI, at most group x (C + ceil(256 / tile height) x (ceil(256 / tile
+ * width) + 1)) tiles are held, which is group x (C + 2) for tiles of 256 px or more, plus the
+ * decoded tiles under one window (group x 4 for those sizes). Real AEF COGs are band-separate
+ * with 1024 px tiles: at the 2048 px cap, 8 x 5 compressed and 32 decoded 1 MiB tiles.
  */
 export async function fetchEntries(aoi: Aoi, entries: AefEntry[], store: CacheStore, opts: Options = {}): Promise<RasterSource> {
   const fetchFn = opts.fetch ?? fetch;

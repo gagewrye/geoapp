@@ -192,9 +192,14 @@ describe("tile lifetime and memory bound through fetchEntries (tester, F3, struc
       [{ name: "w", gx0: 0, gy0: 0, width: 640, height: 960, tile: 320, bottomUp: true }, { name: "e", gx0: 640, gy0: 0, width: 640, height: 960, tile: 320, bottomUp: false }],
       [133, 77, 1000, 800]],
     ["512 px tiles, AOI past the COG's south-east corner", [{ name: "a", gx0: 0, gy0: 0, width: 1024, height: 1024, tile: 512, bottomUp: true }], [300, 500, 900, 800]],
+    // tester follow-up T3: below 256 px a window row spans several tile rows and columns
+    ["64 px tiles, bottom-up, COG starts before the AOI", [{ name: "a", gx0: -10, gy0: -30, width: 700, height: 600, tile: 64, bottomUp: true }], [0, 0, 600, 520]],
+    ["100 px tiles, which do not divide 256", [{ name: "a", gx0: 0, gy0: 0, width: 800, height: 700, tile: 100, bottomUp: false }], [37, 51, 700, 600]],
   ];
+  /** Tiles held per COG (spec 002 Cache, aefDownload): group x (C + ceil(256 / th) x (ceil(256 / tw) + 1)). */
+  const bound = (c: Cog, ax: number, w: number) => BAND_GROUP * (colsAcross(c, ax, w) + Math.ceil(256 / c.tile) * (Math.ceil(256 / c.tile) + 1));
 
-  it.each(layouts)("%s: peak tiles held <= BAND_GROUP x (tile columns across + 2), all released at the end, each byte fetched once, pixels right", async (_n, specs, [ax, ay, w, h]) => {
+  it.each(layouts)("%s: peak tiles held within the bound, all released at the end, each byte fetched once, pixels right", async (_n, specs, [ax, ay, w, h]) => {
     const cogs = specs.map(make);
     const files = new Map(cogs.map((k) => [BASE + k.entry.path, k.bytes]));
     const plan = vi.spyOn(RangeSource.prototype, "plan");
@@ -222,7 +227,8 @@ describe("tile lifetime and memory bound through fetchEntries (tester, F3, struc
     for (const s of sources) {
       const url = (s as unknown as { url: string }).url;
       const c = cogs.find((k) => BASE + k.entry.path === url)!.c;
-      expect(peaks.get(s), url).toBeLessThanOrEqual(BAND_GROUP * (colsAcross(c, ax, w) + 2));
+      expect(peaks.get(s), url).toBeLessThanOrEqual(bound(c, ax, w));
+      if (c.tile >= 256) expect(bound(c, ax, w)).toBe(BAND_GROUP * (colsAcross(c, ax, w) + 2));
       expect(internals(s).tiles.size, `${url} tiles left after the download`).toBe(0);
     }
     expect(blockPeak).toBeLessThanOrEqual((16 * 2 ** 20) / 65536);
