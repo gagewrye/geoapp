@@ -2,6 +2,7 @@ import type { Map as MapLibreMap } from "maplibre-gl";
 import { TerraDraw, TerraDrawPolygonMode, TerraDrawSelectMode } from "terra-draw";
 import { TerraDrawMapLibreGLAdapter } from "terra-draw-maplibre-gl-adapter";
 import { normalizeLon } from "../core/ring";
+import { guardDrags } from "./dragGuard";
 import { ringValidation, type BlockReason } from "./validation";
 
 /**
@@ -18,7 +19,8 @@ class WrappingAdapter extends TerraDrawMapLibreGLAdapter<MapLibreMap> {
 
 /** terra-draw with polygon drawing and select-mode editing, both behind one validation (ADR 0003). */
 export function createDraw(map: MapLibreMap, onBlocked: (reason: BlockReason) => void): TerraDraw {
-  const validation = ringValidation(onBlocked);
+  const ref: { draw?: TerraDraw } = {};
+  const validation = guardDrags(map, () => ref.draw, ringValidation(onBlocked), onBlocked);
   const draw = new TerraDraw({
     adapter: new WrappingAdapter({ map }),
     modes: [
@@ -39,6 +41,7 @@ export function createDraw(map: MapLibreMap, onBlocked: (reason: BlockReason) =>
       }),
     ],
   });
+  ref.draw = draw;
   draw.start();
   return draw;
 }
