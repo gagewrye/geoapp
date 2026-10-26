@@ -1,4 +1,5 @@
 import { fromBlob, type GeoTIFF } from "geotiff";
+import { AEF_BANDS, AEF_NODATA_Q, dequantize } from "../core/aef";
 import { affineFromTags } from "../core/geotags";
 import type { GeoTags, RasterSource } from "./source";
 
@@ -26,15 +27,29 @@ export async function openGeoTiff(tiff: GeoTIFF): Promise<RasterSource> {
   const bandCount = image.getSamplesPerPixel();
   // Bands are read as Float32Array, so compare against nodata rounded the same way.
   const nd = gdalNoData(image.getGDALNoData(), stripNul(fd.getValue("GDAL_NODATA")));
-  const nodata = nd === null ? null : Math.fround(nd);
+  // AlphaEarth COGs are read dequantized (spec 002); their no data becomes NaN.
+  const aef = isAef(fd.getValue("SampleFormat"), fd.getValue("BitsPerSample"), bandCount, nd);
+  const nodata = aef || nd === null ? null : Math.fround(nd);
   return {
     meta: { width, height, bandCount, gt, epsg, nodata, geoTags },
     async readWindow(x0, y0, w, h) {
       const rasters = (await image.readRasters({ window: [x0, y0, x0 + w, y0 + h] })) as unknown as ArrayLike<number>[];
-      const bands = Array.from(rasters, (r) => (r instanceof Float32Array ? r : Float32Array.from(r)));
+      const bands = Array.from(rasters, (r) => {
+        if (!aef) return r instanceof Float32Array ? r : Float32Array.from(r);
+        const out = new Float32Array(r.length);
+        dequantize(r as Int8Array, out);
+        return out;
+      });
       return { x0, y0, width: w, height: h, bands, nodata };
     },
   };
+}
+
+/** 64 signed 8-bit bands with GDAL_NODATA -128: the AlphaEarth Int8 encoding. */
+function isAef(format: unknown, bits: unknown, bandCount: number, nodata: number | null): boolean {
+  // a missing SampleFormat means unsigned; a single value may come back as a number
+  const all = (v: unknown, x: number) => v !== undefined && Array.from(typeof v === "number" ? [v] : (v as ArrayLike<number>)).every((e) => e === x);
+  return bandCount === AEF_BANDS && nodata === AEF_NODATA_Q && all(format, 2) && all(bits, 8);
 }
 
 /** geotiff.js parses GDAL's "-inf"/"inf" as NaN, so read infinities from the raw tag. */
