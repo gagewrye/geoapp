@@ -50,14 +50,36 @@ export function memoryStore() {
   return store;
 }
 
-/** OPFS store (ADR 0005); opening it drops any earlier AOI's cache. `root` is for tests. */
+// Folders held by a live store, per root: two stores on one folder would delete each other's files.
+const OPFS_ROOT = {};
+const live = new WeakMap<object, Set<string>>();
+
+/**
+ * OPFS store (ADR 0005); opening it drops any earlier AOI's cache. Refused while another store on
+ * the same folder is live, that is, not yet discarded. `root` is for tests.
+ */
 export async function opfsStore(name = "aef-cache", root?: FileSystemDirectoryHandle): Promise<CacheStore> {
-  const top = root ?? await navigator.storage.getDirectory();
-  await top.removeEntry(name, { recursive: true }).catch(() => {}); // absent on first use
-  const dir = await top.getDirectoryHandle(name, { create: true });
+  const key = root ?? OPFS_ROOT;
+  const held = live.get(key) ?? new Set<string>();
+  live.set(key, held);
+  // reserved before any await, so two opens started together can't both get the folder
+  if (held.has(name)) throw new Error("The AlphaEarth cache is already in use.");
+  held.add(name);
+  let dir: FileSystemDirectoryHandle, top: FileSystemDirectoryHandle;
+  try {
+    top = root ?? await navigator.storage.getDirectory();
+    await top.removeEntry(name, { recursive: true }).catch(() => {}); // absent on first use
+    dir = await top.getDirectoryHandle(name, { create: true });
+  } catch (e) {
+    held.delete(name);
+    throw e;
+  }
+  let gone = false;
+  const alive = () => { if (gone) throw new Error("This AlphaEarth cache was discarded."); };
   const file = (b: number) => `b${b}.i8`;
   return {
     async band(b) {
+      alive();
       // one writable per band: every byte is written once, with no read-modify-write
       const w = await (await dir.getFileHandle(file(b), { create: true })).createWritable();
       return {
@@ -67,6 +89,7 @@ export async function opfsStore(name = "aef-cache", root?: FileSystemDirectoryHa
       };
     },
     async read(i) {
+      alive();
       return Promise.all(Array.from({ length: AEF_BANDS }, async (_, b) => {
         const f = await (await dir.getFileHandle(file(b))).getFile();
         const plane = new Int8Array(await f.slice(i * PLANE_BYTES, (i + 1) * PLANE_BYTES).arrayBuffer());
@@ -75,7 +98,13 @@ export async function opfsStore(name = "aef-cache", root?: FileSystemDirectoryHa
       }));
     },
     async discard() {
-      await top.removeEntry(name, { recursive: true });
+      if (gone) return; // the folder may already belong to a newer store
+      gone = true;
+      try {
+        await top.removeEntry(name, { recursive: true });
+      } finally {
+        held.delete(name); // given up even if deleting failed: the next open deletes it again
+      }
     },
   };
 }

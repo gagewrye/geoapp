@@ -2,9 +2,10 @@ import { expect, test, type Page } from "@playwright/test";
 import { firstDiff } from "../unit/helpers/floats";
 import { BACKGROUND } from "../../src/map/style";
 import {
-  ATTRIBUTION, cacheFiles, chip, chipCentre, cogRequests, fetchChip, HOST, lonLatBox, logRequests, refChip, serveAef, type Fault,
+  ATTRIBUTION, cacheFiles, chip, chipBox, chipCentre, cogRequests, drawArea, fetchChip, HOST, lonLatBox, logRequests, refChip, serveAef, type Fault,
 } from "./aef";
-import { message, openApp, pixelAt, toScreen } from "./helpers";
+import { holdCogs } from "./aefTester";
+import { jumpTo, message, openApp, pixelAt, toScreen } from "./helpers";
 
 // Spec 002 criteria 9, 11, 12, 13 and 14 (fetched data), on fixtures (a) and (b).
 const bg = [1, 3, 5].map((i) => parseInt(BACKGROUND.slice(i, i + 2), 16));
@@ -107,4 +108,24 @@ test("no entries for the area and year: the message, and no COG request (criteri
   expect(cogRequests(log)).toEqual([]);
   expect(await cacheFiles(page)).toBeNull();
   await expect(page.getByText(ATTRIBUTION)).toBeHidden();
+});
+
+test("one AlphaEarth operation at a time: a double-clicked first Fetch runs one download, with Fetch and Open AlphaEarth file disabled until it ends", async ({ page }) => {
+  await serveAef(page);
+  const log = logRequests(page);
+  const gate = await holdCogs(page);
+  await openApp(page);
+  await jumpTo(page, chipCentre, 15);
+  await drawArea(page, lonLatBox(chip.epsg, chipBox, 30));
+  await expect(page.locator("#aef-fetch")).toBeEnabled();
+  await page.dblclick("#aef-fetch");
+  await expect(message(page)).toHaveText("Downloading embeddings...");
+  await expect(page.locator("#aef-fetch")).toBeDisabled();
+  await expect(page.locator("#open-aef")).toBeDisabled();
+  gate.release();
+  await expect(message(page)).toHaveText("Embeddings downloaded.");
+  await expect(page.locator("#aef-fetch")).toBeEnabled();
+  await expect(page.locator("#open-aef")).toBeEnabled();
+  const asked = cogRequests(log).map((r) => `${r.url()} ${r.headers().range ?? ""}`);
+  expect(new Set(asked).size, "each COG range requested once").toBe(asked.length);
 });

@@ -30,11 +30,18 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 export function initAef({ map, draw, previewMaxSide, say, run, onState }: Deps) {
   const year = $<HTMLSelectElement>("aef-year"), fetchBtn = $<HTMLButtonElement>("aef-fetch");
   const preview = $<HTMLInputElement>("aef-preview"), attribution = $("aef-attribution"), info = $("aef-info");
+  const openAef = $<HTMLInputElement>("open-aef");
   let area: Aoi | undefined;
   let refused = false; // the last area drawn was refused, so its message is showing
   let data: Loaded | undefined;
   let state: AefState = "none";
-  const setState = (s: AefState) => { state = s; fetchBtn.disabled = !area || !year.value || s === "busy"; onState(s); };
+  // the only place the AlphaEarth controls are enabled: while busy, nothing else can start (one operation at a time)
+  const setState = (s: AefState) => {
+    state = s;
+    fetchBtn.disabled = !area || !year.value || s === "busy";
+    openAef.disabled = s === "busy";
+    onState(s);
+  };
 
   loadYears().then((years) => {
     year.replaceChildren(...years.map((y) => new Option(String(y), String(y))));
@@ -67,39 +74,52 @@ export function initAef({ map, draw, previewMaxSide, say, run, onState }: Deps) 
   year.addEventListener("change", () => setState(state));
   preview.addEventListener("change", () => setAefPreviewVisible(map, preview.checked));
 
-  fetchBtn.addEventListener("click", () => run(async () => {
-    if (!area || !year.value) return;
-    const aoi = area;
-    await unload();
-    setState("busy");
-    say("Downloading embeddings...");
-    let store: CacheStore | undefined;
-    try {
-      store = await opfsStore();
-      await show({ aoi, source: await downloadAoi(aoi, Number(year.value), store), store }, false);
-    } catch (e) {
-      await store?.discard().catch(() => {}); // downloadAoi discards a partial cache; this covers the rest
-      setState("failed");
-      throw e;
-    }
-    say("Embeddings downloaded.");
-  }));
+  fetchBtn.addEventListener("click", () => {
+    if (state === "busy" || !area || !year.value) return;
+    const aoi = area, y = Number(year.value);
+    setState("busy"); // before any await, so a second click finds Fetch disabled
+    return run(async () => {
+      let store: CacheStore | undefined;
+      try {
+        await unload();
+        say("Downloading embeddings...");
+        store = await opfsStore();
+        await show({ aoi, source: await downloadAoi(aoi, y, store), store }, false);
+      } catch (e) {
+        await store?.discard().catch(() => {}); // downloadAoi discards a partial cache; this covers the rest
+        setState("failed");
+        throw e;
+      }
+      say("Embeddings downloaded.");
+    });
+  });
 
-  $<HTMLInputElement>("open-aef").addEventListener("change", (ev) => run(async () => {
-    const file = (ev.target as HTMLInputElement).files?.[0];
+  openAef.addEventListener("change", () => {
+    const file = openAef.files?.[0];
     if (!file) return;
-    say("");
-    const opened = await openAefFile(file); // a refused file leaves the loaded data as it was
-    await unload();
+    // the input is disabled while busy; a change that still arrives must not replace data mid-operation
+    if (state === "busy") { openAef.value = ""; return; }
+    const before = state;
     setState("busy");
-    try {
-      await show(opened, true);
-    } catch (e) {
-      setState("failed");
-      throw e;
-    }
-    say("AlphaEarth file opened.");
-  }));
+    return run(async () => {
+      say("");
+      let opened: Loaded;
+      try {
+        opened = await openAefFile(file);
+      } catch (e) {
+        setState(before); // a refused file leaves the loaded data as it was
+        throw e;
+      }
+      await unload();
+      try {
+        await show(opened, true);
+      } catch (e) {
+        setState("failed");
+        throw e;
+      }
+      say("AlphaEarth file opened.");
+    });
+  });
 
   return {
     /** The loaded AlphaEarth data, or null. */

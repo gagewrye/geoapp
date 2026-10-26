@@ -205,7 +205,10 @@ test.describe("year picker and Fetch states (criteria 11, 13)", () => {
 });
 
 test.describe("opening an AlphaEarth file during a fetch (Scope: one set of AlphaEarth data at a time)", () => {
-  /** Start a held fetch over the chip, then open the west fixture file while it is held. */
+  /**
+   * Start a held fetch over the chip, then try to open the west fixture file while it is held. The
+   * control is disabled during a fetch (tester F1, F2); a change set by script is still made, and ignored.
+   */
   async function fileDuringFetch(page: Page) {
     await serveAef(page);
     const log = logRequests(page);
@@ -213,8 +216,10 @@ test.describe("opening an AlphaEarth file during a fetch (Scope: one set of Alph
     await openApp(page);
     await fetchChip(page);
     await expect(message(page)).toHaveText("Downloading embeddings...");
+    await expect(page.locator("#open-aef")).toBeDisabled();
     await page.setInputFiles("#open-aef", westFile());
-    await expect(message(page)).toHaveText("AlphaEarth file opened.");
+    await page.waitForTimeout(300); // long enough for the file to open, were it opened
+    await expect(message(page)).toHaveText("Downloading embeddings...");
     return { log, gate };
   }
 

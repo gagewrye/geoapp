@@ -72,8 +72,62 @@ describe("cache layout (criterion 17)", () => {
 
   it("opening the store drops an earlier AOI's cache", async () => {
     const { handle, root } = fakeOpfs();
-    await fetchEntries(aoiAround(0, 0, N, N), entries, await opfsStore("aef-cache", handle), { fetch: rangeFetch().fetch });
+    const old = await opfsStore("aef-cache", handle);
+    await fetchEntries(aoiAround(0, 0, N, N), entries, old, { fetch: rangeFetch().fetch });
+    // a cache left by an earlier page load: on disk, but no live store holds it
+    await old.discard();
+    const left = await root.getDirectoryHandle("aef-cache", { create: true });
+    await (await (await left.getFileHandle("b0.i8", { create: true })).createWritable()).close();
     await opfsStore("aef-cache", handle);
     expect((await root.getDirectoryHandle("aef-cache")).entries.size).toBe(0);
+  });
+});
+
+describe("one live store per folder (tester F1)", () => {
+  it("refuses a second store on a folder while the first is live, and leaves the first's cache intact", async () => {
+    const { handle, root } = fakeOpfs();
+    const first = await opfsStore("aef-cache", handle);
+    await fetchEntries(aoiAround(0, 0, N, N), entries, first, { fetch: rangeFetch().fetch });
+    await expect(opfsStore("aef-cache", handle)).rejects.toThrow("The AlphaEarth cache is already in use.");
+    expect((await root.getDirectoryHandle("aef-cache")).entries.size).toBe(AEF_BANDS);
+    expect(await first.read(0)).toHaveLength(AEF_BANDS);
+  });
+
+  it("two opens started together: exactly one gets the folder", async () => {
+    const { handle } = fakeOpfs();
+    const r = await Promise.allSettled([opfsStore("aef-cache", handle), opfsStore("aef-cache", handle)]);
+    expect(r.map((x) => x.status).sort()).toEqual(["fulfilled", "rejected"]);
+  });
+
+  it("another folder, or another root, is not blocked", async () => {
+    const a = fakeOpfs(), b = fakeOpfs();
+    await opfsStore("aef-cache", a.handle);
+    await expect(opfsStore("other", a.handle)).resolves.toBeDefined();
+    await expect(opfsStore("aef-cache", b.handle)).resolves.toBeDefined();
+  });
+
+  it("after discard the folder opens again, and the discarded store neither writes, reads nor deletes the new one", async () => {
+    const { handle, root } = fakeOpfs();
+    const old = await opfsStore("aef-cache", handle);
+    await old.discard();
+    const fresh = await opfsStore("aef-cache", handle);
+    const w = await fresh.band(0);
+    await w.append(new Int8Array(PLANE_BYTES));
+    await w.close();
+    await expect(old.band(1)).rejects.toThrow("discarded");
+    await expect(old.read(0)).rejects.toThrow("discarded");
+    await old.discard(); // a no-op: the folder now belongs to the fresh store
+    const dir = await root.getDirectoryHandle("aef-cache");
+    expect((await (await dir.getFileHandle("b0.i8")).getFile()).size).toBe(PLANE_BYTES);
+  });
+
+  it("a failed open releases the folder", async () => {
+    const { handle, root } = fakeOpfs();
+    const get = root.getDirectoryHandle.bind(root);
+    let fail = true;
+    root.getDirectoryHandle = async (n, o) => { if (fail) throw new DOMException("denied", "SecurityError"); return get(n, o); };
+    await expect(opfsStore("aef-cache", handle)).rejects.toThrow("denied");
+    fail = false;
+    await expect(opfsStore("aef-cache", handle)).resolves.toBeDefined();
   });
 });
