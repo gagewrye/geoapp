@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { AEF_BASE, dequantize, type AefEntry, type Aoi } from "../../../src/core/aef";
-import { downloadAoi, fetchEntries } from "../../../src/io/aefDownload";
-import { memoryStore, WINDOW_BYTES } from "../../../src/io/aefCache";
+import { BAND_GROUP, downloadAoi, fetchEntries } from "../../../src/io/aefDownload";
+import { memoryStore, PLANE_BYTES } from "../../../src/io/aefCache";
 import { loadYears } from "../../../src/io/aefIndex";
 import { firstDiff } from "../helpers/floats";
 import { rangeFetch } from "../helpers/rangeFetch";
@@ -37,7 +37,7 @@ describe("mosaic of mixed-orientation COGs (criterion 7)", () => {
     for (let k = 0; k < 64; k++) expect(firstDiff(tile.bands[k]!, refBand(k)), `band ${k}`).toBe(-1);
     expect(tile.bands[0]!.filter(Number.isNaN).length).toBe(chip.invalid);
     expect(chip.invalid).toBeGreaterThan(0);
-    expect([...store.windows.values()].map((w) => w.length)).toEqual([WINDOW_BYTES]);
+    expect([...store.files.values()].map((planes) => planes.map((p) => p.length))).toEqual(Array(64).fill([PLANE_BYTES]));
   });
 
   it("pixels covered by no COG are NaN, and windows split the chip correctly", async () => {
@@ -83,7 +83,7 @@ describe("download failures (criterion 12)", () => {
     const { fetch } = rangeFetch(fault);
     await expect(downloadAoi(chipAoi, 2021, store, { fetch })).rejects.toThrow(message);
     expect(store.discarded).toBe(true);
-    expect(store.windows.size).toBe(0);
+    expect(store.files.size).toBe(0);
   });
 
   it("a failure after some windows were cached discards the partial cache", async () => {
@@ -91,9 +91,9 @@ describe("download failures (criterion 12)", () => {
     const fault = (url: string, range: [number, number] | null) => (url.endsWith("fixture-ne-topdown.tiff") && range && range[0] >= 8192 ? "network" as const : undefined);
     const store = memoryStore();
     await expect(fetchEntries(wideAoi, entries, store, { fetch: rangeFetch(fault).fetch, blockSize: 4096 })).rejects.toThrow(message);
-    expect(store.writes).toBe(1);
+    expect(store.writes).toBe(BAND_GROUP); // window 0 of the first band pass
     expect(store.discarded).toBe(true);
-    expect(store.windows.size).toBe(0);
+    expect(store.files.size).toBe(0);
   });
 });
 

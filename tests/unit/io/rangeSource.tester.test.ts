@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AefEntry, Aoi } from "../../../src/core/aef";
 import { tileWindows } from "../../../src/core/grid";
 import { memoryStore } from "../../../src/io/aefCache";
-import { fetchEntries } from "../../../src/io/aefDownload";
+import { BAND_GROUP, fetchEntries } from "../../../src/io/aefDownload";
 import { AefDownloadError } from "../../../src/io/rangeGet";
 import { RangeSource } from "../../../src/io/rangeSource";
 import { aefTiff, memFetch, pattern } from "../helpers/aefTiff";
@@ -194,7 +194,7 @@ describe("tile lifetime and memory bound through fetchEntries (tester, F3, struc
     ["512 px tiles, AOI past the COG's south-east corner", [{ name: "a", gx0: 0, gy0: 0, width: 1024, height: 1024, tile: 512, bottomUp: true }], [300, 500, 900, 800]],
   ];
 
-  it.each(layouts)("%s: peak tiles held <= 64 x (tile columns across + 2), all released at the end, each byte fetched once, pixels right", async (_n, specs, [ax, ay, w, h]) => {
+  it.each(layouts)("%s: peak tiles held <= BAND_GROUP x (tile columns across + 2), all released at the end, each byte fetched once, pixels right", async (_n, specs, [ax, ay, w, h]) => {
     const cogs = specs.map(make);
     const files = new Map(cogs.map((k) => [BASE + k.entry.path, k.bytes]));
     const plan = vi.spyOn(RangeSource.prototype, "plan");
@@ -202,14 +202,17 @@ describe("tile lifetime and memory bound through fetchEntries (tester, F3, struc
     const store = memoryStore();
     const peaks = new Map<RangeSource, number>();
     let blockPeak = 0;
-    const write = store.write.bind(store);
-    store.write = async (i, d) => {
-      // a window's reads are done and nothing of it is released yet: the peak for this window
-      for (const s of new Set(plan.mock.contexts as RangeSource[])) {
-        peaks.set(s, Math.max(peaks.get(s) ?? 0, internals(s).tiles.size));
-        blockPeak = Math.max(blockPeak, internals(s).blocks.size);
-      }
-      return write(i, d);
+    const band = store.band.bind(store);
+    store.band = async (b) => {
+      const w = await band(b);
+      return { ...w, append: (d) => {
+        // a window's reads are done and nothing of it is released yet: the peak for this window
+        for (const s of new Set(plan.mock.contexts as RangeSource[])) {
+          peaks.set(s, Math.max(peaks.get(s) ?? 0, internals(s).tiles.size));
+          blockPeak = Math.max(blockPeak, internals(s).blocks.size);
+        }
+        return w.append(d);
+      } };
     };
     const aoi: Aoi = { epsg: 32617, gt: [OX + 10 * ax, 10, 0, OY - 10 * ay, 0, -10], width: w, height: h };
     const src = await fetchEntries(aoi, cogs.map((k) => k.entry).reverse(), store, { fetch, base: BASE });
@@ -219,7 +222,7 @@ describe("tile lifetime and memory bound through fetchEntries (tester, F3, struc
     for (const s of sources) {
       const url = (s as unknown as { url: string }).url;
       const c = cogs.find((k) => BASE + k.entry.path === url)!.c;
-      expect(peaks.get(s), url).toBeLessThanOrEqual(64 * (colsAcross(c, ax, w) + 2));
+      expect(peaks.get(s), url).toBeLessThanOrEqual(BAND_GROUP * (colsAcross(c, ax, w) + 2));
       expect(internals(s).tiles.size, `${url} tiles left after the download`).toBe(0);
     }
     expect(blockPeak).toBeLessThanOrEqual((16 * 2 ** 20) / 65536);

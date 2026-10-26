@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { AEF_BANDS, type AefEntry, type Aoi } from "../../../src/core/aef";
 import { tileWindows } from "../../../src/core/grid";
 import { TILE_SIZE } from "../../../src/core/types";
-import { memoryStore, WINDOW_BYTES, type CacheStore } from "../../../src/io/aefCache";
+import { memoryStore, PLANE_BYTES, type CacheStore } from "../../../src/io/aefCache";
 import { fetchEntries } from "../../../src/io/aefDownload";
 import { aefTiff, memFetch, pattern, type AefTiffSpec } from "../helpers/aefTiff";
 
@@ -157,18 +157,25 @@ describe("no data -128 (tester, criterion 7)", () => {
 });
 
 describe("tile-by-tile memory rule (tester, structural)", () => {
-  /** Store that records window indices and sizes without keeping the data. */
+  /** Store that records each band's plane sizes, in append order, without keeping the data. */
   function countingStore() {
-    const writes: { i: number; bytes: number }[] = [];
+    const planes = new Map<number, number[]>();
     return {
-      writes, discarded: false,
-      async write(i: number, d: Int8Array) { writes.push({ i, bytes: d.length }); },
-      async read(): Promise<Int8Array> { throw new Error("not kept"); },
+      planes, discarded: false,
+      async band(b: number) {
+        const sizes: number[] = [];
+        planes.set(b, sizes);
+        return { async append(d: Int8Array) { sizes.push(d.length); }, async close() {}, async abort() {} };
+      },
+      async read(): Promise<Int8Array[]> { throw new Error("not kept"); },
       async discard() { this.discarded = true; },
     };
   }
+  /** Every one of the 64 bands got exactly n planes of 64 KiB. */
+  const onePlanePerWindow = (planes: Map<number, number[]>, n: number) =>
+    expect([...planes.keys()].sort((a, b) => a - b).map((b) => planes.get(b))).toEqual(Array(AEF_BANDS).fill(Array(n).fill(PLANE_BYTES)));
 
-  it("every COG read window lies inside the file and is at most 256x256; every cache window is one 4 MiB write", async () => {
+  it("every COG read window lies inside the file and is at most 256x256; each band gets one 64 KiB plane per window", async () => {
     const spy = vi.spyOn(GeoTIFFImage.prototype, "readRasters");
     const cogs = [cog(OX, OY, 520, 300, { bottomUp: true }), cog(OX + 5200, OY, 300, 300)];
     const aoi = aoiAt(OX + 50, OY - 30, 700, 270);
@@ -183,19 +190,17 @@ describe("tile-by-tile memory rule (tester, structural)", () => {
       expect(c1).toBeLessThanOrEqual(520); expect(r1).toBeLessThanOrEqual(300);
     }
     const across = Math.ceil(700 / 256), down = Math.ceil(270 / 256);
-    expect(store.writes.map((w) => w.i)).toEqual(Array.from({ length: across * down }, (_, i) => i)); // row-major, once each
-    for (const w of store.writes) expect(w.bytes).toBe(WINDOW_BYTES);
-    expect(WINDOW_BYTES).toBe(4 * 2 ** 20);
+    onePlanePerWindow(store.planes, across * down); // appended in row-major order, once each
+    expect(PLANE_BYTES).toBe(64 * 2 ** 10);
   });
 
-  it("at MAX_AOI_SIDE (2048x2048) the download is 64 window writes of 4 MiB and no read exceeds 256x256", async () => {
+  it("at MAX_AOI_SIDE (2048x2048) the download is 64 planes of 64 KiB per band and no read exceeds 256x256", async () => {
     const spy = vi.spyOn(GeoTIFFImage.prototype, "readRasters");
     const cogs = [cog(OX + 20000, OY - 20000, 80, 80), cog(OX, OY, 64, 64, { bottomUp: true })]; // far corner and origin
     const aoi = aoiAt(OX, OY, 2048, 2048);
     const store = countingStore();
     await fetchEntries(aoi, cogs.map((c) => c.entry), store, { fetch: memFetch(serve(cogs)).fetch, base: BASE });
-    expect(store.writes.map((w) => w.i)).toEqual(Array.from({ length: 64 }, (_, i) => i));
-    for (const w of store.writes) expect(w.bytes).toBe(WINDOW_BYTES);
+    onePlanePerWindow(store.planes, 64);
     for (const [opts] of spy.mock.calls) {
       const [c0, r0, c1, r1] = (opts as { window: number[] }).window as number[];
       expect(c1! - c0!).toBeLessThanOrEqual(TILE_SIZE); expect(r1! - r0!).toBeLessThanOrEqual(TILE_SIZE);

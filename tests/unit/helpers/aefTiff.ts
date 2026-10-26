@@ -8,6 +8,8 @@ export type AefTiffSpec = {
   /** Positive y scale with a south-west origin, like Source Cooperative. */
   bottomUp?: boolean;
   epsg?: number; scaleX?: number; scaleY?: number; deflate?: boolean;
+  /** PlanarConfiguration 1 (all bands in each tile) instead of 2 (one band per tile, as real AEF COGs). */
+  interleaved?: boolean;
   /** Int8 value of band b at north-up row r, column c (file-local). */
   value: (b: number, r: number, c: number) => number;
 };
@@ -20,13 +22,14 @@ export function aefTiff(s: AefTiffSpec): Uint8Array {
   const sx = s.scaleX ?? 10, sy = s.scaleY ?? 10;
   const across = Math.ceil(s.width / T), down = Math.ceil(s.height / T);
   const tiles: Uint8Array[] = [];
-  for (let b = 0; b < nb; b++) for (let ty = 0; ty < down; ty++) for (let tx = 0; tx < across; tx++) {
-    const t = new Int8Array(T * T).fill(-128);
+  const spp = s.interleaved ? nb : 1; // samples per tile pixel
+  for (let b = 0; b < (s.interleaved ? 1 : nb); b++) for (let ty = 0; ty < down; ty++) for (let tx = 0; tx < across; tx++) {
+    const t = new Int8Array(T * T * spp).fill(-128);
     for (let r = 0; r < T; r++) for (let c = 0; c < T; c++) {
       const fr = ty * T + r, fc = tx * T + c;
       if (fr >= s.height || fc >= s.width) continue;
       const nr = s.bottomUp ? s.height - 1 - fr : fr; // file row -> north-up row
-      t[r * T + c] = s.value(b, nr, fc);
+      for (let k = 0; k < spp; k++) t[(r * T + c) * spp + k] = s.value(b + k, nr, fc);
     }
     const raw = new Uint8Array(t.buffer);
     tiles.push(s.deflate ? new Uint8Array(deflateSync(raw)) : raw);
@@ -36,7 +39,7 @@ export function aefTiff(s: AefTiffSpec): Uint8Array {
     : [[33550, 12, [sx, sy, 0]], [33922, 12, [0, 0, 0, s.x0, s.y1, 0]]];
   const entries: [number, number, number[] | null | string][] = [
     [256, 4, [s.width]], [257, 4, [s.height]], [258, 3, Array(nb).fill(8)], [259, 3, [s.deflate ? 8 : 1]], [262, 3, [1]],
-    [277, 3, [nb]], [284, 3, [2]], [322, 3, [T]], [323, 3, [T]], [324, 4, null], [325, 4, tiles.map((t) => t.length)],
+    [277, 3, [nb]], [284, 3, [s.interleaved ? 1 : 2]], [322, 3, [T]], [323, 3, [T]], [324, 4, null], [325, 4, tiles.map((t) => t.length)],
     ...(nb > 1 ? [[338, 3, Array(nb - 1).fill(0)] as [number, number, number[]]] : []),
     [339, 3, Array(nb).fill(2)], ...geo,
     [34735, 3, [1, 1, 0, 3, 1024, 0, 1, 1, 1025, 0, 1, 1, 3072, 0, 1, epsg]],

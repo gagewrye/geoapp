@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AefEntry, Aoi } from "../../../src/core/aef";
 import { memoryStore } from "../../../src/io/aefCache";
-import { fetchEntries } from "../../../src/io/aefDownload";
+import { BAND_GROUP, fetchEntries } from "../../../src/io/aefDownload";
 import { aefTiff, memFetch, pattern, type Override } from "../helpers/aefTiff";
 
 // Tester tests (spec 002 criterion 12): Range answers that are not a clean 206 of the asked bytes.
@@ -32,8 +32,8 @@ describe("Range handling (tester, criterion 12)", () => {
   it("a 200 for a pixel request after window 0 was cached shows the message and discards the partial cache", async () => {
     const { run, store } = await attempt((url, range, data) => (eastPixels(url, range) ? new Response(data.slice(), { status: 200 }) : undefined));
     await expect(run).rejects.toThrow(MSG);
-    expect(store.writes).toBe(1);
-    expect([store.discarded, store.windows.size]).toEqual([true, 0]);
+    expect(store.writes).toBe(BAND_GROUP); // window 0 of the first band pass
+    expect([store.discarded, store.files.size]).toEqual([true, 0]);
   });
 
   it("a 416 for a pixel request shows the message and discards the cache", async () => {

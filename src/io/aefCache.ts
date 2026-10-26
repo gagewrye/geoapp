@@ -2,50 +2,80 @@ import { AEF_BANDS, dequantize, type Aoi } from "../core/aef";
 import { TILE_SIZE } from "../core/types";
 import type { GeoTags, RasterSource } from "./source";
 
-/** One cached window: Int8 [64][256][256], band-sequential, no data -128 (4 MiB). */
-export const WINDOW_BYTES = AEF_BANDS * TILE_SIZE * TILE_SIZE;
+/** One band of one cached window: Int8 [256][256], no data -128, edge windows padded (64 KiB). */
+export const PLANE_BYTES = TILE_SIZE * TILE_SIZE;
 
-/** Where downloaded AOI windows live; index = row-major position in the 256x256 grid. */
+/** Appends one band's window planes, in row-major window order. */
+export interface BandWriter {
+  append(plane: Int8Array): Promise<void>;
+  close(): Promise<void>;
+  /** Give up on this band; the download is being discarded. */
+  abort(): Promise<void>;
+}
+
+/** Where a downloaded AOI lives: one file per band, plane i at byte i x 64 KiB (spec 002). */
 export interface CacheStore {
-  write(i: number, data: Int8Array): Promise<void>;
-  read(i: number): Promise<Int8Array>;
-  /** Delete every cached window. */
+  /** Start band b's file; each band is written by one writer, once. */
+  band(b: number): Promise<BandWriter>;
+  /** The 64 band planes of window i (row-major position in the 256x256 grid). */
+  read(i: number): Promise<Int8Array[]>;
+  /** Delete every cached band. */
   discard(): Promise<void>;
 }
 
-/** In-memory store for tests; counts writes and records a discard. */
+/** In-memory store for tests; counts plane writes and records a discard. */
 export function memoryStore() {
-  const windows = new Map<number, Int8Array>();
+  const files = new Map<number, Int8Array[]>();
   const store = {
-    windows, writes: 0, discarded: false,
-    async write(i: number, data: Int8Array) { store.writes++; windows.set(i, data.slice()); },
-    async read(i: number) {
-      const w = windows.get(i);
-      if (!w) throw new Error(`AlphaEarth cache has no window ${i}`);
-      return w;
+    files, writes: 0, discarded: false,
+    async band(b: number): Promise<BandWriter> {
+      if (files.has(b)) throw new Error(`AlphaEarth cache band ${b} written twice`);
+      const planes: Int8Array[] = [];
+      files.set(b, planes);
+      return {
+        async append(plane) { store.writes++; planes.push(plane.slice()); },
+        async close() {},
+        async abort() {},
+      };
     },
-    async discard() { store.discarded = true; windows.clear(); },
+    async read(i: number) {
+      return Array.from({ length: AEF_BANDS }, (_, b) => {
+        const plane = files.get(b)?.[i];
+        if (!plane) throw new Error(`AlphaEarth cache has no window ${i}`);
+        return plane;
+      });
+    },
+    async discard() { store.discarded = true; files.clear(); },
   };
   return store;
 }
 
-/** OPFS store (ADR 0005); opening it drops any earlier AOI's cache. */
-export async function opfsStore(name = "aef-cache"): Promise<CacheStore> {
-  const root = await navigator.storage.getDirectory();
-  await root.removeEntry(name, { recursive: true }).catch(() => {}); // absent on first use
-  const dir = await root.getDirectoryHandle(name, { create: true });
-  const file = (i: number) => `w${i}.i8`;
+/** OPFS store (ADR 0005); opening it drops any earlier AOI's cache. `root` is for tests. */
+export async function opfsStore(name = "aef-cache", root?: FileSystemDirectoryHandle): Promise<CacheStore> {
+  const top = root ?? await navigator.storage.getDirectory();
+  await top.removeEntry(name, { recursive: true }).catch(() => {}); // absent on first use
+  const dir = await top.getDirectoryHandle(name, { create: true });
+  const file = (b: number) => `b${b}.i8`;
   return {
-    async write(i, data) {
-      const w = await (await dir.getFileHandle(file(i), { create: true })).createWritable();
-      await w.write(data as Int8Array<ArrayBuffer>);
-      await w.close();
+    async band(b) {
+      // one writable per band: every byte is written once, with no read-modify-write
+      const w = await (await dir.getFileHandle(file(b), { create: true })).createWritable();
+      return {
+        append: (plane) => w.write(plane as Int8Array<ArrayBuffer>),
+        close: () => w.close(),
+        abort: () => w.abort(),
+      };
     },
     async read(i) {
-      return new Int8Array(await (await (await dir.getFileHandle(file(i))).getFile()).arrayBuffer());
+      return Promise.all(Array.from({ length: AEF_BANDS }, async (_, b) => {
+        const f = await (await dir.getFileHandle(file(b))).getFile();
+        const plane = new Int8Array(await f.slice(i * PLANE_BYTES, (i + 1) * PLANE_BYTES).arrayBuffer());
+        if (plane.length !== PLANE_BYTES) throw new Error(`AlphaEarth cache has no window ${i}`);
+        return plane;
+      }));
     },
     async discard() {
-      await root.removeEntry(name, { recursive: true });
+      await top.removeEntry(name, { recursive: true });
     },
   };
 }
@@ -59,7 +89,7 @@ export function utmGeoTags(aoi: Aoi): GeoTags {
   };
 }
 
-/** The cached AOI as a raster: reads one grid window from the store and dequantizes it. */
+/** The cached AOI as a raster: reads one grid window's 64 planes from the store and dequantizes them. */
 export function cacheSource(aoi: Aoi, store: CacheStore): RasterSource {
   const across = Math.ceil(aoi.width / TILE_SIZE);
   return {
@@ -69,10 +99,10 @@ export function cacheSource(aoi: Aoi, store: CacheStore): RasterSource {
       if (x0 % TILE_SIZE || y0 % TILE_SIZE || width > TILE_SIZE || height > TILE_SIZE || x0 + width > aoi.width || y0 + height > aoi.height) {
         throw new Error(`AlphaEarth cache reads 256x256 grid windows, not ${width}x${height} at ${x0},${y0}`);
       }
-      const q = await store.read((y0 / TILE_SIZE) * across + x0 / TILE_SIZE);
+      const planes = await store.read((y0 / TILE_SIZE) * across + x0 / TILE_SIZE);
       const part = new Int8Array(width * height);
-      const bands = Array.from({ length: AEF_BANDS }, (_, k) => {
-        for (let r = 0; r < height; r++) part.set(q.subarray(k * TILE_SIZE * TILE_SIZE + r * TILE_SIZE, k * TILE_SIZE * TILE_SIZE + r * TILE_SIZE + width), r * width);
+      const bands = planes.map((q) => {
+        for (let r = 0; r < height; r++) part.set(q.subarray(r * TILE_SIZE, r * TILE_SIZE + width), r * width);
         const out = new Float32Array(width * height);
         dequantize(part, out);
         return out;

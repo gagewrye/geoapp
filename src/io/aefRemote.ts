@@ -27,30 +27,34 @@ export async function openRemoteCog(url: string, fetchFn: Fetch, opts: { blockSi
 
 /**
  * Keep each listed tile (in-band index -> last AOI window reading it, from core tileLastWindow)
- * in every band from its first read until release(cog, that window).
+ * from its first read until release(cog, its last step). Downloads run in passes of `group`
+ * bands over `windows` windows, so band b's tile is last read at step floor(b / group) * windows + w.
  */
-export function planTiles(cog: RemoteCog, lastWindow: Map<number, number>): void {
+export function planTiles(cog: RemoteCog, lastWindow: Map<number, number>, windows: number, group: number): void {
   const { tilesPerBand, bandSeparate, offsets, counts } = cog.layout;
-  const last = new Map<number, number>(); // offset -> last window; files may share bytes between tiles
+  const last = new Map<number, number>(); // offset -> last step; files may share bytes between tiles
   for (const [t, w] of lastWindow) {
+    // a pixel-interleaved tile holds every band, so it is read in pass 0 only (group = 64)
     for (let b = 0; b < (bandSeparate ? cog.meta.bandCount : 1); b++) {
       const i = b * tilesPerBand + t, offset = offsets[i]!, count = counts[i]!;
       if (count === 0) continue; // sparse tile, never fetched
       cog.source.plan(offset, count);
-      last.set(offset, Math.max(last.get(offset) ?? w, w));
+      const step = Math.floor(b / group) * windows + w;
+      last.set(offset, Math.max(last.get(offset) ?? step, step));
     }
   }
-  for (const [offset, w] of last) cog.releases.set(w, [...(cog.releases.get(w) ?? []), offset]);
+  for (const [offset, step] of last) cog.releases.set(step, [...(cog.releases.get(step) ?? []), offset]);
 }
 
-/** Drop the tiles whose last reader was window w. */
-export function release(cog: RemoteCog, w: number): void {
-  for (const offset of cog.releases.get(w) ?? []) cog.source.release(offset);
-  cog.releases.delete(w);
+/** Drop the tiles whose last reader was this step. */
+export function release(cog: RemoteCog, step: number): void {
+  for (const offset of cog.releases.get(step) ?? []) cog.source.release(offset);
+  cog.releases.delete(step);
 }
 
-/** Raw Int8 bands of a file window [c0, r0, c1, r1], in file row order. */
-export async function readInt8(cog: RemoteCog, win: [number, number, number, number]): Promise<Int8Array[]> {
-  const bands = (await cog.image.readRasters({ window: win })) as unknown as ArrayLike<number>[];
+/** Raw Int8 bands [b0, b1) of a file window [c0, r0, c1, r1], in file row order. */
+export async function readInt8(cog: RemoteCog, win: [number, number, number, number], [b0, b1]: [number, number]): Promise<Int8Array[]> {
+  const samples = Array.from({ length: b1 - b0 }, (_, k) => b0 + k);
+  const bands = (await cog.image.readRasters({ window: win, samples })) as unknown as ArrayLike<number>[];
   return Array.from(bands, (b) => (b instanceof Int8Array ? b : Int8Array.from(b)));
 }

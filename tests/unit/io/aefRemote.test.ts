@@ -100,7 +100,7 @@ describe("request timeout (F6)", () => {
     });
     await expect(run(fetch)).rejects.toThrow(MSG);
     await vi.advanceTimersByTimeAsync(2 * T);
-    expect(signals).toHaveLength(6); // a window asks for 256 tiles; only the first 6 slots were used
+    expect(signals).toHaveLength(6); // a window asks for 4 tiles x 8 bands; only the first 6 slots were used
     expect(signals.slice(1).every((sg) => sg.aborted)).toBe(true); // the first had already ended with its 500
   });
 
@@ -138,6 +138,6 @@ describe("request timeout (F6)", () => {
       return new Response(d.slice(r[0], Math.min(r[1], d.length - 1) + 1), { status: 206, headers: headers(r, d) });
     });
     await run(fetch);
-    expect(peak).toBe(6); // a window reads 4 tiles x 64 bands at once
+    expect(peak).toBe(6); // a window reads 4 tiles x 8 bands at once
   });
 });

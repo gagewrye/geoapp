@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { GeoTIFFImage } from "geotiff";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AefEntry, Aoi } from "../../../src/core/aef";
 import { tileWindows } from "../../../src/core/grid";
 import { memoryStore } from "../../../src/io/aefCache";
-import { fetchEntries } from "../../../src/io/aefDownload";
+import { BAND_GROUP, fetchEntries } from "../../../src/io/aefDownload";
 import { openRemoteCog, planTiles, readInt8, release } from "../../../src/io/aefRemote";
 import { aefTiff, memFetch, pattern } from "../helpers/aefTiff";
 
@@ -52,8 +53,8 @@ describe("each tile fetched once (F3)", () => {
   it("keeps a planned tile until its last window is released, then drops it", async () => {
     const { fetch, log } = memFetch(files);
     const cog = await openRemoteCog(BASE + east.entry.path, fetch);
-    planTiles(cog, new Map([[0, 5]])); // tile 0 of each band, last read by window 5
-    const read = () => readInt8(cog, [0, 0, 10, 10]);
+    planTiles(cog, new Map([[0, 5]]), 10, 64); // tile 0 of each band, last read by window 5 of one pass
+    const read = () => readInt8(cog, [0, 0, 10, 10], [0, 64]);
     await read();
     const n = log.length;
     await read();
@@ -63,5 +64,47 @@ describe("each tile fetched once (F3)", () => {
     release(cog, 5);
     await read();
     expect(log.length).toBe(n + 64); // one exact request per band tile
+  });
+
+  it("in band-group passes, band b's tile is kept until window w of pass floor(b / group)", async () => {
+    const { fetch, log } = memFetch(files);
+    const cog = await openRemoteCog(BASE + east.entry.path, fetch);
+    planTiles(cog, new Map([[0, 5]]), 10, 8); // band 8..15 tiles are last read at step 1 x 10 + 5
+    const read = () => readInt8(cog, [0, 0, 10, 10], [8, 16]);
+    await read();
+    const n = log.length;
+    release(cog, 5); // pass 0's step 5 drops bands 0..7 only
+    await read();
+    expect(log.length).toBe(n);
+    release(cog, 15);
+    await read();
+    expect(log.length).toBe(n + 8);
+  });
+});
+
+describe("band-group passes (spec 002 Cache)", () => {
+  afterEach(() => vi.restoreAllMocks());
+  const samples = (spy: { mock: { calls: unknown[][] } }) => new Set(spy.mock.calls.map(([o]) => (o as { samples: number[] }).samples.join(",")));
+  const groups = (k: number) => Array.from({ length: 64 / k }, (_, g) => Array.from({ length: k }, (_, i) => g * k + i).join(","));
+
+  it.each([
+    ["band-separate COGs are read 8 bands per pass", false, groups(BAND_GROUP)],
+    ["a pixel-interleaved COG is read in one pass of 64 bands, so no tile is refetched", true, groups(64)],
+  ])("%s; each byte is requested once and pixels are right", async (_n, interleaved, want) => {
+    const c = cog("c", 0, 576, 576, true);
+    const bytes = interleaved ? aefTiff({ width: 576, height: 576, x0: OX, y1: OY, tile: T, bottomUp: true, interleaved, value: (b, r, cc) => pattern(b, cc, r) }) : c.bytes;
+    const url = BASE + c.entry.path;
+    const spy = vi.spyOn(GeoTIFFImage.prototype, "readRasters");
+    const { fetch, log } = memFetch(new Map([[url, bytes]]));
+    const src = await fetchEntries(aoi, [c.entry], memoryStore(), { fetch, base: BASE });
+    expect(samples(spy)).toEqual(new Set(want));
+    const ranges = log.map((l) => [l.range![0], Math.min(l.range![1], bytes.length - 1)] as const);
+    const seen = new Uint8Array(bytes.length);
+    for (const [a, b] of ranges) seen.fill(1, a, b + 1);
+    expect(ranges.reduce((s, [a, b]) => s + b - a + 1, 0)).toBe(seen.reduce((s, v) => s + v, 0));
+    const t = await src.readWindow(256, 256, 256, 256);
+    for (const b of [0, 9, 63]) for (let r = 0; r < 256; r += 11) for (let cc = 0; cc < 256; cc += 13) {
+      expect(t.bands[b]![r * 256 + cc]).toBe(deq(pattern(b, 20 + 256 + cc, 20 + 256 + r)));
+    }
   });
 });

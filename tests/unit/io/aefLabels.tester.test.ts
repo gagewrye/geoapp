@@ -4,7 +4,7 @@ import { fit } from "../../../src/core/fit";
 import { predictTile } from "../../../src/core/predict";
 import { samplePixels } from "../../../src/core/sample";
 import { NODATA_OUT } from "../../../src/core/types";
-import { cacheSource, memoryStore, WINDOW_BYTES } from "../../../src/io/aefCache";
+import { cacheSource, memoryStore, PLANE_BYTES } from "../../../src/io/aefCache";
 
 // Tester edges: spec 001 labeling on the AlphaEarth cache (64 bands, NaN = no data, nodata null).
 const aoi: Aoi = { epsg: 32617, gt: [500000, 10, 0, 2800000, 0, -10], width: 40, height: 30 };
@@ -14,11 +14,11 @@ const BANDS = Array.from({ length: AEF_BANDS }, (_, i) => i + 1);
 /** One cached window: west half value +40, east half -40 in every band, rows 0..4 no data (-128). */
 async function cached() {
   const store = memoryStore();
-  const q = new Int8Array(WINDOW_BYTES).fill(-128);
-  for (let b = 0; b < AEF_BANDS; b++) for (let r = 5; r < aoi.height; r++) for (let c = 0; c < aoi.width; c++) {
-    q[b * 65536 + r * 256 + c] = (c < 20 ? 40 : -40) + (b % 2);
+  for (let b = 0; b < AEF_BANDS; b++) {
+    const q = new Int8Array(PLANE_BYTES).fill(-128);
+    for (let r = 5; r < aoi.height; r++) for (let c = 0; c < aoi.width; c++) q[r * 256 + c] = (c < 20 ? 40 : -40) + (b % 2);
+    await (await store.band(b)).append(q);
   }
-  await store.write(0, q);
   return cacheSource(aoi, store).readWindow(0, 0, aoi.width, aoi.height);
 }
 
