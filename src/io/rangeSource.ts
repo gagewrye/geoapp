@@ -8,7 +8,8 @@ type Slice = { offset: number; length: number };
 export const BLOCK = 65536;
 const HEADER_CACHE_BYTES = 16 * 2 ** 20;
 // Browsers open 6 connections per host over HTTP/1.1; more would wait in the browser's queue
-// without progress and trip the idle timeout.
+// without progress and trip the idle timeout. The cap is per COG (per RangeSource); it holds per
+// host only because fetchEntries reads one COG at a time. Parallel COG reads need a shared limiter.
 const MAX_IN_FLIGHT = 6;
 
 /**
