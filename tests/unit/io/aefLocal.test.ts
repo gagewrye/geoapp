@@ -3,6 +3,7 @@ import { fromArrayBuffer } from "geotiff";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { dequantize } from "../../../src/core/aef";
 import { openGeoTiff } from "../../../src/io/geotiffSource";
+import { firstDiff } from "../helpers/floats";
 
 const COGS = "tests/fixtures/aef/cogs/2021/17N";
 const buffer = (path: string) => {
@@ -27,7 +28,7 @@ describe("local AlphaEarth COG (criterion 15)", () => {
       expect(q).toBeInstanceOf(Int8Array);
       const want = new Float32Array(q.length);
       dequantize(q, want);
-      expect(tile.bands[k]).toEqual(want); // NaN equals NaN here
+      expect(firstDiff(tile.bands[k]!, want), `band ${k}`).toBe(-1);
       invalid += q.filter((v) => v === -128).length;
     });
     expect(tile.bands[0]!.filter(Number.isNaN).length * 64).toBe(invalid);

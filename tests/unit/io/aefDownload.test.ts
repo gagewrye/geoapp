@@ -4,6 +4,7 @@ import { AEF_BASE, dequantize, type AefEntry, type Aoi } from "../../../src/core
 import { downloadAoi, fetchEntries } from "../../../src/io/aefDownload";
 import { memoryStore, WINDOW_BYTES } from "../../../src/io/aefCache";
 import { loadYears } from "../../../src/io/aefIndex";
+import { firstDiff } from "../helpers/floats";
 import { rangeFetch } from "../helpers/rangeFetch";
 
 const F = "tests/fixtures/aef";
@@ -33,7 +34,7 @@ describe("mosaic of mixed-orientation COGs (criterion 7)", () => {
     const src = await fetchEntries(chipAoi, entries, store, { fetch });
     expect(src.meta).toMatchObject({ width: N, height: N, bandCount: 64, epsg: 32617, gt: chipAoi.gt, nodata: null });
     const tile = await src.readWindow(0, 0, N, N);
-    for (let k = 0; k < 64; k++) expect(tile.bands[k]).toEqual(refBand(k));
+    for (let k = 0; k < 64; k++) expect(firstDiff(tile.bands[k]!, refBand(k)), `band ${k}`).toBe(-1);
     expect(tile.bands[0]!.filter(Number.isNaN).length).toBe(chip.invalid);
     expect(chip.invalid).toBeGreaterThan(0);
     expect([...store.windows.values()].map((w) => w.length)).toEqual([WINDOW_BYTES]);
@@ -44,13 +45,14 @@ describe("mosaic of mixed-orientation COGs (criterion 7)", () => {
     const src = await fetchEntries(wideAoi, entries, memoryStore(), { fetch });
     const w0 = await src.readWindow(0, 0, 256, 228);
     const w1 = await src.readWindow(256, 0, 64, 228);
-    for (const k of [0, 1, 16, 63]) {
+    for (let k = 0; k < 64; k++) {
       const want = refBand(k);
+      const got = new Float32Array(320 * 228), exp = new Float32Array(320 * 228).fill(NaN);
       for (let r = 0; r < 228; r++) for (let c = 0; c < 320; c++) {
-        const got = c < 256 ? w0.bands[k]![r * 256 + c]! : w1.bands[k]![r * 64 + c - 256]!;
-        const inChip = c >= 192 && r >= 100;
-        expect(got, `band ${k} col ${c} row ${r}`).toEqual(inChip ? want[(r - 100) * N + c - 192] : NaN);
+        got[r * 320 + c] = c < 256 ? w0.bands[k]![r * 256 + c]! : w1.bands[k]![r * 64 + c - 256]!;
+        if (c >= 192 && r >= 100) exp[r * 320 + c] = want[(r - 100) * N + c - 192]!;
       }
+      expect(firstDiff(got, exp), `band ${k}`).toBe(-1);
     }
   });
 
