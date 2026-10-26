@@ -77,16 +77,15 @@ describe("index swap under failure (tester, F5 / criterion 16)", () => {
   });
 
   // swapIn renames: #1-#3 move 2019, years.json, NOTICE aside; #4.. move the new ones in.
-  // TESTER FOLLOW-UP T1 (open): the old entries sit in tmp/.old, which the finally block deletes,
-  // so a failed swap loses the old index. Flip these to `it` once fixed.
-  it.fails.each([2, 4, 7])("rename failure #%d (mid-swap): exit 1 and the old index is still there", async (at) => {
+  // Tester follow-up T1 (fixed): the old entries sat in tmp/.old, which the cleanup deleted.
+  it.each([2, 4, 7])("rename failure #%d (mid-swap): exit 1 and the old index is still there", async (at) => {
     const { parent, out, result } = await failing("rename", at);
     await expect(result).rejects.toThrow(/injected rename failure/);
     expect(await snapshot(out)).toEqual(OLD);
     expect(await readdir(parent)).toEqual(["out"]);
   });
 
-  it.fails("without injection: a plain file named like a year in out makes the swap fail, and the old index must survive", async () => {
+  it("without injection: a plain file named like a year in out makes the swap fail, and the old index must survive", async () => {
     const { parent, out } = await existingOut();
     await writeFile(join(out, "2021"), "a stray file, not a shard dir");
     await expect(run("node", [SCRIPT, CSV, out])).rejects.toThrow();

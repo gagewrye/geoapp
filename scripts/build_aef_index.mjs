@@ -118,13 +118,32 @@ async function main() {
 
 /** Replace what this script owns in out ({year}/, years.json, NOTICE) with tmp's; other files stay. */
 async function swapIn(tmp, out) {
-  const old = join(tmp, ".old");
-  await mkdir(old);
-  // Move only what this script writes, so stale shards go but a mistyped out dir is not wiped.
-  for (const d of await readdir(out, { withFileTypes: true })) {
-    if ((d.isDirectory() && /^\d{4}$/.test(d.name)) || d.name === "years.json" || d.name === "NOTICE") await rename(join(out, d.name), join(old, d.name));
+  // A sibling of out, not inside tmp: main's cleanup of tmp must never delete the old index.
+  const old = await mkdtemp(join(dirname(resolve(out)), ".aef-index-old-"));
+  const movedOut = [], movedIn = [];
+  try {
+    // Move only what this script writes, so stale shards go but a mistyped out dir is not wiped.
+    for (const d of await readdir(out, { withFileTypes: true })) {
+      if ((d.isDirectory() && /^\d{4}$/.test(d.name)) || d.name === "years.json" || d.name === "NOTICE") {
+        await rename(join(out, d.name), join(old, d.name));
+        movedOut.push(d.name);
+      }
+    }
+    for (const name of await readdir(tmp)) {
+      await rename(join(tmp, name), join(out, name));
+      movedIn.push(name);
+    }
+  } catch (e) {
+    try {
+      for (const name of movedIn) await rm(join(out, name), { recursive: true, force: true });
+      for (const name of movedOut) await rename(join(old, name), join(out, name));
+    } catch (undo) {
+      throw new Error(`${e.message}; restoring the old index also failed (${undo.message}), it is in ${old}`, { cause: undo });
+    }
+    await rm(old, { recursive: true, force: true });
+    throw e;
   }
-  for (const name of await readdir(tmp)) if (name !== ".old") await rename(join(tmp, name), join(out, name));
+  await rm(old, { recursive: true, force: true });
 }
 
 main().catch((e) => {
