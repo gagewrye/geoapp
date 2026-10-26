@@ -68,7 +68,6 @@ $("train").addEventListener("click", () => run(async () => {
   if (classes.length < 2) return say("Draw polygons for at least two classes.");
   say("Training...");
   const result = await train(source, features, classes);
-  if (result.samples === 0) return say("No raster pixels fall inside the polygons.");
   model = result.model;
   say(`Trained on ${result.samples} pixels, ${classes.length} classes.`);
 }));

@@ -7,7 +7,7 @@ export function fit(X: Float32Array, y: Uint8Array, bands: number[], classes: st
   const d = bands.length;
   const k = classes.length;
   const n = y.length;
-  if (n === 0) throw new Error("fit: no training samples");
+  if (n === 0) throw new Error("No training samples: no raster pixels fall inside the polygons");
   if (X.length !== n * d) throw new Error(`fit: X has ${X.length} values, expected ${n * d}`);
   for (let i = 0; i < n; i++) if (y[i]! >= k) throw new Error(`fit: label ${y[i]} has no class`);
 
