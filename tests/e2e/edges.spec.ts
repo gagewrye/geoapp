@@ -8,10 +8,11 @@ import { FEATURE, clickAt, drawPolygon, jumpTo, message, openApp, openRaster, pi
 const polygons = async (page: Page) => (await snapshot(page)).map((f) => f.geometry);
 
 /** Drag with many small moves, as a real pointer does. */
-async function smoothDrag(page: Page, a: { x: number; y: number }, b: { x: number; y: number }, steps = 200) {
+async function smoothDrag(page: Page, a: { x: number; y: number }, b: { x: number; y: number }, steps = 200, held: () => Promise<void> = async () => {}) {
   await page.mouse.move(a.x, a.y);
   await page.mouse.down();
   for (let i = 1; i <= steps; i++) await page.mouse.move(a.x + ((b.x - a.x) * i) / steps, a.y + ((b.y - a.y) * i) / steps);
+  await held();
   await page.mouse.up();
   await page.waitForTimeout(100);
 }
@@ -49,7 +50,7 @@ for (const sign of [1, -1]) {
       expect(await polygons(page)).toEqual(before);
     });
 
-    test("adding a vertex in edit mode (midpoint drag) beyond MAX_LAT is blocked, nothing stored past the limit", async ({ page }) => {
+    test("adding a vertex in edit mode (midpoint drag) beyond MAX_LAT is blocked and leaves the stored polygon unchanged", async ({ page }) => {
       // Wide polygon so the polar midpoint is far from any corner on screen; on small polygons
       // terra-draw grabs the nearby corner instead of the midpoint.
       const wide: LngLat[] = [[-30, sign * 76], [30, sign * 76], [30, sign * 82], [-30, sign * 82]];
@@ -62,15 +63,14 @@ for (const sign of [1, -1]) {
       const m = polar(mid);
       const a = await toScreen(page, m);
       for (const v of before) expect(Math.hypot((await toScreen(page, v)).x - a.x, (await toScreen(page, v)).y - a.y)).toBeGreaterThan(60);
-      await smoothDrag(page, a, await toScreen(page, [m[0], sign * 88]), 10);
+      let during: LngLat[] = [];
+      await smoothDrag(page, a, await toScreen(page, [m[0], sign * 88]), 10, async () => { during = (await polygons(page))[0].coordinates[0]; });
       await expect(message(page)).toHaveText(MESSAGES.latitude);
+      expect(during).toHaveLength(before.length + 1); // the vertex really was added (midpoint, not a corner)
+      for (const [, lat] of during) expect(Math.abs(lat)).toBeLessThan(MAX_LAT);
+      // Criterion 15: the blocked edit, including its inserted vertex, leaves the stored polygon unchanged
       const after = (await polygons(page))[0].coordinates[0] as LngLat[];
-      expect(after).toHaveLength(before.length + 1); // the vertex really was added (midpoint, not a corner)
-      for (const [, lat] of after) {
-        expect(Math.abs(lat)).toBeLessThan(MAX_LAT);
-        expect(Math.abs(lat)).not.toBe(MAX_LAT);
-      }
-      for (const v of before) expect(after).toContainEqual(v); // existing corners untouched
+      expect(after).toEqual(before);
     });
 
     test("an ordinary (smooth) vertex drag beyond MAX_LAT leaves the stored polygon unchanged", async ({ page }) => {

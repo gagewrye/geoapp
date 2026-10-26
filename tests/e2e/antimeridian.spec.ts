@@ -48,16 +48,10 @@ for (const zoom of [3, 14]) {
         const from = start();
         await dragFromTo(page, from, { x: from.x + 110, y: from.y });
         await expect(message(page)).toHaveText(MESSAGES.antimeridian);
-        // a blocked drag snaps back to where it started
+        // a blocked drag, including a midpoint's inserted vertex, snaps back to where it started
         const after = await snapshot(page);
         expect(after).toHaveLength(1);
-        const ring: [number, number][] = after[0].geometry.coordinates[0];
-        if (edit.startsWith("dragging a midpoint")) {
-          expect(ring).toHaveLength(before.length + 1); // the inserted vertex is its own committed edit
-          for (const v of before) expect(ring).toContainEqual(v);
-        } else {
-          expect(ring).toEqual(before);
-        }
+        expect(after[0].geometry.coordinates[0]).toEqual(before);
         await expectNothingInvalid(page);
       });
     }
