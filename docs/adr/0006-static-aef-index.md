@@ -1,8 +1,9 @@
 # 0006: Static per-zone AlphaEarth tile index, hosted with the app
 
 **Status:** Accepted (Gage, 2026-10-26)
+*Factual correction (2026-10-26): index and shard sizes in Context; decision unchanged.*
 
-**Context:** COG file names contain an Earth Engine asset id, so they can't be computed from coordinates, and an index is needed. Google's readme and the Source Cooperative README both describe `aef_index.{parquet,gpkg,csv}` under `v1/annual/`. It has one row per file: WGS84 footprint, CRS, year, UTM zone, and UTM and WGS84 bounds. Footprints never cross the antimeridian (checked 2026-10-26). The CSV is over 10 MB. Reading GeoParquet in the browser would need a new dependency. Fetching the full index every session wastes bandwidth.
+**Context:** COG file names contain an Earth Engine asset id, so they can't be computed from coordinates, and an index is needed. Google's readme and the Source Cooperative README both describe `aef_index.{parquet,gpkg,csv}` under `v1/annual/`. It has one row per file: WGS84 footprint, CRS, year, UTM zone, and UTM and WGS84 bounds. Footprints never cross the antimeridian (checked 2026-10-26). The live CSV is about 800 MB, and the full shard set is 43 MB over 1,080 shards, so only the needed shards are committed and the rest are generated at deploy time. Reading GeoParquet in the browser would need a new dependency. Fetching the full index every session wastes bandwidth.
 
 **Decision:** A Node build script with no dependencies (`scripts/`, not shipped) reads the `AEF_BASE` host's `aef_index.csv` and writes `public/aef-index/years.json` and `public/aef-index/{year}/{epsg}.json` (`AefEntry[]`, spec 002). Paths are relative to `AEF_BASE`. The output is committed and regenerated when the host adds a year. The implementer confirms the CSV column names against the live file.
 
