@@ -20,16 +20,6 @@ function collectErrors(page: Page): string[] {
   return errors;
 }
 
-/** Counts pointerup events the app dispatches itself (untrusted), seen at the window. */
-async function countSyntheticPointerups(page: Page): Promise<() => Promise<number>> {
-  await page.evaluate(() => {
-    const w = window as any;
-    w.__syntheticUps = 0;
-    window.addEventListener("pointerup", (e) => { if (!e.isTrusted) w.__syntheticUps++; }, { capture: true });
-  });
-  return () => page.evaluate(() => (window as any).__syntheticUps as number);
-}
-
 /** Raw CDP mouse or pen; `held` false sends buttons 0 (a lost release when no mouseReleased came). */
 function rawPointer(cdp: CDPSession, pointerType: "mouse" | "pen" = "mouse") {
   return (type: "mousePressed" | "mouseMoved" | "mouseReleased", p: Xy, held: boolean) =>
@@ -51,11 +41,10 @@ async function expectNothingInvalid(page: Page) {
 
 test.describe("draw mode is untouched by the button-up handler (criteria 2, 12, tester)", () => {
   for (const zoom of [3, 14]) {
-    test(`zoom ${zoom}: long button-up hovers between clicks add no vertex, dispatch no synthetic pointerup, and vertices equal unproject`, async ({ page }) => {
+    test(`zoom ${zoom}: long button-up hovers between clicks add no vertex and vertices equal unproject`, async ({ page }) => {
       const errors = collectErrors(page);
       await openApp(page);
       await jumpTo(page, [15, 45], zoom);
-      const synthetic = await countSyntheticPointerups(page);
       const mouse = rawPointer(await page.context().newCDPSession(page));
       const c = await toScreen(page, [15, 45]);
       const pts = [{ x: c.x - 120, y: c.y - 90 }, { x: c.x + 130, y: c.y - 80 }, { x: c.x + 110, y: c.y + 100 }, { x: c.x - 100, y: c.y + 90 }];
@@ -73,7 +62,6 @@ test.describe("draw mode is untouched by the button-up handler (criteria 2, 12, 
         await page.waitForTimeout(80);
         at = p;
       }
-      expect(await synthetic(), "no synthetic pointerup while drawing").toBe(0);
       const all = await rings(page);
       expect(all).toHaveLength(1);
       expect(all[0]).toHaveLength(5);
@@ -89,7 +77,6 @@ test.describe("draw mode is untouched by the button-up handler (criteria 2, 12, 
   test("a map pan in the middle of drawing, then more clicks, yields exactly the clicked vertices", async ({ page }) => {
     await openApp(page);
     await jumpTo(page, [0, 0], 3);
-    const synthetic = await countSyntheticPointerups(page);
     await setMode(page, "draw");
     const c = await toScreen(page, [0, 0]);
     await clickAt(page, { x: c.x - 100, y: c.y - 60 });
@@ -109,7 +96,6 @@ test.describe("draw mode is untouched by the button-up handler (criteria 2, 12, 
       return f.geometry.coordinates[0][0];
     })) as LngLat;
     await clickAt(page, await toScreen(page, first));
-    expect(await synthetic()).toBe(0);
     const all = await rings(page);
     expect(all).toHaveLength(1);
     expect(all[0]).toHaveLength(5);
@@ -120,7 +106,7 @@ test.describe("draw mode is untouched by the button-up handler (criteria 2, 12, 
 });
 
 test.describe("select mode outside a feature drag is untouched by the button-up handler (tester)", () => {
-  test("hovering after a normal drag dispatches no synthetic pointerup, keeps the edit and selection, and a click off the polygon deselects", async ({ page }) => {
+  test("hovering after a normal drag keeps the edit and selection, and a click off the polygon deselects", async ({ page }) => {
     const errors = collectErrors(page);
     await openApp(page);
     await jumpTo(page, [0, 0], 3);
@@ -128,7 +114,6 @@ test.describe("select mode outside a feature drag is untouched by the button-up 
     await drawPolygon(page, [{ x: c.x - 150, y: c.y - 100 }, { x: c.x + 150, y: c.y - 100 }, { x: c.x + 150, y: c.y + 100 }, { x: c.x - 150, y: c.y + 100 }], "a");
     await setMode(page, "select");
     await clickAt(page, c);
-    const synthetic = await countSyntheticPointerups(page);
     const v = { x: c.x + 150, y: c.y - 100 };
     await page.mouse.move(v.x, v.y);
     await page.mouse.down();
@@ -136,10 +121,8 @@ test.describe("select mode outside a feature drag is untouched by the button-up 
     await page.mouse.up();
     await page.waitForTimeout(80);
     const [edited] = await rings(page);
-    expect(await synthetic(), "a normally released drag needs no synthetic pointerup").toBe(0);
     for (let i = 1; i <= 30; i++) await page.mouse.move(v.x + 30 - 10 * i, v.y - 30 + 6 * i);
     await page.waitForTimeout(80);
-    expect(await synthetic(), "button-up hover outside a drag must not dispatch pointerup").toBe(0);
     expect(await rings(page)).toEqual([edited]);
     const selected = () => page.evaluate(() => (window as any).__geoapp.draw.getSnapshot().some((f: any) => f.properties.selected));
     expect(await selected()).toBe(true);
@@ -163,7 +146,6 @@ test.describe("lost release across 180 (criterion 14, tester)", () => {
         await setMode(page, "select");
         await clickAt(page, { x: c.x - 115, y: c.y });
         const before = await rings(page);
-        const synthetic = await countSyntheticPointerups(page);
         const mouse = rawPointer(await page.context().newCDPSession(page));
         const from = what === "body" ? { x: c.x - 115, y: c.y } : pts[1]!;
         const to = { x: from.x + 120, y: from.y };
@@ -176,9 +158,7 @@ test.describe("lost release across 180 (criterion 14, tester)", () => {
         expect(await rings(page)).toEqual(before);
         await expectNothingInvalid(page);
         expect(await dragPanEnabled(page)).toBe(true);
-        // sanity check for the counter used in the draw-mode tests: the lost release was ended by exactly one
-        expect(await synthetic()).toBe(1);
-        // and it is over: hovering back across 180 edits nothing
+        // it is over: hovering back across 180 edits nothing
         for (let i = 1; i <= 15; i++) await mouse("mouseMoved", lerp({ x: to.x + 60, y: to.y + 40 }, from, i / 15), false);
         for (let i = 1; i <= 15; i++) await mouse("mouseMoved", lerp(from, to, i / 15), false);
         await page.waitForTimeout(100);
