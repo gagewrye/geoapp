@@ -29,7 +29,9 @@ export async function openGeoTiff(tiff: GeoTIFF): Promise<RasterSource> {
   const width = image.getWidth();
   const height = image.getHeight();
   const bandCount = image.getSamplesPerPixel();
-  const nodata = image.getGDALNoData();
+  // Bands are read as Float32Array, so compare against nodata rounded the same way.
+  const nd = image.getGDALNoData();
+  const nodata = nd === null ? null : Math.fround(nd);
   return {
     meta: { width, height, bandCount, gt, epsg, nodata, geoTags },
     async readWindow(x0, y0, w, h) {
