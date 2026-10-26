@@ -107,6 +107,20 @@ test.describe("classify export guard (criteria 9, 11, tester)", () => {
       expect([img.getWidth(), img.getHeight()]).toEqual([1000, 1000]);
     });
   }
+
+  test("OPFS path: if cleanup after a failed write also fails, the user still sees the write error", async ({ page }) => {
+    await opfsWithSpies(page);
+    await page.addInitScript(() => {
+      (window as any).FileSystemDirectoryHandle.prototype.removeEntry = () => Promise.reject(new Error("simulated removeEntry failure"));
+    });
+    await openApp(page);
+    await trainTwoClasses(page);
+    await page.evaluate(() => { Object.assign((window as any).__spy, { failAt: 3, mode: "reject" }); });
+    await page.click("#classify");
+    await expect(message(page)).not.toHaveText(/^(Trained on .*|Classifying\.\.\.)$/);
+    await expect(message(page)).toHaveText("simulated write failure");
+    expect((await spy(page)).aborts).toBe(1);
+  });
 });
 
 /** n tiny labelled polygons inside rgbFixture, added through terra-draw, one class each. */

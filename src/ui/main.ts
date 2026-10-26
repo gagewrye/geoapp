@@ -88,7 +88,7 @@ $("classify").addEventListener("click", () => run(async () => {
   try {
     await classify(source, model, sink);
   } catch (e) {
-    await sink.abort?.();
+    await sink.abort?.().catch(() => {}); // a failed cleanup must not hide the classify error
     throw e;
   }
   say("Export complete.");
