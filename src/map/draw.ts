@@ -1,5 +1,5 @@
 import type { Map as MapLibreMap } from "maplibre-gl";
-import { TerraDraw, TerraDrawPolygonMode, TerraDrawSelectMode } from "terra-draw";
+import { TerraDraw, TerraDrawPolygonMode, TerraDrawRectangleMode, TerraDrawSelectMode } from "terra-draw";
 import { TerraDrawMapLibreGLAdapter } from "terra-draw-maplibre-gl-adapter";
 import { normalizeLon } from "../core/ring";
 import { guardDrags } from "./dragGuard";
@@ -37,7 +37,11 @@ function endDragsAnywhere(map: MapLibreMap) {
   window.addEventListener("pointermove", (e) => { if (e.buttons === 0) endFeatureDrag(e); }, { capture: true });
 }
 
-/** terra-draw with polygon drawing and select-mode editing, both behind one validation (ADR 0003). */
+/**
+ * terra-draw with polygon drawing and select-mode editing, both behind one validation (ADR 0003),
+ * and the AlphaEarth area rectangle (spec 002). Select mode edits polygons only, so the area is
+ * never edited or labelled; it is outline-only so the preview below stays visible.
+ */
 export function createDraw(map: MapLibreMap, onBlocked: (reason: BlockReason) => void): TerraDraw {
   endDragsAnywhere(map);
   const ref: { draw?: TerraDraw } = {};
@@ -46,6 +50,7 @@ export function createDraw(map: MapLibreMap, onBlocked: (reason: BlockReason) =>
     adapter: new WrappingAdapter({ map }),
     modes: [
       new TerraDrawPolygonMode({ validation }),
+      new TerraDrawRectangleMode({ styles: { fillOpacity: 0, outlineColor: "#ffd400", outlineWidth: 2 } }),
       new TerraDrawSelectMode({
         flags: {
           polygon: {
