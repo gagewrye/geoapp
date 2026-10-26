@@ -140,7 +140,7 @@ async function swapIn(tmp, out) {
     } catch (undo) {
       throw new Error(`${e.message}; restoring the old index also failed (${undo.message}), it is in ${old}`, { cause: undo });
     }
-    await rm(old, { recursive: true, force: true });
+    await dropOld(old); // the restore worked; a stray empty folder must not replace the swap's error
     throw e;
   }
   await dropOld(old);

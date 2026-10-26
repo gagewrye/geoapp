@@ -41,7 +41,7 @@ async function attempt(fail: string) {
   return { out, old, ...res };
 }
 
-describe("old index folder cleanup (review optional item 1)", () => {
+describe("old index folder cleanup (review optional items 1, 2)", () => {
   it("a failed delete after a good swap warns, naming the folder, and exits 0 with the new index in place", async () => {
     const r = await attempt("rm:1");
     expect(r.code).toBe(0);
@@ -51,4 +51,12 @@ describe("old index folder cleanup (review optional item 1)", () => {
     expect(await readFile(join(r.out, "years.json"), "utf8")).toBe("[2017,2018,2021,2025]");
   });
 
+  it("a failed delete after a good restore warns and rethrows the swap's own error", async () => {
+    const r = await attempt("rename:4,rm:1"); // first move-in fails, the restore succeeds, deleting old fails
+    expect(r.code).toBe(1);
+    expect(r.old).toHaveLength(1);
+    expect(r.stderr).toContain(r.old[0]);
+    expect(r.stderr).toMatch(/build_aef_index: injected rename failure #4\s*$/);
+    expect(await readFile(join(r.out, "years.json"), "utf8")).toBe("[2019]");
+  });
 });
