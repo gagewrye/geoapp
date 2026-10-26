@@ -20,6 +20,12 @@ export class AefGridError extends Error {
   }
 }
 
+export class AefCrsError extends Error {
+  constructor(readonly path: string, epsg: number, aoiEpsg: number) {
+    super(`AlphaEarth file ${path} is in ${epsg ? `EPSG:${epsg}` : "an unknown CRS"}, not the area's EPSG:${aoiEpsg}.`);
+  }
+}
+
 /** blockSize and timeoutMs (per COG request, without progress) are for tests. */
 type Options = { fetch?: Fetch; base?: string; appBase?: string; blockSize?: number; timeoutMs?: number };
 
@@ -56,8 +62,9 @@ export async function fetchEntries(aoi: Aoi, entries: AefEntry[], store: CacheSt
     for (const e of byPath) {
       const cog = await openRemoteCog(base + e.path, fetchFn, { blockSize: opts.blockSize, timeoutMs: opts.timeoutMs });
       const { gt, width, height, bandCount, epsg } = cog.meta;
+      if (epsg !== aoi.epsg) throw new AefCrsError(e.path, epsg, aoi.epsg);
       const at = placeCog(aoi, gt, width, height);
-      if (!at || epsg !== aoi.epsg) throw new AefGridError(e.path);
+      if (!at) throw new AefGridError(e.path);
       if (bandCount !== AEF_BANDS) throw new Error(`AlphaEarth file ${e.path} has ${bandCount} bands, not ${AEF_BANDS}.`);
       cogs.push({ cog, at });
     }

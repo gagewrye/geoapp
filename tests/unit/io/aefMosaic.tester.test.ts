@@ -110,7 +110,6 @@ describe("grid refusal (tester, criterion 7)", () => {
     ["1 m off", () => cog(OX + 1001, OY, 100, 100)],
     ["20 m pixels", () => cog(OX + 1000, OY, 50, 50, { scaleX: 20, scaleY: 20 })],
     ["10 x 20 m pixels", () => cog(OX + 1000, OY, 100, 50, { scaleY: 20 })],
-    ["another UTM zone", () => cog(OX + 1000, OY, 100, 100, { epsg: 32618 })],
   ])("refuses a COG %s before writing anything, and discards the cache", async (name, make) => {
     const bad = make(), ok = good();
     const list = name.includes("first") ? [bad, ok] : [ok, bad];
@@ -118,6 +117,16 @@ describe("grid refusal (tester, criterion 7)", () => {
     const aoi = aoiAt(OX, OY, 200, 100);
     await expect(fetchEntries(aoi, list.map((c) => c.entry), store, { fetch: memFetch(serve(list)).fetch, base: BASE }))
       .rejects.toThrow(`AlphaEarth file ${bad.entry.path} is not on the area's 10 m grid.`);
+    expect(store.writes).toBe(0);
+    expect(store.discarded).toBe(true);
+  });
+
+  // Review issue 12: a COG in another CRS names that CRS instead of the 10 m grid message.
+  it.each([[32618, "EPSG:32618"], [0, "an unknown CRS"]])("refuses a COG in EPSG %d, naming its CRS, before writing anything", async (epsg, crs) => {
+    const bad = cog(OX + 1000, OY, 100, 100, { epsg }), ok = good();
+    const store = memoryStore();
+    await expect(fetchEntries(aoiAt(OX, OY, 200, 100), [ok.entry, bad.entry], store, { fetch: memFetch(serve([ok, bad])).fetch, base: BASE }))
+      .rejects.toThrow(`AlphaEarth file ${bad.entry.path} is in ${crs}, not the area's EPSG:32617.`);
     expect(store.writes).toBe(0);
     expect(store.discarded).toBe(true);
   });
