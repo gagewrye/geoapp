@@ -20,7 +20,8 @@ export class AefGridError extends Error {
   }
 }
 
-type Options = { fetch?: Fetch; base?: string; appBase?: string; blockSize?: number };
+/** blockSize and timeoutMs (per COG request, without progress) are for tests. */
+type Options = { fetch?: Fetch; base?: string; appBase?: string; blockSize?: number; timeoutMs?: number };
 
 /** Look up the AOI's COGs for the year and stream them into the cache (spec 002). */
 export async function downloadAoi(aoi: Aoi, year: number, store: CacheStore, opts: Options = {}): Promise<RasterSource> {
@@ -46,7 +47,7 @@ export async function fetchEntries(aoi: Aoi, entries: AefEntry[], store: CacheSt
     const cogs: { cog: RemoteCog; at: Placement }[] = [];
     const byPath = [...entries].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
     for (const e of byPath) {
-      const cog = await openRemoteCog(base + e.path, fetchFn, opts.blockSize);
+      const cog = await openRemoteCog(base + e.path, fetchFn, { blockSize: opts.blockSize, timeoutMs: opts.timeoutMs });
       const { gt, width, height, bandCount, epsg } = cog.meta;
       const at = placeCog(aoi, gt, width, height);
       if (!at || epsg !== aoi.epsg) throw new AefGridError(e.path);

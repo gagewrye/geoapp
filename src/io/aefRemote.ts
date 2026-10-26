@@ -3,7 +3,7 @@ import { openGeoTiff } from "./geotiffSource";
 import { BLOCK, RangeSource, type Fetch } from "./rangeSource";
 import type { RasterMeta } from "./source";
 
-export { AefDownloadError, type Fetch } from "./rangeSource";
+export { AefDownloadError, type Fetch } from "./rangeGet";
 
 /** Tile grid of a COG and each tile's byte range, read from its header. */
 type Layout = { tileWidth: number; tileHeight: number; tilesPerBand: number; bandSeparate: boolean; offsets: number[]; counts: number[] };
@@ -11,8 +11,8 @@ type Layout = { tileWidth: number; tileHeight: number; tilesPerBand: number; ban
 export type RemoteCog = { url: string; meta: RasterMeta; image: GeoTIFFImage; layout: Layout; source: RangeSource; releases: Map<number, number[]> };
 
 /** Open a COG over HTTP; reads only its header, including the tile offsets. */
-export async function openRemoteCog(url: string, fetchFn: Fetch, blockSize = BLOCK): Promise<RemoteCog> {
-  const source = new RangeSource(url, fetchFn, blockSize);
+export async function openRemoteCog(url: string, fetchFn: Fetch, opts: { blockSize?: number; timeoutMs?: number } = {}): Promise<RemoteCog> {
+  const source = new RangeSource(url, fetchFn, opts.blockSize ?? BLOCK, opts.timeoutMs);
   const tiff = await GeoTIFF.fromSource(source as unknown as Parameters<typeof GeoTIFF.fromSource>[0]);
   const { meta } = await openGeoTiff(tiff);
   const image = await tiff.getImage(0);

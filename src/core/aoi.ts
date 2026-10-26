@@ -12,6 +12,10 @@ const EDGE_STEPS = 16;
 
 /** Lon/lat ring (closed or open) to a north-up 10 m UTM grid snapped outward; "zones" or "size" when refused. */
 export function aoiGrid(ring: [number, number][]): Aoi | "zones" | "size" {
+  // a bad ring is a caller bug; "zones" would tell the user something false about their area
+  if (ring.length === 0 || !ring.every(([lon, lat]) => Number.isFinite(lon) && Number.isFinite(lat))) {
+    throw new Error("aoiGrid needs a ring of finite lon/lat vertices");
+  }
   const epsgs = new Set(ring.map(([lon, lat]) => utmEpsg(lon, lat)));
   if (epsgs.size !== 1) return "zones";
   const epsg = [...epsgs][0]!;

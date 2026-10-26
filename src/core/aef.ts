@@ -30,6 +30,7 @@ const LO = -0.3, HI = 0.3;
 
 /** False-colour preview: A01, A16, A09 stretched linearly from [-0.3, 0.3] to [0, 255], clamped. */
 export function aefPreview(tile: Tile): Tile {
+  if (tile.bands.length < 17) throw new Error(`aefPreview needs at least 17 bands (A01, A16, A09), got ${tile.bands.length}`);
   const n = tile.width * tile.height;
   const bands = PREVIEW_BANDS.map((b) => {
     const src = tile.bands[b]!;

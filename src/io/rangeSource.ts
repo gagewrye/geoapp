@@ -1,16 +1,15 @@
-export type Fetch = typeof globalThis.fetch;
-type Slice = { offset: number; length: number };
+import { AefDownloadError, getRange, IDLE_TIMEOUT_MS, type Fetch } from "./rangeGet";
 
-/** Any failed COG request: a non-206 answer, a network error or a CORS failure (spec 002). */
-export class AefDownloadError extends Error {
-  constructor(readonly host: string, cause: unknown) {
-    super(`Couldn't download embeddings from ${host}.`, { cause });
-  }
-}
+export { AefDownloadError, type Fetch } from "./rangeGet";
+
+type Slice = { offset: number; length: number };
 
 // Header reads (IFDs, tag arrays) go through aligned blocks; the cap only matters for odd files.
 export const BLOCK = 65536;
 const HEADER_CACHE_BYTES = 16 * 2 ** 20;
+// Browsers open 6 connections per host over HTTP/1.1; more would wait in the browser's queue
+// without progress and trip the idle timeout.
+const MAX_IN_FLIGHT = 6;
 
 /**
  * geotiff.js source sending only ranged GETs without credentials and accepting only exact 206s.
@@ -25,8 +24,13 @@ export class RangeSource {
   private readonly planned = new Map<number, number>(); // tile offset -> byte count
   private readonly tiles = new Map<number, Promise<ArrayBuffer>>(); // planned tiles read and not yet released
   private size: number | null = null;
+  private active = 0;
+  private readonly waiting: (() => void)[] = [];
+  // a download is all or nothing, so the first failure stops every other request at once
+  private failed: AefDownloadError | null = null;
+  private readonly stop = new AbortController();
 
-  constructor(private readonly url: string, private readonly fetchFn: Fetch, private readonly blockSize: number) {
+  constructor(private readonly url: string, private readonly fetchFn: Fetch, private readonly blockSize: number, private readonly timeoutMs = IDLE_TIMEOUT_MS) {
     this.host = new URL(url).host;
   }
 
@@ -117,39 +121,23 @@ export class RangeSource {
     }
   }
 
+  /** A validated ranged GET, waiting for one of MAX_IN_FLIGHT slots first. */
   private async get(start: number, end: number, signal?: AbortSignal): Promise<ArrayBuffer> {
-    let res: Response;
+    if (this.active < MAX_IN_FLIGHT) this.active++;
+    else await new Promise<void>((go) => this.waiting.push(go)); // the finishing request hands over its slot
     try {
-      res = await this.fetchFn(this.url, { method: "GET", headers: { Range: `bytes=${start}-${end}` }, credentials: "omit", signal });
+      if (this.failed) throw this.failed;
+      const stop = signal ? AbortSignal.any([signal, this.stop.signal]) : this.stop.signal;
+      const { body, total } = await getRange({ url: this.url, fetchFn: this.fetchFn, start, end, size: this.size, timeoutMs: this.timeoutMs, signal: stop });
+      this.size = total;
+      return body;
     } catch (e) {
-      throw new AefDownloadError(this.host, e); // browsers report CORS failures as network errors
+      if (!this.failed && e instanceof AefDownloadError) { this.failed = e; this.stop.abort(e); }
+      throw e;
+    } finally {
+      const next = this.waiting.shift();
+      if (next) next(); else this.active--;
     }
-    // a 200 would mean the host ignored Range and is sending the whole multi-GB file
-    if (res.status !== 206) throw new AefDownloadError(this.host, new Error(`HTTP ${res.status} for ${this.url}`));
-    const want = this.expected(start, end, res.headers.get("Content-Range"));
-    let body: ArrayBuffer;
-    try {
-      body = await res.arrayBuffer();
-    } catch (e) {
-      throw new AefDownloadError(this.host, e); // connection lost mid-body
-    }
-    if (body.byteLength !== want) throw new AefDownloadError(this.host, new Error(`${body.byteLength} bytes for a ${want}-byte range of ${this.url}`));
-    return body;
-  }
-
-  /**
-   * Byte count a 206 must carry. Its Content-Range must start where asked, end where asked (or at
-   * the last byte when the range runs past the file), and give the same file size every time;
-   * otherwise its bytes are not the asked ones and would be decoded as the wrong pixels.
-   */
-  private expected(start: number, end: number, contentRange: string | null): number {
-    const m = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(contentRange ?? "");
-    const [s, e, total] = m ? [Number(m[1]), Number(m[2]), Number(m[3])] : [NaN, NaN, NaN];
-    if (s !== start || start >= total || e !== Math.min(end, total - 1) || (this.size !== null && total !== this.size)) {
-      throw new AefDownloadError(this.host, new Error(`Content-Range ${JSON.stringify(contentRange)} for bytes=${start}-${end} of ${this.url}`));
-    }
-    this.size = total;
-    return e - s + 1;
   }
 
   private evict(): void {

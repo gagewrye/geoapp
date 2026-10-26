@@ -39,3 +39,10 @@ describe("aefPreview (criterion 5)", () => {
     expect(aefPreview(t).bands.map((b) => b[0])).toEqual([0, 128, 255]);
   });
 });
+
+describe("aefPreview input (F6)", () => {
+  it.each([0, 3, 16])("refuses a tile with %d bands, naming the count", (n) => {
+    const tile: Tile = { x0: 0, y0: 0, width: 1, height: 1, nodata: null, bands: Array.from({ length: n }, () => new Float32Array(1)) };
+    expect(() => aefPreview(tile)).toThrow(`aefPreview needs at least 17 bands (A01, A16, A09), got ${n}`);
+  });
+});

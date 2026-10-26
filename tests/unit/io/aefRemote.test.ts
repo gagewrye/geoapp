@@ -54,3 +54,80 @@ describe("206 validation (criterion 12)", () => {
     await expect(fetchEntries(aoi, [entry], store, { fetch: memFetch(files, override).fetch, base: BASE, blockSize: 4096 })).rejects.toThrow(MSG);
   });
 });
+
+describe("request timeout (F6)", () => {
+  const T = 60; // ms without progress
+  /** Fetch that serves the header normally and answers pixel requests with `pixel`. */
+  function stalling(pixel: (range: [number, number], data: Uint8Array, signal: AbortSignal) => Promise<Response>) {
+    const signals: AbortSignal[] = [];
+    let n = 0;
+    const { fetch: serve } = memFetch(files);
+    const fetch = (async (input: RequestInfo | URL, init: RequestInit = {}) => {
+      if (n++ === 0) return serve(input, init);
+      const m = /^bytes=(\d+)-(\d+)$/.exec(new Headers(init.headers).get("range") ?? "")!;
+      signals.push(init.signal!);
+      return pixel([Number(m[1]), Number(m[2])], bytes, init.signal!);
+    }) as typeof globalThis.fetch;
+    return { fetch, signals };
+  }
+  const run = (fetch: typeof globalThis.fetch, store = memoryStore()) => fetchEntries(aoi, [entry], store, { fetch, base: BASE, blockSize: 4096, timeoutMs: T });
+  const headers = (r: [number, number], d: Uint8Array) => ({ "Content-Range": `bytes ${r[0]}-${Math.min(r[1], d.length - 1)}/${d.length}` });
+
+  it("a request with no answer fails with the message and is aborted", async () => {
+    const { fetch, signals } = stalling(() => new Promise(() => {})); // never answers, ignores abort
+    const store = memoryStore();
+    await expect(run(fetch, store)).rejects.toThrow(MSG);
+    expect(store.discarded).toBe(true);
+    expect(signals.length).toBeGreaterThan(0);
+    expect(signals.every((s) => s.aborted)).toBe(true);
+  });
+
+  it("after one request fails, queued requests are never sent and those in flight are aborted", async () => {
+    let first = true;
+    const { fetch, signals } = stalling(async () => {
+      if (first) { first = false; await new Promise((ok) => setTimeout(ok, 5)); return new Response("", { status: 500 }); }
+      return new Promise(() => {}); // the other in-flight requests hang
+    });
+    await expect(run(fetch)).rejects.toThrow(MSG);
+    await new Promise((ok) => setTimeout(ok, 2 * T));
+    expect(signals).toHaveLength(6); // a window asks for 256 tiles; only the first 6 slots were used
+    expect(signals.slice(1).every((sg) => sg.aborted)).toBe(true); // the first had already ended with its 500
+  });
+
+  it("a body that stops arriving fails with the message", async () => {
+    const { fetch } = stalling(async (r, d) => {
+      const body = new ReadableStream({ start(c) { c.enqueue(d.slice(r[0], r[0] + 10)); } }); // never closes
+      return new Response(body, { status: 206, headers: headers(r, d) });
+    });
+    await expect(run(fetch)).rejects.toThrow(MSG);
+  });
+
+  it("a slow body that keeps arriving is not timed out", async () => {
+    const { fetch } = stalling(async (r, d) => {
+      const all = d.slice(r[0], Math.min(r[1], d.length - 1) + 1), step = Math.ceil(all.length / 4);
+      let i = 0;
+      const body = new ReadableStream({
+        async pull(c) {
+          await new Promise((ok) => setTimeout(ok, T / 3)); // 4 chunks take longer than T in total
+          if (i >= all.length) { c.close(); return; }
+          c.enqueue(all.slice(i, i + step)); i += step;
+        },
+      });
+      return new Response(body, { status: 206, headers: headers(r, d) });
+    });
+    const src = await run(fetch);
+    expect((await src.readWindow(0, 0, 100, 100)).bands).toHaveLength(64);
+  });
+
+  it("keeps at most 6 requests in flight per COG, so queued ones are not timed out", async () => {
+    let now = 0, peak = 0;
+    const { fetch } = stalling(async (r, d) => {
+      peak = Math.max(peak, ++now);
+      await new Promise((ok) => setTimeout(ok, 5));
+      now--;
+      return new Response(d.slice(r[0], Math.min(r[1], d.length - 1) + 1), { status: 206, headers: headers(r, d) });
+    });
+    await run(fetch);
+    expect(peak).toBe(6); // a window reads 4 tiles x 64 bands at once
+  });
+});

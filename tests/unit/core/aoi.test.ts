@@ -82,3 +82,14 @@ describe("selectEntries (criterion 4)", () => {
     expect(selectEntries(index, aoi, 2019)).toEqual([]);
   });
 });
+
+describe("aoiGrid input (F6)", () => {
+  it.each([
+    ["an empty ring", []],
+    ["a NaN longitude", [[NaN, 10], [1, 10], [1, 11]]],
+    ["a NaN latitude", [[0, 10], [1, NaN], [1, 11]]],
+    ["an infinite coordinate", [[0, 10], [Infinity, 10], [1, 11]]],
+  ] as [string, [number, number][]][])("throws on %s instead of reporting zones", (_name, ring) => {
+    expect(() => aoiGrid(ring)).toThrow("aoiGrid needs a ring of finite lon/lat vertices");
+  });
+});
