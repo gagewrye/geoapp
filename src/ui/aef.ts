@@ -33,6 +33,7 @@ export function initAef({ map, draw, previewMaxSide, say, run, onState }: Deps) 
   const openAef = $<HTMLInputElement>("open-aef");
   let area: Aoi | undefined;
   let refused = false; // the last area drawn was refused, so its message is showing
+  let noIndex = false; // years.json failed or listed no years: nothing can be fetched
   let data: Loaded | undefined;
   let state: AefState = "none";
   // the only place the AlphaEarth controls are enabled: while busy, nothing else can start (one operation at a time)
@@ -44,10 +45,11 @@ export function initAef({ map, draw, previewMaxSide, say, run, onState }: Deps) 
   };
 
   loadYears().then((years) => {
+    if (!years.length) throw new Error("no AlphaEarth years");
     year.replaceChildren(...years.map((y) => new Option(String(y), String(y))));
-    year.value = String(years.at(-1) ?? "");
+    year.value = String(years.at(-1));
     setState(state);
-  }, () => {}); // without an index nothing can be fetched; the button stays disabled
+  }).catch(() => { noIndex = true; say(MESSAGES.aefIndex); }); // Fetch stays disabled: no year to pick
 
   async function unload(): Promise<void> {
     removeAefPreview(map);
@@ -142,7 +144,8 @@ export function initAef({ map, draw, previewMaxSide, say, run, onState }: Deps) 
       if (old.length) d.removeFeatures(old);
       area = g;
       info.textContent = `Area: ${g.width} x ${g.height} px, EPSG:${g.epsg}`;
-      if (refused) say("");
+      if (noIndex) say(MESSAGES.aefIndex); // the reason Fetch stays disabled for this area
+      else if (refused) say("");
       refused = false;
       setState(state);
     },

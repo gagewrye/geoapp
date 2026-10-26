@@ -7,4 +7,5 @@ export const MESSAGES = {
   size: "Area too large (max 20 km per side).",
   // not fixed by spec 002: AlphaEarth data is never a labelling surface, so it has its own control
   rasterIsAef: "This is an AlphaEarth file. Open it with \"Open AlphaEarth file\".",
+  aefIndex: "Couldn't load the AlphaEarth index, so embeddings can't be fetched.",
 } as const;

@@ -140,15 +140,20 @@ test.describe("year picker and Fetch states (criteria 11, 13)", () => {
     await expect(page.locator("#aef-fetch")).toBeEnabled(); // can try another year
   });
 
-  test("without an index, Fetch stays disabled (follow-up: no message says why)", async ({ page }) => {
-    await serveAef(page);
-    await page.route("**/aef-index/years.json", (r) => r.fulfill({ status: 500, body: "x" }));
-    await openApp(page);
-    await jumpTo(page, chipCentre, 13);
-    await drawArea(page, box);
-    await expect(page.locator("#aef-info")).not.toHaveText("");
-    await expect(page.locator("#aef-fetch")).toBeDisabled();
-  });
+  // Tester F4: the message says why Fetch stays disabled, at load and again once an area is drawn.
+  for (const [what, answer] of [["fails to load", { status: 500, body: "x" }], ["lists no years", { status: 200, contentType: "application/json", body: "[]" }]] as const) {
+    test(`when years.json ${what}, a message says so and Fetch stays disabled`, async ({ page }) => {
+      await serveAef(page);
+      await page.route("**/aef-index/years.json", (r) => r.fulfill(answer));
+      await openApp(page);
+      await expect(message(page)).toHaveText(MESSAGES.aefIndex);
+      await jumpTo(page, chipCentre, 13);
+      await drawArea(page, box);
+      await expect(page.locator("#aef-info")).not.toHaveText("");
+      await expect(page.locator("#aef-fetch")).toBeDisabled();
+      await expect(message(page)).toHaveText(MESSAGES.aefIndex);
+    });
+  }
 
   test("mid-fetch, changing the year or redrawing the area keeps Fetch disabled, and the fetch finishes for the original area and year", async ({ page }) => {
     await serveAef(page);
