@@ -24,6 +24,7 @@ export class RangeSource {
   private readonly blocks = new Map<number, Promise<ArrayBuffer>>(); // insertion order = LRU
   private readonly planned = new Map<number, number>(); // tile offset -> byte count
   private readonly tiles = new Map<number, Promise<ArrayBuffer>>(); // planned tiles read and not yet released
+  private readonly offsets = new WeakMap<ArrayBuffer, number>(); // planned tile bytes -> tile offset
   private size: number | null = null;
   private active = 0;
   private readonly waiting: (() => void)[] = [];
@@ -48,10 +49,13 @@ export class RangeSource {
 
   release(offset: number): void { this.tiles.delete(offset); }
 
+  /** Offset of a planned tile from the bytes fetch() returned for it; undefined for other reads. */
+  tileOffset(bytes: ArrayBuffer): number | undefined { return this.offsets.get(bytes); }
+
   private tile({ offset, length }: Slice, signal?: AbortSignal): Promise<ArrayBuffer> {
     let t = this.tiles.get(offset);
     if (!t) {
-      const p = this.exact(offset, length, signal);
+      const p = this.exact(offset, length, signal).then((buf) => { this.offsets.set(buf, offset); return buf; });
       this.tiles.set(offset, p);
       p.catch(() => { if (this.tiles.get(offset) === p) this.tiles.delete(offset); });
       t = p;

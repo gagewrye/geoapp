@@ -1,4 +1,5 @@
-import { GeoTIFF, type GeoTIFFImage } from "geotiff";
+import { GeoTIFF, type GeoTIFFImage, type Pool } from "geotiff";
+import { DecodedTiles } from "./decodedTiles";
 import { openGeoTiff } from "./geotiffSource";
 import { BLOCK, RangeSource, type Fetch } from "./rangeSource";
 import type { RasterMeta } from "./source";
@@ -8,7 +9,10 @@ export { AefDownloadError, type Fetch } from "./rangeGet";
 /** Tile grid of a COG and each tile's byte range, read from its header. */
 type Layout = { tileWidth: number; tileHeight: number; tilesPerBand: number; bandSeparate: boolean; offsets: number[]; counts: number[] };
 
-export type RemoteCog = { url: string; meta: RasterMeta; image: GeoTIFFImage; layout: Layout; source: RangeSource; releases: Map<number, number[]> };
+export type RemoteCog = {
+  url: string; meta: RasterMeta; image: GeoTIFFImage; layout: Layout; source: RangeSource; decoded: DecodedTiles;
+  releases: Map<number, number[]>;
+};
 
 /** Open a COG over HTTP; reads only its header, including the tile offsets. */
 export async function openRemoteCog(url: string, fetchFn: Fetch, opts: { blockSize?: number; timeoutMs?: number } = {}): Promise<RemoteCog> {
@@ -22,12 +26,12 @@ export async function openRemoteCog(url: string, fetchFn: Fetch, opts: { blockSi
   const tileWidth = image.getTileWidth(), tileHeight = image.getTileHeight();
   const tilesPerBand = Math.ceil(image.getWidth() / tileWidth) * Math.ceil(image.getHeight() / tileHeight);
   const layout = { tileWidth, tileHeight, tilesPerBand, bandSeparate: image.planarConfiguration === 2, offsets: offsets!, counts: counts! };
-  return { url, meta, image, layout, source, releases: new Map() };
+  return { url, meta, image, layout, source, decoded: new DecodedTiles(source), releases: new Map() };
 }
 
 /**
- * Keep each listed tile (in-band index -> last AOI window reading it, from core tileLastWindow)
- * from its first read until release(cog, its last step). Downloads run in passes of `group`
+ * Keep each listed tile (in-band index -> last AOI window reading it, from core tileLastWindow),
+ * compressed and decoded, from its first read until release(cog, its last step). Downloads run in passes of `group`
  * bands over `windows` windows, so band b's tile is last read at step floor(b / group) * windows + w.
  */
 export function planTiles(cog: RemoteCog, lastWindow: Map<number, number>, windows: number, group: number): void {
@@ -48,13 +52,14 @@ export function planTiles(cog: RemoteCog, lastWindow: Map<number, number>, windo
 
 /** Drop the tiles whose last reader was this step. */
 export function release(cog: RemoteCog, step: number): void {
-  for (const offset of cog.releases.get(step) ?? []) cog.source.release(offset);
+  for (const offset of cog.releases.get(step) ?? []) { cog.source.release(offset); cog.decoded.release(offset); }
   cog.releases.delete(step);
 }
 
 /** Raw Int8 bands [b0, b1) of a file window [c0, r0, c1, r1], in file row order. */
 export async function readInt8(cog: RemoteCog, win: [number, number, number, number], [b0, b1]: [number, number]): Promise<Int8Array[]> {
   const samples = Array.from({ length: b1 - b0 }, (_, k) => b0 + k);
-  const bands = (await cog.image.readRasters({ window: win, samples })) as unknown as ArrayLike<number>[];
+  const pool = cog.decoded.pool() as unknown as Pool;
+  const bands = (await cog.image.readRasters({ window: win, samples, pool })) as unknown as ArrayLike<number>[];
   return Array.from(bands, (b) => (b instanceof Int8Array ? b : Int8Array.from(b)));
 }
