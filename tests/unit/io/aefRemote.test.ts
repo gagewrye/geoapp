@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AefEntry, Aoi } from "../../../src/core/aef";
 import { memoryStore } from "../../../src/io/aefCache";
 import { fetchEntries } from "../../../src/io/aefDownload";
@@ -56,7 +56,17 @@ describe("206 validation (criterion 12)", () => {
 });
 
 describe("request timeout (F6)", () => {
+  // Fake timers: with real ones an event-loop stall under parallel load looked like a stalled request.
   const T = 60; // ms without progress
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+  /** Advance fake time in 1 ms steps until p settles, then return it. */
+  async function drive<R>(p: Promise<R>): Promise<R> {
+    let done = false;
+    p.then(() => { done = true; }, () => { done = true; });
+    for (let i = 0; i < 100_000 && !done; i++) await vi.advanceTimersByTimeAsync(1);
+    return p;
+  }
   /** Fetch that serves the header normally and answers pixel requests with `pixel`. */
   function stalling(pixel: (range: [number, number], data: Uint8Array, signal: AbortSignal) => Promise<Response>) {
     const signals: AbortSignal[] = [];
@@ -70,7 +80,7 @@ describe("request timeout (F6)", () => {
     }) as typeof globalThis.fetch;
     return { fetch, signals };
   }
-  const run = (fetch: typeof globalThis.fetch, store = memoryStore()) => fetchEntries(aoi, [entry], store, { fetch, base: BASE, blockSize: 4096, timeoutMs: T });
+  const run = (fetch: typeof globalThis.fetch, store = memoryStore()) => drive(fetchEntries(aoi, [entry], store, { fetch, base: BASE, blockSize: 4096, timeoutMs: T }));
   const headers = (r: [number, number], d: Uint8Array) => ({ "Content-Range": `bytes ${r[0]}-${Math.min(r[1], d.length - 1)}/${d.length}` });
 
   it("a request with no answer fails with the message and is aborted", async () => {
@@ -89,7 +99,7 @@ describe("request timeout (F6)", () => {
       return new Promise(() => {}); // the other in-flight requests hang
     });
     await expect(run(fetch)).rejects.toThrow(MSG);
-    await new Promise((ok) => setTimeout(ok, 2 * T));
+    await vi.advanceTimersByTimeAsync(2 * T);
     expect(signals).toHaveLength(6); // a window asks for 256 tiles; only the first 6 slots were used
     expect(signals.slice(1).every((sg) => sg.aborted)).toBe(true); // the first had already ended with its 500
   });
