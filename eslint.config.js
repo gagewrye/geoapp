@@ -5,6 +5,7 @@ export default tseslint.config(
   { ignores: ["dist/", "node_modules/", "test-results/", "playwright-report/"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  { rules: { "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }] } },
   {
     // core/ is pure: no DOM, no I/O layers.
     files: ["src/core/**/*.ts"],
