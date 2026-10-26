@@ -68,6 +68,17 @@ describe("GDAL nodata on integer and float rasters (criteria 5, 7, 9)", () => {
     expect(samplePixels(t, [all], [1]).y.length).toBe(3);
   });
 
+  // geotiff.js parses GDAL's "-inf"/"inf" as NaN, which would match no pixel
+  it.each([
+    ["-inf", -Infinity], ["-Inf", -Infinity], ["inf", Infinity], ["+inf", Infinity], ["INF", Infinity],
+  ] as const)("GDAL_NODATA %s: nodata is %d and that pixel predicts 255 and is not sampled", async (nd, value) => {
+    const { src, t, pred } = await run(Float32Array.from([-5, 5, value, 5]), nd, 0);
+    expect(src.meta.nodata).toBe(value);
+    expect(pred).toEqual([0, 1, 255, 1]);
+    const all = { rings: [[[0, 0], [4, 0], [4, 1], [0, 1]] as [number, number][]], label: 0 };
+    expect(samplePixels(t, [all], [1]).y.length).toBe(3);
+  });
+
   it("valid neighbours of a float nodata stay valid", async () => {
     // 0.1 as float32 and its float32 neighbours: only the exact value is nodata
     const nd = Math.fround(0.1);

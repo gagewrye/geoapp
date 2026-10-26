@@ -30,7 +30,7 @@ export async function openGeoTiff(tiff: GeoTIFF): Promise<RasterSource> {
   const height = image.getHeight();
   const bandCount = image.getSamplesPerPixel();
   // Bands are read as Float32Array, so compare against nodata rounded the same way.
-  const nd = image.getGDALNoData();
+  const nd = gdalNoData(image.getGDALNoData(), stripNul(fd.getValue("GDAL_NODATA")));
   const nodata = nd === null ? null : Math.fround(nd);
   return {
     meta: { width, height, bandCount, gt, epsg, nodata, geoTags },
@@ -40,6 +40,13 @@ export async function openGeoTiff(tiff: GeoTIFF): Promise<RasterSource> {
       return { x0, y0, width: w, height: h, bands, nodata };
     },
   };
+}
+
+/** geotiff.js parses GDAL's "-inf"/"inf" as NaN, so read infinities from the raw tag. */
+function gdalNoData(parsed: number | null, raw: string | undefined): number | null {
+  if (parsed === null || !Number.isNaN(parsed) || raw === undefined) return parsed;
+  const t = raw.trim();
+  return /^-inf/i.test(t) ? -Infinity : /^\+?inf/i.test(t) ? Infinity : parsed;
 }
 
 function affineOf(tags: GeoTags, origin: number[], res: number[]): Affine {
