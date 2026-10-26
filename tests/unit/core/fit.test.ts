@@ -58,4 +58,8 @@ describe("fit (criterion 6)", () => {
     expect(() => fit(new Float32Array([1, 2]), new Uint8Array([0, 1]), [1], cls(256))).toThrow(/2\.\.255 classes/);
     expect(() => fit(new Float32Array([1, 2]), new Uint8Array([0, 1]), [1], cls(255), { epochs: 1 })).not.toThrow();
   });
+
+  it.each([Infinity, -Infinity, NaN])("rejects a %d sample value instead of returning a NaN model", (v) => {
+    expect(() => fit(new Float32Array([1, 2, 3, v]), new Uint8Array([0, 1]), [1, 2], ["a", "b"])).toThrow("fit: sample 1 band 2 is not finite");
+  });
 });

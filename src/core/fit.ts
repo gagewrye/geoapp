@@ -12,6 +12,10 @@ export function fit(X: Float32Array, y: Uint8Array, bands: number[], classes: st
   if (n === 0) throw new Error("No training samples: no raster pixels fall inside the polygons");
   if (X.length !== n * d) throw new Error(`fit: X has ${X.length} values, expected ${n * d}`);
   for (let i = 0; i < n; i++) if (y[i]! >= k) throw new Error(`fit: label ${y[i]} has no class`);
+  // One infinite or NaN value would turn the whole model into NaN.
+  for (let i = 0; i < n; i++) for (let j = 0; j < d; j++) {
+    if (!Number.isFinite(X[i * d + j]!)) throw new Error(`fit: sample ${i} band ${bands[j]} is not finite`);
+  }
 
   const mean = new Array<number>(d).fill(0);
   const std = new Array<number>(d).fill(0);
