@@ -6,8 +6,11 @@ import type { GeoTags, RasterSource } from "./source";
 const stripNul = (s: unknown) => (typeof s === "string" ? s.replace(/\0+$/, "") : undefined);
 const nums = (v: unknown) => (v ? Array.from(v as ArrayLike<number>) : undefined);
 
+/** A raster from a GeoTIFF; `aef` is true for an AlphaEarth-encoded file, read dequantized. */
+export type GeoTiffSource = RasterSource & { aef: boolean };
+
 /** Wrap the first image of a GeoTIFF/COG; reads only the header until a window is requested. */
-export async function openGeoTiff(tiff: GeoTIFF): Promise<RasterSource> {
+export async function openGeoTiff(tiff: GeoTIFF): Promise<GeoTiffSource> {
   const image = await tiff.getImage(0);
   const fd = image.fileDirectory;
   const keys = image.getGeoKeys() ?? {};
@@ -31,6 +34,7 @@ export async function openGeoTiff(tiff: GeoTIFF): Promise<RasterSource> {
   const aef = isAef(fd.getValue("SampleFormat"), fd.getValue("BitsPerSample"), bandCount, nd);
   const nodata = aef || nd === null ? null : Math.fround(nd);
   return {
+    aef,
     meta: { width, height, bandCount, gt, epsg, nodata, geoTags },
     async readWindow(x0, y0, w, h) {
       const rasters = (await image.readRasters({ window: [x0, y0, x0 + w, y0 + h] })) as unknown as ArrayLike<number>[];
@@ -59,6 +63,6 @@ function gdalNoData(parsed: number | null, raw: string | undefined): number | nu
   return /^-inf/i.test(t) ? -Infinity : /^\+?inf/i.test(t) ? Infinity : parsed;
 }
 
-export async function openFile(file: Blob): Promise<RasterSource> {
+export async function openFile(file: Blob): Promise<GeoTiffSource> {
   return openGeoTiff(await fromBlob(file));
 }
