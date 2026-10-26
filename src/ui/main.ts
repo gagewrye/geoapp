@@ -46,7 +46,7 @@ map.on("load", () => {
     renderPolygonList($("polygons"), d);
   });
   d.on("change", (_ids, type) => { if (type !== "update") renderPolygonList($("polygons"), d); });
-  // Test hook for e2e (spec 001 criteria 12, 14, 15); exposes no user data beyond this page.
+  // Test hook for e2e (spec 001 criteria 12, 14, 15; spec 002 criteria 11, 15); exposes no user data beyond this page.
   (window as unknown as Record<string, unknown>).__geoapp = { map, draw: d, aef: aef.current };
   $("map").dataset.ready = "true";
 });
