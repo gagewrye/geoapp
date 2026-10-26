@@ -16,8 +16,8 @@ const MAX_IN_FLIGHT = 6;
  * geotiff.js source sending only ranged GETs without credentials and accepting only exact 206s.
  * Header reads are cached in aligned blocks. Planned tiles are fetched exactly (reusing bytes
  * already in header blocks) and kept until released, so no tile is fetched twice. geotiff.js's
- * own BlockedSource replaces request errors with "Request failed" and leaves the original
- * rejection unhandled, which would hide why a download failed.
+ * own BlockedSource replaces request errors with an AggregateError "Request failed" that drops
+ * the original error, which would hide why a download failed.
  */
 export class RangeSource {
   private readonly host: string;
