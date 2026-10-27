@@ -78,12 +78,14 @@ export function initLabels({ map, say, onBusy, onChange, onPaint }: Deps) {
     renderClasses(list, classes, selected, locked, {
       select,
       rename: (i, name) => {
+        if (locked) return classes[i]!.name;
         const ok = checkName(classes, i, name);
         if (ok === null) { say(MESSAGES.className); return classes[i]!.name; }
         classes[i]!.name = ok;
         return ok;
       },
       recolour: (i, colour) => {
+        if (locked) return;
         classes[i]!.colour = colour;
         redraw(store.tiles.keys());
         brush.refresh();
