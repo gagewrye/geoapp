@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fixture from "../../fixtures/crs-points.json";
 import { applyAffine, fromLonLat, toLonLat } from "../../../src/core/crs";
-import { BRUSH_SIZES, footprint, footprintRing, pixelAt, strokeCells } from "../../../src/core/pixel";
+import { BRUSH_SIZES, footprint, footprintRing, pixelAt, strokeCells, strokeCellsIn } from "../../../src/core/pixel";
 import type { Affine, Grid } from "../../../src/core/types";
 
 const grid = (epsg: number, gt: Affine, width = 1000, height = 1000): Grid => ({ epsg, gt, width, height });
@@ -124,4 +124,25 @@ describe("strokeCells (criterion 3)", () => {
       }
     });
   }
+});
+
+describe("strokeCellsIn", () => {
+  it("gives exactly strokeCells' cells inside the box, in order", () => {
+    let s = 9;
+    const rnd = (n: number) => Math.floor(((s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32) * n) - n / 2;
+    for (let t = 0; t < 400; t++) {
+      const a: [number, number] = [rnd(200), rnd(200)], b: [number, number] = [rnd(200), rnd(200)];
+      const box = { x0: rnd(100), y0: rnd(100), x1: 0, y1: 0 };
+      box.x1 = box.x0 + Math.abs(rnd(120)); box.y1 = box.y0 + Math.abs(rnd(120));
+      const want = strokeCells(a, b).filter(([c, r]) => c >= box.x0 && c <= box.x1 && r >= box.y0 && r <= box.y1);
+      expect(strokeCellsIn(a, b, box), `${a} ${b} ${JSON.stringify(box)}`).toEqual(want);
+    }
+  });
+  it("skips a long stroke's cells outside the box without visiting them", () => {
+    const t0 = performance.now();
+    const cells = strokeCellsIn([-3e8, -3e8 + 7], [3e8, 3e8 + 7], { x0: 0, y0: 0, x1: 999, y1: 999 });
+    expect(performance.now() - t0).toBeLessThan(200);
+    expect(cells.length).toBeGreaterThan(0);
+    expect(cells).toHaveLength(993); // rows 7..999 on the diagonal
+  });
 });

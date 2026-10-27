@@ -30,18 +30,36 @@ export function footprintRing(grid: Grid, w: Window): [number, number][] {
   return corners.map(([c, r]) => toLonLat(grid.epsg, ...applyAffine(grid.gt, c, r)));
 }
 
-/** 8-connected Bresenham cells from a to b, both ends included. */
+/** 8-connected Bresenham cells from a to b, both ends included: cell k is a + round(k * (b - a) / n). */
 export function strokeCells(a: [number, number], b: [number, number]): [number, number][] {
-  const out: [number, number][] = [];
-  let [c, r] = a;
-  const dc = Math.abs(b[0] - c), dr = -Math.abs(b[1] - r);
-  const sc = c < b[0] ? 1 : -1, sr = r < b[1] ? 1 : -1;
-  let err = dc + dr;
-  for (;;) {
-    out.push([c, r]);
-    if (c === b[0] && r === b[1]) return out;
-    const e2 = 2 * err;
-    if (e2 >= dr) { err += dr; c += sc; }
-    if (e2 <= dc) { err += dc; r += sr; }
+  const n = Math.max(Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1]));
+  return cellRange(a, b, n, 0, n);
+}
+
+/** strokeCells(a, b) inside a box (bounds inclusive), visiting only steps that can land in it. */
+// At low zoom one pointer move can span millions of off-raster pixels.
+export function strokeCellsIn(a: [number, number], b: [number, number], box: { x0: number; y0: number; x1: number; y1: number }): [number, number][] {
+  const n = Math.max(Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1]));
+  if (n === 0) return inBox(a, box) ? [[a[0], a[1]]] : [];
+  // |round(t) - t| <= 0.5, so a step lands in [lo, hi] only if its exact position is within [lo - 0.5, hi + 0.5]
+  let k0 = 0, k1 = n;
+  for (const [p, d, lo, hi] of [[a[0], b[0] - a[0], box.x0, box.x1], [a[1], b[1] - a[1], box.y0, box.y1]] as const) {
+    if (d === 0) { if (p < lo || p > hi) return []; continue; }
+    const ka = ((lo - 0.5 - p) * n) / d, kb = ((hi + 0.5 - p) * n) / d;
+    k0 = Math.max(k0, Math.floor(Math.min(ka, kb)) - 1);
+    k1 = Math.min(k1, Math.ceil(Math.max(ka, kb)) + 1);
   }
+  return k0 > k1 ? [] : cellRange(a, b, n, k0, k1).filter((c) => inBox(c, box));
+}
+
+const inBox = ([c, r]: [number, number], box: { x0: number; y0: number; x1: number; y1: number }) =>
+  c >= box.x0 && c <= box.x1 && r >= box.y0 && r <= box.y1;
+
+function cellRange(a: [number, number], b: [number, number], n: number, k0: number, k1: number): [number, number][] {
+  const out: [number, number][] = [];
+  const dc = b[0] - a[0], dr = b[1] - a[1];
+  for (let k = k0; k <= k1; k++) {
+    out.push(n === 0 ? [a[0], a[1]] : [a[0] + Math.round((k * dc) / n), a[1] + Math.round((k * dr) / n)]);
+  }
+  return out;
 }
