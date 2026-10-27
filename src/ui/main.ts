@@ -10,6 +10,7 @@ import type { RasterSource } from "../io/source";
 import { createDraw } from "../map/draw";
 import { createMap } from "../map/map";
 import { fitToPreview, showPreview } from "../map/preview";
+import { initAef, type AefState } from "./aef";
 import { MESSAGES } from "./messages";
 import { renderPolygonList } from "./polygonList";
 
@@ -23,6 +24,13 @@ let draw: TerraDraw | undefined;
 let source: RasterSource | undefined;
 let model: Model | undefined;
 
+/** Train and Classify work on local imagery only: off while AlphaEarth is in use without it (spec 002). */
+function lockModel(aef: AefState): void {
+  const off = !source && aef !== "none";
+  $<HTMLButtonElement>("train").disabled = off;
+  $<HTMLButtonElement>("classify").disabled = off;
+}
+
 map.on("load", () => {
   // terra-draw also fires "finish" at the end of a blocked drag, so only an unblocked gesture
   // (pointer press or key) clears a block message left over from an earlier edit.
@@ -34,16 +42,19 @@ map.on("load", () => {
   d.on("finish", (id, ctx) => {
     if (!blocked && (message.textContent === MESSAGES.antimeridian || message.textContent === MESSAGES.latitude)) say("");
     if (ctx.mode === "polygon" && ctx.action === "draw") d.updateFeatureProperties(id, { className: $<HTMLInputElement>("class-name").value.trim() });
+    if (ctx.mode === "rectangle" && ctx.action === "draw") aef.areaDrawn(id);
     renderPolygonList($("polygons"), d);
   });
   d.on("change", (_ids, type) => { if (type !== "update") renderPolygonList($("polygons"), d); });
-  // Test hook for e2e (spec 001 criteria 12, 14, 15); exposes no user data beyond this page.
-  (window as unknown as Record<string, unknown>).__geoapp = { map, draw: d };
+  // Test hook for e2e (spec 001 criteria 12, 14, 15; spec 002 criteria 11, 15); exposes no user data beyond this page.
+  (window as unknown as Record<string, unknown>).__geoapp = { map, draw: d, aef: aef.current };
   $("map").dataset.ready = "true";
 });
 
 $("mode-draw").addEventListener("click", () => draw?.setMode("polygon"));
 $("mode-select").addEventListener("click", () => draw?.setMode("select"));
+
+const aef = initAef({ map, draw: () => draw, previewMaxSide: PREVIEW_MAX_SIDE, say, run, onState: lockModel });
 
 async function run(task: () => Promise<void>): Promise<void> {
   try {
@@ -58,8 +69,10 @@ $<HTMLInputElement>("open-raster").addEventListener("change", (ev) => run(async 
   if (!file) return;
   say("");
   const s = await openFile(file);
+  if (s.aef) return say(MESSAGES.rasterIsAef);
   await openRaster(s);
   source = s;
+  lockModel(aef.state());
   const { width, height, bandCount, epsg } = s.meta;
   $("raster-info").textContent = `${file.name}: ${width} x ${height}, ${bandCount} band(s), EPSG:${epsg}`;
   const preview = await buildPreview(s, PREVIEW_MAX_SIDE);
@@ -70,7 +83,8 @@ $<HTMLInputElement>("open-raster").addEventListener("change", (ev) => run(async 
 
 $("train").addEventListener("click", () => run(async () => {
   if (!source || !draw) return say("Open a raster first.");
-  const { classes, features } = labelFeatures(draw.getSnapshot());
+  // the AlphaEarth area is a rectangle-mode feature; only drawn polygons are labels
+  const { classes, features } = labelFeatures(draw.getSnapshot().filter((f) => f.properties.mode === "polygon"));
   if (classes.length < 2) return say("Draw polygons for at least two classes.");
   if (classes.length > 255) return say("At most 255 classes are supported."); // before sampling; fit checks too
   say("Training...");

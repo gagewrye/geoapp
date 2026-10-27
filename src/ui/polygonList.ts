@@ -4,7 +4,8 @@ import type { TerraDraw } from "terra-draw";
 export function renderPolygonList(list: HTMLElement, draw: TerraDraw): void {
   list.replaceChildren();
   for (const f of draw.getSnapshot()) {
-    if (f.geometry.type !== "Polygon" || f.id === undefined) continue;
+    // the AlphaEarth area is a rectangle-mode polygon, not a label
+    if (f.geometry.type !== "Polygon" || f.id === undefined || f.properties.mode !== "polygon") continue;
     const id = f.id;
     const li = document.createElement("li");
     li.dataset.featureId = String(id);

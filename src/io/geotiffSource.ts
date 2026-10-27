@@ -1,12 +1,16 @@
 import { fromBlob, type GeoTIFF } from "geotiff";
-import type { Affine } from "../core/types";
+import { AEF_BANDS, AEF_NODATA_Q, dequantize } from "../core/aef";
+import { affineFromTags } from "../core/geotags";
 import type { GeoTags, RasterSource } from "./source";
 
 const stripNul = (s: unknown) => (typeof s === "string" ? s.replace(/\0+$/, "") : undefined);
 const nums = (v: unknown) => (v ? Array.from(v as ArrayLike<number>) : undefined);
 
+/** A raster from a GeoTIFF; `aef` is true for an AlphaEarth-encoded file, read dequantized. */
+export type GeoTiffSource = RasterSource & { aef: boolean };
+
 /** Wrap the first image of a GeoTIFF/COG; reads only the header until a window is requested. */
-export async function openGeoTiff(tiff: GeoTIFF): Promise<RasterSource> {
+export async function openGeoTiff(tiff: GeoTIFF): Promise<GeoTiffSource> {
   const image = await tiff.getImage(0);
   const fd = image.fileDirectory;
   const keys = image.getGeoKeys() ?? {};
@@ -20,26 +24,36 @@ export async function openGeoTiff(tiff: GeoTIFF): Promise<RasterSource> {
     GeoAsciiParams: stripNul(fd.getValue("GeoAsciiParams")),
   };
   for (const k of Object.keys(geoTags) as (keyof GeoTags)[]) if (geoTags[k] === undefined) delete geoTags[k];
-  const gt = affineOf(geoTags, image.getOrigin(), image.getResolution());
-  if (keys.GTRasterTypeGeoKey === 2) {
-    // PixelIsPoint: tie point is a pixel centre, shift to the corner as GDAL does
-    gt[0] -= 0.5 * (gt[1] + gt[2]);
-    gt[3] -= 0.5 * (gt[4] + gt[5]);
-  }
+  const gt = affineFromTags(geoTags, keys.GTRasterTypeGeoKey === 2);
   const width = image.getWidth();
   const height = image.getHeight();
   const bandCount = image.getSamplesPerPixel();
   // Bands are read as Float32Array, so compare against nodata rounded the same way.
   const nd = gdalNoData(image.getGDALNoData(), stripNul(fd.getValue("GDAL_NODATA")));
-  const nodata = nd === null ? null : Math.fround(nd);
+  // AlphaEarth COGs are read dequantized (spec 002); their no data becomes NaN.
+  const aef = isAef(fd.getValue("SampleFormat"), fd.getValue("BitsPerSample"), bandCount, nd);
+  const nodata = aef || nd === null ? null : Math.fround(nd);
   return {
+    aef,
     meta: { width, height, bandCount, gt, epsg, nodata, geoTags },
     async readWindow(x0, y0, w, h) {
       const rasters = (await image.readRasters({ window: [x0, y0, x0 + w, y0 + h] })) as unknown as ArrayLike<number>[];
-      const bands = Array.from(rasters, (r) => (r instanceof Float32Array ? r : Float32Array.from(r)));
+      const bands = Array.from(rasters, (r) => {
+        if (!aef) return r instanceof Float32Array ? r : Float32Array.from(r);
+        const out = new Float32Array(r.length);
+        dequantize(r as Int8Array, out);
+        return out;
+      });
       return { x0, y0, width: w, height: h, bands, nodata };
     },
   };
+}
+
+/** 64 signed 8-bit bands with GDAL_NODATA -128: the AlphaEarth Int8 encoding. */
+function isAef(format: unknown, bits: unknown, bandCount: number, nodata: number | null): boolean {
+  // a missing SampleFormat means unsigned; a single value may come back as a number
+  const all = (v: unknown, x: number) => v !== undefined && Array.from(typeof v === "number" ? [v] : (v as ArrayLike<number>)).every((e) => e === x);
+  return bandCount === AEF_BANDS && nodata === AEF_NODATA_Q && all(format, 2) && all(bits, 8);
 }
 
 /** geotiff.js parses GDAL's "-inf"/"inf" as NaN, so read infinities from the raw tag. */
@@ -49,12 +63,6 @@ function gdalNoData(parsed: number | null, raw: string | undefined): number | nu
   return /^-inf/i.test(t) ? -Infinity : /^\+?inf/i.test(t) ? Infinity : parsed;
 }
 
-function affineOf(tags: GeoTags, origin: number[], res: number[]): Affine {
-  const m = tags.ModelTransformation;
-  if (m && m.length >= 8) return [m[3]!, m[0]!, m[1]!, m[7]!, m[4]!, m[5]!];
-  return [origin[0]!, res[0]!, 0, origin[1]!, 0, res[1]!];
-}
-
-export async function openFile(file: Blob): Promise<RasterSource> {
+export async function openFile(file: Blob): Promise<GeoTiffSource> {
   return openGeoTiff(await fromBlob(file));
 }

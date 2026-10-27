@@ -36,8 +36,11 @@ function ranges(src: Tile, nb: number): [number, number][] {
   });
 }
 
-/** Warp a (decimated) tile onto an axis-aligned Mercator grid; corners are TL, TR, BR, BL lon/lat. */
-export function warpPreview(src: Tile, gt: Affine, epsg: number, maxSide: number) {
+/**
+ * Warp a (decimated) tile onto an axis-aligned Mercator grid; corners are TL, TR, BR, BL lon/lat.
+ * Each band is stretched over its own valid range unless `stretch` fixes one range for all.
+ */
+export function warpPreview(src: Tile, gt: Affine, epsg: number, maxSide: number, stretch?: [number, number]) {
   const [mx0, my0, mx1, my1] = footprint(src, gt, epsg);
   const aspect = (mx1 - mx0) / (my1 - my0);
   const width = aspect >= 1 ? maxSide : Math.max(1, Math.round(maxSide * aspect));
@@ -45,7 +48,7 @@ export function warpPreview(src: Tile, gt: Affine, epsg: number, maxSide: number
   const sx = (mx1 - mx0) / width;
   const sy = (my1 - my0) / height;
   const nb = src.bands.length >= 3 ? 3 : 1;
-  const rg = ranges(src, nb);
+  const rg = stretch ? Array.from({ length: nb }, () => stretch) : ranges(src, nb);
   const rgba = new Uint8ClampedArray(width * height * 4);
   for (let v = 0; v < height; v++) {
     const lat = latOf(my1 - (v + 0.5) * sy);

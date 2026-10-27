@@ -1,0 +1,676 @@
+<VRTDataset rasterXSize="8192" rasterYSize="8192" subClass="VRTWarpedDataset">
+  <SRS dataAxisToSRSAxisMapping="1,2">PROJCS["WGS 84 / UTM zone 17N",GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]],PROJECTION["Transverse_Mercator"],PARAMETER["latitude_of_origin",0],PARAMETER["central_meridian",-81],PARAMETER["scale_factor",0.9996],PARAMETER["false_easting",500000],PARAMETER["false_northing",0],UNIT["metre",1,AUTHORITY["EPSG","9001"]],AXIS["Easting",EAST],AXIS["Northing",NORTH],AUTHORITY["EPSG","32617"]]</SRS>
+  <GeoTransform>  4.1808000000000000e+05,  1.0000000000000000e+01,  0.0000000000000000e+00,  2.8672000000000000e+06,  0.0000000000000000e+00, -1.0000000000000000e+01</GeoTransform>
+  <Metadata>
+    <MDI key="AREA_OR_POINT">Area</MDI>
+  </Metadata>
+  <Metadata domain="IMAGE_STRUCTURE">
+    <MDI key="INTERLEAVE">PIXEL</MDI>
+  </Metadata>
+  <VRTRasterBand dataType="Int8" band="1" subClass="VRTWarpedRasterBand">
+    <Description>A00</Description>
+    <NoDataValue>-128</NoDataValue>
+    <ColorInterp>Gray</ColorInterp>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="2" subClass="VRTWarpedRasterBand">
+    <Description>A01</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="3" subClass="VRTWarpedRasterBand">
+    <Description>A02</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="4" subClass="VRTWarpedRasterBand">
+    <Description>A03</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="5" subClass="VRTWarpedRasterBand">
+    <Description>A04</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="6" subClass="VRTWarpedRasterBand">
+    <Description>A05</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="7" subClass="VRTWarpedRasterBand">
+    <Description>A06</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="8" subClass="VRTWarpedRasterBand">
+    <Description>A07</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="9" subClass="VRTWarpedRasterBand">
+    <Description>A08</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="10" subClass="VRTWarpedRasterBand">
+    <Description>A09</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="11" subClass="VRTWarpedRasterBand">
+    <Description>A10</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="12" subClass="VRTWarpedRasterBand">
+    <Description>A11</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="13" subClass="VRTWarpedRasterBand">
+    <Description>A12</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="14" subClass="VRTWarpedRasterBand">
+    <Description>A13</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="15" subClass="VRTWarpedRasterBand">
+    <Description>A14</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="16" subClass="VRTWarpedRasterBand">
+    <Description>A15</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="17" subClass="VRTWarpedRasterBand">
+    <Description>A16</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="18" subClass="VRTWarpedRasterBand">
+    <Description>A17</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="19" subClass="VRTWarpedRasterBand">
+    <Description>A18</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="20" subClass="VRTWarpedRasterBand">
+    <Description>A19</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="21" subClass="VRTWarpedRasterBand">
+    <Description>A20</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="22" subClass="VRTWarpedRasterBand">
+    <Description>A21</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="23" subClass="VRTWarpedRasterBand">
+    <Description>A22</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="24" subClass="VRTWarpedRasterBand">
+    <Description>A23</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="25" subClass="VRTWarpedRasterBand">
+    <Description>A24</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="26" subClass="VRTWarpedRasterBand">
+    <Description>A25</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="27" subClass="VRTWarpedRasterBand">
+    <Description>A26</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="28" subClass="VRTWarpedRasterBand">
+    <Description>A27</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="29" subClass="VRTWarpedRasterBand">
+    <Description>A28</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="30" subClass="VRTWarpedRasterBand">
+    <Description>A29</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="31" subClass="VRTWarpedRasterBand">
+    <Description>A30</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="32" subClass="VRTWarpedRasterBand">
+    <Description>A31</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="33" subClass="VRTWarpedRasterBand">
+    <Description>A32</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="34" subClass="VRTWarpedRasterBand">
+    <Description>A33</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="35" subClass="VRTWarpedRasterBand">
+    <Description>A34</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="36" subClass="VRTWarpedRasterBand">
+    <Description>A35</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="37" subClass="VRTWarpedRasterBand">
+    <Description>A36</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="38" subClass="VRTWarpedRasterBand">
+    <Description>A37</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="39" subClass="VRTWarpedRasterBand">
+    <Description>A38</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="40" subClass="VRTWarpedRasterBand">
+    <Description>A39</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="41" subClass="VRTWarpedRasterBand">
+    <Description>A40</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="42" subClass="VRTWarpedRasterBand">
+    <Description>A41</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="43" subClass="VRTWarpedRasterBand">
+    <Description>A42</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="44" subClass="VRTWarpedRasterBand">
+    <Description>A43</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="45" subClass="VRTWarpedRasterBand">
+    <Description>A44</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="46" subClass="VRTWarpedRasterBand">
+    <Description>A45</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="47" subClass="VRTWarpedRasterBand">
+    <Description>A46</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="48" subClass="VRTWarpedRasterBand">
+    <Description>A47</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="49" subClass="VRTWarpedRasterBand">
+    <Description>A48</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="50" subClass="VRTWarpedRasterBand">
+    <Description>A49</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="51" subClass="VRTWarpedRasterBand">
+    <Description>A50</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="52" subClass="VRTWarpedRasterBand">
+    <Description>A51</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="53" subClass="VRTWarpedRasterBand">
+    <Description>A52</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="54" subClass="VRTWarpedRasterBand">
+    <Description>A53</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="55" subClass="VRTWarpedRasterBand">
+    <Description>A54</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="56" subClass="VRTWarpedRasterBand">
+    <Description>A55</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="57" subClass="VRTWarpedRasterBand">
+    <Description>A56</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="58" subClass="VRTWarpedRasterBand">
+    <Description>A57</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="59" subClass="VRTWarpedRasterBand">
+    <Description>A58</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="60" subClass="VRTWarpedRasterBand">
+    <Description>A59</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="61" subClass="VRTWarpedRasterBand">
+    <Description>A60</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="62" subClass="VRTWarpedRasterBand">
+    <Description>A61</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="63" subClass="VRTWarpedRasterBand">
+    <Description>A62</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <VRTRasterBand dataType="Int8" band="64" subClass="VRTWarpedRasterBand">
+    <Description>A63</Description>
+    <NoDataValue>-128</NoDataValue>
+  </VRTRasterBand>
+  <BlockXSize>512</BlockXSize>
+  <BlockYSize>128</BlockYSize>
+  <GDALWarpOptions>
+    <WarpMemoryLimit>6.71089e+07</WarpMemoryLimit>
+    <ResampleAlg>NearestNeighbour</ResampleAlg>
+    <WorkingDataType>Int16</WorkingDataType>
+    <Option name="INIT_DEST">NO_DATA</Option>
+    <Option name="ERROR_OUT_IF_EMPTY_SOURCE_WINDOW">FALSE</Option>
+    <SourceDataset relativeToVRT="0">/vsis3/us-west-2.opendata.source.coop/tge-labs/aef/v1/annual/2021/17N/xm0lu3s74sdjecpf8-0000000000-0000008192.tiff</SourceDataset>
+    <Transformer>
+      <ApproxTransformer>
+        <MaxError>0.125</MaxError>
+        <BaseTransformer>
+          <GenImgProjTransformer>
+            <SrcGeoTransform>418080,10,0,2785280,0,10</SrcGeoTransform>
+            <SrcInvGeoTransform>-41808,0.10000000000000001,0,-278528,0,0.10000000000000001</SrcInvGeoTransform>
+            <DstGeoTransform>418080,10,0,2867200,0,-10</DstGeoTransform>
+            <DstInvGeoTransform>-41808,0.10000000000000001,0,286720,0,-0.10000000000000001</DstInvGeoTransform>
+          </GenImgProjTransformer>
+        </BaseTransformer>
+      </ApproxTransformer>
+    </Transformer>
+    <BandList>
+      <BandMapping src="1" dst="1">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="2" dst="2">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="3" dst="3">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="4" dst="4">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="5" dst="5">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="6" dst="6">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="7" dst="7">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="8" dst="8">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="9" dst="9">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="10" dst="10">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="11" dst="11">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="12" dst="12">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="13" dst="13">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="14" dst="14">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="15" dst="15">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="16" dst="16">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="17" dst="17">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="18" dst="18">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="19" dst="19">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="20" dst="20">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="21" dst="21">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="22" dst="22">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="23" dst="23">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="24" dst="24">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="25" dst="25">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="26" dst="26">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="27" dst="27">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="28" dst="28">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="29" dst="29">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="30" dst="30">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="31" dst="31">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="32" dst="32">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="33" dst="33">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="34" dst="34">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="35" dst="35">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="36" dst="36">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="37" dst="37">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="38" dst="38">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="39" dst="39">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="40" dst="40">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="41" dst="41">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="42" dst="42">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="43" dst="43">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="44" dst="44">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="45" dst="45">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="46" dst="46">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="47" dst="47">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="48" dst="48">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="49" dst="49">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="50" dst="50">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="51" dst="51">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="52" dst="52">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="53" dst="53">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="54" dst="54">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="55" dst="55">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="56" dst="56">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="57" dst="57">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="58" dst="58">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="59" dst="59">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="60" dst="60">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="61" dst="61">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="62" dst="62">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="63" dst="63">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+      <BandMapping src="64" dst="64">
+        <SrcNoDataReal>-128</SrcNoDataReal>
+        <SrcNoDataImag>0</SrcNoDataImag>
+        <DstNoDataReal>-128</DstNoDataReal>
+        <DstNoDataImag>0</DstNoDataImag>
+      </BandMapping>
+    </BandList>
+  </GDALWarpOptions>
+</VRTDataset>

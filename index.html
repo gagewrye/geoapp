@@ -20,6 +20,18 @@
         <ul id="polygons"></ul>
       </fieldset>
       <fieldset>
+        <legend>AlphaEarth embeddings</legend>
+        <div class="row">
+          <button id="aef-draw" type="button">Draw area</button>
+          <label>Year <select id="aef-year"></select></label>
+        </div>
+        <button id="aef-fetch" type="button" disabled>Fetch embeddings</button>
+        <p id="aef-info"></p>
+        <label>Open AlphaEarth file <input id="open-aef" type="file" accept=".tif,.tiff,image/tiff" /></label>
+        <label><input id="aef-preview" type="checkbox" disabled /> AlphaEarth preview</label>
+        <p id="aef-attribution" hidden>The AlphaEarth Foundations Satellite Embedding dataset is produced by Google and Google DeepMind.</p>
+      </fieldset>
+      <fieldset>
         <legend>Model</legend>
         <button id="train" type="button">Train</button>
         <button id="classify" type="button">Classify and export</button>
