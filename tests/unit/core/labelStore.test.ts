@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { tileWindows, type Window } from "../../../src/core/grid";
 import {
-  MAX_LABEL_TILES, brush, emptyStore, keepMasks, labelWindows, tileKeys, tileWindow, type LabelStore, type NodataMasks,
+  MAX_LABEL_TILES, brush, emptyStore, keepMasks, labelWindows, paintedValues, tileKeys, tileWindow, type LabelStore, type NodataMasks,
 } from "../../../src/core/labelStore";
 import { nodataMask } from "../../../src/core/nodata";
 import { makeTile } from "../helpers/tiles";
@@ -153,5 +153,20 @@ describe("labelWindows", () => {
     const m = masksFor(s);
     for (const [c, r] of [[590, 290], [5, 290], [300, 5], [5, 5]] as const) brush(s, m, win(c, r, 1), 1, false);
     expect(labelWindows(s)).toEqual([win(0, 0, 256), win(256, 0, 256), win(0, 256, 256, 44), win(512, 256, 88, 44)]);
+  });
+});
+
+describe("paintedValues", () => {
+  it("is empty for an empty store", () => {
+    expect(paintedValues(emptyStore(600, 300))).toEqual(new Set());
+  });
+
+  it("gives the values painted across tiles", () => {
+    const s = emptyStore(600, 300);
+    const m = masksFor(s);
+    brush(s, m, win(10, 10, 7), 1, false);
+    brush(s, m, win(300, 10, 7), 3, false);
+    expect(s.tiles.size).toBe(2);
+    expect(paintedValues(s)).toEqual(new Set([1, 3]));
   });
 });
