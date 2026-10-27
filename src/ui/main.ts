@@ -22,7 +22,7 @@ const map = createMap($("map"));
 let draw: TerraDraw | undefined;
 let source: RasterSource | undefined;
 let model: Model | undefined;
-let training = false; // one run at a time, so one label snapshot (spec 003 [C5]) and no older run overwriting a newer one
+let training = false; // one run at a time, so one label snapshot (spec 003 Training) and no older run overwriting a newer one
 let classifying = false; // one export at a time: without the Save dialog, every export writes the same OPFS file
 // Opens are numbered so that an older open finishing late can't replace the raster a newer one opened
 let opens = 0;

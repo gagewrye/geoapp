@@ -103,7 +103,7 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
     if (painting() && lastType !== "touch" && e.target instanceof Node && container.contains(e.target)) e.stopPropagation();
   }, { capture: true });
   // Only on the map, which also covers a right release that fires contextmenu late (Windows); the panel
-  // keeps its menu even just after an erase, so text fields keep copy and paste (spec 003 [C3], Gage)
+  // keeps its menu even just after an erase, so text fields keep copy and paste (spec 003 Strokes)
   map.getContainer().addEventListener("contextmenu", (e) => { if (grid) e.preventDefault(); });
 
   return {

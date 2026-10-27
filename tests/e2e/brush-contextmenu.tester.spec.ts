@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { jumpTo, message, openApp, openRaster, rgbFixture, stroke, toScreen } from "./helpers";
 
-// Tester: spec 003 [C3] / criterion 10. contextmenu is prevented on the map while local imagery is
+// Tester: spec 003 Strokes / criterion 10. contextmenu is prevented on the map while local imagery is
 // open (MapLibre prevents it on its canvas anyway), and never on the panel, even within 500 ms of an
 // erase stroke ending (Gage, 2026-10-27).
 
@@ -22,7 +22,7 @@ const menus = async (page: Page) => (await page.evaluate(() => (window as any)._
 const rawMenus = (page: Page) => page.evaluate(() => (window as any).__menus.splice(0) as Menu[]);
 const rightClickName = (page: Page) => page.locator("#classes .class-name").first().click({ button: "right" });
 
-test.describe("contextmenu (criterion 10 [C3], tester)", () => {
+test.describe("contextmenu (criterion 10, tester)", () => {
   test("imagery open: prevented on the map in Paint and Pan mode; never on a class name field away from an erase", async ({ page }) => {
     await openApp(page);
     await openRaster(page, rgbFixture());
