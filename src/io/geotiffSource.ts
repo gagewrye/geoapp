@@ -1,7 +1,7 @@
-import { fromBlob, type GeoTIFF } from "geotiff";
+import { fromBlob, type GeoTIFF, type GeoTIFFImage } from "geotiff";
 import { AEF_BANDS, AEF_NODATA_Q, dequantize } from "../core/aef";
 import { affineFromTags } from "../core/geotags";
-import type { GeoTags, RasterSource } from "./source";
+import type { GeoTags, RasterMeta, RasterSource } from "./source";
 
 const stripNul = (s: unknown) => (typeof s === "string" ? s.replace(/\0+$/, "") : undefined);
 const nums = (v: unknown) => (v ? Array.from(v as ArrayLike<number>) : undefined);
@@ -9,9 +9,8 @@ const nums = (v: unknown) => (v ? Array.from(v as ArrayLike<number>) : undefined
 /** A raster from a GeoTIFF; `aef` is true for an AlphaEarth-encoded file, read dequantized. */
 export type GeoTiffSource = RasterSource & { aef: boolean };
 
-/** Wrap the first image of a GeoTIFF/COG; reads only the header until a window is requested. */
-export async function openGeoTiff(tiff: GeoTIFF): Promise<GeoTiffSource> {
-  const image = await tiff.getImage(0);
+/** Size, CRS, geotransform and copyable georeferencing tags of a GeoTIFF image; reads only the header. */
+export async function readGeoMeta(image: GeoTIFFImage): Promise<Pick<RasterMeta, "width" | "height" | "gt" | "epsg" | "geoTags">> {
   const fd = image.fileDirectory;
   const keys = image.getGeoKeys() ?? {};
   const epsg = Number(keys.GTModelTypeGeoKey === 2 ? keys.GeographicTypeGeoKey : keys.ProjectedCSTypeGeoKey ?? keys.GeographicTypeGeoKey) || 0;
@@ -25,8 +24,14 @@ export async function openGeoTiff(tiff: GeoTIFF): Promise<GeoTiffSource> {
   };
   for (const k of Object.keys(geoTags) as (keyof GeoTags)[]) if (geoTags[k] === undefined) delete geoTags[k];
   const gt = affineFromTags(geoTags, keys.GTRasterTypeGeoKey === 2);
-  const width = image.getWidth();
-  const height = image.getHeight();
+  return { width: image.getWidth(), height: image.getHeight(), gt, epsg, geoTags };
+}
+
+/** Wrap the first image of a GeoTIFF/COG; reads only the header until a window is requested. */
+export async function openGeoTiff(tiff: GeoTIFF): Promise<GeoTiffSource> {
+  const image = await tiff.getImage(0);
+  const fd = image.fileDirectory;
+  const { width, height, gt, epsg, geoTags } = await readGeoMeta(image);
   const bandCount = image.getSamplesPerPixel();
   // Bands are read as Float32Array, so compare against nodata rounded the same way.
   const nd = gdalNoData(image.getGDALNoData(), stripNul(fd.getValue("GDAL_NODATA")));

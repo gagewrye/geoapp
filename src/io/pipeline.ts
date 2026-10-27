@@ -18,7 +18,7 @@ export class RasterRefusedError extends Error {
 }
 
 /** Refuse unsupported rasters from metadata alone, before any tile is read. */
-export async function openRaster(source: RasterSource): Promise<void> {
+export async function openRaster(source: Pick<RasterSource, "meta">): Promise<void> {
   const { epsg, gt, width, height } = source.meta;
   try {
     projString(epsg);
