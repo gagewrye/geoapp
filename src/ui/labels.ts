@@ -153,6 +153,6 @@ export function initLabels({ map, say, onBusy, onPaint }: Deps) {
     store: () => store,
     classes: () => classes,
     /** Classes with painted pixels. */
-    paintedClasses: () => [...paintedValues(store)].filter((v) => v <= classes.length).length,
+    paintedClasses: () => paintedValues(store).size,
   };
 }
