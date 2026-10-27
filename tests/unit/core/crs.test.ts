@@ -1,39 +1,7 @@
 import { describe, expect, it } from "vitest";
-import fixture from "../../fixtures/crs-points.json";
-import { crossesAntimeridian, toLonLat } from "../../../src/core/crs";
-import { toPixelPolygons } from "../../../src/core/polygons";
-import type { Affine } from "../../../src/core/types";
+import { crossesAntimeridian, normalizeLon, toLonLat } from "../../../src/core/crs";
 
-type Feature = GeoJSON.Feature<GeoJSON.Polygon, { label: number }>;
-const poly = (ring: [number, number][], label = 0): Feature => ({
-  type: "Feature", properties: { label }, geometry: { type: "Polygon", coordinates: [ring] },
-});
-
-describe("toPixelPolygons (criterion 3)", () => {
-  for (const c of fixture.cases) {
-    it(`maps reference points for EPSG:${c.epsg} within 0.01 px`, () => {
-      const ring = c.points.map((p) => p.lonlat as [number, number]);
-      const [out] = toPixelPolygons([poly(ring, 3)], c.epsg, c.gt as Affine);
-      expect(out!.label).toBe(3);
-      c.points.forEach((p, i) => {
-        const [col, row] = out!.rings[0]![i]!;
-        expect(Math.abs(col - p.pixel[0]!)).toBeLessThan(0.01);
-        expect(Math.abs(row - p.pixel[1]!)).toBeLessThan(0.01);
-      });
-    });
-  }
-  it("keeps hole rings", () => {
-    const f: Feature = { type: "Feature", properties: { label: 1 }, geometry: { type: "Polygon",
-      coordinates: [[[0, 0], [4, 0], [4, -4], [0, 0]], [[1, -1], [2, -1], [2, -2], [1, -1]]] } };
-    const [out] = toPixelPolygons([f], 4326, [0, 1, 0, 0, 0, -1]);
-    expect(out!.rings).toHaveLength(2);
-    expect(out!.rings[1]![2]).toEqual([2, 2]);
-  });
-  it("throws on an unsupported EPSG code", () => {
-    expect(() => toPixelPolygons([poly([[0, 0], [1, 0], [1, 1]])], 2154, [0, 1, 0, 0, 0, -1])).toThrow(/EPSG:2154/);
-    expect(() => toPixelPolygons([], 32661, [0, 1, 0, 0, 0, -1])).toThrow(/unsupported/i);
-  });
-});
+// Spec 001 criterion 3 (toPixelPolygons) is superseded by spec 003 criterion 1 (pixelAt, pixel.test.ts).
 
 describe("crossesAntimeridian (criterion 16)", () => {
   it("refuses EPSG:4326 extents past 180 either way", () => {
@@ -59,5 +27,15 @@ describe("toLonLat", () => {
     expect(lon).toBeCloseTo(180, 6);
     const [lon2] = toLonLat(32660, 840000, 1106908);
     expect(lon2).toBeGreaterThan(180);
+  });
+});
+
+describe("normalizeLon", () => {
+  it("wraps longitudes into [-180, 180] and keeps +-180", () => {
+    expect(normalizeLon(181)).toBeCloseTo(-179, 12);
+    expect(normalizeLon(-540.5)).toBeCloseTo(179.5, 12);
+    expect(normalizeLon(180)).toBe(180);
+    expect(normalizeLon(-180)).toBe(-180);
+    expect(normalizeLon(12.25)).toBe(12.25);
   });
 });

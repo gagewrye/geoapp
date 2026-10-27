@@ -1,6 +1,5 @@
 import "./style.css";
 import type { TerraDraw } from "terra-draw";
-import { labelFeatures } from "../core/labels";
 import { parseModel, serializeModel } from "../core/modelio";
 import type { Model } from "../core/types";
 import { openFile } from "../io/geotiffSource";
@@ -10,9 +9,9 @@ import type { RasterSource } from "../io/source";
 import { createDraw } from "../map/draw";
 import { createMap } from "../map/map";
 import { fitToPreview, showPreview } from "../map/preview";
-import { initAef, type AefState } from "./aef";
+import { initAef } from "./aef";
+import { initLabels } from "./labels";
 import { MESSAGES } from "./messages";
-import { renderPolygonList } from "./polygonList";
 
 const PREVIEW_MAX_SIDE = 1024;
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -24,37 +23,27 @@ let draw: TerraDraw | undefined;
 let source: RasterSource | undefined;
 let model: Model | undefined;
 
-/** Train and Classify work on local imagery only: off while AlphaEarth is in use without it (spec 002). */
-function lockModel(aef: AefState): void {
-  const off = !source && aef !== "none";
-  $<HTMLButtonElement>("train").disabled = off;
+/** Train and Classify need local imagery (spec 002); Train also waits for pending mask reads (spec 003). */
+function lockModel(): void {
+  const off = !source && aef.state() !== "none";
+  $<HTMLButtonElement>("train").disabled = off || labels.busy();
   $<HTMLButtonElement>("classify").disabled = off;
 }
 
+const labels = initLabels({ map, say, onBusy: () => lockModel(), onPaint: () => draw?.setMode("static") });
+const aef = initAef({ map, draw: () => draw, previewMaxSide: PREVIEW_MAX_SIDE, say, run, onState: () => lockModel() });
+$("aef-draw").addEventListener("click", () => labels.setMode("pan")); // the area tool and the brush never share the mouse
+
 map.on("load", () => {
-  // terra-draw also fires "finish" at the end of a blocked drag, so only an unblocked gesture
-  // (pointer press or key) clears a block message left over from an earlier edit.
-  let blocked = false;
-  map.getCanvasContainer().addEventListener("pointerdown", (e) => { if (e.isPrimary) blocked = false; }, { capture: true });
-  window.addEventListener("keydown", () => { blocked = false; }, { capture: true }); // Enter finishes a polygon too
-  draw = createDraw(map, (reason) => { blocked = true; say(MESSAGES[reason]); });
+  draw = createDraw(map);
   const d = draw;
-  d.on("finish", (id, ctx) => {
-    if (!blocked && (message.textContent === MESSAGES.antimeridian || message.textContent === MESSAGES.latitude)) say("");
-    if (ctx.mode === "polygon" && ctx.action === "draw") d.updateFeatureProperties(id, { className: $<HTMLInputElement>("class-name").value.trim() });
-    if (ctx.mode === "rectangle" && ctx.action === "draw") aef.areaDrawn(id);
-    renderPolygonList($("polygons"), d);
-  });
-  d.on("change", (_ids, type) => { if (type !== "update") renderPolygonList($("polygons"), d); });
-  // Test hook for e2e (spec 001 criteria 12, 14, 15; spec 002 criteria 11, 15); exposes no user data beyond this page.
-  (window as unknown as Record<string, unknown>).__geoapp = { map, draw: d, aef: aef.current };
+  d.on("finish", (id, ctx) => { if (ctx.mode === "rectangle" && ctx.action === "draw") aef.areaDrawn(id); });
+  // Test hook for e2e (specs 001-003); exposes no user data beyond this page.
+  const hook = { map, draw: d, aef: aef.current, imagery: () => source ?? null };
+  Object.defineProperty(hook, "labels", { get: () => ({ store: labels.store(), classes: labels.classes() }) });
+  (window as unknown as Record<string, unknown>).__geoapp = hook;
   $("map").dataset.ready = "true";
 });
-
-$("mode-draw").addEventListener("click", () => draw?.setMode("polygon"));
-$("mode-select").addEventListener("click", () => draw?.setMode("select"));
-
-const aef = initAef({ map, draw: () => draw, previewMaxSide: PREVIEW_MAX_SIDE, say, run, onState: lockModel });
 
 async function run(task: () => Promise<void>): Promise<void> {
   try {
@@ -65,14 +54,18 @@ async function run(task: () => Promise<void>): Promise<void> {
 }
 
 $<HTMLInputElement>("open-raster").addEventListener("change", (ev) => run(async () => {
-  const file = (ev.target as HTMLInputElement).files?.[0];
+  const input = ev.target as HTMLInputElement;
+  const file = input.files?.[0];
   if (!file) return;
   say("");
   const s = await openFile(file);
   if (s.aef) return say(MESSAGES.rasterIsAef);
   await openRaster(s);
+  // only a raster that opens can discard the labels; Cancel keeps everything
+  if (labels.hasLabels() && !confirm(MESSAGES.discard)) { input.value = ""; return; }
   source = s;
-  lockModel(aef.state());
+  labels.open(s);
+  lockModel();
   const { width, height, bandCount, epsg } = s.meta;
   $("raster-info").textContent = `${file.name}: ${width} x ${height}, ${bandCount} band(s), EPSG:${epsg}`;
   const preview = await buildPreview(s, PREVIEW_MAX_SIDE);
@@ -82,15 +75,15 @@ $<HTMLInputElement>("open-raster").addEventListener("change", (ev) => run(async 
 }));
 
 $("train").addEventListener("click", () => run(async () => {
-  if (!source || !draw) return say("Open a raster first.");
-  // the AlphaEarth area is a rectangle-mode feature; only drawn polygons are labels
-  const { classes, features } = labelFeatures(draw.getSnapshot().filter((f) => f.properties.mode === "polygon"));
-  if (classes.length < 2) return say("Draw polygons for at least two classes.");
-  if (classes.length > 255) return say("At most 255 classes are supported."); // before sampling; fit checks too
+  if (!source) return say("Open a raster first.");
+  if (labels.busy()) return; // Train is disabled meanwhile
+  if (labels.paintedClasses() < 2) return say(MESSAGES.paintTwo);
+  const names = labels.classes().map((c) => c.name);
   say("Training...");
-  const result = await train(source, features, classes);
+  const result = await train(source, labels.store(), names);
+  if (result === "no samples") return say(MESSAGES.noSamples);
   model = result.model;
-  say(`Trained on ${result.samples} pixels, ${classes.length} classes.`);
+  say(`Trained on ${result.samples} pixels, ${names.length} classes.`);
 }));
 
 $("classify").addEventListener("click", () => run(async () => {

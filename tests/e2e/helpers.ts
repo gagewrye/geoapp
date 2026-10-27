@@ -1,7 +1,6 @@
 import { expect, type CDPSession, type Page } from "@playwright/test";
 import { geotiffBuffer, type Value } from "../unit/helpers/sources";
-import { checkRing, normalizeLon } from "../../src/core/ring";
-import type { Affine } from "../../src/core/types";
+import type { Affine, Grid } from "../../src/core/types";
 
 export type LngLat = [number, number];
 export type Ring = LngLat[];
@@ -76,31 +75,6 @@ export async function pixelAt(page: Page, p: Xy): Promise<number[]> {
   }, p);
 }
 
-export async function snapshot(page: Page): Promise<any[]> {
-  return page.evaluate(() => (window as any).__geoapp.draw.getSnapshot().filter((f: any) => f.geometry.type === "Polygon"));
-}
-
-/** Polygons rendered by terra-draw layers, as returned by queryRenderedFeatures. */
-export async function renderedPolygons(page: Page): Promise<any[]> {
-  return page.evaluate(() => {
-    const { map } = (window as any).__geoapp;
-    const layers = map.getStyle().layers.filter((l: any) => l.id.startsWith("td-") && l.type === "fill").map((l: any) => l.id);
-    return map.queryRenderedFeatures({ layers }).filter((f: any) => f.geometry.type === "Polygon").map((f: any) => ({ coordinates: f.geometry.coordinates }));
-  });
-}
-
-export async function setMode(page: Page, mode: "draw" | "select"): Promise<void> {
-  await page.click(mode === "draw" ? "#mode-draw" : "#mode-select");
-}
-
-/** Click vertices in polygon mode, then click the first one again to close. */
-export async function drawPolygon(page: Page, pts: Xy[], className?: string): Promise<void> {
-  if (className !== undefined) await page.fill("#class-name", className);
-  await setMode(page, "draw");
-  for (const p of pts) await clickAt(page, p);
-  await clickAt(page, pts[0]!);
-}
-
 export async function clickAt(page: Page, p: Xy): Promise<void> {
   await page.mouse.move(p.x, p.y);
   await page.mouse.down();
@@ -116,32 +90,10 @@ export async function dragFromTo(page: Page, a: Xy, b: Xy): Promise<void> {
   await page.waitForTimeout(80);
 }
 
-/** Drag with one large move then a 1 px nudge, so terra-draw sees a single drag update at b. */
-export async function jumpDrag(page: Page, a: Xy, b: Xy): Promise<void> {
-  await page.mouse.move(a.x, a.y);
-  await page.mouse.down();
-  await page.mouse.move(b.x, b.y);
-  await page.mouse.move(b.x + 1, b.y);
-  await page.mouse.up();
-  await page.waitForTimeout(80);
-}
-
 /** Longitude difference reduced to (-180, 180]. */
 export const lonDiff = (a: number, b: number) => { const d = (((a - b) % 360) + 540) % 360 - 180; return d === -180 ? 180 : d; };
 
 export const message = (page: Page) => page.locator("#message");
-
-/** Outer rings of the stored polygons. */
-export const rings = async (page: Page): Promise<Ring[]> => (await snapshot(page)).map((f) => f.geometry.coordinates[0]);
-
-/** A ring that checkRing accepts, after wrapping longitudes. */
-export const valid = (r: Ring) => checkRing(r.map(([x, y]) => [normalizeLon(x), y])) === null;
-
-/** Nothing invalid is stored or rendered. */
-export async function expectNothingInvalid(page: Page): Promise<void> {
-  for (const r of await rings(page)) expect(valid(r), JSON.stringify(r)).toBe(true);
-  for (const f of await renderedPolygons(page)) for (const r of f.coordinates) expect(valid(r), JSON.stringify(r)).toBe(true);
-}
 
 export const lerp = (a: Xy, b: Xy, t: number): Xy => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
 
@@ -167,37 +119,88 @@ export function toucher(cdp: CDPSession) {
 
 /**
  * Raw CDP mouse or pen, so coordinates may lie outside the viewport. `held` false sends buttons 0
- * (a lost release when no mouseReleased came).
+ * (a lost release when no mouseReleased came). A pen's barrel button is "right".
  */
-export function rawPointer(cdp: CDPSession, pointerType: "mouse" | "pen" = "mouse") {
+export function rawPointer(cdp: CDPSession, pointerType: "mouse" | "pen" = "mouse", button: "left" | "right" = "left") {
   return (type: "mousePressed" | "mouseMoved" | "mouseReleased", p: Xy, held: boolean) =>
     cdp.send("Input.dispatchMouseEvent", {
       type, x: p.x, y: p.y, pointerType,
-      button: type === "mouseMoved" && !held ? "none" : "left", buttons: held ? 1 : 0, clickCount: type === "mouseMoved" ? 0 : 1,
+      button: type === "mouseMoved" && !held ? "none" : button, buttons: held ? (button === "left" ? 1 : 2) : 0, clickCount: type === "mouseMoved" ? 0 : 1,
     });
 }
 
-/** Large polar polygon whose body point is > 40 px (terra-draw's grab distance) from every handle. */
-export const polar: Ring = [[-40, 60], [40, 60], [40, 82], [-40, 82]];
-export const polarBody: LngLat = [0, 72];
-export const polarVertex: LngLat = [40, 82];
+/** rgbFixture's grid. */
+export const RGB_GRID: Grid = { width: 1000, height: 1000, epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01] };
 
-/** Draw `polar` on the globe near the north pole and select it. */
-export async function polarSetup(page: Page): Promise<void> {
-  await openApp(page);
-  await jumpTo(page, [0, 75], 1.5);
-  await drawPolygon(page, await Promise.all(polar.map((p) => toScreen(page, p))), "ice");
-  await setMode(page, "select");
-  await clickAt(page, await toScreen(page, polarBody));
+/** Stored labels through the e2e hook, as "col,row" -> value (non-zero only). */
+export async function labels(page: Page): Promise<Map<string, number>> {
+  const flat: number[] = await page.evaluate(() => {
+    const { store } = (window as any).__geoapp.labels;
+    const out: number[] = [];
+    for (const [key, t] of store.tiles as Map<string, Uint8Array>) {
+      const [x0, y0] = key.split(",").map(Number) as [number, number];
+      const w = Math.min(256, store.width - x0);
+      t.forEach((v, i) => { if (v) out.push(x0 + (i % w), y0 + Math.floor(i / w), v); });
+    }
+    return out;
+  });
+  const m = new Map<string, number>();
+  for (let i = 0; i < flat.length; i += 3) m.set(`${flat[i]},${flat[i + 1]}`, flat[i + 2]!);
+  return m;
 }
 
-/** A valid polygon just west of 180 at the current view, selected in select mode; returns its screen corners and body. */
-export async function westOf180(page: Page): Promise<{ c: Xy; pts: Xy[]; body: Xy }> {
-  const c = await toScreen(page, [180, 0]);
-  const pts = [{ x: c.x - 200, y: c.y - 80 }, { x: c.x - 30, y: c.y - 80 }, { x: c.x - 30, y: c.y + 80 }, { x: c.x - 200, y: c.y + 80 }];
-  await drawPolygon(page, pts, "a");
-  await setMode(page, "select");
-  const body = { x: c.x - 115, y: c.y };
-  await clickAt(page, body);
-  return { c, pts, body };
+/** Keys of the stored label tiles. */
+export const tileKeysStored = (page: Page): Promise<string[]> =>
+  page.evaluate(() => [...(window as any).__geoapp.labels.store.tiles.keys()].sort());
+
+/** Wait until strokes waiting for nodata masks have applied (Train is disabled meanwhile). */
+export const settled = (page: Page) => expect(page.locator("#train")).toBeEnabled();
+
+/** Mouse stroke through the points with one button held, then released, and settled. */
+export async function stroke(page: Page, pts: Xy[], button: "left" | "right" = "left"): Promise<void> {
+  await page.mouse.move(pts[0]!.x, pts[0]!.y);
+  await page.mouse.down({ button });
+  for (const p of pts.slice(1)) await page.mouse.move(p.x, p.y);
+  await page.mouse.up({ button });
+  await settled(page);
+}
+
+/** n evenly spaced points from a to b, both included. */
+export const path = (a: Xy, b: Xy, n: number): Xy[] => Array.from({ length: n }, (_, i) => lerp(a, b, n === 1 ? 0 : i / (n - 1)));
+
+/** The view, to check that painting moved nothing. */
+export const view = (page: Page) => page.evaluate(() => {
+  const { map } = (window as any).__geoapp;
+  const c = map.getCenter();
+  return { lng: c.lng as number, lat: c.lat as number, zoom: map.getZoom() as number, bearing: map.getBearing() as number, pitch: map.getPitch() as number };
+});
+
+/** The brush hover feature collection (empty when there is no hover source yet). */
+export const hoverFeatures = (page: Page): Promise<any[]> => page.evaluate(async () => {
+  const s = (window as any).__geoapp.map.getSource("brush-hover");
+  return s ? ((await s.getData()) as any).features : [];
+});
+
+/** Choose the class at a 0-based index by clicking its row. */
+export const selectClass = (page: Page, i: number) => page.locator("#classes li").nth(i).click({ position: { x: 4, y: 4 } });
+
+/** Rename class i in the class list (Enter commits). */
+export async function renameClass(page: Page, i: number, name: string): Promise<void> {
+  const field = page.locator("#classes .class-name").nth(i);
+  await field.fill(name);
+  await field.press("Enter");
+}
+
+/**
+ * On rgbFixture: name classes 1 and 2, then paint class 1 west (band 1 = 200) and class 2 east
+ * (band 1 = 120) of 15E by mouse, at zoom 6 around 15E 45N.
+ */
+export async function paintTwoClasses(page: Page, names = ["left", "right"]): Promise<void> {
+  for (const [i, n] of names.entries()) await renameClass(page, i, n);
+  await jumpTo(page, [15, 45], 6);
+  for (const [i, lon] of [12.005, 18.005].entries()) {
+    await selectClass(page, i);
+    const a = await toScreen(page, [lon, 45.005]);
+    await stroke(page, [a, { x: a.x + 30, y: a.y + 20 }, { x: a.x + 60, y: a.y }]);
+  }
 }

@@ -3,7 +3,7 @@ import { expect, test, type Browser, type Page, type Request } from "@playwright
 import { AEF_BASE } from "../../src/core/aef";
 import { toLonLat } from "../../src/core/crs";
 import { chip, cogRequests, fetchChip, logRequests, serveAef } from "./aef";
-import { drawPolygon, jumpTo, message, openApp, openRaster, tiff, toScreen, type LngLat } from "./helpers";
+import { jumpTo, labels, message, openApp, openRaster, path, renameClass, selectClass, stroke, tiff, toScreen, type LngLat } from "./helpers";
 
 // Tester e2e for criterion 8: a local raster over the AOI itself, labels inside the AOI, names
 // with characters that would be percent-encoded in a URL, cookies on both hosts, and the Range
@@ -16,17 +16,20 @@ const N = chip.width;
 const localRaster = () => tiff(FILE, N + 60, N + 60, 3, (b, c) => (c < (N + 60) / 2 ? 40 : 210) + 5 * b,
   { epsg: chip.epsg, gt: [chip.x0 - 300, 10, 0, chip.y1 + 300, 0, -10] });
 
-/** A UTM box inside the chip, as screen corners at the current view. */
-const utmRect = (page: Page, [x0, y0, x1, y1]: number[]) =>
-  Promise.all(([[x0, y1], [x1, y1], [x1, y0], [x0, y0]] as LngLat[]).map(([x, y]) => toScreen(page, toLonLat(chip.epsg, x, y) as LngLat)));
+/** Screen point of a UTM position at the current view. */
+const utm = (page: Page, x: number, y: number) => toScreen(page, toLonLat(chip.epsg, x, y) as LngLat);
 
 async function localWork(page: Page): Promise<string> {
   await openRaster(page, localRaster());
   await expect(message(page)).toHaveText("Raster opened.");
   await jumpTo(page, toLonLat(chip.epsg, chip.x0 + 640, chip.y1 - 640) as LngLat, 15);
-  // both labels lie inside the area that is fetched next
-  await drawPolygon(page, await utmRect(page, [chip.x0 + 100, chip.y1 - 1100, chip.x0 + 500, chip.y1 - 200]), CLASSES[0]);
-  await drawPolygon(page, await utmRect(page, [chip.x0 + 800, chip.y1 - 1100, chip.x0 + 1200, chip.y1 - 200]), CLASSES[1]);
+  // both classes are painted inside the area that is fetched next
+  for (const [i, x] of [chip.x0 + 100, chip.x0 + 800].entries()) {
+    await renameClass(page, i, CLASSES[i]!);
+    await selectClass(page, i);
+    await stroke(page, path(await utm(page, x, chip.y1 - 300), await utm(page, x + 400, chip.y1 - 1000), 10));
+  }
+  expect(new Set((await labels(page)).values())).toEqual(new Set([1, 2]));
   await page.click("#train");
   await expect(message(page)).toHaveText(/^Trained on \d+ pixels, 2 classes\.$/);
   const [dl] = await Promise.all([page.waitForEvent("download"), page.click("#save-model")]);

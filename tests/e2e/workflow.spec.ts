@@ -3,15 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { fromArrayBuffer } from "geotiff";
 import { validate } from "../../src/core/validate";
 import { MESSAGES } from "../../src/ui/messages";
-import { drawPolygon, message, openApp, openRaster, rgbFixture, snapshot, tiff, toScreen, type LngLat } from "./helpers";
-
-const rect = async (page: Page, [w, s, e, n]: number[]) =>
-  Promise.all(([[w, n], [e, n], [e, s], [w, s]] as LngLat[]).map((p) => toScreen(page, p)));
-
-async function drawTwoClasses(page: Page) {
-  await drawPolygon(page, await rect(page, [11, 43, 13, 46]), "left");
-  await drawPolygon(page, await rect(page, [17, 43, 19, 46]), "right");
-}
+import { message, openApp, openRaster, paintTwoClasses, rgbFixture, tiff } from "./helpers";
 
 async function download(page: Page, click: string): Promise<Buffer> {
   const [dl] = await Promise.all([page.waitForEvent("download"), page.click(click)]);
@@ -26,7 +18,7 @@ test("open, train, classify, export and save/load a model with no outside reques
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
-  await drawTwoClasses(page);
+  await paintTwoClasses(page); // spec 003's brush replaces spec 001's polygons
 
   await page.click("#train");
   await expect(message(page)).toHaveText(/^Trained on \d+ pixels, 2 classes\.$/);
@@ -51,19 +43,7 @@ test("open, train, classify, export and save/load a model with no outside reques
   expect(requests.length).toBeGreaterThan(0);
 });
 
-test("users draw polygons and give each a class name (criterion 2)", async ({ page }) => {
-  await openApp(page);
-  await openRaster(page, rgbFixture());
-  await expect(message(page)).toHaveText("Raster opened.");
-  await drawTwoClasses(page);
-  const names = page.locator("#polygons .polygon-class");
-  await expect(names).toHaveCount(2);
-  expect(await names.evaluateAll((els) => els.map((e) => (e as HTMLInputElement).value))).toEqual(["left", "right"]);
-  await names.nth(1).fill("water");
-  await names.nth(1).press("Enter");
-  await names.nth(1).blur();
-  expect((await snapshot(page)).map((f) => f.properties.className)).toEqual(["left", "water"]);
-});
+// Criterion 2 (draw polygons and name them) is superseded by spec 003 criteria 10 and 14 (brush-paint, brush-panel).
 
 test.describe("rasters at 180 degrees (criterion 16)", () => {
   const one = () => 100;

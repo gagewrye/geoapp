@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { fromArrayBuffer, writeArrayBuffer } from "geotiff";
 import { predictTile } from "../../../src/core/predict";
-import { samplePixels } from "../../../src/core/sample";
+import { labelSamples } from "../../../src/core/labelSamples";
 import type { Model } from "../../../src/core/types";
 import { openGeoTiff } from "../../../src/io/geotiffSource";
 
@@ -16,7 +16,7 @@ function tiff(values: Float32Array, nodata?: string): ArrayBuffer {
 }
 
 const model: Model = { version: 1, type: "logreg", bands: [1], mean: [0], std: [1], classes: ["lo", "hi"], W: [[-1], [1]], b: [0, 0] };
-const all = { rings: [[[0, 0], [4, 0], [4, 1], [0, 1]] as [number, number][]], label: 0 };
+const all = new Uint8Array(4).fill(1); // every pixel labelled
 
 async function open(values: Float32Array, nodata?: string) {
   const src = await openGeoTiff(await fromArrayBuffer(tiff(values, nodata)));
@@ -34,7 +34,7 @@ describe("GDAL_NODATA infinity spellings (tester, issue 3a)", () => {
     expect(src.meta.nodata).toBe(value);
     expect(t.nodata).toBe(value);
     expect(pred).toEqual([0, 1, 255, 1]);
-    expect(samplePixels(t, [all], [1]).y.length).toBe(3);
+    expect(labelSamples(t, all, [1]).y.length).toBe(3);
   });
 
   it("-inf nodata does not also mark +inf pixels (sign is kept)", async () => {

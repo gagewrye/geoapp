@@ -1,42 +1,46 @@
 import { describe, expect, it } from "vitest";
 import { fromArrayBuffer } from "geotiff";
-import { applyAffine, toLonLat } from "../../../src/core/crs";
+import { fit } from "../../../src/core/fit";
+import { labelSamples } from "../../../src/core/labelSamples";
+import { brush, emptyStore, labelWindows } from "../../../src/core/labelStore";
 import { predictTile } from "../../../src/core/predict";
 import type { Affine, Model } from "../../../src/core/types";
 import { openGeoTiff } from "../../../src/io/geotiffSource";
 import { buildPreview, checkClassify, classify, openRaster, RasterRefusedError, train } from "../../../src/io/pipeline";
 import { fakeSource, geotiffBuffer, recordingSink } from "../helpers/sources";
 
-type Feature = GeoJSON.Feature<GeoJSON.Polygon, { label: number }>;
-
-/** Lon/lat polygon for a pixel rectangle of a source. */
-function pixelRect(epsg: number, gt: Affine, [c0, r0, c1, r1]: number[], label: number): Feature {
-  const ring = [[c0!, r0!], [c1!, r0!], [c1!, r1!], [c0!, r1!], [c0!, r0!]].map(([c, r]) => toLonLat(epsg, ...applyAffine(gt, c!, r!)));
-  return { type: "Feature", properties: { label }, geometry: { type: "Polygon", coordinates: [ring] } };
+/** Paint value over [c0, r0, c1, r1) with all-valid masks (the brush's masks are tested in paintQueue). */
+function paint(store: ReturnType<typeof emptyStore>, [c0, r0, c1, r1]: number[], value: number) {
+  const w = { x0: c0!, y0: r0!, width: c1! - c0!, height: r1! - r0! };
+  const masks = new Map(Array.from({ length: 64 }, (_, i) => [`${(i % 8) * 256},${Math.floor(i / 8) * 256}`, new Uint8Array(8192)]));
+  brush(store, masks, w, value, false);
 }
 const value = (b: number, c: number, r: number) => (b === 0 ? (c < 1024 ? 10 : 50) : b === 1 ? r % 13 : (c + r) % 5);
 const model1 = (classes: string[], W: number[][], mean = [30], std = [20]): Model =>
   ({ version: 1, type: "logreg", bands: [1], mean, std, classes, W, b: classes.map(() => 0) });
 
 describe("windowed I/O on a 2048x2048 source (criterion 8)", () => {
-  it("trains from windows <= 256x256 that intersect a polygon bbox only", async () => {
-    const { source, reads } = fakeSource({ width: 2048, height: 2048 }, value);
-    const { gt, epsg } = source.meta;
-    const boxes = [[300, 300, 520, 400], [1500.5, 1900, 1600, 2000]];
-    const feats = [pixelRect(epsg, gt, boxes[0]!, 0), pixelRect(epsg, gt, boxes[1]!, 1)];
-    const { model, samples } = await train(source, feats, ["low", "high"], { epochs: 30 });
-    expect(samples).toBeGreaterThan(30000);
+  // spec 003 criterion 8 replaces spec 001's bounding-box rule: training reads exactly the stored tiles
+  it("trains reading exactly the stored tiles' windows, once each and each at most 256x256; samples = labelled non-nodata pixels", async () => {
+    const nd = (c: number, r: number) => c >= 1550 && c < 1560 && r >= 1950 && r < 1960;
+    const make = () => fakeSource({ width: 2048, height: 2048, nodata: -1 }, (b, c, r) => (b === 2 && nd(c, r) ? -1 : value(b, c, r)));
+    const { source, reads } = make();
+    const store = emptyStore(2048, 2048);
+    paint(store, [300, 300, 520, 400], 1);
+    // all-valid masks label the 10x10 nodata block too, as a hook write could; training skips it
+    paint(store, [1500, 1900, 1600, 2000], 2);
+    const { model, samples } = (await train(source, store, ["low", "high"], { epochs: 30 })) as { model: Model; samples: number };
+    expect(samples).toBe(220 * 100 + 100 * 100 - 100);
     expect(model.classes).toEqual(["low", "high"]);
     expect(model.bands).toEqual([1, 2, 3]);
-    expect(reads.length).toBe(4); // each box spans 2 windows across, 1 down
-    for (const w of reads) {
-      expect(w.width).toBeLessThanOrEqual(256);
-      expect(w.height).toBeLessThanOrEqual(256);
-      expect(w.x0 % 256).toBe(0);
-      expect(w.y0 % 256).toBe(0);
-      const hit = boxes.some(([x0, y0, x1, y1]) => x1! + 0.01 > w.x0 && x0! - 0.01 < w.x0 + w.width && y1! + 0.01 > w.y0 && y0! - 0.01 < w.y0 + w.height);
-      expect(hit).toBe(true);
-    }
+    expect(reads.map((w) => `${w.x0},${w.y0},${w.width},${w.height}`)).toEqual(labelWindows(store).map((w) => `${w.x0},${w.y0},256,256`));
+    expect(reads).toHaveLength(4);
+    // and the model is fit on exactly those samples
+    const other = make().source;
+    const parts = await Promise.all(labelWindows(store).map(async (w) =>
+      labelSamples(await other.readWindow(w.x0, w.y0, w.width, w.height), store.tiles.get(`${w.x0},${w.y0}`)!, [1, 2, 3])));
+    const X = Float32Array.from(parts.flatMap((p) => [...p.X])), y = Uint8Array.from(parts.flatMap((p) => [...p.y]));
+    expect(model).toEqual(fit(X, y, [1, 2, 3], ["low", "high"], { epochs: 30 }));
   });
 
   it("classifies from windows <= 256x256 with every write after the header <= 65,536 bytes", async () => {

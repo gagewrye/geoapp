@@ -28,10 +28,7 @@ function mercBounds(src: Window, gt: Affine, epsg: number): [number, number, num
   return [x0, y0, x1, y1];
 }
 
-/**
- * The axis-aligned Mercator grid over a window (longer side maxSide), with corners TL, TR, BR, BL in
- * lon/lat. `each` passes every grid pixel (row-major index) and its centre's raster (col, row) to f.
- */
+/** Axis-aligned Mercator grid over a window (longer side maxSide; corners TL, TR, BR, BL); `each` visits pixel centres. */
 export function mercatorGrid(win: Window, gt: Affine, epsg: number, maxSide: number) {
   const [mx0, my0, mx1, my1] = mercBounds(win, gt, epsg);
   const aspect = (mx1 - mx0) / (my1 - my0);

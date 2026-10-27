@@ -1,4 +1,5 @@
 import type { Map as MapLibreMap } from "maplibre-gl";
+import { beforeSlot } from "./layers";
 
 const SOURCE = "preview";
 
@@ -14,9 +15,7 @@ export function showPreview(map: MapLibreMap, p: Preview): void {
   if (map.getLayer(SOURCE)) map.removeLayer(SOURCE);
   if (map.getSource(SOURCE)) map.removeSource(SOURCE);
   map.addSource(SOURCE, { type: "canvas", canvas, coordinates, animate: false });
-  // keep drawn polygons (terra-draw "td-" layers) above the preview
-  const before = map.getStyle().layers.find((l) => l.id.startsWith("td-"))?.id;
-  map.addLayer({ id: SOURCE, type: "raster", source: SOURCE, paint: { "raster-fade-duration": 0, "raster-resampling": "nearest" } }, before);
+  map.addLayer({ id: SOURCE, type: "raster", source: SOURCE, paint: { "raster-fade-duration": 0, "raster-resampling": "nearest" } }, beforeSlot(map, "preview"));
 }
 
 export function fitToPreview(map: MapLibreMap, corners: [number, number][]): void {

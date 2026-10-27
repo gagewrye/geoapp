@@ -2,7 +2,7 @@ import type { Map as MapLibreMap } from "maplibre-gl";
 import type { TerraDraw } from "terra-draw";
 import type { Aoi } from "../core/aef";
 import { aoiGrid, sameAoi } from "../core/aoi";
-import { normalizeLon } from "../core/ring";
+import { normalizeLon } from "../core/crs";
 import { CacheBusyError, opfsStore, type CacheStore } from "../io/aefCache";
 import { downloadAoi } from "../io/aefDownload";
 import { loadYears } from "../io/aefIndex";
@@ -25,7 +25,7 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 
 /**
  * AlphaEarth controls (spec 002): area, year, fetch, local file, preview and attribution. Only one
- * set of AlphaEarth data is loaded at a time, and nothing here reads polygons or labels.
+ * set of AlphaEarth data is loaded at a time, and nothing here reads labels.
  */
 export function initAef({ map, draw, previewMaxSide, say, run, onState }: Deps) {
   const year = $<HTMLSelectElement>("aef-year"), fetchBtn = $<HTMLButtonElement>("aef-fetch");

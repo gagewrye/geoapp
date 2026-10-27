@@ -1,11 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
 import { chip, chipCentre, drawArea, drawSmallArea, lonLatBox } from "./aef";
-import { drawPolygon, jumpTo, message, openApp, openRaster, rgbFixture, snapshot, toScreen, type LngLat } from "./helpers";
+import { jumpTo, labels, message, openApp, openRaster, paintTwoClasses, rgbFixture, toScreen, type LngLat } from "./helpers";
 
-// Spec 002 criterion 3 in the UI, and the area rectangle kept apart from spec 001's labels.
-const rect = (page: Page, [w, s, e, n]: number[]) =>
-  Promise.all(([[w, n], [e, n], [e, s], [w, s]] as LngLat[]).map((p) => toScreen(page, p)));
+// Spec 002 criterion 3 in the UI, and the area rectangle kept apart from spec 003's brush labels.
 
 const areas = (page: Page) => page.evaluate(() => (window as any).__geoapp.draw.getSnapshot().filter((f: any) => f.properties.mode === "rectangle").length);
 
@@ -39,22 +37,23 @@ test.describe("refused areas (criterion 3)", () => {
   });
 });
 
-test("the area is one rectangle, never a labelled polygon", async ({ page }) => {
+test("the area is one rectangle, never a label", async ({ page }) => {
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
   await drawSmallArea(page, [13, 45.5]);
   await drawSmallArea(page, [15, 45.5]); // replaces the first
   expect(await areas(page)).toBe(1);
-  await drawPolygon(page, await rect(page, [11, 43, 13, 46]), "left");
-  await drawPolygon(page, await rect(page, [17, 43, 19, 46]), "right");
-  await expect(page.locator("#polygons li")).toHaveCount(2);
-  expect((await snapshot(page)).filter((f) => f.properties.mode === "polygon")).toHaveLength(2);
+  await page.click("#mode-paint"); // the area tool switched the brush to Pan (ADR 0009)
+  await paintTwoClasses(page);
+  expect((await labels(page)).size).toBeGreaterThan(0);
   await page.click("#train");
   await expect(message(page)).toHaveText(/^Trained on \d+ pixels, 2 classes\.$/);
-  // select mode edits polygons only: clicking the area's edge selects nothing
-  await page.click("#mode-select");
-  const edge = await toScreen(page, [15, 45.51]);
+  // painting over the area's edge labels pixels and leaves the area alone
+  await jumpTo(page, [15, 45.5], 12);
+  const edge = await toScreen(page, [15, 45.51] as LngLat);
   await page.mouse.click(edge.x, edge.y);
-  expect(await page.evaluate(() => (window as any).__geoapp.draw.getSnapshot().some((f: any) => f.properties.selected))).toBe(false);
+  const snap = await page.evaluate(() => (window as any).__geoapp.draw.getSnapshot());
+  expect(snap.map((f: any) => f.properties.mode)).toEqual(["rectangle"]);
+  expect(snap.some((f: any) => f.properties.selected)).toBe(false);
 });

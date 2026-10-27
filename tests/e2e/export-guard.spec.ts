@@ -1,19 +1,16 @@
 import { expect, test, type Page } from "@playwright/test";
 import { fromArrayBuffer } from "geotiff";
 import { readFile } from "node:fs/promises";
-import { drawPolygon, message, openApp, openRaster, rgbFixture, tiff, toScreen, type LngLat } from "./helpers";
+import { MESSAGES } from "../../src/ui/messages";
+import { jumpTo, message, openApp, openRaster, paintTwoClasses, rgbFixture, stroke, tiff, toScreen } from "./helpers";
 
 // Tester: checkClassify before the sink opens, the sink abort path, and the 2..255 class limit
-// (criteria 9, 11 via the UI; reviewer fixes 2 and 3).
-
-const rect = async (page: Page, [w, s, e, n]: number[]) =>
-  Promise.all(([[w, n], [e, n], [e, s], [w, s]] as LngLat[]).map((p) => toScreen(page, p)));
+// (criteria 9, 11 via the UI; reviewer fixes 2 and 3). Labels come from spec 003's brush.
 
 async function trainTwoClasses(page: Page) {
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
-  await drawPolygon(page, await rect(page, [11, 43, 13, 46]), "left");
-  await drawPolygon(page, await rect(page, [17, 43, 19, 46]), "right");
+  await paintTwoClasses(page);
   await page.click("#train");
   await expect(message(page)).toHaveText(/^Trained on \d+ pixels, 2 classes\.$/);
 }
@@ -57,6 +54,7 @@ test.describe("classify export guard (criteria 9, 11, tester)", () => {
     });
     await openApp(page);
     await trainTwoClasses(page);
+    page.on("dialog", (d) => void d.accept()); // spec 003: opening another raster discards the labels
     await openRaster(page, oneBand());
     await expect(message(page)).toHaveText("Raster opened.");
     await page.click("#classify");
@@ -68,6 +66,7 @@ test.describe("classify export guard (criteria 9, 11, tester)", () => {
     await opfsWithSpies(page);
     await openApp(page);
     await trainTwoClasses(page);
+    page.on("dialog", (d) => void d.accept()); // spec 003: opening another raster discards the labels
     await openRaster(page, oneBand());
     await expect(message(page)).toHaveText("Raster opened.");
     let downloads = 0;
@@ -123,19 +122,14 @@ test.describe("classify export guard (criteria 9, 11, tester)", () => {
   });
 });
 
-/** n tiny labelled polygons inside rgbFixture, added through terra-draw, one class each. */
+/** Add classes up to n, then label one pixel of each through the e2e hook (rgbFixture has no nodata). */
 async function addClasses(page: Page, n: number) {
+  for (let i = 2; i < n; i++) await page.click("#class-add");
+  await expect(page.locator("#classes li")).toHaveCount(n);
   await page.evaluate((n) => {
-    const { draw } = (window as any).__geoapp;
-    const fs = [];
-    for (let i = 0; i < n; i++) {
-      const r6 = (v: number) => Math.round(v * 1e6) / 1e6;
-      const w = r6(10.2 + (i % 16) * 0.6), s = r6(40.2 + Math.floor(i / 16) * 0.6), e = r6(w + 0.03), nn = r6(s + 0.03);
-      fs.push({ type: "Feature", properties: { mode: "polygon", className: `c${i}` },
-        geometry: { type: "Polygon", coordinates: [[[w, s], [e, s], [e, nn], [w, nn], [w, s]]] } });
-    }
-    const res = draw.addFeatures(fs);
-    if (res.some((r: any) => !r.valid)) throw new Error(`addFeatures rejected a polygon: ${JSON.stringify(res.find((r: any) => !r.valid))}`);
+    const t = new Uint8Array(256 * 256);
+    for (let v = 1; v <= n; v++) t[(v - 1) * 37] = v;
+    (window as any).__geoapp.labels.store.tiles.set("0,0", t);
   }, n);
 }
 
@@ -148,7 +142,7 @@ test.describe("class limit 2..255 through the UI (criteria 6, 11, tester)", () =
     await expect(message(page)).toHaveText("Raster opened.");
     await addClasses(page, 255);
     await page.click("#train");
-    await expect(message(page)).toHaveText(/^Trained on \d+ pixels, 255 classes\.$/, { timeout: 60_000 });
+    await expect(message(page)).toHaveText("Trained on 255 pixels, 255 classes.", { timeout: 60_000 });
     const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 60_000 }), page.click("#classify")]);
     await expect(message(page)).toHaveText("Export complete.");
     const buf = await readFile((await dl.path())!);
@@ -157,23 +151,16 @@ test.describe("class limit 2..255 through the UI (criteria 6, 11, tester)", () =
     expect(px!.includes(255)).toBe(false); // no nodata in the fixture
   });
 
-  test("256 classes are refused with a message naming the limit, and no model is kept", async ({ page }) => {
-    await openApp(page);
-    await openRaster(page, rgbFixture());
-    await expect(message(page)).toHaveText("Raster opened.");
-    await addClasses(page, 256);
-    await page.click("#train");
-    await expect(message(page)).toHaveText("At most 255 classes are supported.");
-    await page.click("#save-model");
-    await expect(message(page)).toHaveText("Train or load a model first.");
-  });
+  // "256 classes are refused" is gone: spec 003's Add is disabled at 255 classes (brush-panel.spec.ts).
 
-  test("one class is refused before training", async ({ page }) => {
+  test("one painted class is refused before training", async ({ page }) => {
     await openApp(page);
     await openRaster(page, rgbFixture());
     await expect(message(page)).toHaveText("Raster opened.");
-    await addClasses(page, 1);
+    await jumpTo(page, [15, 45], 6);
+    const a = await toScreen(page, [12.005, 45.005]);
+    await stroke(page, [a, { x: a.x + 40, y: a.y }]);
     await page.click("#train");
-    await expect(message(page)).toHaveText("Draw polygons for at least two classes.");
+    await expect(message(page)).toHaveText(MESSAGES.paintTwo);
   });
 });

@@ -6,9 +6,13 @@ body { display: flex; }
 #panel .row { display: flex; gap: 6px; }
 #panel .row button { margin: 0; }
 #panel fieldset { margin: 12px 0; }
-#polygons { list-style: none; padding: 0; }
-#polygons li { display: flex; gap: 4px; margin: 4px 0; }
-#polygons input { flex: 1; min-width: 0; }
+#classes { list-style: none; padding: 0; max-height: 40vh; overflow-y: auto; }
+#classes li { display: flex; gap: 4px; margin: 2px 0; padding: 2px; align-items: center; }
+#classes li.selected { background: #dde8f5; }
+#classes .class-name { flex: 1; min-width: 0; }
+#classes .class-colour { width: 32px; padding: 0; }
+#brush-size { align-self: center; }
+#panel button[aria-pressed="true"] { font-weight: bold; }
 #message { color: #a40000; min-height: 2em; }
 #map { flex: 1; height: 100%; }
 #panel .row label { margin: 0; align-self: center; }

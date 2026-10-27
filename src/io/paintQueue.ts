@@ -17,13 +17,9 @@ type Events = {
   error: (e: unknown) => void;
 };
 
-/**
- * Applies stroke cells in order (spec 003 Imagery nodata). Before a paint cell, every tile its
- * footprint meets needs a nodata mask: missing ones are read from the imagery one window at a time,
- * and each window is dropped once its mask is made. Cells wait in the queue meanwhile, so they still
- * apply after the stroke ends. Erase reads nothing. After each cell only masks of stored tiles and of
- * that footprint are kept.
- */
+/** Applies stroke cells in order, first reading missing nodata masks one tile window at a time (spec 003). */
+// Cells wait while masks load, so they still apply after the stroke ends. Erase reads nothing, and
+// after each cell only the masks of stored tiles and of that footprint are kept.
 export class PaintQueue {
   readonly masks: NodataMasks = new Map();
   private ops: PaintOp[] = [];

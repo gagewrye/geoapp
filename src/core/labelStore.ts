@@ -5,10 +5,8 @@ import { TILE_SIZE } from "./types";
 /** At most 256 label tiles (16 MiB) in memory (ADR 0010). */
 export const MAX_LABEL_TILES = 256;
 
-/**
- * Painted labels on the source grid. Keys are `${x0},${y0}` of tileWindows() windows; each tile is
- * row-major and window-sized; 0 = unlabelled, else class index + 1. No all-zero tile is kept.
- */
+/** Painted labels on the source grid: 0 = unlabelled, else class index + 1. */
+// Keys are `${x0},${y0}` of tileWindows() windows; tiles are row-major and window-sized; no all-zero tile is kept.
 export type LabelStore = { width: number; height: number; tiles: Map<string, Uint8Array> };
 /** Imagery-nodata masks (nodataMask) by LabelStore key. */
 export type NodataMasks = Map<string, Uint8Array>;
@@ -46,10 +44,7 @@ function isEmpty(tile: Uint8Array): boolean {
   return true;
 }
 
-/**
- * Paint sets w's pixels whose mask bit is 0 to value, and throws if a tile w meets has no mask; erase
- * clears w's pixels equal to value, ignoring masks. "full" (nothing changed) when paint needs tile 257.
- */
+/** Paint w (mask bit 0 pixels only; throws on a missing mask) or erase value in w; "full" changes nothing. */
 export function brush(store: LabelStore, masks: NodataMasks, w: Window, value: number, erase: boolean): "ok" | "full" {
   if (!Number.isInteger(value) || value < 1 || value > 255) throw new Error(`brush: label value ${value} is not 1..255`);
   const keys = tileKeys(w);
