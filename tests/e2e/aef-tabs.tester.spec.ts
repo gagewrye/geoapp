@@ -1,8 +1,9 @@
 import { readFileSync } from "node:fs";
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import { AEF_BASE } from "../../src/core/aef";
 import { MESSAGES } from "../../src/ui/messages";
 import { chip, chipBox, chipCentre, cogRequests, drawArea, fetchChip, logRequests, lonLatBox, serveAef } from "./aef";
-import { chipMismatches, files64, holdCogs, holdRemoves, westFile } from "./aefTester";
+import { chipLoaded, chipMismatches, files64, holdCogs, holdRemoves, quiet, westFile } from "./aefTester";
 import { jumpTo, message, openApp } from "./helpers";
 
 // Tester re-verification of F10: try to get two tabs onto the AlphaEarth cache at once.
@@ -216,4 +217,60 @@ test("two tabs clicking Fetch at the same moment: real Web Locks give the cache 
   const winner = texts[0] === "Embeddings downloaded." ? a! : b!;
   expect((await chipMismatches(winner, REF)).mismatches).toBe(0);
   expect((await files64(winner)).ok).toBe(true);
+});
+
+// Tester F10: OPFS is per origin, so one tab at a time holds the AlphaEarth cache (a Web Locks lock). A second
+// tab's fetch is refused with a message; nothing silently overwrites the first tab's cache.
+test.describe("two tabs of the app share one OPFS origin (Scope: one set of AlphaEarth data)", () => {
+  /** Draw a different area than tab A's in `b` (same window count, another grid) and click Fetch. */
+  async function fetchOther(b: Page) {
+    await openApp(b);
+    await jumpTo(b, chipCentre, 13); // zoom 13 keeps the 200 m-margin box on screen
+    await drawArea(b, lonLatBox(chip.epsg, chipBox, 200));
+    await expect(b.locator("#aef-year option")).not.toHaveCount(0);
+    await b.click("#aef-fetch");
+  }
+
+  /** Tab b was refused: the message, no COG request, nothing loaded, and both controls usable again. */
+  async function refusedAt(b: Page, lb: Parameters<typeof cogRequests>[0]) {
+    await expect(message(b)).toHaveText(MESSAGES.aefOtherTab);
+    expect(cogRequests(lb), "tab B's COG requests").toEqual([]);
+    expect(await b.evaluate(() => (window as any).__geoapp.aef())).toBeNull();
+    await expect(b.locator("#aef-fetch")).toBeEnabled();
+    await expect(b.locator("#open-aef")).toBeEnabled();
+  }
+
+  test("a fetch in a second tab is refused, and the first tab's loaded data stays readable and equal to the chip", async ({ context }) => {
+    const a = await context.newPage(), b = await context.newPage();
+    for (const p of [a, b]) await serveAef(p);
+    const lb = logRequests(b);
+    await openApp(a);
+    await fetchChip(a);
+    await expect(message(a)).toHaveText("Embeddings downloaded.");
+    expect((await chipMismatches(a, REF)).mismatches).toBe(0);
+    await fetchOther(b);
+    await refusedAt(b, lb);
+    const r = await chipMismatches(a, REF).catch((e: Error) => ({ mismatches: `threw: ${e.message}` }));
+    expect(r.mismatches, "tab A's data after tab B's fetch").toBe(0);
+    await chipLoaded(a);
+  });
+
+  test("two tabs fetching at once: the second is refused, and the first finishes with its own area", async ({ context }) => {
+    const a = await context.newPage(), b = await context.newPage();
+    for (const p of [a, b]) await serveAef(p);
+    const la = logRequests(a), lb = logRequests(b);
+    let answered = 0, open!: () => void;
+    const gate = new Promise<void>((r) => { open = r; });
+    await a.route(`${AEF_BASE}**`, async (route) => { if (answered++ >= 100) await gate; await route.fallback(); });
+    await openApp(a);
+    await fetchChip(a);
+    await expect.poll(() => cogRequests(la).length).toBeGreaterThan(100);
+    await fetchOther(b);
+    await refusedAt(b, lb);
+    open();
+    const text = await quiet(a, la);
+    expect(text, "tab A's fetch").toBe("Embeddings downloaded.");
+    expect((await chipMismatches(a, REF)).mismatches, "tab A's data must be the chip").toBe(0);
+    await chipLoaded(a);
+  });
 });

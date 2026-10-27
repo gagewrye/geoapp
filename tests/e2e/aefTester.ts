@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import { AEF_BASE, type AefEntry } from "../../src/core/aef";
-import { cacheFiles, chip } from "./aef";
+import { ATTRIBUTION, cacheFiles, chip } from "./aef";
 
 // Shared by the spec 002 tester e2e files: holding COG answers, and checking the loaded cache.
 const N = chip.width;
@@ -66,6 +66,15 @@ export async function chipMismatches(page: Page, refI8: Buffer): Promise<{ misma
     }
     return { mismatches, outsideNaN, aoi };
   }, [chip.x0, chip.y1, N, refI8.toString("base64")] as const);
+}
+
+/** The loaded data is the chip, cached as 64 good band files, with the preview and attribution shown. */
+export async function chipLoaded(page: Page) {
+  const f = await files64(page);
+  expect(f.ok, JSON.stringify(f)).toBe(true);
+  expect((await chipMismatches(page, readFileSync(`${FIX}/ref_chip.i8`))).mismatches).toBe(0);
+  await expect(page.locator("#aef-preview")).toBeChecked();
+  await expect(page.getByText(ATTRIBUTION)).toBeVisible();
 }
 
 /** Wait until no request has been made for `ms`, so every task the page started has finished. */
