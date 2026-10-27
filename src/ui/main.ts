@@ -36,8 +36,9 @@ function lockModel(): void {
 }
 
 const labels = initLabels({ map, say, onBusy: () => lockModel(), onPaint: () => draw?.setMode("static") });
-const aef = initAef({ map, draw: () => draw, previewMaxSide: PREVIEW_MAX_SIDE, say, run, onState: () => lockModel() });
-$("aef-draw").addEventListener("click", () => labels.setMode("pan")); // the area tool and the brush never share the mouse
+// the area tool and the brush never share the mouse
+const aef = initAef({ map, draw: () => draw, previewMaxSide: PREVIEW_MAX_SIDE, say, run, onState: () => lockModel(),
+  onAreaTool: () => labels.setMode("pan") });
 
 map.on("load", () => {
   draw = createDraw(map, () => labels.syncHandlers());

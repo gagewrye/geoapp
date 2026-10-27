@@ -28,10 +28,16 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
   let eraseEnded = 0; // a right release may still fire contextmenu after pointerup (Windows)
   const painting = () => grid !== null && mode === "paint" && !space;
 
+  // Only handlers the brush turned off are turned back on: outside Paint mode terra-draw and MapLibre own them
+  const handlers = [map.dragRotate, map.doubleClickZoom, map.boxZoom];
+  let owned = false;
   const syncHandlers = () => {
-    for (const h of [map.dragRotate, map.doubleClickZoom, map.boxZoom]) {
-      if (painting()) h.disable();
-      else h.enable();
+    if (painting()) {
+      for (const h of handlers) h.disable();
+      owned = true;
+    } else if (owned) {
+      for (const h of handlers) h.enable();
+      owned = false;
     }
   };
 

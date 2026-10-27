@@ -16,6 +16,12 @@ class WrappingAdapter extends TerraDrawMapLibreGLAdapter<MapLibreMap> {
     if (enabled) this.onRestore();
   }
 
+  // a mode stopping turns double-click zoom back on, also when Paint stops the area tool (F12)
+  override setDoubleClickToZoom(enabled: boolean): void {
+    super.setDoubleClickToZoom(enabled);
+    if (enabled) this.onRestore();
+  }
+
   override unproject(x: number, y: number): { lng: number; lat: number } {
     const { lng, lat } = super.unproject(x, y);
     return { lng: normalizeLon(lng), lat };

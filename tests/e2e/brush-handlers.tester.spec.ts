@@ -95,9 +95,29 @@ test.describe("handlers after the area tool, then Paint (criterion 12, tester pa
     expect(await handlers(page)).toEqual([false, false, false]);
   });
 
-  test("probe F12: Paint mode's handlers are off as soon as Paint is chosen", async ({ page }) => {
-    test.fail(true, "F12: doubleClickZoom is enabled after #aef-draw then #mode-paint, until a canvas pointerup");
+  test("F12: Paint mode's handlers are off as soon as Paint is chosen", async ({ page }) => {
     await aoiThenPaint(page);
     expect(await handlers(page)).toEqual([false, false, false]);
   });
+});
+
+// Review of spec 003: outside Paint mode the brush leaves terra-draw in charge, so rectangle mode keeps
+// double-click zoom off (as on spec 002), with or without imagery open.
+test.describe("double-click zoom stays off while the area tool is active (spec 002)", () => {
+  for (const imagery of [false, true]) {
+    test(`after Draw area and after a click in rectangle mode${imagery ? ", with imagery open" : ""}`, async ({ page }) => {
+      await openApp(page);
+      if (imagery) {
+        await openRaster(page, rgbFixture());
+        await expect(message(page)).toHaveText("Raster opened.");
+      }
+      await jumpTo(page, [15, 45], 7);
+      const dblZoom = () => page.evaluate(() => (window as any).__geoapp.map.doubleClickZoom.isEnabled() as boolean);
+      await page.click("#aef-draw");
+      expect(await dblZoom()).toBe(false);
+      const c = await toScreen(page, [15.005, 45.005]);
+      await page.mouse.click(c.x, c.y);
+      expect(await dblZoom()).toBe(false);
+    });
+  }
 });
