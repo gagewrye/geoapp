@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { fromArrayBuffer, writeArrayBuffer } from "geotiff";
 import { predictTile } from "../../../src/core/predict";
-import { samplePixels } from "../../../src/core/sample";
+import { labelSamples } from "../../../src/core/labelSamples";
 import type { Model } from "../../../src/core/types";
 import { openGeoTiff } from "../../../src/io/geotiffSource";
 
@@ -37,6 +37,7 @@ function write(values: Typed, nodata?: string): ArrayBuffer {
 }
 
 // class 1 above the threshold, class 0 below; 255 at nodata
+const all = new Uint8Array(4).fill(1); // every pixel labelled
 const model = (threshold: number): Model => ({ version: 1, type: "logreg", bands: [1], mean: [threshold], std: [1], classes: ["lo", "hi"], W: [[-1], [1]], b: [0, 0] });
 
 async function run(values: Typed, nodata: string | undefined, threshold: number) {
@@ -64,8 +65,7 @@ describe("GDAL nodata on integer and float rasters (criteria 5, 7, 9)", () => {
   it.each(cases)("%s: the nodata pixel predicts 255 and is not sampled", async (_name, values, nd, threshold) => {
     const { t, pred } = await run(values, nd, threshold);
     expect(pred).toEqual([0, 1, 255, 1]);
-    const all = { rings: [[[0, 0], [4, 0], [4, 1], [0, 1]] as [number, number][]], label: 0 };
-    expect(samplePixels(t, [all], [1]).y.length).toBe(3);
+    expect(labelSamples(t, all, [1]).y.length).toBe(3);
   });
 
   // geotiff.js parses GDAL's "-inf"/"inf" as NaN, which would match no pixel
@@ -75,8 +75,7 @@ describe("GDAL nodata on integer and float rasters (criteria 5, 7, 9)", () => {
     const { src, t, pred } = await run(Float32Array.from([-5, 5, value, 5]), nd, 0);
     expect(src.meta.nodata).toBe(value);
     expect(pred).toEqual([0, 1, 255, 1]);
-    const all = { rings: [[[0, 0], [4, 0], [4, 1], [0, 1]] as [number, number][]], label: 0 };
-    expect(samplePixels(t, [all], [1]).y.length).toBe(3);
+    expect(labelSamples(t, all, [1]).y.length).toBe(3);
   });
 
   it("valid neighbours of a float nodata stay valid", async () => {

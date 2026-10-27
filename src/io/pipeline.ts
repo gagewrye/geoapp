@@ -1,11 +1,10 @@
 import { crossesAntimeridian, projString } from "../core/crs";
 import { decimatedAffine, decimatedTile, decimateInto, decimationFactor } from "../core/decimate";
 import { fit } from "../core/fit";
-import { tileWindows, windowsIntersecting } from "../core/grid";
-import { toPixelPolygons } from "../core/polygons";
+import { tileWindows } from "../core/grid";
+import { labelSamples } from "../core/labelSamples";
+import { labelWindows, type LabelStore } from "../core/labelStore";
 import { predictTile } from "../core/predict";
-import { bbox } from "../core/rasterize";
-import { samplePixels } from "../core/sample";
 import type { Model } from "../core/types";
 import { validate } from "../core/validate";
 import { warpPreview } from "../core/warp";
@@ -38,23 +37,26 @@ export async function buildPreview(source: RasterSource, maxSide: number, stretc
   return warpPreview(dec, decimatedAffine(gt, f), epsg, maxSide, stretch);
 }
 
-type Feature = GeoJSON.Feature<GeoJSON.Polygon, { label: number }>;
-
-/** Sample only windows touching a polygon bbox, then fit on all bands. */
-export async function train(source: RasterSource, features: Feature[], classes: string[],
-  opts?: { epochs?: number; lr?: number; l2?: number }): Promise<{ model: Model; samples: number }> {
-  const { width, height, bandCount, gt, epsg } = source.meta;
-  const bands = Array.from({ length: bandCount }, (_, i) => i + 1);
-  const polys = toPixelPolygons(features, epsg, gt);
+/** Fit every class in the list on the stored label tiles, sampled on all bands (spec 003). */
+// Each tile's window is read once. "no samples" when every labelled pixel is nodata.
+export async function train(source: RasterSource, store: LabelStore, classes: string[],
+  opts?: { epochs?: number; lr?: number; l2?: number }): Promise<{ model: Model; samples: number } | "no samples"> {
+  const bands = Array.from({ length: source.meta.bandCount }, (_, i) => i + 1);
+  // The brush stays live while training reads, so train on the labels as they were when called:
+  // copy every tile before the first await. Transient peak: one copy of the store, at most
+  // MAX_LABEL_TILES x 64 KiB = 16 MiB, freed tile by tile as each window is sampled.
+  const snapshot = labelWindows(store).map((w) => ({ w, labels: store.tiles.get(`${w.x0},${w.y0}`)!.slice() }));
   const Xs: Float32Array[] = [];
   const ys: Uint8Array[] = [];
-  for (const w of windowsIntersecting(width, height, polys.map(bbox))) {
-    const s = samplePixels(await source.readWindow(w.x0, w.y0, w.width, w.height), polys, bands);
+  while (snapshot.length) {
+    const { w, labels } = snapshot.shift()!;
+    const s = labelSamples(await source.readWindow(w.x0, w.y0, w.width, w.height), labels, bands);
     Xs.push(s.X);
     ys.push(s.y);
   }
   const X = concat(Xs, Float32Array);
   const y = concat(ys, Uint8Array);
+  if (!y.length) return "no samples";
   return { model: fit(X, y, bands, classes, opts), samples: y.length };
 }
 

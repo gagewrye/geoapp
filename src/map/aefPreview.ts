@@ -1,4 +1,5 @@
 import type { Map as MapLibreMap } from "maplibre-gl";
+import { beforeSlot } from "./layers";
 
 // Its own source and layer, so local imagery's "preview" layer can sit above it.
 const ID = "aef-preview";
@@ -6,8 +7,8 @@ const ID = "aef-preview";
 type Preview = { rgba: Uint8ClampedArray; width: number; height: number; corners: [number, number][] };
 
 /**
- * Show the AlphaEarth preview below any local-imagery preview and below drawn shapes. It is
- * view-only: a raster layer that drawing never targets. A canvas source avoids any fetch.
+ * Show the AlphaEarth preview below every other layer (layers.ts). It is view-only: a raster
+ * layer that the brush never labels. A canvas source avoids any fetch.
  */
 export function showAefPreview(map: MapLibreMap, p: Preview): void {
   removeAefPreview(map);
@@ -17,8 +18,7 @@ export function showAefPreview(map: MapLibreMap, p: Preview): void {
   canvas.getContext("2d")!.putImageData(new ImageData(new Uint8ClampedArray(p.rgba), p.width, p.height), 0, 0);
   const coordinates = p.corners as [[number, number], [number, number], [number, number], [number, number]];
   map.addSource(ID, { type: "canvas", canvas, coordinates, animate: false });
-  const before = map.getStyle().layers.find((l) => l.id === "preview" || l.id.startsWith("td-"))?.id;
-  map.addLayer({ id: ID, type: "raster", source: ID, paint: { "raster-fade-duration": 0, "raster-resampling": "nearest" } }, before);
+  map.addLayer({ id: ID, type: "raster", source: ID, paint: { "raster-fade-duration": 0, "raster-resampling": "nearest" } }, beforeSlot(map, "aef-preview"));
 }
 
 /** Show or hide the preview; it stays loaded, so toggling makes no request. */

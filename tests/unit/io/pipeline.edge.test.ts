@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { fromArrayBuffer } from "geotiff";
-import { applyAffine, toLonLat } from "../../../src/core/crs";
+import { brush, emptyStore } from "../../../src/core/labelStore";
 import { predictTile } from "../../../src/core/predict";
 import { TILE_SIZE, type Affine, type Model, type Tile } from "../../../src/core/types";
 import { openGeoTiff } from "../../../src/io/geotiffSource";
@@ -51,9 +51,13 @@ function expectGridReads(reads: Read[], width: number, height: number) {
 const key = (w: Read) => `${w.x0},${w.y0}`;
 const model1: Model = { version: 1, type: "logreg", bands: [1], mean: [30], std: [20], classes: ["low", "high"], W: [[-1], [1]], b: [0, 0] };
 
-function pixelRect(meta: RasterMeta, [c0, r0, c1, r1]: number[], label: number): GeoJSON.Feature<GeoJSON.Polygon, { label: number }> {
-  const ring = [[c0!, r0!], [c1!, r0!], [c1!, r1!], [c0!, r1!], [c0!, r0!]].map(([c, r]) => toLonLat(meta.epsg, ...applyAffine(meta.gt, c!, r!)));
-  return { type: "Feature", properties: { label }, geometry: { type: "Polygon", coordinates: [ring] } };
+/** Paint [c0, r0, c1, r1) clipped to the raster, with all-valid masks. */
+function paint(store: ReturnType<typeof emptyStore>, [c0, r0, c1, r1]: number[], value: number) {
+  const x0 = Math.max(0, c0!), y0 = Math.max(0, r0!);
+  const w = { x0, y0, width: Math.min(store.width, c1!) - x0, height: Math.min(store.height, r1!) - y0 };
+  const masks = new Map<string, Uint8Array>();
+  for (let y = 0; y < store.height; y += TILE_SIZE) for (let x = 0; x < store.width; x += TILE_SIZE) masks.set(`${x},${y}`, new Uint8Array(8192));
+  brush(store, masks, w, value, false);
 }
 
 describe("large rasters with partial edge tiles (criterion 8)", () => {
@@ -80,19 +84,30 @@ describe("large rasters with partial edge tiles (criterion 8)", () => {
     expect(Math.max(p.width, p.height)).toBeLessThanOrEqual(1024);
   }, 30_000);
 
-  it("trains on a polygon that runs past the raster edge reading only clipped, intersecting windows", async () => {
+  it("trains on labels in partial edge tiles reading only those clipped windows", async () => {
     const W = 1000, H = 700;
     const { source, reads } = fastSource({ width: W, height: H });
-    const feats = [pixelRect(source.meta, [900, 600, 1200, 900], 1), pixelRect(source.meta, [-100, -50, 30, 20], 0)];
-    const { samples } = await train(source, feats, ["a", "b"], { epochs: 5 });
+    const store = emptyStore(W, H);
+    paint(store, [900, 600, 1200, 900], 2);
+    paint(store, [-100, -50, 30, 20], 1);
+    const r = await train(source, store, ["a", "b"], { epochs: 5 });
     expectGridReads(reads, W, H);
     expect(reads.map(key).sort()).toEqual(["0,0", "768,512"]);
-    expect(samples).toBe(100 * 100 + 30 * 20);
+    expect(r !== "no samples" && r.samples).toBe(100 * 100 + 30 * 20);
   });
 
-  it("refuses training when no polygon touches the raster, without reading any window", async () => {
+  it("returns \"no samples\" when every labelled pixel is nodata, reading only the stored tiles", async () => {
+    const { source, reads } = fastSource({ width: 1000, height: 700, nodata: 10 }); // the west half is nodata
+    const store = emptyStore(1000, 700);
+    paint(store, [0, 0, 20, 20], 1);
+    paint(store, [300, 300, 320, 320], 2);
+    expect(await train(source, store, ["a", "b"])).toBe("no samples");
+    expect(reads.map(key).sort()).toEqual(["0,0", "256,256"]);
+  });
+
+  it("reads nothing with an empty store", async () => {
     const { source, reads } = fastSource({ width: 1000, height: 700 });
-    await expect(train(source, [pixelRect(source.meta, [2000, 2000, 2100, 2100], 0), pixelRect(source.meta, [-500, 0, -400, 10], 1)], ["a", "b"])).rejects.toThrow(/sample/i);
+    expect(await train(source, emptyStore(1000, 700), ["a", "b"])).toBe("no samples");
     expect(reads).toHaveLength(0);
   });
 

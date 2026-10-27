@@ -66,3 +66,9 @@ export function crossesAntimeridian(epsg: number, gt: Affine, width: number, hei
   }
   return false;
 }
+
+/** Wrap a longitude into [-180, 180]; MapLibre world copies can unproject beyond it. */
+export function normalizeLon(lon: number): number {
+  if (lon >= -180 && lon <= 180) return lon;
+  return ((((lon + 180) % 360) + 360) % 360) - 180;
+}

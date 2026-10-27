@@ -10,14 +10,19 @@
       <h1>Geoplatform</h1>
       <label>Open GeoTIFF <input id="open-raster" type="file" accept=".tif,.tiff,image/tiff" /></label>
       <p id="raster-info"></p>
-      <fieldset>
+      <fieldset id="brush-panel" hidden>
         <legend>Labels</legend>
-        <label>Class name <input id="class-name" type="text" value="class 1" /></label>
         <div class="row">
-          <button id="mode-draw" type="button">Draw polygon</button>
-          <button id="mode-select" type="button">Edit</button>
+          <button id="mode-paint" type="button" aria-pressed="true">Paint</button>
+          <button id="mode-pan" type="button" aria-pressed="false">Pan</button>
         </div>
-        <ul id="polygons"></ul>
+        <div class="row">
+          <button id="brush-smaller" type="button" aria-label="Smaller brush">&minus;</button>
+          <span id="brush-size">Brush: 7 px</span>
+          <button id="brush-larger" type="button" aria-label="Larger brush">+</button>
+        </div>
+        <ul id="classes"></ul>
+        <button id="class-add" type="button">Add class</button>
       </fieldset>
       <fieldset>
         <legend>AlphaEarth embeddings</legend>

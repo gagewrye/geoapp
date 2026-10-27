@@ -2,22 +2,18 @@ import { readFile } from "node:fs/promises";
 import { expect, test, type Browser, type Page, type Request } from "@playwright/test";
 import { AEF_BASE } from "../../src/core/aef";
 import { cogRequests, fetchChip, logRequests, serveAef } from "./aef";
-import { drawPolygon, message, openApp, openRaster, rgbFixture, toScreen, type LngLat } from "./helpers";
+import { message, openApp, openRaster, paintTwoClasses, rgbFixture } from "./helpers";
 
 // Spec 002 criterion 8: what the AlphaEarth fetch sends does not depend on the local raster,
 // its labels or its model, and showing or hiding the preview sends nothing.
 const FILE = "secret-field-7731.tif";
 const CLASSES = ["mangrove-secret-a", "seagrass-secret-b"];
 
-const rect = (page: Page, [w, s, e, n]: number[]) =>
-  Promise.all(([[w, n], [e, n], [e, s], [w, s]] as LngLat[]).map((p) => toScreen(page, p)));
-
-/** Open the local raster under FILE, label two classes, train, and return the saved model JSON. */
+/** Open the local raster under FILE, paint two classes, train, and return the saved model JSON. */
 async function localWork(page: Page): Promise<string> {
   await openRaster(page, { ...rgbFixture(), name: FILE });
   await expect(message(page)).toHaveText("Raster opened.");
-  await drawPolygon(page, await rect(page, [11, 43, 13, 46]), CLASSES[0]);
-  await drawPolygon(page, await rect(page, [17, 43, 19, 46]), CLASSES[1]);
+  await paintTwoClasses(page, CLASSES);
   await page.click("#train");
   await expect(message(page)).toHaveText(/^Trained on \d+ pixels, 2 classes\.$/);
   const [dl] = await Promise.all([page.waitForEvent("download"), page.click("#save-model")]);

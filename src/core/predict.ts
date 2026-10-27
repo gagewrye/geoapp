@@ -1,4 +1,4 @@
-import { isNodata } from "./rasterize";
+import { isNodata } from "./nodata";
 import { NODATA_OUT, type Model, type Tile } from "./types";
 
 /** Class index per pixel (softmax argmax == logit argmax); 255 = nodata. */

@@ -2,7 +2,7 @@ import type { Map as MapLibreMap } from "maplibre-gl";
 import type { TerraDraw } from "terra-draw";
 import type { Aoi } from "../core/aef";
 import { aoiGrid, sameAoi } from "../core/aoi";
-import { normalizeLon } from "../core/ring";
+import { normalizeLon } from "../core/crs";
 import { CacheBusyError, opfsStore, type CacheStore } from "../io/aefCache";
 import { downloadAoi } from "../io/aefDownload";
 import { loadYears } from "../io/aefIndex";
@@ -19,15 +19,17 @@ type Loaded = { aoi: Aoi; source: RasterSource; store?: CacheStore; year?: numbe
 type Deps = {
   map: MapLibreMap; draw: () => TerraDraw | undefined; previewMaxSide: number;
   say: (text: string) => void; run: (task: () => Promise<void>) => Promise<void>; onState: (s: AefState) => void;
+  /** The area tool was chosen; runs before terra-draw starts rectangle mode (ADR 0009). */
+  onAreaTool: () => void;
 };
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 /**
  * AlphaEarth controls (spec 002): area, year, fetch, local file, preview and attribution. Only one
- * set of AlphaEarth data is loaded at a time, and nothing here reads polygons or labels.
+ * set of AlphaEarth data is loaded at a time, and nothing here reads labels.
  */
-export function initAef({ map, draw, previewMaxSide, say, run, onState }: Deps) {
+export function initAef({ map, draw, previewMaxSide, say, run, onState, onAreaTool }: Deps) {
   const year = $<HTMLSelectElement>("aef-year"), fetchBtn = $<HTMLButtonElement>("aef-fetch");
   const preview = $<HTMLInputElement>("aef-preview"), attribution = $("aef-attribution"), info = $("aef-info");
   const openAef = $<HTMLInputElement>("open-aef");
@@ -78,7 +80,8 @@ export function initAef({ map, draw, previewMaxSide, say, run, onState }: Deps) 
     setState("loaded");
   }
 
-  $("aef-draw").addEventListener("click", () => draw()?.setMode("rectangle"));
+  // the brush goes to Pan first, so rectangle mode's handler state is the last one applied
+  $("aef-draw").addEventListener("click", () => { onAreaTool(); draw()?.setMode("rectangle"); });
   year.addEventListener("change", () => setState(state));
   preview.addEventListener("change", () => setAefPreviewVisible(map, preview.checked));
 

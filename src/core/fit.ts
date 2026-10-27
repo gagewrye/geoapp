@@ -9,7 +9,7 @@ export function fit(X: Float32Array, y: Uint8Array, bands: number[], classes: st
   const n = y.length;
   // Labels are Uint8 and 255 is the nodata output, so 255 classes is the most that fit.
   if (k < 2 || k > 255) throw new Error(`fit: need 2..255 classes, got ${k}`);
-  if (n === 0) throw new Error("No training samples: no raster pixels fall inside the polygons");
+  if (n === 0) throw new Error("No training samples");
   if (X.length !== n * d) throw new Error(`fit: X has ${X.length} values, expected ${n * d}`);
   for (let i = 0; i < n; i++) if (y[i]! >= k) throw new Error(`fit: label ${y[i]} has no class`);
   // One infinite or NaN value would turn the whole model into NaN.
