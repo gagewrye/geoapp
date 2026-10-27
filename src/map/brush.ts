@@ -23,6 +23,7 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
   let mode: BrushMode = "paint";
   let space = false;
   let stroke: Stroke | null = null;
+  let locked = false; // while seeding (spec 004): no strokes and no footprint; Paint mode's handlers stay
   let lastType = "mouse";
   let pointer: { x: number; y: number; target: EventTarget | null } | null = null; // last mouse or pen position
   const painting = () => grid !== null && mode === "paint" && !space;
@@ -54,7 +55,7 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
 
   // Hovering is synchronous and reads nothing: the ring covers the whole footprint, nodata included.
   const hover = () => {
-    const cell = pointer && painting() ? cellAt(pointer.x, pointer.y, pointer.target) : null;
+    const cell = pointer && painting() && !locked ? cellAt(pointer.x, pointer.y, pointer.target) : null;
     const w = cell && footprint(grid!, cell[0], cell[1], deps.side());
     showHover(map, w ? footprintRing(grid!, w) : null, deps.colour());
   };
@@ -79,7 +80,7 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
   container.addEventListener("pointerdown", (e) => {
     lastType = e.pointerType;
     if (e.pointerType === "touch") { pointer = null; hover(); return; }
-    if (!painting() || stroke || (e.button !== 0 && e.button !== 2)) return;
+    if (!painting() || locked || stroke || (e.button !== 0 && e.button !== 2)) return;
     stroke = { pointerId: e.pointerId, erase: e.button === 2, prev: null };
     apply(stroke, e);
   });
@@ -115,6 +116,8 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
     syncHandlers,
     /** Space held acts as Pan. */
     setSpace(held: boolean): void { if (space !== held) { space = held; syncHandlers(); hover(); } },
+    /** Locked, the brush neither paints nor shows its footprint; a stroke in progress ends. */
+    setLocked(on: boolean): void { locked = on; if (on) end(); hover(); },
     /** Redraw the footprint after a size or colour change. */
     refresh: hover,
   };
