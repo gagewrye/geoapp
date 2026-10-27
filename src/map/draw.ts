@@ -28,10 +28,9 @@ class WrappingAdapter extends TerraDrawMapLibreGLAdapter<MapLibreMap> {
   }
 }
 
-/**
- * terra-draw for spec 002's area rectangle only (ADR 0009); "static" except while the area tool is
- * active. `onRestore` runs after terra-draw gives MapLibre's drag handlers back.
- */
+/** terra-draw for spec 002's area rectangle only (ADR 0009). */
+// "static" except while the area tool is active. `onRestore` runs after terra-draw gives MapLibre's
+// drag handlers or double-click zoom back.
 // The outline is unfilled so the preview below stays visible.
 export function createDraw(map: MapLibreMap, onRestore: () => void): TerraDraw {
   const draw = new TerraDraw({

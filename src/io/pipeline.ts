@@ -37,10 +37,8 @@ export async function buildPreview(source: RasterSource, maxSide: number, stretc
   return warpPreview(dec, decimatedAffine(gt, f), epsg, maxSide, stretch);
 }
 
-/**
- * Read each stored label tile's window once, sample it on all bands, and fit every class in the
- * list (spec 003). "no samples" when every labelled pixel is nodata.
- */
+/** Fit every class in the list on the stored label tiles, sampled on all bands (spec 003). */
+// Each tile's window is read once. "no samples" when every labelled pixel is nodata.
 export async function train(source: RasterSource, store: LabelStore, classes: string[],
   opts?: { epochs?: number; lr?: number; l2?: number }): Promise<{ model: Model; samples: number } | "no samples"> {
   const bands = Array.from({ length: source.meta.bandCount }, (_, i) => i + 1);
