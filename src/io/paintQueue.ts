@@ -47,11 +47,6 @@ export class PaintQueue {
     this.setBusy(false);
   }
 
-  /** Resolves once the queue is empty. */
-  async idle(): Promise<void> {
-    while (this.ops.length) await new Promise((r) => setTimeout(r, 5));
-  }
-
   private setBusy(busy: boolean): void {
     if (busy === this.busy) return;
     this.busy = busy;

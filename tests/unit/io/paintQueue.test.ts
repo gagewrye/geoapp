@@ -3,6 +3,7 @@ import { footprint } from "../../../src/core/pixel";
 import { emptyStore, type LabelStore } from "../../../src/core/labelStore";
 import { PaintQueue } from "../../../src/io/paintQueue";
 import type { RasterSource } from "../../../src/io/source";
+import { idle } from "../helpers/paintQueue";
 import { fakeSource } from "../helpers/sources";
 
 type Read = { x0: number; y0: number; width: number; height: number };
@@ -52,7 +53,7 @@ describe("paint reads (criterion 8)", () => {
     const { q, store } = queue(src);
     store.tiles.set("0,0", new Uint8Array(65536).fill(1));
     for (let c = 0; c < 600; c += 3) q.push({ w: dab(store, c, 100), value: 1, erase: true });
-    await q.idle();
+    await idle(q);
     expect(src.reads).toEqual([]);
     expect(store.tiles.get("0,0")![100 * 256 + 10]).toBe(0);
   });
@@ -61,7 +62,7 @@ describe("paint reads (criterion 8)", () => {
     const src = instrumented();
     const { q, store } = queue(src);
     for (let pass = 0; pass < 3; pass++) for (let c = 240; c <= 270; c++) q.push({ w: dab(store, pass % 2 ? 510 - c : c, 100), value: 1, erase: false });
-    await q.idle();
+    await idle(q);
     expect(src.reads.map(key)).toEqual(["0,0", "256,0"]);
     expect(aligned(src.reads)).toBe(true);
     expect(src.maxInFlight).toBe(1);
@@ -73,7 +74,7 @@ describe("paint reads (criterion 8)", () => {
     const { q, store } = queue(src);
     q.push({ w: dab(store, 253, 253), value: 2, erase: false }); // a tile corner: 4 tiles
     q.push({ w: dab(store, 1000, 1000), value: 2, erase: false });
-    await q.idle();
+    await idle(q);
     expect(src.reads.map(key)).toEqual(["0,0", "256,0", "0,256", "256,256", "768,768"]);
     expect(src.maxInFlight).toBe(1);
   });
@@ -84,15 +85,15 @@ describe("paint reads (criterion 8)", () => {
     const { q, store } = queue(src);
     const stroke = (cols: number[]) => cols.forEach((c) => q.push({ w: dab(store, c, 100), value: 1, erase: false }));
     stroke([200, 300, 400, 300]); // stays on tile 256,0: its mask is kept
-    await q.idle();
+    await idle(q);
     expect(src.reads.map(key)).toEqual(["0,0", "256,0"]);
     stroke([200, 300]); // leaves it (mask freed), then comes back
-    await q.idle();
+    await idle(q);
     expect(src.reads.map(key)).toEqual(["0,0", "256,0", "256,0"]);
     expect([...store.tiles.keys()]).toEqual(["0,0"]);
     expect([...q.masks.keys()].sort()).toEqual(["0,0", "256,0"]);
     stroke([100]);
-    await q.idle();
+    await idle(q);
     expect([...q.masks.keys()]).toEqual(["0,0"]);
   });
 
@@ -108,7 +109,7 @@ describe("paint reads (criterion 8)", () => {
     expect(q.size).toBe(3);
     expect(events.busy).toEqual([true]);
     src.release();
-    await q.idle();
+    await idle(q);
     const t = store.tiles.get("0,0")!;
     expect([t[10 * 256 + 8], t[10 * 256 + 9], t[10 * 256 + 12], t[10 * 256 + 15], t[10 * 256 + 16]]).toEqual([1, 2, 0, 2, 0]);
     expect(events.busy).toEqual([true, false]);
@@ -120,7 +121,7 @@ describe("paint reads (criterion 8)", () => {
     const src = instrumented();
     const { q, store } = queue(src);
     q.push({ w: dab(store, 10, 10), value: 1, erase: false });
-    await q.idle();
+    await idle(q);
     src.hold();
     q.push({ w: dab(store, 600, 10), value: 1, erase: false });
     await new Promise((r) => setTimeout(r, 10));
@@ -141,7 +142,7 @@ describe("paint reads (criterion 8)", () => {
     const q = new PaintQueue(source, () => store, { applied() {}, full: () => { full++; }, busy() {}, error: (e) => { throw e; } });
     q.push({ w: dab(store, 100, 16 * 256 + 100), value: 2, erase: false });
     q.push({ w: dab(store, 100, 100), value: 2, erase: false });
-    await q.idle();
+    await idle(q);
     expect(full).toBe(1);
     expect(store.tiles.size).toBe(256);
     expect(store.tiles.get("0,0")![100 * 256 + 100]).toBe(2);
