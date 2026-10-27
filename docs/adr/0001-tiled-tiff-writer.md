@@ -1,6 +1,6 @@
 # 0001: Hand-rolled tiled Uint8 GeoTIFF writer
 
-**Status:** Accepted (Gage, 2026-10-26)
+**Status:** Accepted (Gage, 2026-10-26). Partly superseded by ADR 0013 (2026-10-26): GDAL_NODATA becomes a parameter ("255" for classifications, "0" for label exports), and an optional GDAL_METADATA tag can be written.
 
 **Context:** I checked geotiff 3.0.5 on npm and `src/geotiffwriter.js` at tag v3.0.5 and on master (3.1.0), and they behave the same. `writeGeotiff` takes the whole raster as one array, allocates the full output buffer before writing, writes one uncompressed strip ("we are only writing one strip"), and only writes classic TIFF (`data[3] = 42`, 32-bit offsets). It has no streaming API, so it breaks the tile-by-tile rule. I looked at three options. (a) Write our own small tiled writer that streams to a sink. (b) Accept a whole-raster buffer and set a maximum raster size. (c) Use GDAL-wasm, which is a heavy dependency and a large download.
 
