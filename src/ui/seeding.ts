@@ -40,10 +40,18 @@ export function initSeeding({ labels, imagery, model, training, say, error, onBu
   // Seeding and exporting each lock the brush and class edits; the lock lifts once neither runs on this imagery.
   const relock = () => labels.lock(seeding() || (exporting !== null && exporting === imagery()));
   const confidence = () => { const v = minConf.valueAsNumber; return v >= 0 && v <= 1 ? v : null; };
+  // sync runs on every applied paint cell, and validate costs k x d, so it runs once per (model, imagery);
+  // a train or Load model sets a new model object, and an open a new source
+  let fit: { m: Model; s: RasterSource; ok: boolean } | null = null;
   const modelFits = (s: RasterSource) => {
     const m = model();
     if (!m) return false;
-    try { validate(m, s.meta.bandCount); return true; } catch { return false; }
+    if (fit?.m !== m || fit.s !== s) {
+      let ok = true;
+      try { validate(m, s.meta.bandCount); } catch { ok = false; }
+      fit = { m, s, ok };
+    }
+    return fit.ok;
   };
 
   /** Enables each control for the imagery, model, paint queue and runs in progress. */
