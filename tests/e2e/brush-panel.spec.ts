@@ -107,7 +107,9 @@ test.describe("classes (criterion 14)", () => {
     const overlayPixel = () => page.evaluate(() => {
       const { map, labels } = (window as any).__geoapp;
       const key = [...labels.store.tiles.keys()][0];
-      const canvas: HTMLCanvasElement = map.getSource(`label-${key}`).getCanvas();
+      const source = key === undefined ? undefined : map.getSource(`label-${key}`);
+      if (!source) return null; // overlays are added on the next animation frame
+      const canvas: HTMLCanvasElement = source.getCanvas();
       const d = canvas.getContext("2d")!.getImageData(0, 0, canvas.width, canvas.height).data;
       for (let i = 0; i < d.length; i += 4) if (d[i + 3]) return Array.from(d.subarray(i, i + 4));
       return null;
