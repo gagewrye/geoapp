@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 import { collectErrors, jumpTo, labels, message, openApp, openRaster, rgbFixture, selectClass, settled, stroke, toScreen, type Xy } from "./helpers";
 
-// Tester: spec 003 [C5] Train snapshot (F2). Paint, erase and new tiles while Train reads, Train
+// Tester: spec 003 Training rule, Train snapshot (F2). Paint, erase and new tiles while Train reads, Train
 // while the paint queue waits, two Trains in a row, and a raster opened while Train reads.
 
 /** Paint class 1 west and class 2 east of 15E around 45N at zoom 6 (as brush-train.spec.ts). */
@@ -60,7 +60,7 @@ async function setup(page: Page) {
   return errors;
 }
 
-test.describe("Train snapshot [C5] (tester)", () => {
+test.describe("Train snapshot, spec 003 Training (tester)", () => {
   test("new tiles painted and pixels erased while Train reads: N and the model are the click's; Train is disabled while those mask reads wait and a scripted click does nothing", async ({ page }) => {
     const errors = await setup(page);
     const before = await labels(page);

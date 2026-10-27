@@ -3,7 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 import type { AefEntry } from "../../src/core/aef";
 import { jumpTo, labels, message, openApp, openRaster, rgbFixture, stroke, toScreen, toucher, rawPointer } from "./helpers";
 
-// Tester: spec 003 [C4] / F6. How focus reached a control decides what Space does there: Tab and
+// Tester: spec 003 Modes rule (Space) / F6. How focus reached a control decides what Space does there: Tab and
 // Shift+Tab keep Space native; mouse, touch, pen and label clicks leave Space as Pan; focus coming
 // back after a file chooser or the discard confirm keeps how it was first focused.
 
