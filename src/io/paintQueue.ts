@@ -25,6 +25,7 @@ export class PaintQueue {
   private ops: PaintOp[] = [];
   private running = false;
   private generation = 0; // bumped by clear(), so a read finishing afterwards is ignored
+  private busy = false; // what on.busy last reported: a cell that throws has already left ops
 
   constructor(private readonly source: RasterSource, private readonly store: () => LabelStore, private readonly on: Events) {}
 
@@ -33,7 +34,7 @@ export class PaintQueue {
 
   push(op: PaintOp): void {
     this.ops.push(op);
-    if (this.ops.length === 1) this.on.busy(true);
+    this.setBusy(true);
     void this.run();
   }
 
@@ -41,15 +42,20 @@ export class PaintQueue {
   clear(): void {
     this.generation++;
     this.running = false;
-    const was = this.ops.length > 0;
     this.ops = [];
     this.masks.clear();
-    if (was) this.on.busy(false);
+    this.setBusy(false);
   }
 
   /** Resolves once the queue is empty. */
   async idle(): Promise<void> {
     while (this.ops.length) await new Promise((r) => setTimeout(r, 5));
+  }
+
+  private setBusy(busy: boolean): void {
+    if (busy === this.busy) return;
+    this.busy = busy;
+    this.on.busy(busy);
   }
 
   // Runs synchronously while no read is needed, so cells with their masks in apply at once.
@@ -75,7 +81,7 @@ export class PaintQueue {
         if (brush(store, this.masks, op.w, op.value, op.erase) === "full") this.on.full();
         keepMasks(store, this.masks, op.w);
         this.on.applied(op.w);
-        if (!this.ops.length) this.on.busy(false);
+        if (!this.ops.length) this.setBusy(false);
       }
     } catch (e) {
       if (gen !== this.generation) return;

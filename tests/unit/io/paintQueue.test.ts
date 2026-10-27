@@ -147,3 +147,24 @@ describe("paint reads (criterion 8)", () => {
     expect(store.tiles.get("0,0")![100 * 256 + 100]).toBe(2);
   });
 });
+
+describe("errors", () => {
+  // value 0 makes brush throw after the cell left the queue, so the queue is already empty when it fails
+  for (const erase of [true, false]) {
+    it(`reports idle when brush throws on the last ${erase ? "erase" : "paint"} cell`, async () => {
+      const src = instrumented();
+      const store = emptyStore(2048, 2048);
+      const busy: boolean[] = [], errors: unknown[] = [];
+      const q = new PaintQueue(src.source, () => store, { applied() {}, full() {}, busy: (b) => { busy.push(b); }, error: (e) => { errors.push(e); } });
+      q.push({ w: dab(store, 10, 10), value: 0, erase });
+      await new Promise((r) => setTimeout(r, 20));
+      expect(errors).toHaveLength(1);
+      expect(q.size).toBe(0);
+      expect(busy).toEqual([true, false]);
+      q.push({ w: dab(store, 10, 10), value: 1, erase: false }); // the queue still works
+      await new Promise((r) => setTimeout(r, 20));
+      expect(busy).toEqual([true, false, true, false]);
+      expect(store.tiles.size).toBe(1);
+    });
+  }
+});
