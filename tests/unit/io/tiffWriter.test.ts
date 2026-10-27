@@ -39,4 +39,17 @@ describe("tiled TIFF writer (ADR 0001)", () => {
     expect(reads).toBe(0);
     expect(tiffLayout(60000, 60000, geo).totalBytes).toBeLessThanOrEqual(MAX_TIFF_BYTES);
   });
+
+  it("writes GDAL_NODATA and GDAL_METADATA as given (ADR 0013), refusing non-ASCII before writing", async () => {
+    const rec = recordingSink();
+    await writeTiff(rec.sink, 10, 10, geo, async (w) => new Uint8Array(w.width * w.height).fill(4), { nodata: "0", metadata: "<GDALMetadata></GDALMetadata>" });
+    const im = await (await fromArrayBuffer(rec.bytes().buffer as ArrayBuffer)).getImage();
+    expect(im.getGDALNoData()).toBe(0);
+    expect(await im.fileDirectory.loadValue("GDAL_METADATA")).toBe("<GDALMetadata></GDALMetadata>\u0000");
+    // tile padding is the nodata value
+    expect(rec.bytes()[rec.bytes().length - 1]).toBe(0);
+    const bad = recordingSink();
+    await expect(writeTiff(bad.sink, 10, 10, geo, async () => new Uint8Array(100), { nodata: "0", metadata: "é" })).rejects.toThrow(/7-bit/);
+    expect(bad.writes).toHaveLength(0);
+  });
 });
