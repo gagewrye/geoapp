@@ -22,11 +22,12 @@ const map = createMap($("map"));
 let draw: TerraDraw | undefined;
 let source: RasterSource | undefined;
 let model: Model | undefined;
+let training = false; // one run at a time, so one label snapshot (spec 003 [C5]) and no older run overwriting a newer one
 
-/** Train and Classify need local imagery (spec 002); Train also waits for pending mask reads (spec 003). */
+/** Train and Classify need local imagery (spec 002); Train also waits for pending mask reads and its own run (spec 003). */
 function lockModel(): void {
   const off = !source && aef.state() !== "none";
-  $<HTMLButtonElement>("train").disabled = off || labels.busy();
+  $<HTMLButtonElement>("train").disabled = off || labels.busy() || training;
   $<HTMLButtonElement>("classify").disabled = off;
 }
 
@@ -74,17 +75,26 @@ $<HTMLInputElement>("open-raster").addEventListener("change", (ev) => run(async 
   say("Raster opened.");
 }));
 
-$("train").addEventListener("click", () => run(async () => {
-  if (!source) return say("Open a raster first.");
-  if (labels.busy()) return; // Train is disabled meanwhile
-  if (labels.paintedClasses() < 2) return say(MESSAGES.paintTwo);
-  const names = labels.classes().map((c) => c.name);
-  say("Training...");
-  const result = await train(source, labels.store(), names);
-  if (result === "no samples") return say(MESSAGES.noSamples);
-  model = result.model;
-  say(`Trained on ${result.samples} pixels, ${names.length} classes.`);
-}));
+$("train").addEventListener("click", () => {
+  if (training || labels.busy()) return; // Train is disabled meanwhile
+  training = true;
+  lockModel();
+  return run(async () => {
+    try {
+      if (!source) return say("Open a raster first.");
+      if (labels.paintedClasses() < 2) return say(MESSAGES.paintTwo);
+      const names = labels.classes().map((c) => c.name);
+      say("Training...");
+      const result = await train(source, labels.store(), names);
+      if (result === "no samples") return say(MESSAGES.noSamples);
+      model = result.model;
+      say(`Trained on ${result.samples} pixels, ${names.length} classes.`);
+    } finally {
+      training = false;
+      lockModel();
+    }
+  });
+});
 
 $("classify").addEventListener("click", () => run(async () => {
   if (!source) return say("Open a raster first.");

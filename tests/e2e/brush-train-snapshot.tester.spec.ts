@@ -121,26 +121,33 @@ test.describe("Train snapshot [C5] (tester)", () => {
     expect(errors).toEqual([]);
   });
 
-  // FOLLOW-UP probe: Train isn't disabled while it trains, so two runs overlap and whichever finishes
-  // last sets the model and the message. A later click on fewer tiles can finish first, and the older
-  // run then overwrites it. `test.fail` passes while the older run wins.
-  test.fail("two Trains in a row: when the second finishes first, the first doesn't overwrite its model", async ({ page }) => {
+  // F9: Train is disabled from the click until its run ends, so runs never overlap and an older run
+  // can't overwrite a newer one's model or message.
+  test("two Trains in a row: a click while the first runs starts no run, and the second's model stands", async ({ page }) => {
     const errors = await setup(page);
+    const n1 = (await labels(page)).size;
     await gate(page);
     await page.click("#train"); // run 1, on all the labels
     await expect.poll(() => calls(page)).toBe(1);
-    // erase part of class 2 (no reads), then run 2 on fewer pixels
+    await expect(page.locator("#train")).toBeDisabled();
+    // erase part of class 2 (no reads), then try a second run on fewer pixels
     const b = await toScreen(page, [17.005, 44.505]);
     await rawStroke(page, [b, { x: b.x + 20, y: b.y - 13 }], "right");
     const n2 = (await labels(page)).size;
-    await page.click("#train");
-    await expect.poll(() => calls(page)).toBe(2);
-    // run 2 completes while run 1 still waits on its first read
-    await page.evaluate(() => { (window as any).__gate.hold = false; });
-    await release(page, 1);
+    expect(n2).toBeLessThan(n1);
+    await page.evaluate(() => (document.getElementById("train") as HTMLButtonElement).click()); // disabled: ignored
+    await page.waitForTimeout(300);
+    expect(await calls(page)).toBe(1); // no second run read anything
+    await expect(message(page)).toHaveText("Training...");
+    await release(page, 0);
+    await openGate(page);
+    await expect(message(page)).toHaveText(`Trained on ${n1} pixels, 2 classes.`);
+    await settled(page); // enabled again once run 1 ends
+    const m1 = await savedModel(page);
+    await page.click("#train"); // run 2, on the erased labels
     await expect(message(page)).toHaveText(`Trained on ${n2} pixels, 2 classes.`);
     const m2 = await savedModel(page);
-    await release(page, 0);
+    expect(m2).not.toEqual(m1);
     await page.waitForTimeout(500);
     await expect(message(page)).toHaveText(`Trained on ${n2} pixels, 2 classes.`);
     expect(await savedModel(page)).toEqual(m2);

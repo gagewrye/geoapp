@@ -7,7 +7,7 @@ import { validate } from "../../src/core/validate";
 import { openGeoTiff } from "../../src/io/geotiffSource";
 import { writeTiff } from "../../src/io/tiffWriter";
 import { MESSAGES } from "../../src/ui/messages";
-import { collectErrors, jumpTo, labels, message, openApp, openRaster, rgbFixture, selectClass, settled, stroke, tiff, toScreen } from "./helpers";
+import { collectErrors, jumpTo, labels, message, openApp, openRaster, rgbFixture, selectClass, settled, stroke, tiff, toScreen, type Xy } from "./helpers";
 
 // Spec 003 criteria 15 (train) and 17 (privacy).
 
@@ -27,6 +27,14 @@ async function stripTiff() {
   await writeTiff({ write: async (d) => { parts.push(d.slice()); }, close: async () => {} }, 257 * 256, 2, geo,
     async (w) => new Uint8Array(w.width * w.height).fill(7));
   return { name: "strip.tif", mimeType: "image/tiff", buffer: Buffer.concat(parts) };
+}
+
+/** A mouse stroke that doesn't wait for Train to be enabled again. */
+async function rawStroke(page: Page, pts: Xy[], button: "left" | "right" = "left") {
+  await page.mouse.move(pts[0]!.x, pts[0]!.y);
+  await page.mouse.down({ button });
+  for (const p of pts.slice(1)) await page.mouse.move(p.x, p.y);
+  await page.mouse.up({ button });
 }
 
 /** Paint class 1 on the west half and class 2 on the east half of rgbFixture, by mouse. */
@@ -88,9 +96,10 @@ test.describe("train (criterion 15)", () => {
     });
     await page.click("#train");
     await expect.poll(() => page.evaluate(() => (window as any).__gate.reads)).toBe(1);
-    // class 2 is selected: retrace its stroke with the right button to erase all of it
+    // class 2 is selected: retrace its stroke with the right button to erase all of it (erase reads
+    // nothing; Train stays disabled while it runs, so this doesn't wait for it)
     const b = await toScreen(page, [17.005, 44.505]);
-    await stroke(page, [b, { x: b.x + 30, y: b.y - 20 }, { x: b.x + 60, y: b.y }], "right");
+    await rawStroke(page, [b, { x: b.x + 30, y: b.y - 20 }, { x: b.x + 60, y: b.y }], "right");
     await expect.poll(async () => new Set((await labels(page)).values())).toEqual(new Set([1]));
     await expect(message(page)).toHaveText("Training...");
     await page.evaluate(() => (window as any).__gate.open());
@@ -98,6 +107,34 @@ test.describe("train (criterion 15)", () => {
     expect(errors).toEqual([]);
     await page.click("#train"); // the erase stands for the next Train
     await expect(message(page)).toHaveText(MESSAGES.paintTwo);
+  });
+
+  test("Train is disabled from the click until its run ends, and enabled again after a failed run", async ({ page }) => {
+    const errors = collectErrors(page);
+    await openApp(page);
+    await openRaster(page, rgbFixture());
+    await expect(message(page)).toHaveText("Raster opened.");
+    await paintTwo(page);
+    const n = (await labels(page)).size;
+    await page.evaluate(() => {
+      const s = (window as any).__geoapp.imagery();
+      const read = s.readWindow.bind(s);
+      const g = (window as any).__gate = { reads: 0, fail: null as null | (() => void) };
+      s.readWindow = (...a: unknown[]) => {
+        if (++g.reads > 1) return read(...a);
+        return new Promise((_, rej) => { g.fail = () => rej(new Error("Read failed.")); });
+      };
+    });
+    await page.click("#train");
+    await expect(page.locator("#train")).toBeDisabled();
+    await expect.poll(() => page.evaluate(() => (window as any).__gate.reads)).toBe(1);
+    await page.evaluate(() => (window as any).__gate.fail());
+    await expect(message(page)).toHaveText("Read failed.");
+    await expect(page.locator("#train")).toBeEnabled();
+    await page.click("#train");
+    await expect(message(page)).toHaveText(`Trained on ${n} pixels, 2 classes.`);
+    await expect(page.locator("#train")).toBeEnabled();
+    expect(errors).toEqual([]);
   });
 
   test("with only one class painted the message appears and no model is made", async ({ page }) => {
