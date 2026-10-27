@@ -43,10 +43,10 @@ export function classesFromValues(seen: Uint8Array, nodata: number | null): Clas
   return out;
 }
 
-/**
- * The list, then incoming names not in it (exact match), in order; values[i] is incoming[i]'s label
- * value. Missing colours come from the palette by final position. Over 255 classes gives "too many".
- */
+/** The list, then incoming names not in it (exact match), in order; values[i] is incoming[i]'s label value. */
+// Existing classes keep their place so Merge never relabels pixels already painted. Missing colours
+// come from the palette by final position, as a new class would get. Label values are 8-bit with 0
+// unlabelled, so over 255 classes gives "too many".
 export function mergeClasses(list: LabelClass[], incoming: { name: string; colour?: string }[]): { list: LabelClass[]; values: number[] } | "too many" {
   const out = list.map((c) => ({ ...c }));
   const index = new Map(out.map((c, i) => [c.name, i]));

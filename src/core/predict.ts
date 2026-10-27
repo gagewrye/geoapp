@@ -1,10 +1,9 @@
 import { isNodata } from "./nodata";
 import { NODATA_OUT, type Model, type Tile } from "./types";
 
-/**
- * Logits of every valid pixel: calls f(i, best, logits), best being the first maximum, or
- * nodata(i) where a model band is nodata or NaN. logits is reused between pixels.
- */
+/** Calls f(i, best, logits) on every valid pixel, or nodata(i) where a model band is nodata or NaN. */
+// One loop for predictTile and seedFromModel, so best (the first maximum) is the same pick in both.
+// logits is reused between pixels to spare an allocation per pixel; f must copy what it keeps.
 function scan(model: Model, tile: Tile, f: (i: number, best: number, logits: Float64Array) => void, nodata: (i: number) => void): void {
   const { bands, mean, std, W, b } = model;
   const k = W.length;

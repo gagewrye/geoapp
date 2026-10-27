@@ -46,11 +46,9 @@ async function gather(file: LabelSource, cells: Int32Array, n: number): Promise<
   return vals;
 }
 
-/**
- * Builds new labels from per-window seeds (null when a window seeds nothing) without touching
- * `current`: Merge starts from a shallow copy of its store and list, Replace from neither. Each
- * seeded window's tile becomes mergeTile(new tile, seed).
- */
+/** Builds new labels from per-window seeds (null when a window seeds nothing) without touching `current`. */
+// Leaving `current` alone lets a stale or failed run change nothing: Merge starts from a shallow copy
+// of its store and list, Replace from neither. Each seeded window's tile becomes mergeTile(old, seed).
 async function build(windows: Window[], current: Labels, mode: SeedMode, incoming: { name: string; colour?: string }[],
   seed: (w: Window, values: number[]) => Promise<Uint8Array | null>, stale: () => boolean): Promise<SeedOutcome> {
   const merged = mergeClasses(mode === "merge" ? current.classes : [], incoming);
@@ -73,12 +71,11 @@ async function build(windows: Window[], current: Labels, mode: SeedMode, incomin
 
 const anyNonZero = (a: Uint8Array) => a.some((v) => v !== 0);
 
-/**
- * Imports a class raster onto the imagery grid by nearest pixel centre, masked by imagery nodata
- * (spec 004). A null table takes classes from the values first (a pass that reads no imagery).
- * Each pass visits every seedWindows window once; imagery is read only where a label would land.
- * `stale` turns true when another raster opened: the run stops and changes nothing.
- */
+/** Imports a class raster onto the imagery grid by nearest pixel centre, masked by imagery nodata (spec 004). */
+// A null table takes classes from the values first, in a pass that reads no imagery, so the list is
+// known before any value is mapped. Each pass visits every seedWindows window once, and imagery is
+// read only where a label would land, to keep reads tile by tile and few. `stale` turns true when
+// another raster opened: the run stops and changes nothing.
 export async function importLabels(imagery: RasterSource, file: LabelSource, table: ClassEntry[] | null, current: Labels,
   mode: SeedMode, stale: () => boolean = () => false): Promise<SeedOutcome> {
   const dst = gridOf(imagery.meta), src = gridOf(file.meta);
