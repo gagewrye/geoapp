@@ -65,3 +65,39 @@ test.describe("MapLibre handlers stay off in Paint mode after a stroke (criterio
     expect(before).toBe(false);
   });
 });
+
+// Tester pass 3: terra-draw also calls setDoubleClickToZoom(true) when a mode stops, which the F11
+// restore hook doesn't cover. Choosing Paint after the area tool stops rectangle mode after the
+// brush synced its handlers, so doubleClickZoom is on in Paint mode until the next canvas pointerup.
+test.describe("handlers after the area tool, then Paint (criterion 12, tester pass 3)", () => {
+  async function aoiThenPaint(page: Page) {
+    await openApp(page);
+    await openRaster(page, rgbFixture());
+    await expect(message(page)).toHaveText("Raster opened.");
+    await jumpTo(page, [15, 45], 7);
+    await page.click("#aef-draw");
+    await page.click("#mode-paint");
+  }
+  const handlers = (page: Page) => page.evaluate(() => {
+    const { map } = (window as any).__geoapp;
+    return [map.doubleClickZoom.isEnabled(), map.dragRotate.isEnabled(), map.boxZoom.isEnabled()];
+  });
+
+  test("a double-click doesn't zoom", async ({ page }) => {
+    await aoiThenPaint(page);
+    const c = await toScreen(page, [15.005, 45.005]);
+    const v0 = await view(page);
+    await page.mouse.dblclick(c.x, c.y);
+    await page.waitForTimeout(500);
+    await settled(page);
+    await idle(page);
+    expect((await view(page)).zoom).toBe(v0.zoom);
+    expect(await handlers(page)).toEqual([false, false, false]);
+  });
+
+  test("probe F12: Paint mode's handlers are off as soon as Paint is chosen", async ({ page }) => {
+    test.fail(true, "F12: doubleClickZoom is enabled after #aef-draw then #mode-paint, until a canvas pointerup");
+    await aoiThenPaint(page);
+    expect(await handlers(page)).toEqual([false, false, false]);
+  });
+});
