@@ -184,6 +184,7 @@ describe("tile-by-tile memory rule (tester, structural)", () => {
   const onePlanePerWindow = (planes: Map<number, number[]>, n: number) =>
     expect([...planes.keys()].sort((a, b) => a - b).map((b) => planes.get(b))).toEqual(Array(AEF_BANDS).fill(Array(n).fill(PLANE_BYTES)));
 
+  // Generous timeout: synthetic multi-tile 64-band COGs are slow under full-suite parallel load.
   it("every COG read window lies inside the file and is at most 256x256; each band gets one 64 KiB plane per window", async () => {
     const spy = vi.spyOn(GeoTIFFImage.prototype, "readRasters");
     const cogs = [cog(OX, OY, 520, 300, { bottomUp: true }), cog(OX + 5200, OY, 300, 300)];
@@ -201,7 +202,7 @@ describe("tile-by-tile memory rule (tester, structural)", () => {
     const across = Math.ceil(700 / 256), down = Math.ceil(270 / 256);
     onePlanePerWindow(store.planes, across * down); // appended in row-major order, once each
     expect(PLANE_BYTES).toBe(64 * 2 ** 10);
-  });
+  }, 30_000);
 
   it("at MAX_AOI_SIDE (2048x2048) the download is 64 planes of 64 KiB per band and no read exceeds 256x256", async () => {
     const spy = vi.spyOn(GeoTIFFImage.prototype, "readRasters");

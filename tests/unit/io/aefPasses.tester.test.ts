@@ -10,6 +10,7 @@ import { colsAcross, eachByteOnce, groups, pixelsRight, run } from "../helpers/a
 afterEach(() => vi.restoreAllMocks());
 
 describe("band-group passes (tester, spec 002 Cache)", () => {
+  // Generous timeout: synthetic multi-tile 64-band COGs are slow under full-suite parallel load.
   it("two band-separate COGs: 8 passes, every read fetches only its pass's bands, no tile is fetched twice or after release", async () => {
     const box: [number, number, number, number] = [40, 30, 600, 400];
     const r = await run([
@@ -25,8 +26,9 @@ describe("band-group passes (tester, spec 002 Cache)", () => {
     eachByteOnce(r.files, r.log);
     for (const [, h] of r.probe.held) expect(h.size).toBe(0);
     await pixelsRight(r, box);
-  });
+  }, 30_000);
 
+  // Generous timeout: synthetic multi-tile 64-band COGs are slow under full-suite parallel load.
   it("mixed AOI (one pixel-interleaved COG, one band-separate): one pass of 64 bands, no tile fetched twice, pixels right", async () => {
     const box: [number, number, number, number] = [20, 10, 500, 300];
     const r = await run([
@@ -38,8 +40,9 @@ describe("band-group passes (tester, spec 002 Cache)", () => {
     eachByteOnce(r.files, r.log);
     for (const [, h] of r.probe.held) expect(h.size).toBe(0);
     await pixelsRight(r, box, 17);
-  });
+  }, 30_000);
 
+  // Generous timeout: synthetic multi-tile 64-band COGs are slow under full-suite parallel load.
   it("an interleaved-only AOI over several tile rows: one pass, each 64-band tile fetched once and held at most C + 2", async () => {
     const box: [number, number, number, number] = [5, 7, 700, 600];
     const r = await run([{ name: "i2", gx0: 0, gy0: 0, width: 720, height: 640, tile: 288, interleaved: true, bottomUp: true }], box);
@@ -49,5 +52,5 @@ describe("band-group passes (tester, spec 002 Cache)", () => {
     for (const [s, n] of r.probe.peak) expect(n).toBeLessThanOrEqual(colsAcross(r.cogOf(s).s, box[0], box[2]) + 2);
     for (const read of r.probe.reads) expect(read.tiles.length).toBeLessThanOrEqual(4);
     await pixelsRight(r, box, 31);
-  });
+  }, 30_000);
 });

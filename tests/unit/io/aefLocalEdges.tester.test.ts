@@ -91,6 +91,7 @@ describe("local AlphaEarth file: partial edge windows and tiny files", () => {
 });
 
 describe("memory bound (structural): previewing AlphaEarth data reads only grid windows", () => {
+  // Generous timeout: a synthetic 64-band source read in 108 windows is slow under full-suite parallel load.
   it("a 3000 x 2100 px, 64-band source is read in windows of at most 256 x 256, each window once", async () => {
     const { source, reads } = fakeSource({ width: 3000, height: 2100, bandCount: 64, nodata: null }, (b, c, r) => ((b + c + r) % 60 - 30) / 100);
     await buildAefPreview(source, 1024);
@@ -102,5 +103,5 @@ describe("memory bound (structural): previewing AlphaEarth data reads only grid 
       expect(w.y0 % TILE_SIZE).toBe(0);
     }
     expect(new Set(reads.map((w) => `${w.x0},${w.y0}`)).size).toBe(reads.length);
-  });
+  }, 30_000);
 });

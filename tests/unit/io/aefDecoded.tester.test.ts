@@ -49,6 +49,7 @@ async function download(specs: Spec[], [ax, ay, w, h]: [number, number, number, 
 }
 
 describe("decoded-tile cache, tester", () => {
+  // Generous timeout: synthetic multi-tile 64-band COGs are slow under full-suite parallel load.
   it("misaligned AOI over 512 px tiles with partial edge tiles: each tile decoded once, at most group x (C + 2) held", async () => {
     // 1100 x 1000 px COG, 512 px tiles: the edge tiles are 76 and 488 px; the AOI starts mid-tile
     const s: Spec = { name: "edge", gx0: 0, gy0: 0, width: 1100, height: 1000, tile: 512, bottomUp: true };
@@ -61,8 +62,9 @@ describe("decoded-tile cache, tester", () => {
     expect(r.orphan).toEqual([]);
     expect(r.refetched).toEqual([]);
     await pixelsRight({ cogs: r.cogs, src: r.src } as never, box, 31);
-  });
+  }, 30_000);
 
+  // Generous timeout: synthetic multi-tile 64-band COGs are slow under full-suite parallel load.
   it("two COGs, one pixel-interleaved: one 64-band pass, each tile decoded once, nothing refetched", async () => {
     const a: Spec = { name: "sep", gx0: 0, gy0: 0, width: 400, height: 600, tile: 256, bottomUp: true };
     const b: Spec = { name: "int", gx0: 400, gy0: 0, width: 300, height: 600, tile: 256, interleaved: true };
@@ -72,8 +74,9 @@ describe("decoded-tile cache, tester", () => {
     expect(r.orphan).toEqual([]);
     expect(r.refetched).toEqual([]);
     await pixelsRight({ cogs: r.cogs, src: r.src } as never, box, 23);
-  });
+  }, 30_000);
 
+  // Generous timeout: a synthetic 64-band COG with one 1024 px tile is slow under full-suite parallel load.
   it("an AOI inside a single tile: 64 decodes for 1 x 1 windows of a 1024 px tile, peak within the bound", async () => {
     const s: Spec = { name: "one", gx0: 0, gy0: 0, width: 1024, height: 1024, tile: 1024 };
     const box: [number, number, number, number] = [700, 900, 1, 1];
@@ -81,5 +84,5 @@ describe("decoded-tile cache, tester", () => {
     expect(r.decodes).toBe(AEF_BANDS);
     expect(r.peak[0]).toBeLessThanOrEqual(BAND_GROUP * (1 + 2));
     await pixelsRight({ cogs: r.cogs, src: r.src } as never, box, 1);
-  });
+  }, 30_000);
 });

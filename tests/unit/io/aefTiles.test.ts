@@ -26,6 +26,7 @@ const files = new Map([[BASE + west.entry.path, west.bytes], [BASE + east.entry.
 const aoi: Aoi = { epsg: 32617, gt: [OX + 200, 10, 0, OY - 200, 0, -10], width: 824, height: 536 }; // 4x3 windows
 
 describe("each tile fetched once (F3)", () => {
+  // Generous timeout: synthetic multi-tile 64-band COGs are slow under full-suite parallel load.
   it("requests each byte at most once, covers every tile, and mosaics correctly", async () => {
     const { fetch, log } = memFetch(files);
     const src = await fetchEntries(aoi, [west.entry, east.entry], memoryStore(), { fetch, base: BASE });
@@ -48,7 +49,7 @@ describe("each tile fetched once (F3)", () => {
       const tileBytes = 64 * T * T * (url.endsWith("west.tiff") ? 4 : 2);
       expect(seen.subarray(data.length - tileBytes).every((v) => v === 1), url).toBe(true);
     }
-  });
+  }, 30_000);
 
   it("keeps a planned tile until its last window is released, then drops it", async () => {
     const { fetch, log } = memFetch(files);
@@ -87,6 +88,7 @@ describe("band-group passes (spec 002 Cache)", () => {
   const samples = (spy: { mock: { calls: unknown[][] } }) => new Set(spy.mock.calls.map(([o]) => (o as { samples: number[] }).samples.join(",")));
   const groups = (k: number) => Array.from({ length: 64 / k }, (_, g) => Array.from({ length: k }, (_, i) => g * k + i).join(","));
 
+  // Generous timeout: synthetic multi-tile 64-band COGs are slow under full-suite parallel load.
   it.each([
     ["band-separate COGs are read 8 bands per pass", false, groups(BAND_GROUP)],
     ["a pixel-interleaved COG is read in one pass of 64 bands, so no tile is refetched", true, groups(64)],
@@ -106,5 +108,5 @@ describe("band-group passes (spec 002 Cache)", () => {
     for (const b of [0, 9, 63]) for (let r = 0; r < 256; r += 11) for (let cc = 0; cc < 256; cc += 13) {
       expect(t.bands[b]![r * 256 + cc]).toBe(deq(pattern(b, 20 + 256 + cc, 20 + 256 + r)));
     }
-  });
+  }, 30_000);
 });

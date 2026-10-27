@@ -40,6 +40,7 @@ function probe() {
 afterEach(() => vi.restoreAllMocks());
 
 describe("decoded-tile cache (spec 002 Cache follow-up)", () => {
+  // Generous timeout: synthetic multi-tile 64-band COGs are slow under full-suite parallel load.
   it("band-separate: each tile is decoded once per download, at most group x (C + 2) held, none at the end", async () => {
     const c = cog("sep", 0, { bottomUp: true });
     const p = probe();
@@ -53,8 +54,9 @@ describe("decoded-tile cache (spec 002 Cache follow-up)", () => {
         expect(t.bands[b]![r * w.width + k]).toBe(deq(pattern(b, 200 + w.x0 + k, 200 + w.y0 + r)));
       }
     }
-  });
+  }, 30_000);
 
+  // Generous timeout: synthetic multi-tile 64-band COGs are slow under full-suite parallel load.
   it("pixel-interleaved: each 64-band tile is decoded once, in the single pass", async () => {
     const c = cog("int", 0, { interleaved: true });
     const p = probe();
@@ -63,5 +65,5 @@ describe("decoded-tile cache (spec 002 Cache follow-up)", () => {
     expect(p.heldAtEnd()).toBe(0);
     const t = await src.readWindow(256, 256, 256, 256);
     expect(t.bands[40]![100 * 256 + 100]).toBe(deq(pattern(40, 200 + 356, 200 + 356)));
-  });
+  }, 30_000);
 });

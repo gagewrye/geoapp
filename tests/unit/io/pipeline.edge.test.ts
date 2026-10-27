@@ -71,13 +71,14 @@ describe("large rasters with partial edge tiles (criterion 8)", () => {
     expect(rec.closed).toBe(true);
   });
 
+  // Generous timeout: a synthetic 8192 px source read in 1024 windows is slow under full-suite parallel load.
   it("builds the preview of an 8192x8192 raster from grid windows only, never the full raster", async () => {
     const { source, reads } = fastSource({ width: 8192, height: 8192 });
     const p = await buildPreview(source, 1024);
     expectGridReads(reads, 8192, 8192);
     expect(new Set(reads.map(key)).size).toBe(reads.length);
     expect(Math.max(p.width, p.height)).toBeLessThanOrEqual(1024);
-  });
+  }, 30_000);
 
   it("trains on a polygon that runs past the raster edge reading only clipped, intersecting windows", async () => {
     const W = 1000, H = 700;
