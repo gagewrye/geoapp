@@ -5,7 +5,7 @@
 **Status:** Approved (Gage, 2026-10-26). Amended at Gage's direction (2026-10-26, with spec 004's approval): the brush never labels imagery nodata (Imagery nodata; criteria 4, 8, 18, 19). **ADRs (Accepted):** 0009, the brush is the only labelling tool; 0010, sparse label tiles. Build order: after spec 002, before spec 004 (label seeding and label GeoTIFF export) and spec 005, which trains on AlphaEarth from these labels. **Clarifications 2026-10-27, awaiting Gage** (from the tester's pass): marked [C1]-[C5] inline.
 
 **Open (for Gage, 2026-10-27):**
-- [C5] If Train's snapshot copies the label tiles, peak memory rises by up to 16 MiB while training, beyond ADR 0010's bound. Accept that, or require a snapshot that doesn't copy?
+- [C5] As built, Train's snapshot copies every stored label tile (at most 16 MiB) before reading, and at most one Train runs at a time, so ADR 0010's bound rises from about 146 MiB to about 162 MiB while a Train runs (ADR 0010's pending clarification). Approve the copy and its ~16 MiB, or require a snapshot that doesn't copy?
 - [C3] Does the 500 ms post-erase `contextmenu` guard also apply over the panel?
 
 **Decided (Gage, 2026-10-26):**
