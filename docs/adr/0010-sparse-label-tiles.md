@@ -6,5 +6,5 @@
 - **Consequences:** No new dependency. A dab needing tile 257 is refused. At the cap, memory is about 146 MiB, plus GPU textures and up to 256 map layers:
 - 16 MiB of labels and about 2.1 MiB of nodata masks (at most 264 of 8 KiB).
 - 64 MiB of overlay canvases and 64 MiB of Int32 overlay indices (256 KiB each per tile). A Uint16 index plus a validity bit would cut indices to about 34 MiB.
-- About 162 MiB while a Train runs: its snapshot copies the label tiles, and one Train runs at a time. A seed builds its new store beside the current one (up to 16 MiB), never during a Train's snapshot, so this peak covers both (2026-10-27, awaiting Gage).
+- About 162 MiB while a Train runs: its snapshot copies the label tiles, and one Train runs at a time. A seed builds its new store beside the current one (up to 16 MiB), never during a Train's snapshot on the same imagery, so this peak covers both; a seed dropped by a raster open ends at its next window read (2026-10-27, awaiting Gage).
 - Raising the cap, or moving to OPFS (b), changes only the store.
