@@ -41,11 +41,9 @@ describe("train from the label store (criterion 15/19, tester)", () => {
     expect(reads).toEqual([]);
   });
 
-  // FOLLOW-UP probe: Train isn't locked while it reads, and the brush stays live, so an erase that
-  // empties a stored tile mid-training deletes it from the store; pipeline.train then passes
-  // `undefined` labels to labelSamples ("Cannot read properties of undefined (reading 'length')").
-  // `it.fails` passes while the bug is present; it flips to a failure once train tolerates it.
-  it.fails("a stored tile erased to empty while training awaits an earlier read doesn't break training", async () => {
+  // Train isn't locked while it reads, and the brush stays live, so an erase can empty a stored tile
+  // mid-training; train samples the labels as they were when it was called.
+  it("a stored tile erased to empty while training awaits an earlier read doesn't break training", async () => {
     const { source: inner } = fakeSource({ width: 1024, height: 256, bandCount: 1 }, (_b, c) => c);
     const s = emptyStore(1024, 256);
     paint(s, 0, 0, 10, 10, 1);

@@ -7,7 +7,7 @@ import { validate } from "../../src/core/validate";
 import { openGeoTiff } from "../../src/io/geotiffSource";
 import { writeTiff } from "../../src/io/tiffWriter";
 import { MESSAGES } from "../../src/ui/messages";
-import { jumpTo, labels, message, openApp, openRaster, rgbFixture, selectClass, settled, stroke, tiff, toScreen } from "./helpers";
+import { collectErrors, jumpTo, labels, message, openApp, openRaster, rgbFixture, selectClass, settled, stroke, tiff, toScreen } from "./helpers";
 
 // Spec 003 criteria 15 (train) and 17 (privacy).
 
@@ -69,6 +69,35 @@ test.describe("train (criterion 15)", () => {
     const want = predictTile(model, await src.readWindow(0, 0, 1000, 1000));
     expect(Buffer.from(px!).equals(Buffer.from(want))).toBe(true);
     expect(new Set(want)).toEqual(new Set([0, 1]));
+  });
+
+  test("erasing a class while Train reads: training completes on the labels as they were at the click, with no error", async ({ page }) => {
+    const errors = collectErrors(page);
+    await openApp(page);
+    await openRaster(page, rgbFixture());
+    await expect(message(page)).toHaveText("Raster opened.");
+    await paintTwo(page);
+    const before = await labels(page);
+    expect(new Set(before.values())).toEqual(new Set([1, 2]));
+    await page.evaluate(() => {
+      const s = (window as any).__geoapp.imagery();
+      const read = s.readWindow.bind(s);
+      const g = (window as any).__gate = { reads: 0, open: null as null | (() => void) };
+      const wait = new Promise<void>((r) => { g.open = r; });
+      s.readWindow = async (...a: unknown[]) => { g.reads++; await wait; return read(...a); };
+    });
+    await page.click("#train");
+    await expect.poll(() => page.evaluate(() => (window as any).__gate.reads)).toBe(1);
+    // class 2 is selected: retrace its stroke with the right button to erase all of it
+    const b = await toScreen(page, [17.005, 44.505]);
+    await stroke(page, [b, { x: b.x + 30, y: b.y - 20 }, { x: b.x + 60, y: b.y }], "right");
+    await expect.poll(async () => new Set((await labels(page)).values())).toEqual(new Set([1]));
+    await expect(message(page)).toHaveText("Training...");
+    await page.evaluate(() => (window as any).__gate.open());
+    await expect(message(page)).toHaveText(`Trained on ${before.size} pixels, 2 classes.`);
+    expect(errors).toEqual([]);
+    await page.click("#train"); // the erase stands for the next Train
+    await expect(message(page)).toHaveText(MESSAGES.paintTwo);
   });
 
   test("with only one class painted the message appears and no model is made", async ({ page }) => {

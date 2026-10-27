@@ -43,6 +43,29 @@ describe("windowed I/O on a 2048x2048 source (criterion 8)", () => {
     expect(model).toEqual(fit(X, y, [1, 2, 3], ["low", "high"], { epochs: 30 }));
   });
 
+  it("trains on the labels as they were when called: edits during its reads change neither N nor the model", async () => {
+    const make = () => fakeSource({ width: 2048, height: 2048 }, value);
+    const store = emptyStore(2048, 2048);
+    paint(store, [300, 300, 320, 320], 1);
+    paint(store, [1100, 300, 1120, 320], 2);
+    paint(store, [1100, 1100, 1110, 1110], 2);
+    const want = (await train(make().source, store, ["low", "high"], { epochs: 30 })) as { model: Model; samples: number };
+    const { source: inner } = make();
+    const reads: string[] = [];
+    const source = { meta: inner.meta, async readWindow(x0: number, y0: number, w: number, h: number) {
+      reads.push(`${x0},${y0}`);
+      if (reads.length === 1) {
+        brush(store, new Map(), { x0: 1024, y0: 256, width: 256, height: 256 }, 2, true); // empties a later tile
+        paint(store, [1100, 1100, 1110, 1110], 1); // relabels another
+        paint(store, [1800, 1800, 1810, 1810], 1); // labels a new tile
+      }
+      return inner.readWindow(x0, y0, w, h);
+    } };
+    const got = await train(source, store, ["low", "high"], { epochs: 30 });
+    expect(got).toEqual(want);
+    expect(reads).toEqual(["256,256", "1024,256", "1024,1024"]);
+  });
+
   it("classifies from windows <= 256x256 with every write after the header <= 65,536 bytes", async () => {
     const { source, reads } = fakeSource({ width: 2048, height: 2048 }, value);
     const rec = recordingSink();

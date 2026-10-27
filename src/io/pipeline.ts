@@ -44,10 +44,14 @@ export async function buildPreview(source: RasterSource, maxSide: number, stretc
 export async function train(source: RasterSource, store: LabelStore, classes: string[],
   opts?: { epochs?: number; lr?: number; l2?: number }): Promise<{ model: Model; samples: number } | "no samples"> {
   const bands = Array.from({ length: source.meta.bandCount }, (_, i) => i + 1);
+  // The brush stays live while training reads, so train on the labels as they were when called:
+  // copy every tile before the first await. Transient peak: one copy of the store, at most
+  // MAX_LABEL_TILES x 64 KiB = 16 MiB, freed tile by tile as each window is sampled.
+  const snapshot = labelWindows(store).map((w) => ({ w, labels: store.tiles.get(`${w.x0},${w.y0}`)!.slice() }));
   const Xs: Float32Array[] = [];
   const ys: Uint8Array[] = [];
-  for (const w of labelWindows(store)) {
-    const labels = store.tiles.get(`${w.x0},${w.y0}`)!;
+  while (snapshot.length) {
+    const { w, labels } = snapshot.shift()!;
     const s = labelSamples(await source.readWindow(w.x0, w.y0, w.width, w.height), labels, bands);
     Xs.push(s.X);
     ys.push(s.y);
