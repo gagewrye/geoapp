@@ -2,33 +2,21 @@
 
 **Goal:** Fetch Google AlphaEarth annual embeddings for a user-drawn area and year into a local cache, as training and classification data for spec 005.
 
-**Status:** Approved (Gage, 2026-10-26). **ADRs (Accepted):** 0005 AlphaEarth COGs from Source Cooperative + local AOI cache, 0006 static per-zone index, 0007 Python fixture script, 0008 interim fixtures from public data. Related: 0011, see spec 005.
+**Status:** Approved (Gage, 2026-10-26). Cache rule amended 2026-10-27 (Gage). **ADRs (Accepted):** 0005 AlphaEarth COGs from Source Cooperative + local AOI cache, 0006 static per-zone index, 0007 Python fixture script, 0008 interim fixtures from public data. Related: 0011, see spec 005.
 
-**Build status (2026-10-26):** Built and tested on this branch: criteria 1–17, including the per-band Cache rule, the UI (criteria 3, 8, 11–14 in e2e) and the decoded-tile cache. After tester review: one fetch or file open runs at a time, with Fetch and "Open AlphaEarth file" disabled while it runs, and the OPFS cache refuses a second live store on its folder. One tab at a time holds the cache: a fetch in another tab is refused with "AlphaEarth embeddings are open in another tab. Close that tab, then fetch again." and leaves that tab's data as it was (tester F10). A refused area is removed from the map, and the earlier area, if any, stays the area. If `years.json` fails to load or lists no years, "Couldn't load the AlphaEarth index, so embeddings can't be fetched." shows and Fetch stays disabled. While other AlphaEarth data is loaded or loading, a newly drawn area's info line ends "(not fetched yet; the loaded data is another area)", and for the same area with another year selected, "(not fetched yet; the loaded data is for <year>)" (tester F11). A failed re-fetch also discards the earlier data (tester F8, accepted under criterion 12).
+Built and tested (2026-10-27): criteria 1–17.
 
-**Decided (Gage, 2026-10-26):**
-- Simple regression models only.
-- Users fetch embeddings from Source Cooperative behind a configurable `AEF_BASE`, because Google's bucket sends no CORS headers (ADR 0005).
-- `MAX_AOI_SIDE` is 2048 px. No basemap in v1.
-- CLAUDE.md allows public-dataset fetches that reveal only the area and year.
-- AlphaEarth is never hand-labelled, only trained on: labels are painted on local imagery (spec 003) and can train a model on AlphaEarth (spec 005).
-- Fixture labels are committed with an attribution NOTICE.
-- The preview is on after a fetch, below the imagery.
-- Local AlphaEarth files get their own "Open AlphaEarth file" control.
-- The file name stays `002-alphaearth-classify.md`.
-- Fetch passes of 8 bands, with a single 64-band pass as the fallback for pixel-interleaved COGs.
+**Decided (Gage, 2026-10-26)**, besides what Scope and Rules state: simple regression models only. Users fetch from Source Cooperative behind a configurable `AEF_BASE`, because Google's bucket sends no CORS headers (ADR 0005); CLAUDE.md allows public-dataset fetches that reveal only the area and year. AlphaEarth is only trained on, never hand-labelled: labels are painted on local imagery (spec 003) and can train a model on AlphaEarth (spec 005). The file name stays `002-alphaearth-classify.md`.
 
-**Follow-on specs:** 003 paint-brush labels on local imagery. 004 label seeding from a classified GeoTIFF or a model, with label GeoTIFF export. 005 train on AlphaEarth from imagery labels. 006 localhost GPU inference server for large models (ADR 0012). 007 change detection (per-pixel cosine similarity between years, plus a threshold mask). 008 change prediction (logreg on [E(t-1), E(t)] predicting the class at t+1). AT Protocol: opt-in publishing and discovery of models, label sets and catalog entries under user-owned DIDs; large files are linked off-protocol and private data stays local.
+**Follow-on specs:** 003 paint-brush labels on local imagery; 004 label seeding from a classified GeoTIFF or a model, plus label GeoTIFF export; 005 train on AlphaEarth from imagery labels; 006 localhost GPU inference server for large models (ADR 0012); 007 change detection (per-pixel cosine similarity between years, plus a threshold mask); 008 change prediction (logreg on [E(t-1), E(t)] predicting the class at t+1). AT Protocol: opt-in publishing and discovery of models, label sets and catalog entries under user-owned DIDs; large files linked off-protocol, private data stays local.
 
 ## Scope
 In:
-- Draw one AOI rectangle with terra-draw `TerraDrawRectangleMode`, and pick a year from the index.
-- Download the AOI into an OPFS cache.
-- An optional false-colour preview layer, toggled by an "AlphaEarth preview" checkbox: on after a fetch, below any local-imagery preview, view-only (nothing is ever labelled on it).
-- Show the dataset's attribution.
-- Instead of fetching, open a local AlphaEarth COG (64 bands, Int8, GDAL_NODATA -128) with its own "Open AlphaEarth file" control, through the same dequantizing reader, with no `MAX_AOI_SIDE` limit since nothing is fetched. Its north-up grid is the `Aoi`. Only one set of AlphaEarth data is loaded at a time.
+- Draw one AOI rectangle with terra-draw `TerraDrawRectangleMode`, and pick a year from the index. Download the AOI into an OPFS cache.
+- An "AlphaEarth preview" checkbox toggles a false-colour layer: on after a fetch, below any local-imagery preview, view-only (nothing is ever labelled on it). The dataset's attribution is shown.
+- Instead of fetching, "Open AlphaEarth file" opens a local AlphaEarth COG (64 bands, Int8, GDAL_NODATA -128) through the same dequantizing reader, with no `MAX_AOI_SIDE` limit; its north-up grid is the `Aoi`. One set of AlphaEarth data is loaded at a time.
 
-Out: labelling AlphaEarth in any form; training, classifying or exporting on it (spec 005); change detection and change prediction (007, 008); AOIs spanning two UTM zones or hemispheres (blocked with a message); multiple AOIs, Earth Engine, any basemap, showing results on the map, and models other than spec 001 logreg.
+Out: labelling AlphaEarth in any form; training, classifying or exporting on it (spec 005); change detection and prediction (007, 008); AOIs spanning two UTM zones or hemispheres (blocked with a message); multiple AOIs, Earth Engine, any basemap (none in v1), showing results on the map, and models other than spec 001 logreg.
 
 ## Interfaces (`core/`)
 ```ts
@@ -46,18 +34,24 @@ aefPreview(tile: Tile): Tile  // 3 bands = A01, A16, A09 (1-based 2, 17, 10), li
 **Rules.**
 - **Zone and size.** All AOI rectangle vertices must give the same `utmEpsg`, else `aoiGrid` returns `"zones"` and ui shows "Areas must lie inside one UTM zone and hemisphere." A side over `MAX_AOI_SIDE` returns `"size"` and ui shows "Area too large (max 20 km per side)."
 - **Reading COGs.** `io/` derives each COG's geotransform from its own GeoTIFF tags, not geotiff.js `getResolution` (which negates y). Rows of a bottom-up COG (positive y scale, the Source Cooperative layout) are flipped into the north-up AOI grid. A COG whose origin is not a multiple of 10 m from the AOI grid is refused. Pixels covered by no COG are NaN; `Tile.nodata` is null.
-- **Cache.** The fetch streams the whole AOI into an OPFS cache, one file per band. Each band file holds the AOI's 64 KiB window planes (256x256 Int8, edge windows padded with -128) in row-major window order, each written once. A window read returns its 64 band planes, dequantized on read. Real Source Cooperative COGs are band-separate (fixture (d)), so the fetch runs in passes of 8 bands and peak memory is bounded by 8 bands' tile row (about 35 MB compressed, measured, plus 40 MiB decoded per COG), each byte fetched once. If any COG in the AOI is pixel-interleaved, the whole fetch runs as one 64-band pass: nothing is refetched, but the bound covers 64 bands. Each COG tile is decoded once per pass and kept, with its bytes, until its last 256 px window. Preview, training and classification read only the cache, so requests depend only on AOI and year. One browser tab at a time holds the cache, through a Web Locks lock kept for the store's life and released on discard, a failed open or page unload.
+- **Cache.** The fetch streams the whole AOI into an OPFS cache, one file per band, holding the AOI's 64 KiB window planes (256x256 Int8, edge windows padded with -128) in row-major window order, each written once. A window read returns its 64 band planes, dequantized. Preview, training and classification read only the cache, so requests depend only on AOI and year.
+  - Real Source Cooperative COGs are band-separate (fixture (d)), so the fetch runs in passes of 8 bands, each byte fetched once. If any COG in the AOI is pixel-interleaved, the whole fetch is one 64-band pass: nothing is refetched, but the memory bound covers 64 bands.
+  - Each COG tile is decoded once per pass and kept, with its bytes, until its last 256 px window. Peak memory per COG is 8 bands' tile row: about 35 MB compressed (measured) plus 40 MiB decoded.
+  - One browser tab at a time holds the cache, through a Web Locks lock kept for the store's life and released on discard, a failed open or page unload. A fetch in a second tab is refused with "AlphaEarth embeddings are open in another tab. Close that tab, then fetch again." and changes nothing there.
+- **One operation.** One fetch or file open runs at a time, with Fetch and "Open AlphaEarth file" disabled meanwhile; the cache refuses a second live store on its folder.
+- **Failures.** If `years.json` fails to load or lists no years, "Couldn't load the AlphaEarth index, so embeddings can't be fetched." shows and Fetch stays disabled. A failed re-fetch also discards the earlier data (criterion 12).
+- **Not fetched yet.** While other AlphaEarth data is loaded or loading, the info line ends "(not fetched yet; the loaded data is another area)" for a new area, or "(not fetched yet; the loaded data is for <year>)" for the same area with another year.
 - **Model.** Spec 001's `Model`, unchanged (`bands` 1..64).
-- **Index.** `scripts/build_aef_index.mjs` parses `crs` "EPSG:N" to `epsg` and strips `s3://us-west-2.opendata.source.coop/tge-labs/aef/v1/annual/` from `path`; any other prefix fails the build. The full set is 43 MB, so only `years.json` and the EPSG:32617 shards are committed; deploys generate the rest with the script (ADR 0006).
+- **Index.** `scripts/build_aef_index.mjs` parses `crs` "EPSG:N" to `epsg` and strips `s3://us-west-2.opendata.source.coop/tge-labs/aef/v1/annual/` from `path`; any other prefix fails the build. The full set is 43 MB, so only `years.json` and the EPSG:32617 shards are committed; deploys generate the rest (ADR 0006).
 
 **Test data (ADR 0007; interim source ADR 0008).**
-- Until Gage regenerates them from his chips, the committed fixtures are built by the same script from ADR 0008's stand-in chips: same format, AEF 2021 over the Everglades, labeled by ESA WorldCover 2021 (nearest pixel centre via proj4; 10..100 -> 1..11 in order, mangrove 95 -> 10; WorldCover 0, off-tile and AEF -128 -> 255; train and test chips both contain mangroves). `scripts/fixtures/standin_chips.mjs` writes them as raw Int8/uint8 + `index.csv` and `pack_standin_chips.py` packs `chip_NNNN.npz`, in a directory given as an argument and never committed. The NOTICE then names that source and credits AlphaEarth and ESA WorldCover instead of the label sources below.
-- `scripts/fixtures/make_aef_fixtures.py` reads mangrove-embed `data/chips/*/chip_NNNN.npz`: `x` float16 [64,128,128] (invalid pixels all zero), `y` uint8 1..11 with 255 = ignore, 10 m north-up UTM, and `index.csv` `x0,y1` as the upper-left corner. It writes `tests/fixtures/aef/`, at most 5 MB in total:
-  - (a) One everglades chip (EPSG:32617), re-quantized to Int8 (all-zero vector -> -128) and split into three COGs: west half bottom-up, NE quarter top-down, SE quarter bottom-up. Plus a copy of the NE quarter shifted 5 m, and the reference chip as raw Int8.
+- Until Gage regenerates them from his chips, the committed fixtures come from ADR 0008's stand-in chips through the same script, in the same format: AEF 2021 over the Everglades, labelled by ESA WorldCover 2021 (nearest pixel centre via proj4; 10..100 -> 1..11 in order, mangrove 95 -> 10; WorldCover 0, off-tile and AEF -128 -> 255; train and test chips both contain mangroves). `scripts/fixtures/standin_chips.mjs` writes raw Int8/uint8 + `index.csv` and `pack_standin_chips.py` packs `chip_NNNN.npz`, into a directory given as an argument, never committed. The NOTICE then names that source and credits AlphaEarth and ESA WorldCover instead of the label sources below.
+- `scripts/fixtures/make_aef_fixtures.py` reads mangrove-embed `data/chips/*/chip_NNNN.npz` (`x` float16 [64,128,128], invalid pixels all zero; `y` uint8 1..11, 255 = ignore; 10 m north-up UTM; `index.csv` `x0,y1` = upper-left corner) and writes `tests/fixtures/aef/`, at most 5 MB:
+  - (a) One everglades chip (EPSG:32617), re-quantized to Int8 (all-zero vector -> -128), split into three COGs: west half bottom-up, NE quarter top-down, SE quarter bottom-up. Plus the NE quarter shifted 5 m, and the reference chip as raw Int8.
   - (b) Index shards for these COGs.
-  - (c) A labeled pixel sample: 1,000 train and 1,000 test pixels per region (stand-ins: the Everglades only) from disjoint chips, Int8 + label. Plus `ref.json` with the mangrove class value, mangrove IoU and accuracy from sklearn `LogisticRegression(max_iter=3000)`, the logreg in mangrove-embed `pixel.py`.
+  - (c) 1,000 train and 1,000 test labelled pixels per region (stand-ins: the Everglades only) from disjoint chips, Int8 + label, plus `ref.json`: the mangrove class value, mangrove IoU and accuracy from sklearn `LogisticRegression(max_iter=3000)` (mangrove-embed `pixel.py`).
   - (d) The first 256 KiB and the `.vrt` of one real Source Cooperative COG.
-- The script also writes `tests/fixtures/aef/NOTICE`, crediting AlphaEarth and stating each label source's licence and citation: GMW v3 (CC BY 4.0), ESA WorldCover v200 (CC BY 4.0), GWL_FCS30 (CC BY 4.0), JRC GSW 1.4 (Copernicus, "Source: EC JRC/Google") and GHSL (EC reuse with the source acknowledged), and that labels were derived by mangrove-embed's v3 rules.
+  - `NOTICE`, crediting AlphaEarth and each label source's licence and citation: GMW v3 (CC BY 4.0), ESA WorldCover v200 (CC BY 4.0), GWL_FCS30 (CC BY 4.0), JRC GSW 1.4 (Copernicus, "Source: EC JRC/Google") and GHSL (EC reuse with the source acknowledged), and stating labels were derived by mangrove-embed's v3 rules.
 - CI never touches the network. e2e serves (a) and (b) through a Playwright route that answers Range requests with 206.
 
 ## Acceptance criteria
