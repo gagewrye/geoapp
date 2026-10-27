@@ -1,10 +1,10 @@
 # 0010: Painted labels as sparse in-memory tiles, with per-tile overlays
-**Status:** Accepted (Gage, 2026-10-26). Partly superseded by ADR 0013 (2026-10-26): labels are saved and loaded as a label GeoTIFF (spec 004).
-- **Context:** Painted labels live on the source raster's pixel grid (spec 003). A dense Uint8 label raster for a 20k x 20k image is 400 MB, and CLAUDE.md forbids holding a full raster in memory. Options: (a) a sparse in-memory map of 256x256 Uint8 tiles with a cap; (b) OPFS-backed tiles, unbounded but with async painting and more code. Saving labels is deferred (Gage, 2026-10-26).
-- Display: one overlay at preview resolution (at most 1024 px) would hide fine labels on a large raster, since decimation can skip a 1 px dab. maplibre-gl 6.16.0 `src/source/canvas_source.ts`: with `animate: false`, the canvas is re-uploaded only on resize or while playing (`prepare`), and `pause()` runs `prepare` once if playing. Axis-aligned Mercator rectangles are the safe case for image placement (ADR 0002).
-- **Decision:** Option (a), with `MAX_LABEL_TILES` = 256 (16 MiB). Each labelled tile gets its own canvas source, warped onto an axis-aligned Mercator grid at tile resolution, and `map/` calls `play()` then `pause()` after each redraw. No label file format is defined.
-- **Consequences:** No new dependency. A dab that would need tile 257 is refused with a message. At the cap, memory stays at about 146 MiB, plus GPU textures and up to 256 extra map layers:
-- 16 MiB of labels, and about 2.1 MiB of imagery-nodata masks (at most 264 of 8 KiB; a factual update for Gage's 2026-10-26 nodata amendment to spec 003).
-- About 64 MiB of overlay canvases (256 of 256 KiB) and 64 MiB of overlay indices (one Int32 per overlay pixel, at most 256 KiB per tile, kept because spec 003 builds each once). A Uint16 index plus a validity bit per pixel would cut the indices to about 34 MiB, at the cost of a second array per tile.
-- Clarification 2026-10-27, awaiting Gage: the index cost above, and, if Gage accepts spec 003 [C5] as built (Train copies every stored label tile, at most 16 MiB, before reading; at most one Train runs at a time), the bound rises to about 162 MiB while a Train runs.
-- Labels last only for the session; a save format is chosen when saving is specified. Raising the cap, or moving to OPFS (option b), changes only the store.
+- **Status:** Accepted (Gage, 2026-10-26); memory amendment approved 2026-10-27 (Gage). Partly superseded by ADR 0013: labels save and load as a label GeoTIFF (spec 004).
+- **Context:** Labels live on the source raster's grid (spec 003); a dense Uint8 raster of 20k x 20k is 400 MB, and CLAUDE.md forbids full rasters in memory. Options: (a) capped, sparse in-memory 256x256 Uint8 tiles; (b) OPFS tiles, unbounded but async and more code.
+- One overlay at preview resolution (at most 1024 px) can skip a 1 px dab. maplibre-gl 6.16.0 `src/source/canvas_source.ts`: with `animate: false`, a canvas re-uploads only on resize or while playing (`prepare`); `pause()` runs `prepare` once if playing.
+- **Decision:** (a), `MAX_LABEL_TILES` = 256 (16 MiB). Each labelled tile gets a canvas source at tile resolution on an axis-aligned Mercator grid (the safe case, ADR 0002); `map/` calls `play()` then `pause()` after each redraw.
+- **Consequences:** No new dependency. A dab needing tile 257 is refused. At the cap, memory is about 146 MiB, plus GPU textures and up to 256 map layers:
+- 16 MiB of labels and about 2.1 MiB of nodata masks (at most 264 of 8 KiB).
+- 64 MiB of overlay canvases and 64 MiB of Int32 overlay indices (256 KiB each per tile). A Uint16 index plus a validity bit would cut indices to about 34 MiB.
+- About 162 MiB while a Train runs: its snapshot copies the label tiles, and one Train runs at a time.
+- Raising the cap, or moving to OPFS (b), changes only the store.
