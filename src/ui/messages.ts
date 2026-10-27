@@ -8,4 +8,6 @@ export const MESSAGES = {
   // not fixed by spec 002: AlphaEarth data is never a labelling surface, so it has its own control
   rasterIsAef: "This is an AlphaEarth file. Open it with \"Open AlphaEarth file\".",
   aefIndex: "Couldn't load the AlphaEarth index, so embeddings can't be fetched.",
+  // OPFS is shared by the origin's tabs, so one tab at a time holds the AlphaEarth cache (tester F10)
+  aefOtherTab: "AlphaEarth embeddings are open in another tab. Close that tab, then fetch again.",
 } as const;

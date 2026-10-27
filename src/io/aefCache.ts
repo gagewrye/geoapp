@@ -50,34 +50,67 @@ export function memoryStore() {
   return store;
 }
 
+/** Another tab of the app holds the cache folder (Web Locks), so this tab can't open a store on it. */
+export class CacheBusyError extends Error {
+  constructor() { super("Another tab holds the AlphaEarth cache."); }
+}
+
 // Folders held by a live store, per root: two stores on one folder would delete each other's files.
 const OPFS_ROOT = {};
 const live = new WeakMap<object, Set<string>>();
+// A live store's cross-tab lock, so a replacement in this tab can take it over without letting it go.
+const locksOf = new WeakMap<CacheStore, { key: object; name: string; take: () => (() => void) | undefined }>();
+
+/** Exclusive cross-tab lock on a folder: its release, or null while another tab holds it. */
+function lockFolder(locks: LockManager, name: string): Promise<(() => void) | null> {
+  return new Promise((resolve, reject) => {
+    locks.request(`geoapp:opfs/${name}`, { ifAvailable: true }, (lock) => {
+      if (!lock) return resolve(null);
+      // held until released; the browser also releases it when the page unloads
+      return new Promise<void>((release) => resolve(() => release()));
+    }).catch(reject);
+  });
+}
+
+type StoreOptions = {
+  /** The origin's Web Locks; tests pass a fake. */
+  locks?: LockManager;
+  /** This tab's live store on the folder, handed over (lock included) instead of discarded first. */
+  replaces?: CacheStore;
+};
 
 /**
- * OPFS store (ADR 0005); opening it drops any earlier AOI's cache. Refused while another store on
- * the same folder is live, that is, not yet discarded. `root` is for tests.
+ * OPFS store (ADR 0005); opening it drops any earlier AOI's cache. One tab at a time holds the folder,
+ * through a Web Locks lock kept until discard: refused with CacheBusyError while another tab holds it,
+ * and in this tab while another store on the folder is live, unless it `replaces` that store. `root` is for tests.
  */
-export async function opfsStore(name = "aef-cache", root?: FileSystemDirectoryHandle): Promise<CacheStore> {
+export async function opfsStore(name = "aef-cache", root?: FileSystemDirectoryHandle, { locks, replaces }: StoreOptions = {}): Promise<CacheStore> {
   const key = root ?? OPFS_ROOT;
   const held = live.get(key) ?? new Set<string>();
   live.set(key, held);
-  // reserved before any await, so two opens started together can't both get the folder
-  if (held.has(name)) throw new Error("The AlphaEarth cache is already in use.");
-  held.add(name);
+  const old = replaces && locksOf.get(replaces);
+  // taken before any await, so two opens started together can't both get the folder
+  let release = old && old.key === key && old.name === name ? old.take() : undefined;
+  if (!release) {
+    if (held.has(name)) throw new Error("The AlphaEarth cache is already in use.");
+    held.add(name);
+  }
   let dir: FileSystemDirectoryHandle, top: FileSystemDirectoryHandle;
   try {
+    release ??= await lockFolder(locks ?? navigator.locks, name) ?? undefined;
+    if (!release) throw new CacheBusyError();
     top = root ?? await navigator.storage.getDirectory();
     await top.removeEntry(name, { recursive: true }).catch(() => {}); // absent on first use
     dir = await top.getDirectoryHandle(name, { create: true });
   } catch (e) {
     held.delete(name);
+    release?.();
     throw e;
   }
   let gone = false;
   const alive = () => { if (gone) throw new Error("This AlphaEarth cache was discarded."); };
   const file = (b: number) => `b${b}.i8`;
-  return {
+  const store: CacheStore = {
     async band(b) {
       alive();
       // one writable per band: every byte is written once, with no read-modify-write
@@ -104,9 +137,13 @@ export async function opfsStore(name = "aef-cache", root?: FileSystemDirectoryHa
         await top.removeEntry(name, { recursive: true });
       } finally {
         held.delete(name); // given up even if deleting failed: the next open deletes it again
+        release!();
       }
     },
   };
+  // handing over ends this store as discard does, but keeps the folder reserved and the lock held
+  locksOf.set(store, { key, name, take: () => { if (gone) return undefined; gone = true; return release; } });
+  return store;
 }
 
 /** GeoTIFF tags for a north-up WGS84 UTM grid, so exports carry the AOI's georeferencing. */

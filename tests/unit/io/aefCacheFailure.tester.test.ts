@@ -15,8 +15,8 @@ describe("failure in any pass (tester, criterion 12 with the per-band cache)", (
   /** Run with a fake OPFS; returns the outcome, the writables, and whether the cache folder is gone. */
   async function failing(opts: { fault?: Override; wrap?: (s: CacheStore) => CacheStore }) {
     const tw = trackWritables();
-    const { handle, root } = fakeOpfs();
-    const raw = await opfsStore("aef-cache", handle);
+    const { handle, locks, root } = fakeOpfs();
+    const raw = await opfsStore("aef-cache", handle, { locks });
     const store = opts.wrap ? opts.wrap(raw) : raw;
     const { fetch, log } = memFetch(files, opts.fault);
     const err = await fetchEntries(aoi, COGS.map((c) => c.entry), store, { fetch, base: BASE }).then(() => null, (e: unknown) => e);

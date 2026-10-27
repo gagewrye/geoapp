@@ -351,30 +351,43 @@ test.describe("index (F4)", () => {
   });
 });
 
-// FOLLOW-UP (tester F10): the one-store-per-folder guard is per page, but OPFS is per origin, so a second tab's
-// fetch rewrites the first tab's "aef-cache" folder. Marked as expected failures so a fix shows up as a pass to update.
+// Tester F10: OPFS is per origin, so one tab at a time holds the AlphaEarth cache (a Web Locks lock). A second
+// tab's fetch is refused with a message; nothing silently overwrites the first tab's cache.
 test.describe("two tabs of the app share one OPFS origin (Scope: one set of AlphaEarth data)", () => {
-  test("a fetch in a second tab leaves the first tab's loaded data readable and correct", async ({ context }) => {
-    test.fail();
-    const a = await context.newPage(), b = await context.newPage();
-    for (const p of [a, b]) await serveAef(p);
-    await openApp(a);
-    await fetchChip(a);
-    await expect(message(a)).toHaveText("Embeddings downloaded.");
-    expect((await chipMismatches(a, REF)).mismatches).toBe(0);
+  /** Draw a different area than tab A's in `b` (same window count, another grid) and click Fetch. */
+  async function fetchOther(b: Page) {
     await openApp(b);
-    // a different area: same window count, so the band files keep their size but hold another grid
     await jumpTo(b, chipCentre, 13); // zoom 13 keeps the 200 m-margin box on screen
     await drawArea(b, lonLatBox(chip.epsg, chipBox, 200));
     await expect(b.locator("#aef-year option")).not.toHaveCount(0);
     await b.click("#aef-fetch");
-    await expect(message(b)).toHaveText("Embeddings downloaded.");
+  }
+
+  /** Tab b was refused: the message, no COG request, nothing loaded, and both controls usable again. */
+  async function refused(b: Page, lb: Parameters<typeof cogRequests>[0]) {
+    await expect(message(b)).toHaveText(MESSAGES.aefOtherTab);
+    expect(cogRequests(lb), "tab B's COG requests").toEqual([]);
+    expect(await b.evaluate(() => (window as any).__geoapp.aef())).toBeNull();
+    await expect(fetchBtn(b)).toBeEnabled();
+    await expect(openBtn(b)).toBeEnabled();
+  }
+
+  test("a fetch in a second tab is refused, and the first tab's loaded data stays readable and equal to the chip", async ({ context }) => {
+    const a = await context.newPage(), b = await context.newPage();
+    for (const p of [a, b]) await serveAef(p);
+    const lb = logRequests(b);
+    await openApp(a);
+    await fetchChip(a);
+    await expect(message(a)).toHaveText("Embeddings downloaded.");
+    expect((await chipMismatches(a, REF)).mismatches).toBe(0);
+    await fetchOther(b);
+    await refused(b, lb);
     const r = await chipMismatches(a, REF).catch((e: Error) => ({ mismatches: `threw: ${e.message}` }));
-    expect(r.mismatches, "tab A's data after tab B fetched").toBe(0);
+    expect(r.mismatches, "tab A's data after tab B's fetch").toBe(0);
+    await chipLoaded(a);
   });
 
-  test("two tabs fetching at once: the first tab's data is its own area, or its fetch fails with a message", async ({ context }) => {
-    test.fail();
+  test("two tabs fetching at once: the second is refused, and the first finishes with its own area", async ({ context }) => {
     const a = await context.newPage(), b = await context.newPage();
     for (const p of [a, b]) await serveAef(p);
     const la = logRequests(a), lb = logRequests(b);
@@ -384,15 +397,12 @@ test.describe("two tabs of the app share one OPFS origin (Scope: one set of Alph
     await openApp(a);
     await fetchChip(a);
     await expect.poll(() => cogRequests(la).length).toBeGreaterThan(100);
-    await openApp(b);
-    await jumpTo(b, chipCentre, 13);
-    await drawArea(b, lonLatBox(chip.epsg, chipBox, 200));
-    await expect(b.locator("#aef-year option")).not.toHaveCount(0);
-    await b.click("#aef-fetch");
-    await quiet(b, lb);
+    await fetchOther(b);
+    await refused(b, lb);
     open();
     const text = await quiet(a, la);
-    if (text === "Embeddings downloaded.") expect((await chipMismatches(a, REF)).mismatches, "tab A reports success: its data must be the chip").toBe(0);
-    else expect(await a.evaluate(() => (window as any).__geoapp.aef())).toBeNull();
+    expect(text, "tab A's fetch").toBe("Embeddings downloaded.");
+    expect((await chipMismatches(a, REF)).mismatches, "tab A's data must be the chip").toBe(0);
+    await chipLoaded(a);
   });
 });

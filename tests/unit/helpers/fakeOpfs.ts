@@ -1,3 +1,5 @@
+import { fakeLocks } from "./fakeLocks";
+
 /** One write to a file through a writable: file name, byte position and length. */
 export type OpfsWrite = { file: string; at: number; bytes: number };
 
@@ -58,8 +60,9 @@ export class FakeDir {
   }
 }
 
-/** A fake OPFS root, typed as the handle opfsStore takes. */
+/** A fake OPFS root, typed as the handle opfsStore takes, with the origin's fake Web Locks. */
 export function fakeOpfs() {
   const root = new FakeDir();
-  return { root, handle: root as unknown as FileSystemDirectoryHandle, log: root.log };
+  const { fake, locks } = fakeLocks();
+  return { root, handle: root as unknown as FileSystemDirectoryHandle, log: root.log, locks, lockState: fake };
 }

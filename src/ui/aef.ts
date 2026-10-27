@@ -3,7 +3,7 @@ import type { TerraDraw } from "terra-draw";
 import type { Aoi } from "../core/aef";
 import { aoiGrid, sameAoi } from "../core/aoi";
 import { normalizeLon } from "../core/ring";
-import { opfsStore, type CacheStore } from "../io/aefCache";
+import { CacheBusyError, opfsStore, type CacheStore } from "../io/aefCache";
 import { downloadAoi } from "../io/aefDownload";
 import { loadYears } from "../io/aefIndex";
 import { openAefFile } from "../io/aefLocal";
@@ -84,19 +84,23 @@ export function initAef({ map, draw, previewMaxSide, say, run, onState }: Deps) 
 
   fetchBtn.addEventListener("click", () => {
     if (state === "busy" || !area || !year.value) return;
-    const aoi = area, y = Number(year.value);
+    const aoi = area, y = Number(year.value), before = state;
     fetching = { aoi, year: y };
     setState("busy"); // before any await, so a second click finds Fetch disabled
     return run(async () => {
       let store: CacheStore | undefined;
       try {
-        await unload();
+        // takes over this tab's cache and its cross-tab lock, so no other tab gets it in between; while
+        // another tab holds it this is refused before anything here is unloaded
+        store = await opfsStore("aef-cache", undefined, { replaces: data?.store });
+        await unload(); // a replaced store's discard is a no-op
         say("Downloading embeddings...");
-        store = await opfsStore();
         await show({ aoi, source: await downloadAoi(aoi, y, store), store, year: y }, false);
       } catch (e) {
-        await store?.discard().catch(() => {}); // downloadAoi discards a partial cache; this covers the rest
         fetching = undefined;
+        if (e instanceof CacheBusyError) { setState(before); say(MESSAGES.aefOtherTab); return; }
+        await store?.discard().catch(() => {}); // downloadAoi discards a partial cache; this covers the rest
+        await unload(); // a failed open has already ended the replaced store
         setState("failed");
         throw e;
       }

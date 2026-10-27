@@ -37,8 +37,8 @@ describe("cache layout (criterion 17)", () => {
     ["the fixture (a) AOI", 0, 0, N, N],
     ["an AOI of 2x2 windows with the chip across all four and padded edge windows", 192, 200, 320, 300],
   ])("%s: 64 band files of (windows x 64 KiB), each plane written once, reads equal the reference chip", async (_n, col, row, w, h) => {
-    const { handle, root, log } = fakeOpfs();
-    const store = await opfsStore("aef-cache", handle);
+    const { handle, locks, root, log } = fakeOpfs();
+    const store = await opfsStore("aef-cache", handle, { locks });
     const aoi = aoiAround(col, row, w, h);
     await fetchEntries(aoi, entries, store, { fetch: rangeFetch().fetch });
     const windows = tileWindows(w, h);
@@ -61,8 +61,8 @@ describe("cache layout (criterion 17)", () => {
   });
 
   it("a failed download aborts the open band files and deletes the cache", async () => {
-    const { handle, root } = fakeOpfs();
-    const store = await opfsStore("aef-cache", handle);
+    const { handle, locks, root } = fakeOpfs();
+    const store = await opfsStore("aef-cache", handle, { locks });
     // fail on the east COGs' pixels, while the first pass's band files are open
     const fault = (url: string, range: [number, number] | null) => (url.endsWith("fixture-ne-topdown.tiff") && range && range[0] >= 8192 ? "network" as const : undefined);
     await expect(fetchEntries(aoiAround(192, 0, 320, N), entries, store, { fetch: rangeFetch(fault).fetch, blockSize: 4096 }))
@@ -71,46 +71,46 @@ describe("cache layout (criterion 17)", () => {
   });
 
   it("opening the store drops an earlier AOI's cache", async () => {
-    const { handle, root } = fakeOpfs();
-    const old = await opfsStore("aef-cache", handle);
+    const { handle, locks, root } = fakeOpfs();
+    const old = await opfsStore("aef-cache", handle, { locks });
     await fetchEntries(aoiAround(0, 0, N, N), entries, old, { fetch: rangeFetch().fetch });
     // a cache left by an earlier page load: on disk, but no live store holds it
     await old.discard();
     const left = await root.getDirectoryHandle("aef-cache", { create: true });
     await (await (await left.getFileHandle("b0.i8", { create: true })).createWritable()).close();
-    await opfsStore("aef-cache", handle);
+    await opfsStore("aef-cache", handle, { locks });
     expect((await root.getDirectoryHandle("aef-cache")).entries.size).toBe(0);
   });
 });
 
 describe("one live store per folder (tester F1)", () => {
   it("refuses a second store on a folder while the first is live, and leaves the first's cache intact", async () => {
-    const { handle, root } = fakeOpfs();
-    const first = await opfsStore("aef-cache", handle);
+    const { handle, locks, root } = fakeOpfs();
+    const first = await opfsStore("aef-cache", handle, { locks });
     await fetchEntries(aoiAround(0, 0, N, N), entries, first, { fetch: rangeFetch().fetch });
-    await expect(opfsStore("aef-cache", handle)).rejects.toThrow("The AlphaEarth cache is already in use.");
+    await expect(opfsStore("aef-cache", handle, { locks })).rejects.toThrow("The AlphaEarth cache is already in use.");
     expect((await root.getDirectoryHandle("aef-cache")).entries.size).toBe(AEF_BANDS);
     expect(await first.read(0)).toHaveLength(AEF_BANDS);
   });
 
   it("two opens started together: exactly one gets the folder", async () => {
-    const { handle } = fakeOpfs();
-    const r = await Promise.allSettled([opfsStore("aef-cache", handle), opfsStore("aef-cache", handle)]);
+    const { handle, locks } = fakeOpfs();
+    const r = await Promise.allSettled([opfsStore("aef-cache", handle, { locks }), opfsStore("aef-cache", handle, { locks })]);
     expect(r.map((x) => x.status).sort()).toEqual(["fulfilled", "rejected"]);
   });
 
   it("another folder, or another root, is not blocked", async () => {
     const a = fakeOpfs(), b = fakeOpfs();
-    await opfsStore("aef-cache", a.handle);
-    await expect(opfsStore("other", a.handle)).resolves.toBeDefined();
-    await expect(opfsStore("aef-cache", b.handle)).resolves.toBeDefined();
+    await opfsStore("aef-cache", a.handle, { locks: a.locks });
+    await expect(opfsStore("other", a.handle, { locks: a.locks })).resolves.toBeDefined();
+    await expect(opfsStore("aef-cache", b.handle, { locks: b.locks })).resolves.toBeDefined();
   });
 
   it("after discard the folder opens again, and the discarded store neither writes, reads nor deletes the new one", async () => {
-    const { handle, root } = fakeOpfs();
-    const old = await opfsStore("aef-cache", handle);
+    const { handle, locks, root } = fakeOpfs();
+    const old = await opfsStore("aef-cache", handle, { locks });
     await old.discard();
-    const fresh = await opfsStore("aef-cache", handle);
+    const fresh = await opfsStore("aef-cache", handle, { locks });
     const w = await fresh.band(0);
     await w.append(new Int8Array(PLANE_BYTES));
     await w.close();
@@ -122,12 +122,12 @@ describe("one live store per folder (tester F1)", () => {
   });
 
   it("a failed open releases the folder", async () => {
-    const { handle, root } = fakeOpfs();
+    const { handle, locks, root } = fakeOpfs();
     const get = root.getDirectoryHandle.bind(root);
     let fail = true;
     root.getDirectoryHandle = async (n, o) => { if (fail) throw new DOMException("denied", "SecurityError"); return get(n, o); };
-    await expect(opfsStore("aef-cache", handle)).rejects.toThrow("denied");
+    await expect(opfsStore("aef-cache", handle, { locks })).rejects.toThrow("denied");
     fail = false;
-    await expect(opfsStore("aef-cache", handle)).resolves.toBeDefined();
+    await expect(opfsStore("aef-cache", handle, { locks })).resolves.toBeDefined();
   });
 });

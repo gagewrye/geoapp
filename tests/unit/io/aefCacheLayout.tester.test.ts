@@ -15,8 +15,8 @@ afterEach(() => vi.restoreAllMocks());
 describe("per-band OPFS layout (tester, criterion 17)", () => {
   it("two COGs with a gap, clipped edge windows: 64 files written once each, plane i at i x 64 KiB, padding and gap -128", async () => {
     const tw = trackWritables();
-    const { handle, root, log } = fakeOpfs();
-    const store = await opfsStore("aef-cache", handle);
+    const { handle, locks, root, log } = fakeOpfs();
+    const store = await opfsStore("aef-cache", handle, { locks });
     await fetchEntries(aoi, COGS.map((c) => c.entry), store, { fetch: memFetch(files).fetch, base: BASE });
     const n = tileWindows(aoi.width, aoi.height).length;
     expect(n).toBe(6);
@@ -47,8 +47,8 @@ describe("per-band OPFS layout (tester, criterion 17)", () => {
   });
 
   it("a 1 x 1 px AOI is one window: 64 files of exactly 64 KiB, one valid pixel, the rest -128", async () => {
-    const { handle, root } = fakeOpfs();
-    const store = await opfsStore("aef-cache", handle);
+    const { handle, locks, root } = fakeOpfs();
+    const store = await opfsStore("aef-cache", handle, { locks });
     const a: Aoi = { ...aoi, gt: [OX + 10 * 100, 10, 0, OY - 10 * 50, 0, -10], width: 1, height: 1 };
     await fetchEntries(a, [west.entry], store, { fetch: memFetch(files).fetch, base: BASE });
     const dir = await root.getDirectoryHandle("aef-cache");
