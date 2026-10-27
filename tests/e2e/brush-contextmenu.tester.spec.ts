@@ -2,16 +2,24 @@ import { expect, test, type Page } from "@playwright/test";
 import { jumpTo, message, openApp, openRaster, rgbFixture, stroke, toScreen } from "./helpers";
 
 // Tester: spec 003 [C3] / criterion 10. contextmenu is prevented on the map while local imagery is
-// open (MapLibre prevents it on its canvas anyway), and on the panel's class name field only within 500 ms of an erase stroke ending.
+// open (MapLibre prevents it on its canvas anyway), and never on the panel, even within 500 ms of an
+// erase stroke ending (Gage, 2026-10-27).
 
+type Menu = { onMap: boolean; prevented: boolean; sinceErase: number };
 async function record(page: Page) {
   await page.evaluate(() => {
-    const g = (window as any).__menus = [] as { onMap: boolean; prevented: boolean }[];
+    const g = (window as any).__menus = [] as unknown[];
+    let erased = -Infinity;
+    window.addEventListener("pointerup", (e) => { if (e.button === 2) erased = performance.now(); });
     // registered after the app's listener, so it sees whether the app prevented the default
-    window.addEventListener("contextmenu", (e) => g.push({ onMap: (e.target as Element).closest("#map") !== null, prevented: e.defaultPrevented }));
+    window.addEventListener("contextmenu", (e) => g.push({
+      onMap: (e.target as Element).closest("#map") !== null, prevented: e.defaultPrevented, sinceErase: performance.now() - erased,
+    }));
   });
 }
-const menus = (page: Page) => page.evaluate(() => (window as any).__menus.splice(0) as { onMap: boolean; prevented: boolean }[]);
+const menus = async (page: Page) => (await page.evaluate(() => (window as any).__menus.splice(0) as Menu[]))
+  .map(({ onMap, prevented }) => ({ onMap, prevented }));
+const rawMenus = (page: Page) => page.evaluate(() => (window as any).__menus.splice(0) as Menu[]);
 const rightClickName = (page: Page) => page.locator("#classes .class-name").first().click({ button: "right" });
 
 test.describe("contextmenu (criterion 10 [C3], tester)", () => {
@@ -34,7 +42,7 @@ test.describe("contextmenu (criterion 10 [C3], tester)", () => {
     ]);
   });
 
-  test("more than 500 ms after an erase stroke a class name field's contextmenu isn't prevented; within 500 ms is recorded", async ({ page }) => {
+  test("within 500 ms of an erase stroke a class name field's contextmenu isn't prevented and the map's is", async ({ page }) => {
     await openApp(page);
     await openRaster(page, rgbFixture());
     await expect(message(page)).toHaveText("Raster opened.");
@@ -43,9 +51,27 @@ test.describe("contextmenu (criterion 10 [C3], tester)", () => {
     await stroke(page, [c, { x: c.x + 40, y: c.y }]);
     await record(page);
     await stroke(page, [c, { x: c.x + 40, y: c.y }], "right");
-    await rightClickName(page); // within 500 ms: open question for Gage, recorded only
-    const within = await menus(page);
-    test.info().annotations.push({ type: "panel contextmenu within 500 ms of an erase", description: JSON.stringify(within.filter((m) => !m.onMap)) });
+    await rawMenus(page); // the erase stroke's own press, on the map
+    await rightClickName(page);
+    const name = await rawMenus(page);
+    expect(name.map((m) => [m.onMap, m.prevented])).toEqual([[false, false]]);
+    expect(name[0]!.sinceErase).toBeLessThan(500);
+    await stroke(page, [c, { x: c.x + 40, y: c.y }], "right");
+    await rawMenus(page);
+    await page.mouse.click(c.x, c.y + 60, { button: "right" });
+    const map = await rawMenus(page);
+    expect(map.map((m) => [m.onMap, m.prevented])).toEqual([[true, true]]);
+    expect(map[0]!.sinceErase).toBeLessThan(500);
+  });
+
+  test("more than 500 ms after an erase stroke a class name field's contextmenu isn't prevented", async ({ page }) => {
+    await openApp(page);
+    await openRaster(page, rgbFixture());
+    await expect(message(page)).toHaveText("Raster opened.");
+    await jumpTo(page, [15, 45], 7);
+    const c = await toScreen(page, [15.005, 45.005]);
+    await stroke(page, [c, { x: c.x + 40, y: c.y }]);
+    await record(page);
     await stroke(page, [c, { x: c.x + 40, y: c.y }], "right");
     await page.waitForTimeout(600);
     await rightClickName(page);

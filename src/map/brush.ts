@@ -25,7 +25,6 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
   let stroke: Stroke | null = null;
   let lastType = "mouse";
   let pointer: { x: number; y: number; target: EventTarget | null } | null = null; // last mouse or pen position
-  let eraseEnded = 0; // a right release may still fire contextmenu after pointerup (Windows)
   const painting = () => grid !== null && mode === "paint" && !space;
 
   // Only handlers the brush turned off are turned back on: outside Paint mode terra-draw and MapLibre own them
@@ -75,10 +74,7 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
     if (ws.length) deps.cells(ws, s.erase);
   };
 
-  const end = () => {
-    if (stroke?.erase) eraseEnded = performance.now();
-    stroke = null;
-  };
+  const end = () => { stroke = null; };
 
   container.addEventListener("pointerdown", (e) => {
     lastType = e.pointerType;
@@ -106,10 +102,9 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
   map.getContainer().addEventListener("mousedown", (e) => {
     if (painting() && lastType !== "touch" && e.target instanceof Node && container.contains(e.target)) e.stopPropagation();
   }, { capture: true });
-  window.addEventListener("contextmenu", (e) => {
-    const onMap = e.target instanceof Node && map.getContainer().contains(e.target);
-    if (grid && (onMap || stroke?.erase || performance.now() - eraseEnded < 500)) e.preventDefault();
-  });
+  // Only on the map, which also covers a right release that fires contextmenu late (Windows); the panel
+  // keeps its menu even just after an erase, so text fields keep copy and paste (spec 003 [C3], Gage)
+  map.getContainer().addEventListener("contextmenu", (e) => { if (grid) e.preventDefault(); });
 
   return {
     /** The local imagery's grid, or null when none is open (the brush is then inert). */
