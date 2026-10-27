@@ -33,11 +33,6 @@ export class LabelOverlays {
     }
   }
 
-  /** Repaint every overlay, e.g. after a colour change. */
-  repaintAll(tiles: Map<string, Uint8Array>, colours: string[]): void {
-    for (const key of this.overlays.keys()) this.update(key, tiles.get(key), colours);
-  }
-
   /** Remove every overlay (the labels were discarded). */
   clear(): void {
     for (const [key, o] of this.overlays) this.remove(key, o.id);
