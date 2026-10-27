@@ -103,7 +103,6 @@ test("a file on exactly the drawn area's grid: no note for any year", async ({ p
 });
 
 test("a re-fetch for another year: while it runs, the note follows the year being fetched, not the unloaded data", async ({ page }) => {
-  test.fail(); // FOLLOW-UP (tester F12): the note is computed at Fetch from the data about to be unloaded, and kept
   const h = await setup(page);
   await fetchChip(page, "2021");
   await expect(message(page)).toHaveText("Embeddings downloaded.");
@@ -126,7 +125,6 @@ test("a re-fetch for another year: while it runs, the note follows the year bein
 });
 
 test("a re-fetch for a newly drawn area: while it runs, the info line doesn't say the loaded data is another area", async ({ page }) => {
-  test.fail(); // FOLLOW-UP (tester F12): the note is computed at Fetch from the data about to be unloaded, and kept
   const h = await setup(page);
   await fetchChip(page, "2021");
   await expect(message(page)).toHaveText("Embeddings downloaded.");

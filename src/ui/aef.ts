@@ -94,6 +94,7 @@ export function initAef({ map, draw, previewMaxSide, say, run, onState }: Deps) 
         // another tab holds it this is refused before anything here is unloaded
         store = await opfsStore("aef-cache", undefined, { replaces: data?.store });
         await unload(); // a replaced store's discard is a no-op
+        setState("busy"); // the old data is gone, so the info line's note is now about this fetch
         say("Downloading embeddings...");
         await show({ aoi, source: await downloadAoi(aoi, y, store), store, year: y }, false);
       } catch (e) {
