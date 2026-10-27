@@ -23,15 +23,16 @@ let draw: TerraDraw | undefined;
 let source: RasterSource | undefined;
 let model: Model | undefined;
 let training = false; // one run at a time, so one label snapshot (spec 003 [C5]) and no older run overwriting a newer one
+let classifying = false; // one export at a time: without the Save dialog, every export writes the same OPFS file
 // Opens are numbered so that an older open finishing late can't replace the raster a newer one opened
 let opens = 0;
 let opened = 0;
 
-/** Train and Classify need local imagery (spec 002); Train also waits for pending mask reads and its own run (spec 003). */
+/** Train and Classify need local imagery (spec 002); Train also waits for pending mask reads; each waits for its own run (spec 003). */
 function lockModel(): void {
   const off = !source && aef.state() !== "none";
   $<HTMLButtonElement>("train").disabled = off || labels.busy() || training;
-  $<HTMLButtonElement>("classify").disabled = off;
+  $<HTMLButtonElement>("classify").disabled = off || classifying;
 }
 
 const labels = initLabels({ map, say, onBusy: () => lockModel(), onPaint: () => draw?.setMode("static") });
@@ -115,22 +116,32 @@ $("train").addEventListener("click", () => {
   }, stale);
 });
 
-$("classify").addEventListener("click", () => run(async () => {
-  // the raster and model at the click: another raster may open while the Save dialog is up
-  const s = source, m = model;
-  if (!s) return say("Open a raster first.");
-  if (!m) return say("Train or load a model first.");
-  checkClassify(s, m); // before the Save dialog, so a rejected export leaves no empty file
-  const sink = await openSink("classified.tif");
-  say("Classifying...");
-  try {
-    await classify(s, m, sink);
-  } catch (e) {
-    await sink.abort?.().catch(() => {}); // a failed cleanup must not hide the classify error
-    throw e;
-  }
-  say("Export complete.");
-}));
+$("classify").addEventListener("click", () => {
+  if (classifying) return; // Classify is disabled meanwhile
+  classifying = true;
+  lockModel();
+  return run(async () => {
+    try {
+      // the raster and model at the click: another raster may open while the Save dialog is up
+      const s = source, m = model;
+      if (!s) return say("Open a raster first.");
+      if (!m) return say("Train or load a model first.");
+      checkClassify(s, m); // before the Save dialog, so a rejected export leaves no empty file
+      const sink = await openSink("classified.tif"); // a cancelled dialog throws, so finally still runs
+      say("Classifying...");
+      try {
+        await classify(s, m, sink);
+      } catch (e) {
+        await sink.abort?.().catch(() => {}); // a failed cleanup must not hide the classify error
+        throw e;
+      }
+      say("Export complete.");
+    } finally {
+      classifying = false;
+      lockModel();
+    }
+  });
+});
 
 $("save-model").addEventListener("click", () => {
   if (!model) return say("Train or load a model first.");

@@ -2,9 +2,9 @@ import { expect, test, type Page } from "@playwright/test";
 import { jumpTo, labels, message, moveTo, openApp, openRaster, rgbFixture, settled, stroke, toScreen, view } from "./helpers";
 
 // Tester: spec 003 criterion 12 after a paint stroke. terra-draw's MapLibre adapter calls
-// setDraggability(true) on pointerup, which re-enables map.dragRotate while the brush is in Paint
-// mode. These check that nothing the user sees changes: right drags still erase, double-click and
-// Shift-drag still don't zoom.
+// setDraggability(true) on pointerup; the brush then re-applies Paint mode's handler state, so
+// map.dragRotate stays off. These check that nothing the user sees changes: right drags still
+// erase, double-click and Shift-drag still don't zoom.
 
 async function setup(page: Page) {
   await openApp(page);
