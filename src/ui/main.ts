@@ -41,7 +41,7 @@ const errorText = (e: unknown) => (e instanceof RasterRefusedError && e.reason =
 
 // The labels' callbacks run only after the user acts, by when seeding exists.
 const labels = initLabels({ map, say, onBusy: () => { lockModel(); seeding.sync(); }, onChange: () => seeding.sync(), onPaint: () => draw?.setMode("static") });
-const seeding = initSeeding({ labels, imagery: () => source, model: () => model, say, error: errorText, onBusy: () => lockModel(),
+const seeding = initSeeding({ labels, imagery: () => source, model: () => model, training: () => training, say, error: errorText, onBusy: () => lockModel(),
   opened: (f) => { const h = (window as unknown as { __geoapp?: { labelFile?: unknown } }).__geoapp?.labelFile; if (typeof h === "function") h(f); } });
 // the area tool and the brush never share the mouse
 const aef = initAef({ map, draw: () => draw, previewMaxSide: PREVIEW_MAX_SIDE, say, run, onState: () => lockModel(),
@@ -103,6 +103,7 @@ $("train").addEventListener("click", () => {
   if (training || labels.busy()) return; // Train is disabled meanwhile
   training = true;
   lockModel();
+  seeding.sync(); // no Import labels or Seed meanwhile
   const s = source;
   // a run on a raster that was replaced meanwhile sets no model and no message
   const stale = () => source !== s;
@@ -121,6 +122,7 @@ $("train").addEventListener("click", () => {
     } finally {
       training = false; // even a dropped run keeps Train disabled until it ends: one snapshot at a time
       lockModel();
+      seeding.sync();
     }
   }, stale);
 });

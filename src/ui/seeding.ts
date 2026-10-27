@@ -13,6 +13,8 @@ type Deps = {
   labels: ReturnType<typeof initLabels>;
   imagery: () => RasterSource | undefined;
   model: () => Model | undefined;
+  /** A Train runs: its label snapshot is the one extra store allowed besides the current one (ADR 0010). */
+  training: () => boolean;
   say: (text: string) => void;
   /** Shows an error the way main's other actions do. */
   error: (e: unknown) => string;
@@ -27,7 +29,7 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 /** Import labels, Seed from model and Export labels (spec 004). */
 // A run belongs to the imagery it started on: once another raster opens it sets no labels and no
 // message (spec 003's rule for replaced rasters), and the new raster's controls are free at once.
-export function initSeeding({ labels, imagery, model, say, error, onBusy, opened }: Deps) {
+export function initSeeding({ labels, imagery, model, training, say, error, onBusy, opened }: Deps) {
   const importInput = $<HTMLInputElement>("import-labels"), classMap = $<HTMLInputElement>("class-map");
   const mode = $<HTMLSelectElement>("seed-mode"), minConf = $<HTMLInputElement>("min-confidence");
   const seedBtn = $<HTMLButtonElement>("seed-model"), exportBtn = $<HTMLButtonElement>("export-labels");
@@ -45,10 +47,11 @@ export function initSeeding({ labels, imagery, model, say, error, onBusy, opened
   };
 
   /** Enables each control for the imagery, model, paint queue and runs in progress. */
+  // A seed builds its new store beside the current one, so it waits for a Train's snapshot to go.
   function sync(): void {
-    const s = imagery(), busy = seeding(), queued = labels.busy();
-    importInput.disabled = classMap.disabled = !s || busy || queued;
-    seedBtn.disabled = !s || busy || queued || !modelFits(s) || confidence() === null;
+    const s = imagery(), busy = seeding(), queued = labels.busy(), trains = training();
+    importInput.disabled = classMap.disabled = !s || busy || queued || trains;
+    seedBtn.disabled = !s || busy || queued || trains || !modelFits(s) || confidence() === null;
     exportBtn.disabled = !s || busy || queued || exporting !== null;
     if (!labels.hasLabels()) mode.value = "merge"; // Merge is the default whenever labels appear
     mode.disabled = !labels.hasLabels() || busy;

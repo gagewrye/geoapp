@@ -6,7 +6,7 @@ import { maskNodata } from "../../src/core/seed";
 import type { Model } from "../../src/core/types";
 import { MESSAGES } from "../../src/ui/messages";
 import { jumpTo, labels, message, openApp, openRaster, path, rgbFixture, selectClass, stroke, toScreen } from "./helpers";
-import { classList, sourceOf, storeTiles } from "./seeding";
+import { classList, openImageryGate, pauseImagery, sourceOf, storeTiles } from "./seeding";
 
 // Spec 004 criterion 17, on spec 001's EPSG:4326 fixture (rgbFixture).
 
@@ -107,4 +107,17 @@ test("a loaded model whose class names spec 003 refuses seeds nothing and says w
   expect(await labels(page)).toEqual(painted);
   expect(await classList(page)).toEqual(list);
   await expect(page.locator("#seed-model")).toBeEnabled();
+});
+
+test("while a Train runs, Import labels and Seed are disabled, so at most one extra label store exists (ADR 0010)", async ({ page }) => {
+  test.setTimeout(120_000);
+  await paintAndTrain(page);
+  await pauseImagery(page);
+  await page.click("#train");
+  await expect.poll(() => page.evaluate(() => (window as any).__gate.reads)).toBeGreaterThan(0);
+  await expect(message(page)).toHaveText("Training...");
+  for (const id of ["#train", "#import-labels", "#class-map", "#seed-model"]) await expect(page.locator(id), id).toBeDisabled();
+  await openImageryGate(page);
+  await expect(message(page)).toHaveText(/^Trained on \d+ pixels, 2 classes\.$/);
+  for (const id of ["#train", "#import-labels", "#class-map", "#seed-model"]) await expect(page.locator(id), id).toBeEnabled();
 });
