@@ -8,12 +8,29 @@ async function setup(page: Page) {
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
   await jumpTo(page, [15, 45], 7);
+  await page.evaluate(() => {
+    const g = (window as any).__space = [] as boolean[];
+    // registered after the app's listener, so it sees whether the app prevented the default
+    window.addEventListener("keydown", (e) => { if (e.code === "Space") g.push(e.defaultPrevented); });
+  });
   return toScreen(page, [15.005, 45.005]);
 }
 const idle = (page: Page) => page.waitForFunction(() => !(window as any).__geoapp.map.isMoving(), undefined, { timeout: 5000 });
 const count = async (page: Page) => (await labels(page)).size;
-// Space as Pan gives MapLibre's handlers back; dragRotate is one the brush turns off in Paint mode
-const spacePan = (page: Page) => page.evaluate(() => (window as any).__geoapp.map.dragRotate.isEnabled() as boolean);
+const prevented = (page: Page) => page.evaluate(() => (window as any).__space.splice(0) as boolean[]);
+// MapLibre handlers the brush turns off in Paint mode
+const handlers = (page: Page) => page.evaluate(() => {
+  const { map } = (window as any).__geoapp;
+  return [map.dragRotate.isEnabled(), map.doubleClickZoom.isEnabled(), map.boxZoom.isEnabled()] as boolean[];
+});
+/** While Space is held: true if it acts as Pan (its keydown was prevented and the handlers are back). */
+async function spacePan(page: Page): Promise<boolean> {
+  const pan = await page.evaluate(() => { const g = (window as any).__space as boolean[]; return g[g.length - 1] === true; });
+  expect(await handlers(page)).toEqual([pan, pan, pan]);
+  return pan;
+}
+/** Paint mode's handler state: rotate, double-click zoom and box zoom off. */
+const paintHandlers = async (page: Page) => expect(await handlers(page)).toEqual([false, false, false]);
 const moved = (a: { lng: number; lat: number }, b: { lng: number; lat: number }) => Math.abs(a.lng - b.lng) + Math.abs(a.lat - b.lat);
 
 test.describe("pan and zoom (criterion 12)", () => {
@@ -50,12 +67,6 @@ test.describe("pan and zoom (criterion 12)", () => {
 
   test("Space on a focused form control does its native action, not Pan; on the map it pans", async ({ page }) => {
     const c = await setup(page);
-    await page.evaluate(() => {
-      const g = (window as any).__space = [] as boolean[];
-      // registered after the app's listener, so it sees whether the app prevented the default
-      window.addEventListener("keydown", (e) => { if (e.code === "Space") g.push(e.defaultPrevented); });
-    });
-    const prevented = () => page.evaluate(() => (window as any).__space.splice(0) as boolean[]);
     await page.focus("#aef-year");
     await expect(page.locator("#aef-year")).toBeFocused();
     await page.keyboard.down("Space");
@@ -69,7 +80,7 @@ test.describe("pan and zoom (criterion 12)", () => {
     await page.focus("#mode-paint");
     await page.keyboard.press("Space");
     await expect(page.locator("#mode-paint")).toHaveAttribute("aria-pressed", "true");
-    expect(await prevented()).toEqual([false, false, false]);
+    expect(await prevented(page)).toEqual([false, false, false]);
 
     await page.locator("#map canvas").focus();
     await expect(page.locator("#map canvas")).toBeFocused();
@@ -84,17 +95,12 @@ test.describe("pan and zoom (criterion 12)", () => {
     await idle(page);
     expect(moved(await view(page), v0)).toBeGreaterThan(0.5);
     expect(await count(page)).toBe(0);
-    expect(await prevented()).toEqual([true]);
-    expect(await spacePan(page)).toBe(false);
+    expect(await prevented(page)).toEqual([true]);
+    await paintHandlers(page); // released: Paint mode again
   });
 
   test("after a mouse click on a button, held Space is Pan and presses nothing; tabbed to, Space presses it", async ({ page }) => {
     const c = await setup(page);
-    await page.evaluate(() => {
-      const g = (window as any).__space = [] as boolean[];
-      window.addEventListener("keydown", (e) => { if (e.code === "Space") g.push(e.defaultPrevented); });
-    });
-    const prevented = () => page.evaluate(() => (window as any).__space.splice(0) as boolean[]);
     const size = page.locator("#brush-size");
     await page.click("#brush-larger");
     await expect(page.locator("#brush-larger")).toBeFocused();
@@ -112,8 +118,8 @@ test.describe("pan and zoom (criterion 12)", () => {
     expect(moved(await view(page), v0)).toBeGreaterThan(0.5);
     expect(await count(page)).toBe(0);
     await expect(size).toHaveText(s1!);
-    expect(await spacePan(page)).toBe(false);
-    expect((await prevented())[0]).toBe(true);
+    await paintHandlers(page);
+    expect((await prevented(page))[0]).toBe(true);
 
     await page.click("#mode-pan");
     await page.click("#mode-paint");
@@ -121,25 +127,46 @@ test.describe("pan and zoom (criterion 12)", () => {
     expect(await spacePan(page)).toBe(true); // Paint mode, Space held: Pan
     await page.keyboard.up("Space");
     await expect(page.locator("#mode-paint")).toHaveAttribute("aria-pressed", "true");
-    expect(await spacePan(page)).toBe(false);
-    expect(await prevented()).toEqual([true]);
+    await paintHandlers(page);
+    expect(await prevented(page)).toEqual([true]);
 
     await page.click("#brush-smaller");
     await expect(size).toHaveText("Brush: 7 px");
     await page.keyboard.press("Tab");
     await expect(page.locator("#brush-larger")).toBeFocused();
-    await prevented();
+    await prevented(page);
     await page.keyboard.down("Space");
     expect(await spacePan(page)).toBe(false); // tabbed to, Space is the button's
     await page.keyboard.up("Space");
     await expect(size).toHaveText(s1!);
-    expect(await prevented()).toEqual([false]);
+    expect(await prevented(page)).toEqual([false]);
 
     await page.click("#brush-larger"); // a click on the tabbed-to button makes it mouse-focused again
     const s2 = await size.textContent();
     await page.keyboard.press("Space");
     await expect(size).toHaveText(s2!);
-    expect(await prevented()).toEqual([true]);
+    expect(await prevented(page)).toEqual([true]);
+  });
+
+  test("after paint and erase strokes Paint mode keeps its handlers off, and Space on a select still isn't Pan", async ({ page }) => {
+    const c = await setup(page);
+    await paintHandlers(page);
+    await stroke(page, [c, { x: c.x + 60, y: c.y }]);
+    expect(await count(page)).toBeGreaterThan(0);
+    await paintHandlers(page); // terra-draw's adapter re-enables dragRotate on pointerup
+    await stroke(page, [c, { x: c.x + 60, y: c.y }], "right");
+    expect(await count(page)).toBe(0);
+    await paintHandlers(page);
+    await page.focus("#aef-year");
+    await page.keyboard.down("Space");
+    expect(await spacePan(page)).toBe(false);
+    await page.keyboard.up("Space");
+    await page.locator("#map canvas").focus();
+    await page.keyboard.down("Space");
+    expect(await spacePan(page)).toBe(true);
+    await page.keyboard.up("Space");
+    await paintHandlers(page);
+    expect(await prevented(page)).toEqual([false, true]);
   });
 
   test("in Pan mode a left drag pans, a right drag rotates, and nothing is painted", async ({ page }) => {

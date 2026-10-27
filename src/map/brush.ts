@@ -110,6 +110,8 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
     setImagery(g: Grid | null): void { end(); grid = g; syncHandlers(); hover(); },
     setMode(m: BrushMode): void { mode = m; syncHandlers(); hover(); },
     mode: () => mode,
+    /** Re-apply the mode's MapLibre handler state after something else changed it. */
+    syncHandlers,
     /** Space held acts as Pan. */
     setSpace(held: boolean): void { if (space !== held) { space = held; syncHandlers(); hover(); } },
     /** Redraw the footprint after a size or colour change. */

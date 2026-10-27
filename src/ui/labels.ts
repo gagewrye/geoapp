@@ -145,6 +145,7 @@ export function initLabels({ map, say, onBusy, onPaint }: Deps) {
       setMode("paint");
     },
     setMode,
+    syncHandlers: brush.syncHandlers,
     /** True when any pixel is labelled (no all-zero tile is kept). */
     hasLabels: () => store.tiles.size > 0,
     /** Stroke cells are waiting for nodata masks. */

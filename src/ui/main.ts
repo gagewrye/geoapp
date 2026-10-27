@@ -39,7 +39,7 @@ const aef = initAef({ map, draw: () => draw, previewMaxSide: PREVIEW_MAX_SIDE, s
 $("aef-draw").addEventListener("click", () => labels.setMode("pan")); // the area tool and the brush never share the mouse
 
 map.on("load", () => {
-  draw = createDraw(map);
+  draw = createDraw(map, () => labels.syncHandlers());
   const d = draw;
   d.on("finish", (id, ctx) => { if (ctx.mode === "rectangle" && ctx.action === "draw") aef.areaDrawn(id); });
   // Test hook for e2e (specs 001-003); exposes no user data beyond this page.
