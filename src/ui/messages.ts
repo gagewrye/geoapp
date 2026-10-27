@@ -18,7 +18,7 @@ export const MESSAGES = {
   seedFull: "Label limit reached (256 tiles of 256 x 256 px). Nothing was seeded.",
   tooMany: "Too many classes (max 255). Nothing was seeded.",
   noSeed: "No labels to seed here.",
-  // not fixed by spec 004: a loaded model's names can break spec 003's rule (tester F2)
+  // spec 004, Settled in build
   modelNames: "The model's class names must be unique and not empty, with no spaces around them. Nothing was seeded.",
   minConfidence: "Min. confidence must be between 0 and 1.",
   replace: "Replace labels?",
