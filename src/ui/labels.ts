@@ -23,6 +23,9 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 const NOT_TEXT = new Set(["checkbox", "radio", "button", "submit", "reset", "color", "file", "range", "image"]);
 const inTextField = (el: Element | null) => el instanceof HTMLTextAreaElement
   || (el instanceof HTMLInputElement && !NOT_TEXT.has(el.type)) || (el instanceof HTMLElement && el.isContentEditable);
+// Space activates a focused control natively (keyboard users press buttons with it), so it pans only elsewhere
+const onControl = (el: Element | null) => el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement
+  || el instanceof HTMLSelectElement || el instanceof HTMLButtonElement || (el instanceof HTMLElement && el.isContentEditable);
 
 /** Brush labels on local imagery (spec 003): panel, classes, shortcuts, store, paint queue and overlays. */
 export function initLabels({ map, say, onBusy, onPaint }: Deps) {
@@ -100,15 +103,19 @@ export function initLabels({ map, say, onBusy, onPaint }: Deps) {
     render();
   });
   window.addEventListener("keydown", (e) => {
-    if (!open || inTextField(document.activeElement) || e.ctrlKey || e.metaKey || e.altKey) return;
-    if (e.code === "Space") { e.preventDefault(); brush.setSpace(true); }
-    else if (e.key === "[") step(-1);
+    if (!open || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.code === "Space") {
+      if (!onControl(document.activeElement)) { e.preventDefault(); brush.setSpace(true); }
+      return;
+    }
+    if (inTextField(document.activeElement)) return;
+    if (e.key === "[") step(-1);
     else if (e.key === "]") step(1);
     else if (/^[1-9]$/.test(e.key) && Number(e.key) <= classes.length) select(Number(e.key) - 1);
   });
   window.addEventListener("keyup", (e) => {
     if (e.code !== "Space") return;
-    if (open && !inTextField(document.activeElement)) e.preventDefault(); // a focused button would click
+    if (open && !onControl(document.activeElement)) e.preventDefault();
     brush.setSpace(false);
   });
 
