@@ -137,6 +137,29 @@ test.describe("train (criterion 15)", () => {
     expect(errors).toEqual([]);
   });
 
+  test("a Train that fails after another raster opened shows no error on the new raster", async ({ page }) => {
+    const errors = collectErrors(page);
+    await openApp(page);
+    await openRaster(page, rgbFixture());
+    await expect(message(page)).toHaveText("Raster opened.");
+    await paintTwo(page);
+    await page.evaluate(() => {
+      const s = (window as any).__geoapp.imagery();
+      const g = (window as any).__gate = { reads: 0, fail: null as null | (() => void) };
+      s.readWindow = () => { g.reads++; return new Promise((_, rej) => { g.fail = () => rej(new Error("Read failed.")); }); };
+    });
+    await page.click("#train");
+    await expect.poll(() => page.evaluate(() => (window as any).__gate.reads)).toBe(1);
+    page.once("dialog", (d) => d.accept());
+    await openRaster(page, { ...rgbFixture(), name: "other.tif" });
+    await expect(message(page)).toHaveText("Raster opened.");
+    await page.evaluate(() => (window as any).__gate.fail());
+    await expect(page.locator("#train")).toBeEnabled();
+    await page.waitForTimeout(300);
+    await expect(message(page)).toHaveText("Raster opened.");
+    expect(errors).toEqual([]);
+  });
+
   test("with only one class painted the message appears and no model is made", async ({ page }) => {
     await openApp(page);
     await openRaster(page, rgbFixture());

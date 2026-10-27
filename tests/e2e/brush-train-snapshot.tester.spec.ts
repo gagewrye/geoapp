@@ -154,10 +154,10 @@ test.describe("Train snapshot [C5] (tester)", () => {
     expect(errors).toEqual([]);
   });
 
-  // FOLLOW-UP probe: a Train still reading the old raster finishes after another raster opens, then
-  // says "Trained on N pixels" for labels that were discarded and sets a model from the old raster.
-  test.fail("opening another raster while Train reads: the old run's result doesn't land on the new raster", async ({ page }) => {
-    await setup(page);
+  // F10: a Train still reading the old raster when another opens is dropped: no "Trained on N pixels"
+  // for discarded labels and no model from the old raster.
+  test("opening another raster while Train reads: the old run's result doesn't land on the new raster", async ({ page }) => {
+    const errors = await setup(page);
     await gate(page);
     await page.click("#train");
     await expect.poll(() => calls(page)).toBe(1);
@@ -170,5 +170,7 @@ test.describe("Train snapshot [C5] (tester)", () => {
     await expect(message(page)).toHaveText("Raster opened.");
     await page.click("#save-model");
     await expect(message(page)).toHaveText("Train or load a model first.");
+    await settled(page); // the dropped run has ended, so Train is free for the new raster
+    expect(errors).toEqual([]);
   });
 });
