@@ -19,7 +19,7 @@ export function nextClass(list: LabelClass[]): LabelClass {
 }
 
 /** The trimmed name if class `index` may take it: not empty and no other class's name; else null. */
-export function checkName(list: LabelClass[], index: number, name: string): string | null {
+export function checkName(list: { name: string }[], index: number, name: string): string | null {
   const t = name.trim();
   if (!t || list.some((c, i) => i !== index && c.name === t)) return null;
   return t;
