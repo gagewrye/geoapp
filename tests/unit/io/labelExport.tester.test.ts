@@ -148,16 +148,30 @@ describe("export memory, structurally", () => {
 });
 
 describe("model class names that spec 003's rule refuses", () => {
-  // FOLLOW-UP (tester): spec 001's model validation doesn't apply spec 003's name rule, and
-  // mergeClasses takes model.classes as they are. A loaded model with an untrimmed (or empty or
-  // duplicate) class name seeds a list spec 003 would refuse, and its export then doesn't import
-  // back the same: " padded " comes back trimmed (an empty name is refused outright).
-  it.fails("a seed from a model with an untrimmed class name exports and imports back the same list (FOLLOW-UP)", { timeout: 30_000 }, async () => {
-    const src = await imagery(300, 260, 32633, [500000, 30, 0, 5000000, 0, -30]);
-    const model: Model = { version: 1, type: "logreg", bands: [1], mean: [250], std: [100], classes: [" padded ", "b"], W: [[-1], [1]], b: [0, 0] };
-    const seeded = ok(await seedModel(src, model, 0, { store: emptyStore(300, 260), classes: [] }, "replace"));
-    expect(seeded.classes.map((c) => c.name)).toEqual([" padded ", "b"]);
-    const { r } = await roundTrip(src, seeded.store, seeded.classes);
+  // Tester FOLLOW-UP F2: spec 001's model validation doesn't apply spec 003's name rule, so a seed
+  // would put names in the list that spec 003 refuses, and its export wouldn't import back the same
+  // (" padded " comes back trimmed; an empty name is refused). Seed from model refuses such a model.
+  const src = () => imagery(300, 260, 32633, [500000, 30, 0, 5000000, 0, -30]);
+  const model = (classes: string[]): Model => ({ version: 1, type: "logreg", bands: [1], mean: [250], std: [100], classes, W: classes.map((_, i) => [i]), b: classes.map(() => 0) });
+  for (const [why, classes] of [["an untrimmed", [" padded ", "b"]], ["an empty", ["", "b"]], ["a blank", ["a", "  "]], ["a duplicate", ["a", "b", "a"]]] as const) {
+    it(`refuses a model with ${why} class name in either mode, changing nothing`, { timeout: 30_000 }, async () => {
+      const s = await src();
+      const current = { store: await storeFor(s, 2), classes: [{ name: "x", colour: "#000000" }, { name: "y", colour: "#111111" }] };
+      const tiles = new Map(current.store.tiles), list = current.classes.map((c) => ({ ...c }));
+      let reads = 0;
+      const counted: RasterSource = { meta: s.meta, readWindow: (...a) => { reads++; return s.readWindow(...a); } };
+      for (const mode of ["merge", "replace"] as const) expect(await seedModel(counted, model([...classes]), 0, current, mode)).toBe("bad names");
+      expect(reads).toBe(0);
+      expect(current.store.tiles).toEqual(tiles);
+      expect(current.classes).toEqual(list);
+    });
+  }
+
+  it("a seed from a model with valid names exports and imports back the same list", { timeout: 30_000 }, async () => {
+    const s = await src();
+    const seeded = ok(await seedModel(s, model(["padded", "b"]), 0, { store: emptyStore(300, 260), classes: [] }, "replace"));
+    expect(seeded.classes.map((c) => c.name)).toEqual(["padded", "b"]);
+    const { r } = await roundTrip(s, seeded.store, seeded.classes);
     expect(r.classes).toEqual(seeded.classes);
   });
 });

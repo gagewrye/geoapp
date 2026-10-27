@@ -1,4 +1,4 @@
-import type { LabelClass } from "../core/classes";
+import { badClassName, type LabelClass } from "../core/classes";
 import { classesFromValues, ClassTableError, decodeClasses, mergeClasses, parseClasses, type ClassEntry } from "../core/classTable";
 import { tileWindows, type Window } from "../core/grid";
 import { emptyStore, putTile, tileWindow, type LabelStore } from "../core/labelStore";
@@ -13,7 +13,7 @@ export type Labels = { store: LabelStore; classes: LabelClass[] };
 /** Merge fills only unlabelled pixels; Replace starts from no labels and no classes. */
 export type SeedMode = "merge" | "replace";
 /** The new labels, the pixels the seed labelled and their class count; or why nothing changed. */
-export type SeedOutcome = (Labels & { pixels: number; classCount: number }) | "full" | "too many" | "empty" | "stale";
+export type SeedOutcome = (Labels & { pixels: number; classCount: number }) | "full" | "too many" | "empty" | "bad names" | "stale";
 
 const gridOf = (m: { width: number; height: number; epsg: number; gt: Grid["gt"] }): Grid => ({ width: m.width, height: m.height, epsg: m.epsg, gt: m.gt });
 
@@ -105,8 +105,10 @@ export async function importLabels(imagery: RasterSource, file: LabelSource, tab
 
 /** Seeds labels from a model's predictions where its max softmax is at least minProb, masked by imagery nodata (spec 004). */
 // Every imagery window is read once; the incoming classes are model.classes, without colours.
+// A model whose names spec 003 refuses reads nothing: its list wouldn't export and import back the same.
 export async function seedModel(imagery: RasterSource, model: Model, minProb: number, current: Labels,
   mode: SeedMode, stale: () => boolean = () => false): Promise<SeedOutcome> {
+  if (badClassName(model.classes) !== null) return "bad names";
   const { width, height } = imagery.meta;
   return build(tileWindows(width, height), current, mode, model.classes.map((name) => ({ name })), async (w, values) => {
     const tile = await imagery.readWindow(w.x0, w.y0, w.width, w.height);

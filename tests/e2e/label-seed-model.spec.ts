@@ -93,3 +93,18 @@ test("at 0.9 only pixels whose max softmax is at least 0.9 are labelled; 1.5 sho
   await expect(page.locator("#seed-model")).toBeEnabled();
   await expect(message(page)).toHaveText("");
 });
+
+test("a loaded model whose class names spec 003 refuses seeds nothing and says why", async ({ page }) => {
+  test.setTimeout(120_000);
+  const model = await paintAndTrain(page);
+  const painted = await labels(page);
+  const list = await classList(page);
+  const bad = JSON.stringify({ ...model, classes: [" padded ", "b"] });
+  await page.setInputFiles("#load-model", { name: "model.json", mimeType: "application/json", buffer: Buffer.from(bad) });
+  await expect(message(page)).toHaveText(/^Loaded model/);
+  await page.click("#seed-model"); // Merge: no confirm
+  await expect(message(page)).toHaveText(MESSAGES.modelNames);
+  expect(await labels(page)).toEqual(painted);
+  expect(await classList(page)).toEqual(list);
+  await expect(page.locator("#seed-model")).toBeEnabled();
+});

@@ -24,3 +24,10 @@ export function checkName(list: { name: string }[], index: number, name: string)
   if (!t || list.some((c, i) => i !== index && c.name === t)) return null;
   return t;
 }
+
+/** Index of the first name spec 003's rule refuses as it stands (empty, duplicated or untrimmed), else null. */
+export function badClassName(names: string[]): number | null {
+  const list = names.map((name) => ({ name }));
+  const i = names.findIndex((name, j) => checkName(list, j, name) !== name);
+  return i < 0 ? null : i;
+}

@@ -8,6 +8,7 @@ describe("seedMessage", () => {
     expect(seedMessage("full")).toBe("Label limit reached (256 tiles of 256 x 256 px). Nothing was seeded.");
     expect(seedMessage("too many")).toBe("Too many classes (max 255). Nothing was seeded.");
     expect(seedMessage("empty")).toBe("No labels to seed here.");
+    expect(seedMessage("bad names")).toBe("The model's class names must be unique and not empty, with no spaces around them. Nothing was seeded.");
     expect(seedMessage("stale")).toBeNull();
     expect(seedMessage({ store: { width: 1, height: 1, tiles: new Map() }, classes: [], pixels: 1234, classCount: 3 })).toBe("Seeded 1234 pixels in 3 classes.");
   });
