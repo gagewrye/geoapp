@@ -83,7 +83,7 @@ test("Replace shows the confirm: Cancel keeps labels and classes, OK replaces th
   expect(new Set((await labels(page)).values())).toEqual(new Set([1, 2, 3]));
 });
 
-test("while an import runs the brush, Train and class edits are disabled; while mask reads are pending Import labels and Seed are", async ({ page }) => {
+test("while an import runs the brush, Train and class edits are disabled; while mask reads are pending Import labels, Seed and Export labels are", async ({ page }) => {
   await setup(page);
   await paintTwoClasses(page);
   await page.click("#train");
@@ -121,10 +121,12 @@ test("while an import runs the brush, Train and class edits are disabled; while 
   await expect.poll(() => page.evaluate(() => (window as any).__gate.reads)).toBe(1);
   await expect(page.locator("#import-labels")).toBeDisabled();
   await expect(page.locator("#seed-model")).toBeDisabled();
+  await expect(page.locator("#export-labels")).toBeDisabled(); // its file must hold no half-applied stroke
   await openImageryGate(page);
   await settled(page);
   await expect(page.locator("#import-labels")).toBeEnabled();
   await expect(page.locator("#seed-model")).toBeEnabled();
+  await expect(page.locator("#export-labels")).toBeEnabled();
 });
 
 test("a Merge passing 255 classes shows its message and changes nothing", async ({ page }) => {

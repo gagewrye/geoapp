@@ -32,9 +32,11 @@ export function initSeeding({ labels, imagery, model, say, error, onBusy, opened
   const mode = $<HTMLSelectElement>("seed-mode"), minConf = $<HTMLInputElement>("min-confidence");
   const seedBtn = $<HTMLButtonElement>("seed-model"), exportBtn = $<HTMLButtonElement>("export-labels");
   let running: RasterSource | null = null; // the imagery a seeding run started on
-  let exporting = false;
+  let exporting: RasterSource | null = null; // the imagery an export started on
 
   const seeding = () => running !== null && running === imagery();
+  // Seeding and exporting each lock the brush and class edits; the lock lifts once neither runs on this imagery.
+  const relock = () => labels.lock(seeding() || (exporting !== null && exporting === imagery()));
   const confidence = () => { const v = minConf.valueAsNumber; return v >= 0 && v <= 1 ? v : null; };
   const modelFits = (s: RasterSource) => {
     const m = model();
@@ -47,7 +49,7 @@ export function initSeeding({ labels, imagery, model, say, error, onBusy, opened
     const s = imagery(), busy = seeding(), queued = labels.busy();
     importInput.disabled = classMap.disabled = !s || busy || queued;
     seedBtn.disabled = !s || busy || queued || !modelFits(s) || confidence() === null;
-    exportBtn.disabled = !s || busy || exporting;
+    exportBtn.disabled = !s || busy || queued || exporting !== null;
     if (!labels.hasLabels()) mode.value = "merge"; // Merge is the default whenever labels appear
     mode.disabled = !labels.hasLabels() || busy;
   }
@@ -63,7 +65,7 @@ export function initSeeding({ labels, imagery, model, say, error, onBusy, opened
     const s = imagery()!;
     const stale = () => imagery() !== s;
     running = s;
-    labels.lock(true);
+    relock();
     sync();
     onBusy();
     say("Seeding labels...");
@@ -77,7 +79,7 @@ export function initSeeding({ labels, imagery, model, say, error, onBusy, opened
     } finally {
       if (running === s) {
         running = null;
-        if (!stale()) labels.lock(false); // a new raster's open() has unlocked already
+        relock(); // a new raster's open() has unlocked already
       }
       sync();
       onBusy();
@@ -116,10 +118,12 @@ export function initSeeding({ labels, imagery, model, say, error, onBusy, opened
 
   exportBtn.addEventListener("click", async () => {
     const s = imagery();
-    if (!s || exportBtn.disabled) return;
-    exporting = true; // one at a time: without the Save dialog, every export writes the same OPFS file
+    if (!s || exportBtn.disabled || labels.busy()) return;
+    exporting = s; // one at a time: without the Save dialog, every export writes the same OPFS file
+    // no queued cells (Export waits for them) and no strokes or class edits until it ends, so no
+    // stored tile changes in place and the file holds exactly the labels and classes at the click
+    relock();
     sync();
-    // the tiles and list at the click; a stroke during the write can still change a stored tile
     const store = { ...labels.store(), tiles: new Map(labels.store().tiles) };
     const list = labels.classes().map((c) => ({ ...c }));
     try {
@@ -136,7 +140,8 @@ export function initSeeding({ labels, imagery, model, say, error, onBusy, opened
     } catch (e) {
       say(error(e));
     } finally {
-      exporting = false;
+      exporting = null;
+      relock();
       sync();
     }
   });

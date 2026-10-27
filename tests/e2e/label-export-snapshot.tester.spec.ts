@@ -1,13 +1,13 @@
 import { expect, test } from "@playwright/test";
 import { fromArrayBuffer } from "geotiff";
 import { decodeClasses, CLASS_ITEM } from "../../src/core/classTable";
-import { jumpTo, message, openApp, openRaster, path, rgbFixture, selectClass, stroke, toScreen } from "./helpers";
+import { hoverFeatures, jumpTo, message, openApp, openRaster, path, rgbFixture, selectClass, stroke, toScreen } from "./helpers";
 import { arrayBuffer, noSavePicker, storeTiles } from "./seeding";
 
 // Tester probe of Export labels' snapshot (spec 004 Rules: Export labels; criterion 11's "saves and
 // loads labels exactly"; ADR 0013: values are class index + 1 of the file's own table).
-// The implementer's note: Export copies only the tile map and class list at the click, so a stroke
-// during the write can still change a stored tile that hasn't been written yet.
+// Export snapshots the tile map and class list at the click and, until the write ends, locks the
+// brush and class edits as seeding does, so no stored tile changes in place under the write.
 
 /** Before page scripts: the OPFS writable's 2nd write (the first tile, after the header) waits for __writeGate.open(). */
 const gateWrites = (page: import("@playwright/test").Page) => page.addInitScript(() => {
@@ -21,7 +21,7 @@ const gateWrites = (page: import("@playwright/test").Page) => page.addInitScript
   };
 });
 
-test("labels edited while Export writes don't change the file: it holds the labels and classes at the click", async ({ page }) => {
+test("while Export writes, strokes and class edits are refused, so the file holds the labels and classes at the click", async ({ page }) => {
   test.setTimeout(120_000);
   await noSavePicker(page);
   await gateWrites(page);
@@ -43,11 +43,21 @@ test("labels edited while Export writes don't change the file: it holds the labe
   await page.click("#export-labels");
   await expect.poll(() => page.evaluate(() => (window as any).__writeGate.waiting)).toBe(true);
   // header written, tile 0,0 waiting: tile 512,512 hasn't been read for the file yet.
-  // Erase half of the Class 1 stroke, then paint a class added after the click over the other half.
+  // Class edits are off (selecting still works), and erasing or painting over the stroke changes nothing.
+  await expect(page.locator("#class-add")).toBeDisabled();
+  for (const sel of ["#classes .class-name", "#classes .class-colour"]) {
+    const n = await page.locator(sel).count();
+    for (let i = 0; i < n; i++) await expect(page.locator(sel).nth(i)).toBeDisabled();
+  }
+  await selectClass(page, 1);
+  await expect(page.locator("#classes li").nth(1)).toHaveAttribute("aria-selected", "true");
+  await page.mouse.move(a.x, a.y);
+  expect(await hoverFeatures(page)).toEqual([]); // no footprint
   await stroke(page, path(a, await toScreen(page, [16.4, 43.6]), 6), "right");
-  await page.click("#class-add"); // Class 3, not in the click's list
-  await selectClass(page, 2);
   await stroke(page, path(await toScreen(page, [16.45, 43.6]), b, 6));
+  const during = await storeTiles(page);
+  expect([...during.keys()]).toEqual(["512,512"]);
+  expect(Buffer.from(during.get("512,512")!).equals(Buffer.from(tile))).toBe(true);
   await page.evaluate(() => (window as any).__writeGate.open());
   const file = await (await dl).path();
   await expect(message(page)).toHaveText("Labels exported.");
@@ -61,4 +71,10 @@ test("labels edited while Export writes don't change the file: it holds the labe
   expect(Math.max(...px!)).toBeLessThanOrEqual(table.length);
   // and the tile is the one stored at the click
   expect(Buffer.from(px!).equals(Buffer.from(tile))).toBe(true);
+
+  // the lock ends with the export: a class can be added and a right drag erases again
+  await expect(page.locator("#class-add")).toBeEnabled();
+  await selectClass(page, 0); // a right drag erases the selected class
+  await stroke(page, path(a, await toScreen(page, [16.4, 43.6]), 6), "right");
+  await expect.poll(async () => (await storeTiles(page)).get("512,512")?.filter((v) => v === 1).length ?? 0).toBeLessThan(tile.filter((v) => v === 1).length);
 });

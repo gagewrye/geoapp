@@ -33,7 +33,7 @@ export function initLabels({ map, say, onBusy, onChange, onPaint }: Deps) {
   let selected = 0;
   let size = BRUSH_SIZES.indexOf(DEFAULT_BRUSH);
   let open = false;
-  let locked = false; // while seeding (spec 004): no painting and no class edits, so the swapped-in list loses nothing
+  let locked = false; // while seeding or exporting labels (spec 004): no painting and no class edits, so no list or tile changes under them
   let store: LabelStore = emptyStore(0, 0);
   let queue: PaintQueue | null = null;
   let overlays: LabelOverlays | null = null;
@@ -126,7 +126,7 @@ export function initLabels({ map, say, onBusy, onChange, onPaint }: Deps) {
     brush.setSpace(false);
   });
 
-  /** While seeding: the brush and the class list's edits are off; selecting still works. */
+  /** While seeding or exporting labels: the brush and the class list's edits are off; selecting still works. */
   function lock(on: boolean): void {
     if (locked === on) return;
     locked = on;
