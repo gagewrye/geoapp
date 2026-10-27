@@ -28,4 +28,7 @@ export type Tile = {
 /** GDAL order: x = a + b*col + c*row, y = d + e*col + f*row. */
 export type Affine = [number, number, number, number, number, number];
 
+/** A raster's pixel grid (spec 003); spec 002's Aoi has this shape. */
+export type Grid = { width: number; height: number; epsg: number; gt: Affine };
+
 export type PixelPolygon = { rings: [number, number][][]; label: number };
