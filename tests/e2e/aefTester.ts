@@ -104,3 +104,11 @@ export async function holdRemoves(page: Page): Promise<{ hold: () => Promise<voi
     held: () => page.evaluate(() => (window as any).__removesHeld as number),
   };
 }
+
+/** Whether some tab holds the AlphaEarth cache lock, as seen from `page`. */
+export const lockHeld = (page: Page) => page.evaluate(async () => (await navigator.locks.query()).held?.some((l) => l.name === "geoapp:opfs/aef-cache") ?? false);
+
+/** Wait until no tab holds the cache lock: the browser releases a closed or unloaded page's locks a little later. */
+export async function lockReleased(page: Page): Promise<void> {
+  await expect.poll(() => lockHeld(page), "the closed or unloaded holder's lock is released").toBe(false);
+}

@@ -3,7 +3,7 @@ import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { AEF_BASE } from "../../src/core/aef";
 import { MESSAGES } from "../../src/ui/messages";
 import { chip, chipBox, chipCentre, cogRequests, drawArea, fetchChip, logRequests, lonLatBox, serveAef } from "./aef";
-import { chipLoaded, chipMismatches, files64, holdCogs, holdRemoves, quiet, westFile } from "./aefTester";
+import { chipLoaded, chipMismatches, files64, holdCogs, holdRemoves, lockHeld, lockReleased, quiet, westFile } from "./aefTester";
 import { jumpTo, message, openApp } from "./helpers";
 
 // Tester re-verification of F10: try to get two tabs onto the AlphaEarth cache at once.
@@ -31,7 +31,6 @@ async function instrument(page: Page): Promise<void> {
   });
 }
 const lockRequests = (p: Page) => p.evaluate(() => (window as any).__lockRequests as number);
-const lockHeld = (p: Page) => p.evaluate(async () => (await navigator.locks.query()).held?.some((l) => l.name === "geoapp:opfs/aef-cache") ?? false);
 
 async function pages(context: BrowserContext, n: number): Promise<Page[]> {
   const out: Page[] = [];
@@ -71,10 +70,12 @@ test("three tabs: the lock passes from tab to tab only as each holder closes", a
   expect(await loaded(b!)).toBeNull();
   expect(await loaded(c!)).toBeNull();
   await a!.close();
+  await lockReleased(b!);
   await b!.click("#aef-fetch"); // a refused fetch, retried once the holder is closed
   await fetchedOk(b!);
   await refused(c!);
   await b!.close();
+  await lockReleased(c!);
   await c!.click("#aef-fetch");
   await fetchedOk(c!);
 });
@@ -92,6 +93,7 @@ for (const how of ["closed", "reloaded"] as const) {
     if (how === "closed") await a!.close();
     else { await a!.reload(); await openApp(a!); }
     gate.release();
+    await lockReleased(b!);
     await b!.click("#aef-fetch");
     await fetchedOk(b!);
     if (how === "reloaded") {
@@ -139,6 +141,7 @@ test("a lock request that rejects shows its error and blocks nothing: another ta
   await fetchedOk(b!);
   await refused(a!);
   await b!.close();
+  await lockReleased(a!);
   await a!.click("#aef-fetch");
   await fetchedOk(a!);
 });
@@ -167,6 +170,7 @@ test("a refused fetch over this tab's open file keeps the file and its lock-free
   await expect(message(b!)).toHaveText(MESSAGES.aefOtherTab);
   expect((await loaded(b!))?.width).toBe(64);
   await a!.close();
+  await lockReleased(b!);
   await b!.click("#aef-fetch");
   await fetchedOk(b!);
 });
@@ -176,6 +180,7 @@ test("navigating the holder away releases the lock (it isn't kept by a cached pa
   await fetchChip(a!);
   await fetchedOk(a!);
   await a!.goto("about:blank");
+  await lockReleased(b!);
   await fetchChip(b!);
   await fetchedOk(b!);
   await a!.goBack();

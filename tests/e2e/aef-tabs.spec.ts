@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
 import { ATTRIBUTION, chip, chipBox, chipCentre, cogRequests, drawArea, fetchChip, logRequests, lonLatBox, serveAef } from "./aef";
-import { chipMismatches, files64, westFile } from "./aefTester";
+import { chipMismatches, files64, lockReleased, westFile } from "./aefTester";
 import { jumpTo, message, openApp } from "./helpers";
 
 // Tester F10: one tab at a time holds the AlphaEarth cache. The lock is released on discard (a file
@@ -43,6 +43,7 @@ test("closing the tab that holds the cache lets another tab fetch", async ({ con
   await fetched(a);
   await refusedIn(b);
   await a.close();
+  await lockReleased(b);
   await fetchesIn(b);
 });
 
@@ -52,6 +53,7 @@ test("reloading the tab that holds the cache lets another tab fetch, and the rel
   await refusedIn(b);
   await a.reload();
   await openApp(a);
+  await lockReleased(b);
   await fetchesIn(b);
   await refusedIn(a);
 });
