@@ -7,8 +7,8 @@ type Handlers = {
   recolour: (index: number, colour: string) => void;
 };
 
-/** The class list: select (click anywhere in a row), rename and recolour. */
-export function renderClasses(list: HTMLElement, classes: LabelClass[], selected: number, on: Handlers): void {
+/** The class list: select (click anywhere in a row), rename and recolour; locked, only select. */
+export function renderClasses(list: HTMLElement, classes: LabelClass[], selected: number, locked: boolean, on: Handlers): void {
   list.replaceChildren(...classes.map((c, i) => {
     const li = document.createElement("li");
     li.dataset.index = String(i);
@@ -23,11 +23,13 @@ export function renderClasses(list: HTMLElement, classes: LabelClass[], selected
     name.type = "text";
     name.className = "class-name";
     name.value = c.name;
+    name.disabled = locked;
     name.addEventListener("change", () => { name.value = on.rename(i, name.value); });
     const colour = document.createElement("input");
     colour.type = "color";
     colour.className = "class-colour";
     colour.value = c.colour;
+    colour.disabled = locked;
     colour.addEventListener("input", () => on.recolour(i, colour.value));
     li.append(pick, name, colour);
     li.addEventListener("click", () => on.select(i));
