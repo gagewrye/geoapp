@@ -40,11 +40,16 @@ export function predictTile(model: Model, tile: Tile): Uint8Array {
 export function seedFromModel(model: Model, tile: Tile, minProb: number, values: number[]): Uint8Array {
   const out = new Uint8Array(tile.width * tile.height);
   scan(model, tile, (i, best, logits) => {
-    // max softmax = 1 / sum(exp(l - l_max))
+    // max softmax = 1 / sum(exp(l - l_max)), which can't overflow. An infinite pixel can make l_max
+    // infinite (l - l_max NaN: the logits equal to it count 1 each) or a logit NaN (0 * Infinity,
+    // never predictTile's pick: it counts 0). All NaN tells nothing, so uniform.
     const top = logits[best]!;
     let sum = 0;
-    for (const l of logits) sum += Math.exp(l - top);
-    if (1 / sum >= minProb) out[i] = values[best]!;
+    for (const l of logits) {
+      if (l === top) sum += 1;
+      else if (l < top) sum += Math.exp(l - top);
+    }
+    if ((sum > 0 ? 1 / sum : 1 / logits.length) >= minProb) out[i] = values[best]!;
   }, () => {});
   return out;
 }
