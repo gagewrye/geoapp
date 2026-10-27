@@ -88,6 +88,60 @@ test.describe("pan and zoom (criterion 12)", () => {
     expect(await spacePan(page)).toBe(false);
   });
 
+  test("after a mouse click on a button, held Space is Pan and presses nothing; tabbed to, Space presses it", async ({ page }) => {
+    const c = await setup(page);
+    await page.evaluate(() => {
+      const g = (window as any).__space = [] as boolean[];
+      window.addEventListener("keydown", (e) => { if (e.code === "Space") g.push(e.defaultPrevented); });
+    });
+    const prevented = () => page.evaluate(() => (window as any).__space.splice(0) as boolean[]);
+    const size = page.locator("#brush-size");
+    await page.click("#brush-larger");
+    await expect(page.locator("#brush-larger")).toBeFocused();
+    const s1 = await size.textContent();
+    expect(s1).not.toBe("Brush: 7 px");
+    const v0 = await view(page);
+    await page.mouse.move(c.x, c.y);
+    await page.keyboard.down("Space");
+    expect(await spacePan(page)).toBe(true);
+    await page.mouse.down();
+    await moveTo(page, c, { x: c.x + 150, y: c.y + 40 }, 15);
+    await page.mouse.up();
+    await page.keyboard.up("Space");
+    await idle(page);
+    expect(moved(await view(page), v0)).toBeGreaterThan(0.5);
+    expect(await count(page)).toBe(0);
+    await expect(size).toHaveText(s1!);
+    expect(await spacePan(page)).toBe(false);
+    expect((await prevented())[0]).toBe(true);
+
+    await page.click("#mode-pan");
+    await page.click("#mode-paint");
+    await page.keyboard.down("Space");
+    expect(await spacePan(page)).toBe(true); // Paint mode, Space held: Pan
+    await page.keyboard.up("Space");
+    await expect(page.locator("#mode-paint")).toHaveAttribute("aria-pressed", "true");
+    expect(await spacePan(page)).toBe(false);
+    expect(await prevented()).toEqual([true]);
+
+    await page.click("#brush-smaller");
+    await expect(size).toHaveText("Brush: 7 px");
+    await page.keyboard.press("Tab");
+    await expect(page.locator("#brush-larger")).toBeFocused();
+    await prevented();
+    await page.keyboard.down("Space");
+    expect(await spacePan(page)).toBe(false); // tabbed to, Space is the button's
+    await page.keyboard.up("Space");
+    await expect(size).toHaveText(s1!);
+    expect(await prevented()).toEqual([false]);
+
+    await page.click("#brush-larger"); // a click on the tabbed-to button makes it mouse-focused again
+    const s2 = await size.textContent();
+    await page.keyboard.press("Space");
+    await expect(size).toHaveText(s2!);
+    expect(await prevented()).toEqual([true]);
+  });
+
   test("in Pan mode a left drag pans, a right drag rotates, and nothing is painted", async ({ page }) => {
     const c = await setup(page);
     await page.click("#mode-pan");

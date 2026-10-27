@@ -23,9 +23,6 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 const NOT_TEXT = new Set(["checkbox", "radio", "button", "submit", "reset", "color", "file", "range", "image"]);
 const inTextField = (el: Element | null) => el instanceof HTMLTextAreaElement
   || (el instanceof HTMLInputElement && !NOT_TEXT.has(el.type)) || (el instanceof HTMLElement && el.isContentEditable);
-// Space activates a focused control natively (keyboard users press buttons with it), so it pans only elsewhere
-const onControl = (el: Element | null) => el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement
-  || el instanceof HTMLSelectElement || el instanceof HTMLButtonElement || (el instanceof HTMLElement && el.isContentEditable);
 
 /** Brush labels on local imagery (spec 003): panel, classes, shortcuts, store, paint queue and overlays. */
 export function initLabels({ map, say, onBusy, onPaint }: Deps) {
@@ -102,10 +99,17 @@ export function initLabels({ map, say, onBusy, onPaint }: Deps) {
     classes.push(nextClass(classes));
     render();
   });
+  // Chromium marks the focused element :focus-visible on any keydown, so how it got focus is read when focus arrives
+  let keyFocused = false;
+  window.addEventListener("focusin", (e) => { keyFocused = e.target instanceof Element && e.target.matches(":focus-visible"); });
+  window.addEventListener("pointerdown", () => { keyFocused = false; }, true);
+  // Keyboard users press a control they tabbed to with Space; a mouse click leaves focus there, and then Space means Pan
+  const nativeSpace = (el: Element | null) => inTextField(el) || el instanceof HTMLSelectElement
+    || (keyFocused && (el instanceof HTMLButtonElement || el instanceof HTMLInputElement));
   window.addEventListener("keydown", (e) => {
     if (!open || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.code === "Space") {
-      if (!onControl(document.activeElement)) { e.preventDefault(); brush.setSpace(true); }
+      if (!nativeSpace(document.activeElement)) { e.preventDefault(); brush.setSpace(true); }
       return;
     }
     if (inTextField(document.activeElement)) return;
@@ -115,7 +119,7 @@ export function initLabels({ map, say, onBusy, onPaint }: Deps) {
   });
   window.addEventListener("keyup", (e) => {
     if (e.code !== "Space") return;
-    if (open && !onControl(document.activeElement)) e.preventDefault();
+    if (open && !nativeSpace(document.activeElement)) e.preventDefault();
     brush.setSpace(false);
   });
 
