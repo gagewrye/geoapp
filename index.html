@@ -23,6 +23,15 @@
         </div>
         <ul id="classes"></ul>
         <button id="class-add" type="button">Add class</button>
+        <label>Seed mode <select id="seed-mode" disabled><option value="merge">Merge</option><option value="replace">Replace</option></select></label>
+        <label>Class map (optional) <input id="class-map" type="file" accept=".json,application/json" /></label>
+        <label>Import labels <input id="import-labels" type="file" accept=".tif,.tiff,image/tiff" /></label>
+        <div class="row">
+          <label for="min-confidence">Min. confidence</label>
+          <input id="min-confidence" type="number" min="0" max="1" step="0.05" value="0" />
+        </div>
+        <button id="seed-model" type="button" disabled>Seed from model</button>
+        <button id="export-labels" type="button">Export labels</button>
       </fieldset>
       <fieldset>
         <legend>AlphaEarth embeddings</legend>

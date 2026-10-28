@@ -12,6 +12,7 @@ import { fitToPreview, showPreview } from "../map/preview";
 import { initAef } from "./aef";
 import { initLabels } from "./labels";
 import { MESSAGES } from "./messages";
+import { initSeeding } from "./seeding";
 
 const PREVIEW_MAX_SIDE = 1024;
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -28,14 +29,20 @@ let classifying = false; // one export at a time: without the Save dialog, every
 let opens = 0;
 let opened = 0;
 
-/** Train and Classify need local imagery (spec 002); Train also waits for pending mask reads; each waits for its own run (spec 003). */
+/** Train and Classify need local imagery (spec 002); Train also waits for pending mask reads and seeding; each waits for its own run (specs 003, 004). */
 function lockModel(): void {
   const off = !source && aef.state() !== "none";
-  $<HTMLButtonElement>("train").disabled = off || labels.busy() || training;
+  $<HTMLButtonElement>("train").disabled = off || labels.busy() || training || seeding.seeding();
   $<HTMLButtonElement>("classify").disabled = off || classifying;
 }
 
-const labels = initLabels({ map, say, onBusy: () => lockModel(), onPaint: () => draw?.setMode("static") });
+/** An action's error as shown to the user. */
+const errorText = (e: unknown) => (e instanceof RasterRefusedError && e.reason === "antimeridian" ? MESSAGES.rasterAntimeridian : (e as Error).message);
+
+// The labels' callbacks run only after the user acts, by when seeding exists.
+const labels = initLabels({ map, say, onBusy: () => { lockModel(); seeding.sync(); }, onChange: () => seeding.sync(), onPaint: () => draw?.setMode("static") });
+const seeding = initSeeding({ labels, imagery: () => source, model: () => model, training: () => training, say, error: errorText, onBusy: () => lockModel(),
+  opened: (f) => { const h = (window as unknown as { __geoapp?: { labelFile?: unknown } }).__geoapp?.labelFile; if (typeof h === "function") h(f); } });
 // the area tool and the brush never share the mouse
 const aef = initAef({ map, draw: () => draw, previewMaxSide: PREVIEW_MAX_SIDE, say, run, onState: () => lockModel(),
   onAreaTool: () => labels.setMode("pan") });
@@ -44,8 +51,8 @@ map.on("load", () => {
   draw = createDraw(map, () => labels.syncHandlers());
   const d = draw;
   d.on("finish", (id, ctx) => { if (ctx.mode === "rectangle" && ctx.action === "draw") aef.areaDrawn(id); });
-  // Test hook for e2e (specs 001-003); exposes no user data beyond this page.
-  const hook = { map, draw: d, aef: aef.current, imagery: () => source ?? null };
+  // Test hook for e2e (specs 001-004); exposes no user data beyond this page. labelFile: set by a test to see opened label files.
+  const hook = { map, draw: d, aef: aef.current, imagery: () => source ?? null, model: () => model ?? null, labelFile: null };
   Object.defineProperty(hook, "labels", { get: () => ({ store: labels.store(), classes: labels.classes() }) });
   (window as unknown as Record<string, unknown>).__geoapp = hook;
   $("map").dataset.ready = "true";
@@ -57,7 +64,7 @@ async function run(task: () => Promise<void>, stale = () => false): Promise<void
     await task();
   } catch (e) {
     if (stale()) return;
-    say(e instanceof RasterRefusedError && e.reason === "antimeridian" ? MESSAGES.rasterAntimeridian : (e as Error).message);
+    say(errorText(e));
   }
 }
 
@@ -96,6 +103,7 @@ $("train").addEventListener("click", () => {
   if (training || labels.busy()) return; // Train is disabled meanwhile
   training = true;
   lockModel();
+  seeding.sync(); // no Import labels or Seed meanwhile
   const s = source;
   // a run on a raster that was replaced meanwhile sets no model and no message
   const stale = () => source !== s;
@@ -109,10 +117,12 @@ $("train").addEventListener("click", () => {
       if (stale()) return;
       if (result === "no samples") return say(MESSAGES.noSamples);
       model = result.model;
+      seeding.sync();
       say(`Trained on ${result.samples} pixels, ${names.length} classes.`);
     } finally {
       training = false; // even a dropped run keeps Train disabled until it ends: one snapshot at a time
       lockModel();
+      seeding.sync();
     }
   }, stale);
 });
@@ -154,5 +164,6 @@ $<HTMLInputElement>("load-model").addEventListener("change", (ev) => run(async (
   if (!file) return;
   if (!source) return say("Open a raster first.");
   model = parseModel(await file.text(), source.meta.bandCount);
+  seeding.sync();
   say(`Loaded model with classes: ${model.classes.join(", ")}.`);
 }));

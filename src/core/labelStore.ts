@@ -94,3 +94,19 @@ export function paintedValues(store: LabelStore): Set<number> {
   for (const tile of store.tiles.values()) for (const v of tile) if (v) seen.add(v);
   return seen;
 }
+
+/** Classes of a classCount-long list with labelled pixels; a value with no class doesn't count. */
+// Imports and seeds write the store too (spec 004), so Train doesn't rely on the brush's values alone.
+export function paintedClasses(store: LabelStore, classCount: number): number {
+  return [...paintedValues(store)].filter((v) => v <= classCount).length;
+}
+
+/** Replaces w's tile with window-sized labels; all zeros deletes it; "full" (a new key at the cap) changes nothing. */
+export function putTile(store: LabelStore, w: Window, labels: Uint8Array): "ok" | "full" {
+  if (labels.length !== w.width * w.height) throw new Error(`putTile: ${labels.length} labels for a ${w.width}x${w.height} window`);
+  const key = `${w.x0},${w.y0}`;
+  if (isEmpty(labels)) { store.tiles.delete(key); return "ok"; }
+  if (!store.tiles.has(key) && store.tiles.size >= MAX_LABEL_TILES) return "full";
+  store.tiles.set(key, labels);
+  return "ok";
+}

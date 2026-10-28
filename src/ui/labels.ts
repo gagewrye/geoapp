@@ -1,7 +1,7 @@
 import type { Map as MapLibreMap } from "maplibre-gl";
 import { MAX_CLASSES, checkName, initialClasses, nextClass, type LabelClass } from "../core/classes";
 import type { Window } from "../core/grid";
-import { emptyStore, paintedValues, tileKeys, type LabelStore } from "../core/labelStore";
+import { emptyStore, keepMasks, paintedClasses, tileKeys, type LabelStore } from "../core/labelStore";
 import { BRUSH_SIZES, DEFAULT_BRUSH } from "../core/pixel";
 import { PaintQueue } from "../io/paintQueue";
 import type { RasterSource } from "../io/source";
@@ -15,6 +15,8 @@ type Deps = {
   say: (text: string) => void;
   /** The paint queue became busy or idle (Train is disabled while it is busy). */
   onBusy: () => void;
+  /** The store changed: a cell applied, labels were replaced, or new imagery opened. */
+  onChange: () => void;
   /** Paint mode was chosen: the AlphaEarth area tool must stop (ADR 0009). */
   onPaint: () => void;
 };
@@ -25,12 +27,13 @@ const inTextField = (el: Element | null) => el instanceof HTMLTextAreaElement
   || (el instanceof HTMLInputElement && !NOT_TEXT.has(el.type)) || (el instanceof HTMLElement && el.isContentEditable);
 
 /** Brush labels on local imagery (spec 003): panel, classes, shortcuts, store, paint queue and overlays. */
-export function initLabels({ map, say, onBusy, onPaint }: Deps) {
+export function initLabels({ map, say, onBusy, onChange, onPaint }: Deps) {
   const panel = $("brush-panel"), list = $("classes"), add = $<HTMLButtonElement>("class-add"), sizeText = $("brush-size");
   const classes: LabelClass[] = initialClasses();
   let selected = 0;
   let size = BRUSH_SIZES.indexOf(DEFAULT_BRUSH);
   let open = false;
+  let locked = false; // while seeding or exporting labels (spec 004): no painting and no class edits, so no list or tile changes under them
   let store: LabelStore = emptyStore(0, 0);
   let queue: PaintQueue | null = null;
   let overlays: LabelOverlays | null = null;
@@ -40,7 +43,7 @@ export function initLabels({ map, say, onBusy, onPaint }: Deps) {
   const brush = createBrush(map, {
     side: () => BRUSH_SIZES[size]!,
     colour: () => classes[selected]!.colour,
-    cells: (ws, erase) => { for (const w of ws) queue?.push({ w, value: selected + 1, erase }); },
+    cells: (ws, erase) => { if (!locked) for (const w of ws) queue?.push({ w, value: selected + 1, erase }); },
   });
 
   // A redraw walks a whole tile, so tiles changed by many cells are redrawn once per frame.
@@ -72,21 +75,23 @@ export function initLabels({ map, say, onBusy, onPaint }: Deps) {
     brush.refresh();
   };
   const render = () => {
-    renderClasses(list, classes, selected, {
+    renderClasses(list, classes, selected, locked, {
       select,
       rename: (i, name) => {
+        if (locked) return classes[i]!.name;
         const ok = checkName(classes, i, name);
         if (ok === null) { say(MESSAGES.className); return classes[i]!.name; }
         classes[i]!.name = ok;
         return ok;
       },
       recolour: (i, colour) => {
+        if (locked) return;
         classes[i]!.colour = colour;
         redraw(store.tiles.keys());
         brush.refresh();
       },
     });
-    add.disabled = classes.length >= MAX_CLASSES;
+    add.disabled = locked || classes.length >= MAX_CLASSES;
   };
   render();
 
@@ -95,7 +100,7 @@ export function initLabels({ map, say, onBusy, onPaint }: Deps) {
   $("brush-smaller").addEventListener("click", () => step(-1));
   $("brush-larger").addEventListener("click", () => step(1));
   add.addEventListener("click", () => {
-    if (classes.length >= MAX_CLASSES) return;
+    if (locked || classes.length >= MAX_CLASSES) return;
     classes.push(nextClass(classes));
     render();
   });
@@ -123,6 +128,14 @@ export function initLabels({ map, say, onBusy, onPaint }: Deps) {
     brush.setSpace(false);
   });
 
+  /** While seeding or exporting labels: the brush and the class list's edits are off; selecting still works. */
+  function lock(on: boolean): void {
+    if (locked === on) return;
+    locked = on;
+    brush.setLocked(on);
+    render();
+  }
+
   return {
     /** Start labelling newly opened local imagery: an empty store, no masks, Paint mode. */
     open(source: RasterSource): void {
@@ -132,8 +145,9 @@ export function initLabels({ map, say, onBusy, onPaint }: Deps) {
       const { width, height, epsg, gt } = source.meta;
       const grid = { width, height, epsg, gt };
       store = emptyStore(width, height);
+      lock(false);
       queue = new PaintQueue(source, () => store, {
-        applied: (w: Window) => redraw(tileKeys(w)),
+        applied: (w: Window) => { redraw(tileKeys(w)); onChange(); },
         full: () => say(MESSAGES.labelLimit),
         busy: onBusy,
         error: (e) => say((e as Error).message),
@@ -143,7 +157,24 @@ export function initLabels({ map, say, onBusy, onPaint }: Deps) {
       panel.hidden = false;
       brush.setImagery(grid);
       setMode("paint");
+      onChange();
     },
+    /** Swap in seeded labels and their class list (spec 004); masks of tiles no longer stored are freed. */
+    replace(next: LabelStore, list: LabelClass[]): void {
+      const keys = new Set([...store.tiles.keys(), ...next.tiles.keys()]);
+      store = next;
+      classes.splice(0, classes.length, ...list);
+      if (selected >= classes.length) selected = 0;
+      // the queue is empty (seeding waits for it), so no footprint is pending (spec 003 Storage)
+      if (queue) keepMasks(store, queue.masks, null);
+      redraw(keys); // colours may have changed too
+      render();
+      brush.refresh();
+      onChange();
+    },
+    lock,
+    /** The labels and class list now, for seeding to build on. */
+    current: () => ({ store, classes }),
     setMode,
     syncHandlers: brush.syncHandlers,
     /** True when any pixel is labelled (no all-zero tile is kept). */
@@ -152,7 +183,7 @@ export function initLabels({ map, say, onBusy, onPaint }: Deps) {
     busy: () => (queue?.size ?? 0) > 0,
     store: () => store,
     classes: () => classes,
-    /** Classes with painted pixels. */
-    paintedClasses: () => paintedValues(store).size,
+    /** Classes with labelled pixels; a stored value with no class doesn't count. */
+    paintedClasses: () => paintedClasses(store, classes.length),
   };
 }
