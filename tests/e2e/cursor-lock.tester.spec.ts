@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { classFile } from "../unit/helpers/labelFiles";
-import { jumpTo, message, openApp, openRaster, rgbFixture, type Xy } from "./helpers";
+import { jumpTo, message, openApp, openRaster, paintMode, rgbFixture, type Xy } from "./helpers";
 import { seeded } from "./lockCombos";
 import { importFile, openFileGate, pauseLabelFile, upload } from "./seeding";
 
@@ -12,6 +12,7 @@ async function lockedImport(page: Page): Promise<Xy> {
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await jumpTo(page, [15, 45], 9);
   const box = (await page.locator("#map canvas").boundingBox())!;
   const p = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
@@ -31,7 +32,7 @@ test("selecting class 2 by key during a lock keeps not-allowed; when the lock en
   await openFileGate(page);
   await expect(message(page)).toHaveText(seeded);
   expect(await cursorAt(page, p)).not.toBe("not-allowed");
-  await page.click("#mode-paint"); // an import selects Pan (spec 016)
+  await paintMode(page); // an import selects Pan (spec 016)
   await page.mouse.move(p.x, p.y);
   const cur = await cursorAt(page, p);
   expect(cur.startsWith('url("data:image/svg+xml')).toBe(true);
@@ -51,7 +52,7 @@ test("with Space held when the lock ends, neither not-allowed nor the brush show
   expect(held.startsWith("url(")).toBe(false);
   await page.keyboard.up("Space");
   expect((await cursorAt(page, p)).startsWith("url(")).toBe(false); // the import selected Pan (spec 016)
-  await page.click("#mode-paint");
+  await paintMode(page);
   await page.mouse.move(p.x, p.y);
   expect((await cursorAt(page, p)).startsWith('url("data:image/svg+xml')).toBe(true);
 });

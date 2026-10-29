@@ -2,7 +2,7 @@ import type { CanvasSource, Map as MapLibreMap } from "maplibre-gl";
 import { paintLabels, tileQuads } from "../core/labelQuads";
 import { tileWindow } from "../core/labelStore";
 import type { Grid } from "../core/types";
-import { beforeSlot, LABEL_OPACITY } from "./layers";
+import { beforeSlot, labelViewProps } from "./layers";
 
 /** Largest bilinear placement error of a quad's pixels, in pixels (spec 018). */
 const MAX_ERR = 0.05;
@@ -65,12 +65,13 @@ export class LabelOverlays {
   private add(key: string, o: Overlay): void {
     this.overlays.set(key, o);
     const before = beforeSlot(this.map, "label-");
+    const view = labelViewProps(this.map); // spec 016: Opacity and Show labels
     for (const p of o.parts) {
       this.map.addSource(p.id, { type: "canvas", canvas: p.canvas, coordinates: p.corners, animate: false });
       // bilinear between the corners, as tileQuads measured (maplibre-gl 6.16.0, experimental)
       this.map.getSource<CanvasSource>(p.id)!.setWarp("flat");
       this.map.addLayer({ id: p.id, type: "raster", source: p.id,
-        paint: { "raster-opacity": LABEL_OPACITY, "raster-fade-duration": 0, "raster-resampling": "nearest" } }, before);
+        paint: { ...view.paint, "raster-fade-duration": 0, "raster-resampling": "nearest" }, layout: view.layout }, before);
     }
   }
 

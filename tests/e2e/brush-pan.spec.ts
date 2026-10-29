@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { hoverFeatures, jumpTo, labels, message, moveTo, openApp, openRaster, rgbFixture, settled, stroke, toScreen, toucher, view } from "./helpers";
+import { hoverFeatures, jumpTo, labels, message, moveTo, openApp, openRaster, paintMode, rgbFixture, settled, stroke, toScreen, toucher, view } from "./helpers";
 
 // Spec 003 criterion 12: pan and zoom alongside the brush.
 
@@ -7,6 +7,7 @@ async function setup(page: Page) {
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await jumpTo(page, [15, 45], 7);
   await page.evaluate(() => {
     const g = (window as any).__space = [] as boolean[];

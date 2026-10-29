@@ -42,3 +42,4 @@ body { display: flex; }
 #map .maplibregl-canvas-container.brush-cursor .maplibregl-canvas { cursor: var(--brush-cursor) !important; }
 #map .maplibregl-canvas-container.locked-cursor .maplibregl-canvas { cursor: not-allowed !important; }
 #map .maplibregl-canvas-container.middle-pan .maplibregl-canvas { cursor: grabbing !important; }
+#panel input[type=range] { display: block; width: 100%; box-sizing: border-box; margin: 6px 0; }

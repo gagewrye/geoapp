@@ -3,12 +3,23 @@ import { expect, type Page } from "@playwright/test";
 import type { LabelClass } from "../../src/core/classes";
 import type { LabelStore } from "../../src/core/labelStore";
 import type { Grid } from "../../src/core/types";
-import { tiff } from "./helpers";
+import { writeFile } from "../unit/helpers/labelFiles";
+import { RGB_GRID, type LngLat, tiff } from "./helpers";
 
 // Spec 004 e2e helpers: label files as uploads, the store and list through the hook, downloads, gates.
 
 export const upload = (name: string, data: ArrayBuffer | string) =>
   ({ name, mimeType: typeof data === "string" ? "application/json" : "image/tiff", buffer: Buffer.from(typeof data === "string" ? data : new Uint8Array(data)) });
+
+/** The generated mask on rgbFixture's grid: 16 x 16 px blocks of 0..3, GDAL_NODATA 0, so classes 1, 2, 3 are values 1, 2, 3 (spec 014 tests). */
+export const maskValue = (c: number, r: number) => ((c >> 4) + (r >> 4)) % 4;
+export function maskFile() {
+  const v = new Uint8Array(1000 * 1000);
+  for (let r = 0; r < 1000; r++) for (let c = 0; c < 1000; c++) v[r * 1000 + c] = maskValue(c, r);
+  return upload("mask.tif", writeFile(RGB_GRID, 1, v, "0", { GTModelTypeGeoKey: 2, GTRasterTypeGeoKey: 1, GeographicTypeGeoKey: 4326 }));
+}
+/** Lon/lat of rgbFixture pixel position (col, row may be fractional). */
+export const at = (c: number, r: number): LngLat => [10 + c * 0.01, 50 - r * 0.01];
 
 export const arrayBuffer = (b: Buffer) => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
 

@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { footprint, footprintRing, pixelAt } from "../../src/core/pixel";
 import { MAX_LAT, type Grid } from "../../src/core/types";
-import { collectErrors, hoverFeatures, jumpTo, labels, message, openApp, openRaster, pixelAt as screenPixel, settled, tiff, tileKeysStored, toLngLat, toScreen, type LngLat, type Xy } from "./helpers";
+import { collectErrors, hoverFeatures, jumpTo, labels, message, openApp, openRaster, paintMode, pixelAt as screenPixel, settled, tiff, tileKeysStored, toLngLat, toScreen, type LngLat, type Xy } from "./helpers";
 
 // Tester: spec 003 at raster edges and partial tiles, and beyond MAX_LAT (labelled, not drawn).
 
@@ -20,6 +20,7 @@ test.describe("raster edges and partial tiles (tester)", () => {
     await openApp(page);
     await openRaster(page, edgeFixture());
     await expect(message(page)).toHaveText("Raster opened.");
+    await paintMode(page);
     await jumpTo(page, centre(EDGE, 0, 130), 12);
     for (const [col, want] of [[-2, footprint(EDGE, -2, 130, 7)], [-4, null]] as const) {
       const p = round(await toScreen(page, centre(EDGE, col, 130)));
@@ -48,6 +49,7 @@ test.describe("raster edges and partial tiles (tester)", () => {
     await openApp(page);
     await openRaster(page, edgeFixture());
     await expect(message(page)).toHaveText("Raster opened.");
+    await paintMode(page);
     await setSize(page, 127);
     await jumpTo(page, centre(EDGE, 270, 240), 8);
     const probe = round(await toScreen(page, centre(EDGE, 290, 250)));
@@ -83,6 +85,7 @@ test.describe("beyond MAX_LAT (tester)", () => {
     await openApp(page);
     await openRaster(page, poleFixture());
     await expect(message(page)).toHaveText("Raster opened.");
+    await paintMode(page);
     await setSize(page, 127);
     await jumpTo(page, [2.55, 85.0], 5);
     const p = round(await toScreen(page, [2.55, 85.0]));

@@ -1,6 +1,6 @@
 import type { CanvasSource, Map as MapLibreMap } from "maplibre-gl";
 import { hideWindow, paintPreview, type MaskPreview } from "../core/maskPreview";
-import { beforeSlot, LABEL_OPACITY } from "./layers";
+import { beforeSlot, labelViewProps } from "./layers";
 
 const ID = "mask"; // not "label-...": beforeSlot and the overlay tests treat those ids as tile overlays
 
@@ -37,8 +37,9 @@ export class MaskLayer {
     if (!this.added) {
       this.added = true;
       this.map.addSource(ID, { type: "canvas", canvas: this.canvas, coordinates: this.preview.corners as Corners, animate: false });
+      const view = labelViewProps(this.map); // spec 016: Opacity and Show labels
       this.map.addLayer({ id: ID, type: "raster", source: ID,
-        paint: { "raster-opacity": LABEL_OPACITY, "raster-fade-duration": 0, "raster-resampling": "nearest" } }, beforeSlot(this.map, "mask"));
+        paint: { ...view.paint, "raster-fade-duration": 0, "raster-resampling": "nearest" }, layout: view.layout }, beforeSlot(this.map, "mask"));
       return;
     }
     const s = this.map.getSource<CanvasSource>(ID);

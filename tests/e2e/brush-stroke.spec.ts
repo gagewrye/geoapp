@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { jumpTo, labels, message, moveTo, openApp, openRaster, rawPointer, rgbFixture, settled, toScreen, view, type Xy } from "./helpers";
+import { jumpTo, labels, message, moveTo, openApp, openRaster, paintMode, rawPointer, rgbFixture, settled, toScreen, view, type Xy } from "./helpers";
 
 // Spec 003 criterion 11: how a stroke ends, and pen input.
 
@@ -7,6 +7,7 @@ async function setup(page: Page) {
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await jumpTo(page, [15, 45], 9);
   return toScreen(page, [15.005, 45.005]);
 }

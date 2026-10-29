@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { jumpTo, labels, message, moveTo, openRaster, rgbFixture, tiff, toScreen } from "./helpers";
+import { jumpTo, labels, message, moveTo, openRaster, paintMode, rgbFixture, tiff, toScreen } from "./helpers";
 
 // Helpers for brush-handler-matrix.tester.spec.ts: MapLibre handler flags and the gestures they gate.
 
@@ -56,9 +56,11 @@ export const PAINT = "0001", PAN = "1111";
 export const NONE: Gestures = { dblclick: false, boxZoom: false, rotate: false };
 export const ALL: Gestures = { dblclick: true, boxZoom: true, rotate: true };
 
+/** Opens rgbFixture and selects Paint (an open selects Pan: spec 016). */
 export async function openRgb(page: Page): Promise<void> {
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await jumpTo(page, CENTRE, 7);
 }
 /** A second raster over the same place, so the view stays on imagery. */

@@ -2,9 +2,15 @@ import { applyAffine, fromLonLat, invertAffine, normalizeLon, projString, toLonL
 import type { Window } from "./grid";
 import type { Grid } from "./types";
 
-/** Brush sides in raster pixels; odd, so the square centres on the pointer's pixel. */
-export const BRUSH_SIZES = [1, 3, 7, 15, 31, 63, 127] as const;
+/** Brush sides in raster pixels (spec 017); odd only, so the square centres on the pointer's pixel. */
+export const BRUSH_MIN = 1, BRUSH_MAX = 127, BRUSH_STEP = 2;
 export const DEFAULT_BRUSH = 7;
+
+/** The next brush side up (2s + 1) or down (2·floor((s - 1) / 4) + 1), within BRUSH_MIN..BRUSH_MAX; odd from odd. */
+// From 7 these give spec 003's old fixed sizes 1, 3, 7, 15, 31, 63, 127 exactly.
+export function stepBrush(side: number, dir: 1 | -1): number {
+  return dir > 0 ? Math.min(BRUSH_MAX, 2 * side + 1) : Math.max(BRUSH_MIN, 2 * Math.floor((side - 1) / 4) + 1);
+}
 
 /** [col, row] of the pixel containing a lon/lat (floor); every world copy gives the same pixel; may be off the raster. */
 export function pixelAt(grid: Grid, lon: number, lat: number): [number, number] {

@@ -1,6 +1,6 @@
 import { expect, test, type Page, type Request } from "@playwright/test";
 import {
-  BACKGROUND, hideBasemap, jumpTo, logRequests, message, openApp, openRaster, pixelAt, rgbFixture, stroke, toLngLat, toScreen, type LngLat, type Xy,
+  BACKGROUND, hideBasemap, jumpTo, logRequests, message, openApp, openRaster, paintMode, pixelAt, rgbFixture, stroke, toLngLat, toScreen, type LngLat, type Xy,
 } from "./helpers";
 
 // Spec 012: the bundled Natural Earth basemap, always shown as the bottom map layer.
@@ -75,6 +75,7 @@ test("order: background, basemap, then imagery and labels; the opaque preview hi
   expect((await ids(page)).slice(0, 2)).toEqual(["background", "basemap"]);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await jumpTo(page, [15, 45], 9);
   const a = await toScreen(page, [15.005, 45.005]);
   await stroke(page, [a, { x: a.x + 40, y: a.y }]);
@@ -121,6 +122,7 @@ test("not hideable: no control names it, and it stays visible, opaque and second
   page.on("dialog", (d) => void d.accept());
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await jumpTo(page, [15, 45], 9);
   const a = await toScreen(page, [15.005, 45.005]);
   await stroke(page, [a, { x: a.x + 40, y: a.y }]);
@@ -128,6 +130,7 @@ test("not hideable: no control names it, and it stays visible, opaque and second
   await page.click("#mode-paint");
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   const state = await page.evaluate(() => {
     const { map } = (window as any).__geoapp;
     return { vis: map.getLayoutProperty("basemap", "visibility"), opacity: map.getPaintProperty("basemap", "raster-opacity") };

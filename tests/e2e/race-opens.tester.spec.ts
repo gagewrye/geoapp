@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { collectErrors, jumpTo, labels, message, openApp, openRaster, rgbFixture, selectClass, stroke, toScreen } from "./helpers";
+import { collectErrors, jumpTo, labels, message, openApp, openRaster, paintMode, rgbFixture, selectClass, stroke, toScreen } from "./helpers";
 import { fileGate, fileWaiting, holdFile, info, openRgb, otherFixture, paintPair, releaseFiles } from "./raceCombos";
 
 // Tester pass 3 (F9-F11): overlapping raster opens with labels, with cancel paths.
@@ -14,6 +14,7 @@ test.describe("overlapping opens with labels (tester)", () => {
     await expect.poll(() => fileWaiting(page)).toBeGreaterThan(0);
     await openRaster(page, otherFixture());
     await expect(message(page)).toHaveText("Raster opened.");
+    await paintMode(page);
     await jumpTo(page, [34, 43], 6);
     const a = await toScreen(page, [31.005, 43.005]), b = await toScreen(page, [36.005, 43.005]);
     await selectClass(page, 0);
@@ -54,6 +55,7 @@ test.describe("overlapping opens with labels (tester)", () => {
     await expect.poll(() => asked).toBe(1);
     await releaseFiles(page);
     await expect(message(page)).toHaveText("Raster opened.");
+    await paintMode(page);
     await expect(info(page)).toHaveText(/^slow\.tif: 1000 x 1000/);
     expect(await page.evaluate(() => (window as any).__geoapp.map.getSource("preview")?.coordinates[0][0] as number)).toBeCloseTo(10, 6);
     expect((await labels(page)).size).toBe(200);
@@ -83,6 +85,7 @@ test.describe("overlapping opens with labels (tester)", () => {
     }, heldA);
     await expect(info(page)).toHaveText(/^other\.tif: 800 x 600/);
     await expect(message(page)).toHaveText("Raster opened.");
+    await paintMode(page);
     await releaseFiles(page);
     await page.waitForTimeout(800);
     expect(asked).toBe(1);
@@ -90,6 +93,7 @@ test.describe("overlapping opens with labels (tester)", () => {
     expect(await page.evaluate(() => (window as any).__geoapp.imagery().meta.width)).toBe(800);
     expect((await labels(page)).size).toBe(0);
     await expect(message(page)).toHaveText("Raster opened.");
+    await paintMode(page);
     expect(errors).toEqual([]);
   });
 });

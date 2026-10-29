@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { applyAffine, fromLonLat, toLonLat } from "../../src/core/crs";
 import { footprint, footprintRing } from "../../src/core/pixel";
 import type { Affine, Grid } from "../../src/core/types";
-import { BACKGROUND, clickAt, jumpTo, message, openApp, openRaster, settled, tiff, toScreen, type LngLat } from "./helpers";
+import { BACKGROUND, clickAt, jumpTo, message, openApp, openRaster, paintMode, settled, tiff, toScreen, type LngLat } from "./helpers";
 
 // Spec 018 criterion 3: after a dab, the colour covers exactly the pixels the hover outline marks.
 // Positions and sizes are fixed; at least 10 per raster are where main's shared overlay grid put a painted
@@ -74,6 +74,7 @@ for (const [name, grid] of RASTERS) {
     await openApp(page);
     await openRaster(page, tiff("align.tif", SIZE, SIZE, 1, () => 7, { epsg: grid.epsg, gt: grid.gt }));
     await expect(message(page)).toHaveText("Raster opened.");
+    await paintMode(page); // opening selects Pan (spec 016)
     // basemap and imagery hidden, so unpainted space is the background colour
     await page.evaluate(() => { const { map } = (window as any).__geoapp; for (const id of ["basemap", "preview"]) map.setLayoutProperty(id, "visibility", "none"); });
     const colour: string = await page.evaluate(() => (window as any).__geoapp.labels.classes[0].colour);
@@ -114,6 +115,7 @@ for (const [name, grid] of RASTERS.slice(0, 2)) {
     await openApp(page);
     await openRaster(page, tiff("layers.tif", SIZE, SIZE, 1, () => 7, { epsg: grid.epsg, gt: grid.gt }));
     await expect(message(page)).toHaveText("Raster opened.");
+    await paintMode(page); // opening selects Pan (spec 016); the hover shows only in Paint
     // fill the four tiles through the hook, then recolour, which redraws every stored tile
     await page.evaluate(() => {
       const { store } = (window as any).__geoapp.labels;

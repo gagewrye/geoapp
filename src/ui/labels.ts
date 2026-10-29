@@ -2,13 +2,14 @@ import type { Map as MapLibreMap } from "maplibre-gl";
 import { MAX_CLASSES, checkName, initialClasses, nextClass, type LabelClass } from "../core/classes";
 import type { Window } from "../core/grid";
 import { emptyStore, keepMasks, tileKeys, tileWindow, type LabelStore } from "../core/labelStore";
-import { BRUSH_SIZES, DEFAULT_BRUSH } from "../core/pixel";
 import { baseTile, type MaskBase } from "../io/maskBase";
 import { PaintQueue } from "../io/paintQueue";
 import type { RasterSource } from "../io/source";
 import { createBrush, type BrushMode } from "../map/brush";
+import { initBrushSize } from "./brushSize";
 import { markSelected, renderClasses } from "./classList";
 import { labelDisplay } from "./labelDisplay";
+import { initLabelView } from "./labelView";
 import { MESSAGES, readErrorMessage } from "./messages";
 import { initUndo } from "./undo";
 
@@ -30,10 +31,9 @@ export const inTextField = (el: Element | null) => el instanceof HTMLTextAreaEle
 
 /** Brush labels on local imagery (spec 003): panel, classes, shortcuts, store, paint queue and overlays. */
 export function initLabels({ map, say, onBusy, onChange, panning }: Deps) {
-  const panel = $("brush-panel"), list = $("classes"), add = $<HTMLButtonElement>("class-add"), sizeText = $("brush-size");
+  const panel = $("brush-panel"), list = $("classes"), add = $<HTMLButtonElement>("class-add");
   const classes: LabelClass[] = initialClasses();
   let selected = 0;
-  let size = BRUSH_SIZES.indexOf(DEFAULT_BRUSH);
   let open = false;
   let locked = false; // while seeding or exporting labels (spec 004): no painting and no class edits, so no list or tile changes under them
   let store: LabelStore = emptyStore(0, 0);
@@ -51,28 +51,26 @@ export function initLabels({ map, say, onBusy, onChange, panning }: Deps) {
     undone: (keys) => {
       keepMasks(store, queue!.masks, null);
       redraw(keys);
-      onChange(); // Seed mode, Import, Seed and Export follow the store (spec 004)
+      onChange(); // Import and Export follow the store (spec 004)
     },
   });
 
   const brush = createBrush(map, {
-    side: () => BRUSH_SIZES[size]!,
+    side: () => size.side(),
     colour: () => classes[selected]!.colour,
     cells: (ws, erase) => { if (!locked) for (const w of ws) queue?.push({ w, value: selected + 1, erase, stroke: undo.current() ?? undefined }); },
     onStroke: undo.stroke,
     panning,
+    refused: () => say(MESSAGES.labelsHidden),
   });
+  const view = initLabelView(map, (visible) => brush.setHidden(!visible));
 
   const setMode = (m: BrushMode) => {
     brush.setMode(m);
     $("mode-paint").setAttribute("aria-pressed", String(m === "paint"));
     $("mode-pan").setAttribute("aria-pressed", String(m === "pan"));
   };
-  const step = (d: number) => {
-    size = Math.max(0, Math.min(BRUSH_SIZES.length - 1, size + d));
-    sizeText.textContent = `Brush: ${BRUSH_SIZES[size]} px`;
-    brush.refresh();
-  };
+  const size = initBrushSize(() => brush.refresh());
   const select = (i: number) => {
     selected = i;
     markSelected(list, i);
@@ -101,8 +99,6 @@ export function initLabels({ map, say, onBusy, onChange, panning }: Deps) {
 
   $("mode-paint").addEventListener("click", () => setMode("paint"));
   $("mode-pan").addEventListener("click", () => setMode("pan"));
-  $("brush-smaller").addEventListener("click", () => step(-1));
-  $("brush-larger").addEventListener("click", () => step(1));
   add.addEventListener("click", () => {
     if (locked || classes.length >= MAX_CLASSES) return;
     classes.push(nextClass(classes));
@@ -122,8 +118,8 @@ export function initLabels({ map, say, onBusy, onChange, panning }: Deps) {
       return;
     }
     if (inTextField(document.activeElement)) return;
-    if (e.key === "[") step(-1);
-    else if (e.key === "]") step(1);
+    if (e.key === "[") size.step(-1);
+    else if (e.key === "]") size.step(1);
     else if (/^[1-9]$/.test(e.key) && Number(e.key) <= classes.length) select(Number(e.key) - 1);
   });
   window.addEventListener("keyup", (e) => {
@@ -142,7 +138,7 @@ export function initLabels({ map, say, onBusy, onChange, panning }: Deps) {
   }
 
   return {
-    /** Start labelling newly opened local imagery: an empty store, no masks, Paint mode. */
+    /** Start labelling newly opened local imagery: an empty store, no masks, labels shown, Pan mode (spec 016). */
     open(source: RasterSource): void {
       queue?.clear();
       undo.clear(); // after the queue, which hands its dropped strokes to the history
@@ -158,11 +154,12 @@ export function initLabels({ map, say, onBusy, onChange, panning }: Deps) {
         busy: () => { onBusy(); undo.sync(); },
         error: (e) => say(readErrorMessage(e)),
       }, undo.history, () => base);
+      view.reset();
       display.open(grid);
       open = true;
       panel.hidden = false;
       brush.setImagery(grid);
-      setMode("paint");
+      setMode("pan");
       onChange();
       undo.sync();
     },

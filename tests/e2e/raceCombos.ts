@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { jumpTo, message, openRaster, rgbFixture, selectClass, stroke, tiff, toScreen } from "./helpers";
+import { jumpTo, message, openRaster, paintMode, rgbFixture, selectClass, stroke, tiff, toScreen } from "./helpers";
 
 // Helpers for race-opens.tester.spec.ts: overlapping raster opens, held at the file read.
 
@@ -51,4 +51,5 @@ export const otherFixture = () => tiff("other.tif", 800, 600, 3, (b, c) => (b ==
 export async function openRgb(page: Page) {
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
 }

@@ -1,10 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 import { classFile } from "../unit/helpers/labelFiles";
 import { MESSAGES } from "../../src/ui/messages";
-import { collectErrors, jumpTo, labels, message, openApp, openRaster, paintTwoClasses, rgbFixture, stroke, toScreen } from "./helpers";
+import { collectErrors, jumpTo, labels, message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture, stroke, toScreen } from "./helpers";
 import { classList, importFile, openFileGate, pauseLabelFile, storeTiles, upload } from "./seeding";
 
-// Tester checks of spec 004's controls: Seed mode after erasing everything, the replaced-raster
+// Tester checks of spec 004's controls: an import after erasing everything, the replaced-raster
 // rule for an import that fails, and a run that survives a cancelled "Discard labels?".
 
 const seeded = /^Seeded \d+ pixels in \d+ classes\.$/;
@@ -12,20 +12,17 @@ async function setup(page: Page) {
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
 }
 
-test("erasing every label disables Seed mode again and resets it to Merge", async ({ page }) => {
+test("after erasing every label the next import replaces with no confirm", async ({ page }) => {
   await setup(page);
   await jumpTo(page, [15, 45], 7);
   const a = await toScreen(page, [15.005, 45.005]);
   await stroke(page, [a, { x: a.x + 20, y: a.y }]);
-  await expect(page.locator("#seed-mode")).toBeEnabled();
-  await page.selectOption("#seed-mode", "replace");
   await page.click("#brush-larger"); await page.click("#brush-larger"); await page.click("#brush-larger");
   await stroke(page, [{ x: a.x - 10, y: a.y }, { x: a.x + 30, y: a.y }], "right");
   expect((await labels(page)).size).toBe(0);
-  await expect(page.locator("#seed-mode")).toBeDisabled();
-  await expect(page.locator("#seed-mode")).toHaveValue("merge");
   // and the next import replaces with no confirm
   page.on("dialog", (d) => { throw new Error(`unexpected dialog ${d.message()}`); });
   await importFile(page, upload("classes.tif", classFile("255")));

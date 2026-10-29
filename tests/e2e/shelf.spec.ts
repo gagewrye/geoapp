@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
 import { aefShapedFile, classFile } from "../unit/helpers/labelFiles";
-import { jumpTo, logRequests, message, openApp, openRaster, rgbFixture, settled, stroke, tiff, toScreen } from "./helpers";
+import { jumpTo, logRequests, message, openApp, openRaster, paintMode, rgbFixture, settled, stroke, tiff, toScreen } from "./helpers";
 import { download, importFile, noSavePicker, upload } from "./seeding";
 
 // Spec 013: AlphaEarth and training are shelved; the site only labels local imagery.
@@ -16,6 +16,7 @@ const sourceIds = (page: Page): Promise<string[]> => page.evaluate(() => Object.
 async function openAndPaint(page: Page) {
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await jumpTo(page, [15, 45], 9);
   const a = await toScreen(page, [15.005, 45.005]);
   await stroke(page, [a, { x: a.x + 40, y: a.y }]);
@@ -67,6 +68,7 @@ test("every request from load through open, paint, undo, import, export and anot
   await openRaster(page, tiff("other.tif", 300, 300, 3, (b, c, r) => (c + r + b) % 200, { epsg: 4326, gt: [12, 0.01, 0, 47, 0, -0.01] }));
   await expect(page.locator("#raster-info")).toHaveText(/^other\.tif/);
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await page.waitForTimeout(300);
   const app = new URL(baseURL!);
   const urls = log.map((r) => r.url()).filter((u) => !u.startsWith("data:"));
@@ -92,6 +94,7 @@ test("an AlphaEarth-shaped file opens as 64-band imagery, and Import labels refu
   const file = upload("aef-shaped.tif", aefShapedFile());
   await openRaster(page, file);
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await expect(page.locator("#raster-info")).toContainText("64 band(s)");
   await expect(page.locator("#brush-panel")).toBeVisible();
   await importFile(page, file);

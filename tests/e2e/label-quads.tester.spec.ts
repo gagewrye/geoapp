@@ -5,7 +5,7 @@ import { footprint, footprintRing } from "../../src/core/pixel";
 import type { Grid } from "../../src/core/types";
 import { writeFile } from "../unit/helpers/labelFiles";
 import {
-  BACKGROUND, clickAt, collectErrors, jumpTo, message, openApp, openRaster, pixelAt, RGB_GRID, rgbFixture, selectClass, settled, tiff, toScreen, type LngLat,
+  BACKGROUND, clickAt, collectErrors, jumpTo, message, openApp, openRaster, paintMode, pixelAt, RGB_GRID, rgbFixture, selectClass, settled, tiff, toScreen, type LngLat,
 } from "./helpers";
 import { importFile, upload } from "./seeding";
 
@@ -69,6 +69,7 @@ async function openAt(page: Page, grid: Grid, c: number, r: number) {
   await openApp(page);
   await openRaster(page, tiff("quads.tif", grid.width, grid.height, 1, () => 7, { epsg: grid.epsg, gt: grid.gt }));
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page); // opening selects Pan (spec 016)
   await hideAll(page);
   const lonLat = (x: number, y: number) => toLonLat(grid.epsg, ...applyAffine(grid.gt, x, y)) as LngLat;
   await jumpTo(page, lonLat(c, r), 8);
@@ -116,6 +117,7 @@ test("a 128-quad tile: one layer per quad; size-7 dabs on the raster's top edge,
   page.on("dialog", (d) => void d.accept()); // discard the labels
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page); // opening selects Pan (spec 016)
   await expect.poll(() => labelLayers(page)).toEqual([]);
   expect(await labelSources(page)).toEqual([]);
   expect(errors).toEqual([]);
