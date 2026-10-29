@@ -1,0 +1,9 @@
+# 0016: Label overlays of one raster share one Mercator pixel grid
+
+**Status:** Accepted (Gage, 2026-10-27, with spec 011); kept on 2026-10-28 after implementation, with the residual hairlines below accepted ("keep the grid as is with no gpu layer for now"). Amends ADR 0010 ("a canvas source at tile resolution").
+
+**Context:** ADR 0010 gives each label tile its own canvas, sampled on a Mercator grid fitted to that tile's bounding box. On grids rotated against Mercator (UTM off its central meridian) neighbouring grids are offset by fractions of a pixel, so seams get gaps and double-opacity strips (spec 011). Options: (a) one grid for the raster, pixel edges at multiples of a pitch from Mercator (0, 0), so each overlay pixel belongs to the one tile holding its centre; (b) dilate each overlay by a pixel, which closes gaps but leaves darker overlaps at `raster-opacity` 0.6; (c) one overlay for the whole raster, which breaks ADR 0010's per-tile redraw and memory bounds.
+
+**Decision:** (a). Pitch = the longest Mercator side of the raster's four corner tile windows / 256, computed once per raster, so canvases stay at most about 258 px a side.
+
+**Consequences:** No dependency. Memory per overlay stays about 256 KiB of canvas and index, with one exception: on a raster crossing ±`MAX_LAT`, a middle tile row clipped at the limit is far taller in Mercator than any corner tile, and its overlays reach about 910 px; display is still correct. Where tiles are smaller in Mercator than the corner ones, overlays are coarser than raster pixels, as before. Hairlines remain: maplibre-gl 6.16.0 (`image_source.ts`, `_round()`) rounds each source's corners to its own tile units independently. The measured result was 10 of 1008 seam samples differing, against 382 before. A custom WebGL layer could remove the hairlines later, under its own ADR.

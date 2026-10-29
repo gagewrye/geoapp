@@ -1,5 +1,5 @@
 # 0010: Painted labels as sparse in-memory tiles, with per-tile overlays
-- **Status:** Accepted (Gage, 2026-10-26); memory amendment approved 2026-10-27 (Gage); seeding clause approved 2026-10-28 (Gage). Partly superseded by ADR 0013: labels save and load as a label GeoTIFF (spec 004).
+- **Status:** Accepted (Gage, 2026-10-26); memory amendment approved 2026-10-27 (Gage); seeding clause approved 2026-10-28 (Gage). Partly superseded by ADR 0013: labels save and load as a label GeoTIFF (spec 004). Amended by ADR 0015 (undo adds up to 32 MiB) and ADR 0016 (overlays share one Mercator grid).
 - **Context:** Labels live on the source raster's grid (spec 003); a dense Uint8 raster of 20k x 20k is 400 MB, and CLAUDE.md forbids full rasters in memory. Options: (a) capped, sparse in-memory 256x256 Uint8 tiles; (b) OPFS tiles, unbounded but async and more code.
 - One overlay at preview resolution (at most 1024 px) can skip a 1 px dab. maplibre-gl 6.16.0 `src/source/canvas_source.ts`: with `animate: false`, a canvas re-uploads only on resize or while playing (`prepare`); `pause()` runs `prepare` once if playing.
 - **Decision:** (a), `MAX_LABEL_TILES` = 256 (16 MiB). Each labelled tile gets a canvas source at tile resolution on an axis-aligned Mercator grid (the safe case, ADR 0002); `map/` calls `play()` then `pause()` after each redraw.
