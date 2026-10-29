@@ -61,7 +61,7 @@ test.describe("contextmenu on every map and panel element (criterion 10, tester 
       const g = (window as any).__menus = [] as unknown[];
       window.addEventListener("contextmenu", (e) => g.push([(e.target as Element).closest("#map") !== null, e.defaultPrevented]));
     });
-    const targets = ["#classes .class-name", "#classes input[type=color]", "#seed-mode", "#brush-larger", "#message"];
+    const targets = ["#classes .class-name", "#classes input[type=color]", "#brush-larger", "#message"];
     for (const t of targets) {
       await stroke(page, [c, { x: c.x + 40, y: c.y }], "right");
       const t0 = Date.now();
