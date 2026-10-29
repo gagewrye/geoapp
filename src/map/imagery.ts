@@ -8,9 +8,11 @@ type Corners = [[number, number], [number, number], [number, number], [number, n
 const PREFIX = "imagery-";
 
 /** Imagery tiles as canvas sources placed by ADR 0019 quads, the IMAGERY_TILES most recently used kept (spec 020). */
-// Map order is recency: use() and draw() move a tile to the end, so eviction takes the first.
+// Map order is recency: use() and draw() move a tile to the end, so eviction takes the first. The cap counts
+// sources, not tiles: a tile far from the equator can need several quads, and spec 020 caps imagery- sources too.
 export class ImageryLayer implements TileSink {
   private readonly tiles = new Map<string, string[]>();
+  private sources = 0;
 
   constructor(private readonly map: MapLibreMap) {}
 
@@ -27,6 +29,11 @@ export class ImageryLayer implements TileSink {
   draw(key: string, level: Level, tile: Window, rgba: Uint8ClampedArray<ArrayBuffer>): void {
     this.remove(key);
     const quads = imageryQuads(level, tile);
+    // evict first, so the count never passes the cap even while this tile is added
+    for (const old of [...this.tiles.keys()]) {
+      if (this.sources + quads.length <= IMAGERY_TILES) break;
+      this.remove(old);
+    }
     const img = new ImageData(rgba, tile.width, tile.height);
     const before = this.before(level.s);
     const ids = quads.map((q, i) => {
@@ -42,10 +49,7 @@ export class ImageryLayer implements TileSink {
       return id;
     });
     this.tiles.set(key, ids);
-    for (const old of this.tiles.keys()) {
-      if (this.tiles.size <= IMAGERY_TILES) break;
-      this.remove(old);
-    }
+    this.sources += ids.length;
   }
 
   /** Remove every tile (another raster opened). */
@@ -63,6 +67,7 @@ export class ImageryLayer implements TileSink {
     const ids = this.tiles.get(key);
     if (!ids) return;
     this.tiles.delete(key);
+    this.sources -= ids.length;
     for (const id of ids) {
       if (this.map.getLayer(id)) this.map.removeLayer(id);
       if (this.map.getSource(id)) this.map.removeSource(id);

@@ -47,6 +47,21 @@ describe("ImageryLayer", () => {
     expect([...sources].filter((id) => id.startsWith("imagery-"))).toHaveLength(IMAGERY_TILES);
   });
 
+  it("counts a tile of several quads as that many sources against the cap", () => {
+    const { map, sources } = fakeMap();
+    const layer = new ImageryLayer(map);
+    // 0.01 degree pixels from 85N: a 256 px tile needs several quads (ADR 0019)
+    const steep: Level = { s: 1, overview: null, grid: { width: 256, height: 2500, epsg: 4326, gt: [10, 0.01, 0, 85, 0, -0.01] } };
+    const peak = { n: 0 };
+    const add = map.addSource.bind(map);
+    map.addSource = ((id: string, s: never) => { add(id, s); peak.n = Math.max(peak.n, sources.size); }) as typeof map.addSource;
+    layer.draw("steep", steep, { x0: 0, y0: 0, width: 256, height: 256 }, new Uint8ClampedArray(256 * 256 * 4));
+    expect(sources.size).toBeGreaterThan(1);
+    for (let i = 0; i < IMAGERY_TILES - 1; i++) layer.draw(`1-${i * 8},0`, level(1), tile(i), rgba);
+    expect(peak.n).toBe(IMAGERY_TILES);
+    expect(layer.use("steep")).toBe(false);
+  });
+
   it("puts tiles between the preview and the mask, finer above coarser, and clear() removes them all", () => {
     const { map, layers, sources } = fakeMap();
     const layer = new ImageryLayer(map);
