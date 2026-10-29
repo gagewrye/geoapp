@@ -184,8 +184,6 @@ export function initLabels({ map, say, onBusy, onChange, panning }: Deps) {
       onChange();
     },
     lock,
-    /** The labels and class list now, for seeding to build on. */
-    current: () => ({ store, classes, base }),
     /** The mask base, if one is loaded. */
     base: () => base,
     /** The effective tile at key (stored, else the mask's); null when neither exists. Reads the mask file for an unstored key. */
