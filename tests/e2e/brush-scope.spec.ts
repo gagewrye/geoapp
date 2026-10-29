@@ -41,7 +41,7 @@ test.describe("discard (criterion 16)", () => {
     await expect(page.locator("#raster-info")).toHaveText(/^rgb4326\.tif: 1000 x 1000/);
     expect(await page.evaluate(() => (window as any).__geoapp.imagery().meta.width)).toBe(1000);
     expect(await labels(page)).toEqual(before);
-    await expect.poll(() => page.evaluate(() => (window as any).__geoapp.map.getLayer(`label-${[...(window as any).__geoapp.labels.store.tiles.keys()][0]}`) !== undefined)).toBe(true);
+    await expect.poll(() => page.evaluate(() => { const key = [...(window as any).__geoapp.labels.store.tiles.keys()][0]; return (window as any).__geoapp.map.getStyle().layers.some((l: any) => l.id === `label-${key}` || l.id.startsWith(`label-${key}-`)); })).toBe(true);
 
     page.once("dialog", (d) => { dialogs.push(d.message()); void d.accept(); });
     await openRaster(page, other());

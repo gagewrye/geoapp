@@ -13,7 +13,8 @@ export function showHover(map: MapLibreMap, ring: [number, number][] | null, col
   const source = map.getSource<GeoJSONSource>(HOVER);
   if (!source) {
     if (!ring) return;
-    map.addSource(HOVER, { type: "geojson", data });
+    // overzoomed tiles must neither round nor simplify the ring (spec 018)
+    map.addSource(HOVER, { type: "geojson", data, maxzoom: 24, tolerance: 0 });
     const before = beforeSlot(map, "brush-hover");
     map.addLayer({ id: FILL, type: "fill", source: HOVER, paint: { "fill-color": colour, "fill-opacity": 0.4 } }, before);
     map.addLayer({ id: LINE, type: "line", source: HOVER, paint: { "line-color": colour, "line-width": 1.5 } }, before);

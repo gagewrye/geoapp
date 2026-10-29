@@ -15,18 +15,22 @@ async function setup(page: Page) {
 /** Each stored tile has an overlay whose opaque colours are exactly its classes' colours; no other overlay exists. */
 const overlaysMatch = (page: Page) => page.evaluate(() => {
   const { map, labels: { store, classes } } = (window as any).__geoapp;
-  const ids = map.getStyle().layers.map((l: any) => l.id as string).filter((id: string) => id.startsWith("label-")).sort();
-  const keys = [...store.tiles.keys()].map((k) => `label-${k}`).sort();
-  if (JSON.stringify(ids) !== JSON.stringify(keys)) return `layers ${ids} vs tiles ${keys}`;
+  // a tile is one or more quads, label-${key} or label-${key}-${i} (spec 018)
+  const ids: string[] = map.getStyle().layers.map((l: any) => l.id as string).filter((id: string) => id.startsWith("label-"));
+  const keyOf = (id: string) => id.split("-")[1];
+  const drawn = [...new Set(ids.map(keyOf))].sort(), keys = [...store.tiles.keys()].sort();
+  if (JSON.stringify(drawn) !== JSON.stringify(keys)) return `layers ${drawn} vs tiles ${keys}`;
   for (const [key, tile] of store.tiles as Map<string, Uint8Array>) {
     const want = new Set([...new Set(tile)].filter((v) => v).map((v) => classes[v - 1].colour.toLowerCase()));
-    const canvas: HTMLCanvasElement = map.getSource(`label-${key}`).canvas;
-    const d = canvas.getContext("2d")!.getImageData(0, 0, canvas.width, canvas.height).data;
     const got = new Set<string>();
-    for (let i = 0; i < d.length; i += 4) {
-      if (d[i + 3] === 0) continue;
-      if (d[i + 3] !== 255) return `alpha ${d[i + 3]}`;
-      got.add(`#${[d[i]!, d[i + 1]!, d[i + 2]!].map((v) => v.toString(16).padStart(2, "0")).join("")}`);
+    for (const id of ids.filter((i) => keyOf(i) === key)) {
+      const canvas: HTMLCanvasElement = map.getSource(id).canvas;
+      const d = canvas.getContext("2d")!.getImageData(0, 0, canvas.width, canvas.height).data;
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] === 0) continue;
+        if (d[i + 3] !== 255) return `alpha ${d[i + 3]}`;
+        got.add(`#${[d[i]!, d[i + 1]!, d[i + 2]!].map((v) => v.toString(16).padStart(2, "0")).join("")}`);
+      }
     }
     if (JSON.stringify([...got].sort()) !== JSON.stringify([...want].sort())) return `tile ${key}: ${[...got]} vs ${[...want]}`;
   }

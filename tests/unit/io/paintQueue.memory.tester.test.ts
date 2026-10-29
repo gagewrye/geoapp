@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { footprint, strokeCells } from "../../../src/core/pixel";
 import { MAX_LABEL_TILES, emptyStore, tileKeys, type LabelStore } from "../../../src/core/labelStore";
-import { overlayGrid, overlayIndex } from "../../../src/core/overlay";
-import { fromLonLat } from "../../../src/core/crs";
-import { TILE_SIZE, type Grid } from "../../../src/core/types";
+import { TILE_SIZE } from "../../../src/core/types";
 import { tileWindows } from "../../../src/core/grid";
 import { PaintQueue } from "../../../src/io/paintQueue";
 import type { RasterSource } from "../../../src/io/source";
@@ -102,42 +100,5 @@ describe("paint reads stay tile by tile (CLAUDE.md, criterion 8, tester)", { tim
     let bytes = 0;
     for (const v of t.store.tiles.values()) bytes += v.byteLength;
     expect(bytes).toBeLessThanOrEqual(MAX_LABEL_TILES * 65536);
-  });
-});
-
-describe("overlay index memory (ADR 0010 as amended by ADR 0016, tester measurement)", () => {
-  // ADR 0016: a Uint16 index plus a validity bitmask per cell (2.125 B on top of the 4 B canvas), with no
-  // hard ceiling on overlay size. Measure it structurally.
-  const [ux, uy] = fromLonLat(32633, 14, 47);
-  const grids: Grid[] = [
-    { epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01], width: 1000, height: 1000 },
-    { epsg: 32633, gt: [ux, 30, 0, uy, 0, -30], width: 600, height: 520 },
-    { epsg: 4326, gt: [0, 0.017, 0, 90, 0, -0.017], width: 300, height: 600 }, // up to the pole
-    { epsg: 3857, gt: [1e6, 10, 0, 5e6, 0, -10], width: 512, height: 512 }, // square in Mercator
-  ];
-  it("each tile's index is a width*height Uint16Array and its validity a ceil(width*height / 8) bitmask", () => {
-    for (const g of grids) {
-      const og = overlayGrid(g);
-      for (const w of tileWindows(g.width, g.height)) {
-        const o = overlayIndex(w, g, og);
-        expect(o.index).toBeInstanceOf(Uint16Array);
-        expect(o.index.length).toBe(o.width * o.height);
-        expect(o.valid.byteLength).toBe(Math.ceil((o.width * o.height) / 8));
-      }
-    }
-  });
-
-  it("a mid-latitude UTM tile's overlay stays near tile size (ADR 0016: typically 260-300 px a side)", () => {
-    const g = grids[1]!;
-    const o = overlayIndex({ x0: 0, y0: 0, width: 256, height: 256 }, g, overlayGrid(g));
-    expect(Math.max(o.width, o.height)).toBeLessThanOrEqual(300);
-    expect(Math.min(o.width, o.height)).toBeGreaterThanOrEqual(TILE_SIZE);
-  });
-
-  it("a tile wholly beyond MAX_LAT gets a one-row overlay that marks nothing valid", () => {
-    const g = grids[2]!; // rows 0..255 are 85.65N..90N, all beyond MAX_LAT
-    const o = overlayIndex({ x0: 0, y0: 0, width: 256, height: 256 }, g, overlayGrid(g));
-    expect(o.valid.every((b) => b === 0)).toBe(true); // nothing is drawn, as the spec says
-    expect(o.height).toBe(1);
   });
 });

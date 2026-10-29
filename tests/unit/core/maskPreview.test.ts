@@ -12,7 +12,7 @@ const mercY = (lat: number) => R * Math.log(Math.tan(Math.PI / 4 + (lat * Math.P
 const lonOf = (x: number) => (x / R) * (180 / Math.PI);
 const latOf = (y: number) => (Math.atan(Math.sinh(y / R)) * 180) / Math.PI;
 
-// spec 003's EPSG:32633 fixture grid (tests/unit/core/overlay.test.ts)
+// spec 003's EPSG:32633 fixture grid (tests/unit/core/labelQuads.test.ts)
 const gt: Affine = [613504.343 - 356.5 * 30, 30, 0, 5234037.466 + 300.5 * 30, 0, -30];
 const grid: Grid = { epsg: 32633, gt, width: 600, height: 520 };
 

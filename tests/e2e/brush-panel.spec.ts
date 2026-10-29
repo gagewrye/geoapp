@@ -107,11 +107,13 @@ test.describe("classes (criterion 14)", () => {
     const overlayPixel = () => page.evaluate(() => {
       const { map, labels } = (window as any).__geoapp;
       const key = [...labels.store.tiles.keys()][0];
-      const source = key === undefined ? undefined : map.getSource(`label-${key}`);
-      if (!source) return null; // overlays are added on the next animation frame
-      const canvas: HTMLCanvasElement = source.getCanvas();
-      const d = canvas.getContext("2d")!.getImageData(0, 0, canvas.width, canvas.height).data;
-      for (let i = 0; i < d.length; i += 4) if (d[i + 3]) return Array.from(d.subarray(i, i + 4));
+      // a tile is one or more quads, label-${key} or label-${key}-${i} (spec 018); added on the next animation frame
+      const ids = key === undefined ? [] : map.getStyle().layers.map((l: any) => l.id as string).filter((id: string) => id === `label-${key}` || id.startsWith(`label-${key}-`));
+      for (const id of ids) {
+        const canvas: HTMLCanvasElement = map.getSource(id).getCanvas();
+        const d = canvas.getContext("2d")!.getImageData(0, 0, canvas.width, canvas.height).data;
+        for (let i = 0; i < d.length; i += 4) if (d[i + 3]) return Array.from(d.subarray(i, i + 4));
+      }
       return null;
     });
     const colour = (await hookClasses(page))[0].colour as string;
@@ -119,7 +121,9 @@ test.describe("classes (criterion 14)", () => {
     await expect.poll(overlayPixel).toEqual([...rgb(colour), 255]);
     await page.locator("#classes .class-colour").first().fill("#12ab34");
     await expect.poll(overlayPixel).toEqual([0x12, 0xab, 0x34, 255]);
-    expect(await page.evaluate(() => (window as any).__geoapp.map.getLayer(`label-${[...(window as any).__geoapp.labels.store.tiles.keys()][0]}`).paint.get("raster-opacity"))).toBe(0.6);
+    const opacities: number[] = await page.evaluate(() => (window as any).__geoapp.map.getStyle().layers.filter((l: any) => l.id.startsWith("label-")).map((l: any) => l.paint["raster-opacity"]));
+    expect(opacities.length).toBeGreaterThan(0);
+    expect(new Set(opacities)).toEqual(new Set([0.6]));
     await page.mouse.move(c.x + 40, c.y + 20);
     await expect.poll(async () => (await hoverFeatures(page)).length).toBe(1);
     expect(await page.evaluate(() => (window as any).__geoapp.map.getPaintProperty("brush-hover-fill", "fill-color"))).toBe("#12ab34");
