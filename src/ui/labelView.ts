@@ -11,21 +11,26 @@ export function initLabelView(map: MapLibreMap, onVisible: (visible: boolean) =>
   const apply = () => {
     showText();
     applyLabelView(map, { opacity: Number(range.value) / 100, visible: show.checked });
-    onVisible(show.checked);
   };
+  // Only a visibility change reports, so dragging the slider while hidden doesn't select Pan on every event
+  const toggled = () => { apply(); onVisible(show.checked); };
   // Opacity isn't saved: a reload starts at the default even where the browser restores form values.
   // No layer exists yet, and new ones start from the same default.
   range.value = String(Math.round(DEFAULT_LABEL_OPACITY * 100));
   show.checked = true;
   showText();
   range.addEventListener("input", apply); // live while dragging
-  show.addEventListener("change", apply);
+  show.addEventListener("change", toggled);
 
   return {
+    /** Check Show labels if it isn't. */
+    show(): void {
+      if (!show.checked) { show.checked = true; toggled(); }
+    },
     /** A raster opened: labels show again; the opacity is kept for the page session. */
     reset(): void {
       show.checked = true;
-      apply();
+      toggled();
     },
   };
 }

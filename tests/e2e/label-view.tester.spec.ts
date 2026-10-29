@@ -1,9 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import { pixelAt as cellAt } from "../../src/core/pixel";
-import { MESSAGES } from "../../src/ui/messages";
 import { classFile } from "../unit/helpers/labelFiles";
 import { jumpTo, labels, message, openApp, openRaster, paintMode, RGB_GRID, rgbFixture, settled, stroke, toLngLat, toScreen, view, type Xy } from "./helpers";
-import { importFile, maskFile, openFileGate, pauseLabelFile, storeTiles, upload } from "./seeding";
+import { importFile, maskFile, storeTiles, upload } from "./seeding";
 
 // Tester edge cases for spec 016 (rules beyond the criteria) and spec 017's slider rules.
 
@@ -149,22 +148,4 @@ test("a size change mid-stroke applies to later cells only (spec 017)", async ({
   expect(got.has(`${ca},${ra + 4}`)).toBe(false); // 7 px at the start
   expect(got.has(`${cb},${rb + 7}`)).toBe(true); // 15 px at the end
   expect(got.has(`${cb},${rb + 8}`)).toBe(false);
-});
-
-test("hidden while locked by an import: a press says labels are hidden and paints nothing", async ({ page }) => {
-  await setup(page);
-  await paintMode(page);
-  await toggleShow(page);
-  await jumpTo(page, [15, 45], 9);
-  const a = await toScreen(page, [15.005, 45.005]);
-  await pauseLabelFile(page);
-  await importFile(page, upload("classes.tif", classFile("255")));
-  await expect.poll(() => page.evaluate(() => (window as any).__fileGate.reads)).toBeGreaterThan(0);
-  await expect(page.locator("#class-add")).toBeDisabled(); // locked
-  await message(page).evaluate((e) => { e.textContent = ""; });
-  await page.mouse.click(a.x, a.y);
-  await expect(message(page)).toHaveText(MESSAGES.labelsHidden);
-  expect((await storeTiles(page)).size).toBe(0);
-  await openFileGate(page);
-  await expect(message(page)).toHaveText(seeded);
 });

@@ -15,8 +15,6 @@ type Deps = {
   onStroke: (active: boolean) => void;
   /** A middle-button pan is in progress (spec 009): presses paint nothing. */
   panning: () => boolean;
-  /** A paint or erase press while labels are hidden (spec 016): nothing paints. */
-  refused: () => void;
 };
 type Stroke = { pointerId: number; erase: boolean; prev: [number, number] | null };
 
@@ -31,18 +29,16 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
   let space = false;
   let stroke: Stroke | null = null;
   let locked = false; // while seeding (spec 004): no strokes and no footprint; Paint mode's handlers stay
-  let hidden = false; // labels hidden (spec 016): blocked like locked, since an edit you can't see is easy to make by mistake
   let lastType = "mouse";
   let pointer: { x: number; y: number; target: EventTarget | null } | null = null; // last mouse or pen position
   const painting = () => grid !== null && mode === "paint" && !space;
 
   // The brush cursor (spec 010) is a class plus a variable, which style.css applies to the canvas over MapLibre's cursors.
-  // Locked or hidden, a left drag neither paints nor pans, so neither the brush nor MapLibre's grab would be true.
+  // Locked, a left drag neither paints nor pans, so neither the brush nor MapLibre's grab would be true.
   let cursor = "";
-  const blocked = () => locked || hidden;
   const syncCursor = () => {
-    container.classList.toggle("brush-cursor", painting() && !blocked());
-    container.classList.toggle("locked-cursor", painting() && blocked());
+    container.classList.toggle("brush-cursor", painting() && !locked);
+    container.classList.toggle("locked-cursor", painting() && locked);
     const c = brushCursor(deps.colour());
     if (c !== cursor) container.style.setProperty("--brush-cursor", cursor = c);
   };
@@ -75,7 +71,7 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
 
   // Hovering is synchronous and reads nothing: the ring covers the whole footprint, nodata included.
   const hover = () => {
-    const cell = pointer && painting() && !blocked() ? cellAt(pointer.x, pointer.y, pointer.target) : null;
+    const cell = pointer && painting() && !locked ? cellAt(pointer.x, pointer.y, pointer.target) : null;
     const w = cell && footprint(grid!, cell[0], cell[1], deps.side());
     showHover(map, w ? footprintRing(grid!, w) : null, deps.colour());
   };
@@ -105,7 +101,6 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
     lastType = e.pointerType;
     if (e.pointerType === "touch") { pointer = null; hover(); return; }
     if (!painting() || stroke || deps.panning() || (e.button !== 0 && e.button !== 2)) return;
-    if (hidden) { deps.refused(); return; }
     if (locked) return;
     stroke = { pointerId: e.pointerId, erase: e.button === 2, prev: null };
     deps.onStroke(true);
@@ -141,14 +136,13 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
   return {
     /** The local imagery's grid, or null when none is open (the brush is then inert). */
     setImagery(g: Grid | null): void { end(); grid = g; syncHandlers(); hover(); },
-    setMode(m: BrushMode): void { mode = m; syncHandlers(); hover(); },
+    /** Leaving Paint ends a stroke in progress (spec 016: hiding labels mid-stroke selects Pan). */
+    setMode(m: BrushMode): void { mode = m; if (m !== "paint") end(); syncHandlers(); hover(); },
     mode: () => mode,
     /** Space held acts as Pan. */
     setSpace(held: boolean): void { if (space !== held) { space = held; syncHandlers(); hover(); } },
     /** Locked, the brush neither paints nor shows its footprint; a stroke in progress ends. */
     setLocked(on: boolean): void { locked = on; if (on) end(); syncCursor(); hover(); },
-    /** Labels hidden: like locked, and a press calls refused. */
-    setHidden(on: boolean): void { hidden = on; if (on) end(); syncCursor(); hover(); },
     /** Redraw the footprint and cursor after a size or colour change. */
     refresh(): void { syncCursor(); hover(); },
     /** A stroke is in progress. */

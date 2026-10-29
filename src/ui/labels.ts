@@ -61,15 +61,15 @@ export function initLabels({ map, say, onBusy, onChange, panning }: Deps) {
     cells: (ws, erase) => { if (!locked) for (const w of ws) queue?.push({ w, value: selected + 1, erase, stroke: undo.current() ?? undefined }); },
     onStroke: undo.stroke,
     panning,
-    refused: () => say(MESSAGES.labelsHidden),
   });
-  const view = initLabelView(map, (visible) => brush.setHidden(!visible));
 
   const setMode = (m: BrushMode) => {
     brush.setMode(m);
     $("mode-paint").setAttribute("aria-pressed", String(m === "paint"));
     $("mode-pan").setAttribute("aria-pressed", String(m === "pan"));
   };
+  // Paint never applies to labels you can't see (spec 016): hiding selects Pan, and Paint shows them first
+  const view = initLabelView(map, (visible) => { if (!visible) setMode("pan"); });
   const size = initBrushSize(() => brush.refresh());
   const select = (i: number) => {
     selected = i;
@@ -97,7 +97,7 @@ export function initLabels({ map, say, onBusy, onChange, panning }: Deps) {
   };
   render();
 
-  $("mode-paint").addEventListener("click", () => setMode("paint"));
+  $("mode-paint").addEventListener("click", () => { view.show(); setMode("paint"); });
   $("mode-pan").addEventListener("click", () => setMode("pan"));
   add.addEventListener("click", () => {
     if (locked || classes.length >= MAX_CLASSES) return;
