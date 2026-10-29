@@ -15,7 +15,7 @@ export const MESSAGES = {
   classTable: (field: string) => `The class table is invalid: ${field}.`,
   // spec 014
   mergeMask: "Merge works only while no mask is loaded. Use Replace.",
-  editLimit: "Label limit reached (256 edited tiles of 256 x 256 px). Undo strokes, or export the labels and import the export with Replace.",
+  editLimit: "Label limit reached (256 edited tiles of 256 x 256 px). Undo strokes, or export the labels and import the export.",
   maskGone: "The label mask can't be read any more. Import it again.",
 } as const;
 

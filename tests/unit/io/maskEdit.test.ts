@@ -101,7 +101,7 @@ describe("the cap with a base (criterion 8)", () => {
     const tile = t.store.tiles.get(`${w257.x0},${w257.y0}`)!;
     expect(tile[5 * 256 + 5]).toBe(2);
     expect(tile[0]).toBe(1); // the rest is the base
-    expect(MESSAGES.editLimit).toBe("Label limit reached (256 edited tiles of 256 x 256 px). Undo strokes, or export the labels and import the export with Replace.");
+    expect(MESSAGES.editLimit).toBe("Label limit reached (256 edited tiles of 256 x 256 px). Undo strokes, or export the labels and import the export.");
   });
 });
 
