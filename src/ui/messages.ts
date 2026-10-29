@@ -1,6 +1,8 @@
 import { maskReadFailed } from "../io/labelFile";
 import type { SeedOutcome } from "../io/seeding";
 
+const mib = (bytes: number) => Math.ceil(bytes / 2 ** 20);
+
 /** User-facing strings fixed by specs 001-014, and the ones they don't fix. */
 export const MESSAGES = {
   rasterAntimeridian: "Rasters crossing the 180° meridian aren't supported yet.",
@@ -16,6 +18,8 @@ export const MESSAGES = {
   // spec 014
   editLimit: "Label limit reached (256 edited tiles of 256 x 256 px). Undo strokes, or export the labels and import the export.",
   maskGone: "The label mask can't be read any more. Import it again.",
+  // spec 020
+  largeBlocks: (bytes: number, limit: number) => `Full resolution isn't available: this file stores pixels in ${mib(bytes)} MiB blocks (limit ${mib(limit)} MiB). Re-save it tiled, e.g. gdal_translate -of COG.`,
 } as const;
 
 /** What a seeding run says (spec 004); null for a run dropped because another raster opened. */

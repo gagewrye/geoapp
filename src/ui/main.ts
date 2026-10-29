@@ -6,6 +6,7 @@ import type { RasterSource } from "../io/source";
 import { createMap } from "../map/map";
 import { createNavigation } from "../map/navigation";
 import { fitToPreview, showPreview } from "../map/preview";
+import { initImagery } from "./imagery";
 import { initLabels, inTextField } from "./labels";
 import { MESSAGES } from "./messages";
 import { initSeeding } from "./seeding";
@@ -15,6 +16,7 @@ const message = $("message");
 const say = (text: string) => { message.textContent = text; };
 
 const map = createMap($("map"));
+const fullRes = initImagery(map);
 let source: RasterSource | undefined;
 // Opens are numbered so that an older open finishing late can't replace the raster a newer one opened
 let opens = 0;
@@ -32,7 +34,8 @@ const nav = createNavigation(map, { typing: (el) => inTextField(el) || el instan
 
 map.on("load", () => {
   // Test hook for e2e (specs 001-014; labels.tile(key) is the effective tile); exposes no user data beyond this page. labelFile: set by a test to see opened label files.
-  const hook = { map, imagery: () => source ?? null, labelFile: null };
+  // fullRes: spec 020's block limit, which a test may lower before an open.
+  const hook = { map, imagery: () => source ?? null, labelFile: null, fullRes: fullRes.limits };
   Object.defineProperty(hook, "labels", { get: () => ({ store: labels.store(), classes: labels.classes(), tile: labels.tile }) });
   (window as unknown as Record<string, unknown>).__geoapp = hook;
   $("map").dataset.ready = "true";
@@ -66,6 +69,7 @@ $<HTMLInputElement>("open-raster").addEventListener("change", (ev) => {
     if (labels.hasLabels() && !confirm(MESSAGES.discard)) { input.value = ""; return; }
     opened = req;
     source = s = f;
+    fullRes.clear();
     labels.open(f);
     const { width, height, bandCount, epsg } = f.meta;
     $("raster-info").textContent = `${file.name}: ${width} x ${height}, ${bandCount} band(s), EPSG:${epsg}`;
@@ -73,7 +77,8 @@ $<HTMLInputElement>("open-raster").addEventListener("change", (ev) => {
     if (stale()) return;
     showPreview(map, preview);
     fitToPreview(map, preview.corners);
-    say("Raster opened.");
+    const off = fullRes.open(f, preview.ranges);
+    say(off ? `Raster opened. ${off}` : "Raster opened.");
   }, stale);
 });
 
