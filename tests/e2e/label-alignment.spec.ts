@@ -108,3 +108,27 @@ for (const [name, grid] of RASTERS) {
     expect(bad.slice(0, 8), `${bad.length} of ${inside + outside} samples wrong`).toEqual([]);
   });
 }
+
+for (const [name, grid] of RASTERS.slice(0, 2)) {
+  test(`each stored tile adds exactly one label- layer, between the preview and the hover: ${name} (spec 018 criterion 5)`, async ({ page }) => {
+    await openApp(page);
+    await openRaster(page, tiff("layers.tif", SIZE, SIZE, 1, () => 7, { epsg: grid.epsg, gt: grid.gt }));
+    await expect(message(page)).toHaveText("Raster opened.");
+    // fill the four tiles through the hook, then recolour, which redraws every stored tile
+    await page.evaluate(() => {
+      const { store } = (window as any).__geoapp.labels;
+      for (const k of ["0,0", "256,0", "0,256", "256,256"]) store.tiles.set(k, new Uint8Array(256 * 256).fill(1));
+    });
+    await page.locator("#classes .class-colour").first().fill("#ff8000");
+    const ids = () => page.evaluate(() => (window as any).__geoapp.map.getStyle().layers.map((l: { id: string }) => l.id) as string[]);
+    await expect.poll(async () => (await ids()).filter((id) => id.startsWith("label-")).sort()).toEqual(["label-0,0", "label-0,256", "label-256,0", "label-256,256"]);
+    const lonLat = toLonLat(grid.epsg, ...applyAffine(grid.gt, 100.5, 100.5)) as LngLat;
+    await jumpTo(page, lonLat, 14);
+    const p = await toScreen(page, lonLat);
+    await page.mouse.move(p.x, p.y);
+    await expect.poll(async () => (await ids()).some((id) => id.startsWith("brush-hover"))).toBe(true);
+    const layers = await ids();
+    const labelLayers = layers.filter((id) => id.startsWith("label-"));
+    expect(layers).toEqual(["background", "basemap", "preview", ...labelLayers, "brush-hover-fill", "brush-hover-line"]);
+  });
+}
