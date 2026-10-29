@@ -1,0 +1,5 @@
+# Fixtures are raw bytes; autocrlf would turn label 10 (0x0A) into CR LF.
+*.i8 binary
+*.u8 binary
+*.tiff binary
+*.tif binary
