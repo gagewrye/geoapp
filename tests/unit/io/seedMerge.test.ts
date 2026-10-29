@@ -49,7 +49,7 @@ describe("Merge", () => {
     expect(Buffer.from(store.tiles.get("0,0")!).equals(Buffer.from(before))).toBe(true);
     expect(classes).toEqual([A, B]);
     // every stored value has a class (spec 003 review handoff)
-    expect(Math.max(...[...r.store.tiles.values()].flatMap((t) => [...t]))).toBeLessThanOrEqual(r.classes.length);
+    expect([...r.store.tiles.values()].reduce((m, t) => t.reduce((a, v) => Math.max(a, v), m), 0)).toBeLessThanOrEqual(r.classes.length);
   });
 
   it("gives \"empty\" when every seeded pixel is already labelled, and when the file is all unlisted", async () => {
