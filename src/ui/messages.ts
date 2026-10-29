@@ -1,7 +1,8 @@
 import { maskReadFailed } from "../io/labelFile";
 import type { SeedOutcome } from "../io/seeding";
 
-const mib = (bytes: number) => Math.ceil(bytes / 2 ** 20);
+/** Bytes as MiB rounded up: whole numbers from 10 MiB, else two decimals (a test hook lowers the limit). */
+const mib = (bytes: number) => { const v = bytes / 2 ** 20; return v >= 10 ? Math.ceil(v) : Math.ceil(v * 100) / 100; };
 
 /** User-facing strings fixed by specs 001-014, and the ones they don't fix. */
 export const MESSAGES = {
