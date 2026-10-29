@@ -1,11 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 import { firstDiff } from "../unit/helpers/floats";
-import { BACKGROUND } from "../../src/map/style";
 import {
   ATTRIBUTION, cacheFiles, chip, chipBox, chipCentre, cogRequests, drawArea, fetchChip, HOST, lonLatBox, logRequests, refChip, serveAef, type Fault,
 } from "./aef";
 import { holdCogs, serveYears } from "./aefTester";
-import { jumpTo, message, openApp, pixelAt, toScreen } from "./helpers";
+import { BACKGROUND, hideBasemap, jumpTo, message, openApp, pixelAt, toScreen } from "./helpers";
 
 // Spec 002 criteria 9, 11, 12, 13 and 14 (fetched data), on fixtures (a) and (b).
 const bg = [1, 3, 5].map((i) => parseInt(BACKGROUND.slice(i, i + 2), 16));
@@ -39,6 +38,7 @@ test("fetch end-to-end: cache filled, tiles equal the chip, preview toggles, Tra
   await serveAef(page);
   const log = logRequests(page);
   await openApp(page);
+  await hideBasemap(page);
   await fetchChip(page);
   await expect(message(page)).toHaveText("Embeddings downloaded.");
 

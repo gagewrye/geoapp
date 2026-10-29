@@ -2,12 +2,11 @@ import { readFileSync } from "node:fs";
 import { expect, test, type Page, type Request } from "@playwright/test";
 import type { AefEntry } from "../../src/core/aef";
 import { toLonLat } from "../../src/core/crs";
-import { BACKGROUND } from "../../src/map/style";
 import { AefFileError } from "../../src/io/aefLocal";
 import { MESSAGES } from "../../src/ui/messages";
 import { firstDiff } from "../unit/helpers/floats";
 import { ATTRIBUTION, cacheFiles, chip, fetchChip, logRequests, refChip, serveAef } from "./aef";
-import { jumpTo, message, openApp, openRaster, pixelAt, rgbFixture, toScreen } from "./helpers";
+import { BACKGROUND, hideBasemap, jumpTo, message, openApp, openRaster, pixelAt, rgbFixture, toScreen } from "./helpers";
 
 // "Open AlphaEarth file" (spec 002 Scope; criteria 14 and 15 in the UI), and "Open GeoTIFF"
 // refusing AlphaEarth files, which are never a labelling surface.
@@ -31,6 +30,7 @@ const network = (log: Request[], base: string) =>
 
 test("opening a local AlphaEarth COG makes no requests, shows the preview and attribution, and keeps Train disabled (criteria 14, 15)", async ({ page, baseURL }) => {
   await openApp(page);
+  await hideBasemap(page);
   const log = logRequests(page);
   await page.setInputFiles("#open-aef", westFile());
   await expect(message(page)).toHaveText("AlphaEarth file opened.");

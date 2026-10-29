@@ -1,12 +1,13 @@
 import { expect, test } from "@playwright/test";
-import { FEATURE, jumpTo, openApp, openRaster, pixelAt, rgbFixture, toScreen } from "./helpers";
+import { BACKGROUND, FEATURE, hideBasemap, jumpTo, openApp, openRaster, pixelAt, rgbFixture, toScreen } from "./helpers";
 
-const BACKGROUND = [0x1d, 0x2b, 0x3a];
-const notBackground = (px: number[]) => px.slice(0, 3).some((v, i) => Math.abs(v - BACKGROUND[i]!) > 3);
+const bg = [1, 3, 5].map((i) => parseInt(BACKGROUND.slice(i, i + 2), 16));
+const notBackground = (px: number[]) => px.slice(0, 3).some((v, i) => Math.abs(v - bg[i]!) > 3);
 
 test.describe("globe (criterion 12)", () => {
   test.beforeEach(async ({ page }) => {
     await openApp(page);
+    await hideBasemap(page);
     await openRaster(page, rgbFixture());
     await expect(page.locator("#message")).toHaveText("Raster opened.");
   });

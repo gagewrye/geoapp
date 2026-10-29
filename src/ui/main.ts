@@ -8,9 +8,10 @@ import { downloadBlob, openSink } from "../io/sink";
 import type { RasterSource } from "../io/source";
 import { createDraw } from "../map/draw";
 import { createMap } from "../map/map";
+import { createNavigation } from "../map/navigation";
 import { fitToPreview, showPreview } from "../map/preview";
 import { initAef } from "./aef";
-import { initLabels } from "./labels";
+import { initLabels, inTextField } from "./labels";
 import { MESSAGES } from "./messages";
 import { initSeeding } from "./seeding";
 
@@ -40,9 +41,12 @@ function lockModel(): void {
 const errorText = (e: unknown) => (e instanceof RasterRefusedError && e.reason === "antimeridian" ? MESSAGES.rasterAntimeridian : (e as Error).message);
 
 // The labels' callbacks run only after the user acts, by when seeding exists.
-const labels = initLabels({ map, say, onBusy: () => { lockModel(); seeding.sync(); }, onChange: () => seeding.sync(), onPaint: () => draw?.setMode("static") });
+const labels = initLabels({ map, say, onBusy: () => { lockModel(); seeding.sync(); }, onChange: () => seeding.sync(), onPaint: () => draw?.setMode("static"),
+  panning: () => nav.panning() });
 const seeding = initSeeding({ labels, imagery: () => source, model: () => model, training: () => training, say, error: errorText, onBusy: () => lockModel(),
   opened: (f) => { const h = (window as unknown as { __geoapp?: { labelFile?: unknown } }).__geoapp?.labelFile; if (typeof h === "function") h(f); } });
+// letters type in text fields and pick options in selects, so WASD leaves them alone (spec 009)
+const nav = createNavigation(map, { typing: (el) => inTextField(el) || el instanceof HTMLSelectElement, stroking: labels.stroking });
 // the area tool and the brush never share the mouse
 const aef = initAef({ map, draw: () => draw, previewMaxSide: PREVIEW_MAX_SIDE, say, run, onState: () => lockModel(),
   onAreaTool: () => labels.setMode("pan") });

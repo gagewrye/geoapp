@@ -1,0 +1,9 @@
+# 0014: A bundled low-resolution basemap image, no fetched tiles
+
+**Status:** Accepted (Gage, 2026-10-27), with spec 012.
+
+**Context:** Gage wants an earth map on the globe, only to orient the user; low resolution is fine. The style is offline today (`map/style.ts`). Checked 2026-10-27: (a) **bundled image**: Natural Earth rasters are public domain ("All versions of Natural Earth raster + vector map data ... are in the public domain", naturalearthdata.com terms); `NE1_50M_SR_W` 3.2.0 is an 84 MB zip of a WGS84 TIFF. maplibre-gl 6.16.0 `src/source/image_source.ts`: corners map linearly in Mercator, a whole-world image becomes tile 0/0/0 with world wraps, texture filter LINEAR. (b) **public tiles** (OSM, Esri, MapTiler) are sharp at every zoom but each tile request tells a third party the area being viewed, at tile precision, before the user picks an AOI; that is more than ADR 0005 allows (requests reveal only the requested area and year), and they bring usage policies, keys or attribution. (c) **our own static tile pyramid** tells our host the viewed tiles.
+
+**Decision:** (a). One 2048x2048 Web Mercator JPEG of Natural Earth shaded relief (at most 1 MiB), generated once by hand with GDAL from `NE1_50M_SR_W` 3.2.0, committed as a Vite asset with a NOTICE. It is drawn as an image source as the bottom map layer (only the plain background colour lies under it) and is always shown: users have no control to hide it; only tests hide it, through the e2e hook.
+
+**Consequences:** No dependency; GDAL is a dev tool like ADR 0007's Python. The request is identical for every view, so ADR 0005's privacy statement holds unchanged. It is blurry past about zoom 3, has no labels or borders, nothing beyond ±85.0511° (ADR 0004), and costs about 16 MiB of GPU memory. Going sharper means a larger file (4096 px: ~64 MiB GPU) or revisiting (b) under a new ADR.

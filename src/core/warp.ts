@@ -4,16 +4,19 @@ import { MAX_LAT, type Affine, type Tile } from "./types";
 
 const R = 6378137;
 const D2R = Math.PI / 180;
-const MERC_MAX_Y = R * Math.log(Math.tan(Math.PI / 4 + (MAX_LAT * D2R) / 2));
+/** Mercator y of MAX_LAT. */
+export const MERC_MAX_Y = R * Math.log(Math.tan(Math.PI / 4 + (MAX_LAT * D2R) / 2));
 const EDGE_STEPS = 32;
 
 const mercX = (lon: number) => R * lon * D2R;
 const mercY = (lat: number) => Math.max(-MERC_MAX_Y, Math.min(MERC_MAX_Y, R * Math.log(Math.tan(Math.PI / 4 + (lat * D2R) / 2))));
-const lonOf = (x: number) => x / R / D2R;
-const latOf = (y: number) => Math.atan(Math.sinh(y / R)) / D2R;
+/** Mercator [x, y] of lon/lat, y not clamped (infinite at the poles). */
+export const mercator = (lon: number, lat: number): [number, number] => [R * lon * D2R, R * Math.log(Math.tan(Math.PI / 4 + (lat * D2R) / 2))];
+export const lonOf = (x: number) => x / R / D2R;
+export const latOf = (y: number) => Math.atan(Math.sinh(y / R)) / D2R;
 
 /** Mercator bbox [x0, y0, x1, y1] of a raster window's footprint, from densified edges. */
-function mercBounds(src: Window, gt: Affine, epsg: number): [number, number, number, number] {
+export function mercBounds(src: Window, gt: Affine, epsg: number): [number, number, number, number] {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (let s = 0; s <= EDGE_STEPS; s++) {
     const t = s / EDGE_STEPS;

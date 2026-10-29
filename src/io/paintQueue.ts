@@ -2,9 +2,10 @@ import type { Window } from "../core/grid";
 import { brush, keepMasks, tileKeys, tileWindow, type LabelStore, type NodataMasks } from "../core/labelStore";
 import { nodataMask } from "../core/nodata";
 import type { RasterSource } from "./source";
+import type { StrokeEdit, UndoHistory } from "./undoHistory";
 
-/** One stroke cell: its footprint, label value, and paint or erase. */
-export type PaintOp = { w: Window; value: number; erase: boolean };
+/** One stroke cell: its footprint, label value, paint or erase, and the stroke's undo edit. */
+export type PaintOp = { w: Window; value: number; erase: boolean; stroke?: StrokeEdit };
 
 type Events = {
   /** A cell was applied to the store (it may have changed nothing). */
@@ -27,12 +28,14 @@ export class PaintQueue {
   private generation = 0; // bumped by clear(), so a read finishing afterwards is ignored
   private busy = false; // what on.busy last reported: a cell that throws has already left ops
 
-  constructor(private readonly source: RasterSource, private readonly store: () => LabelStore, private readonly on: Events) {}
+  constructor(private readonly source: RasterSource, private readonly store: () => LabelStore, private readonly on: Events,
+    private readonly history?: UndoHistory) {}
 
   /** Cells waiting or being applied. */
   get size(): number { return this.ops.length; }
 
   push(op: PaintOp): void {
+    if (op.stroke) this.history?.queued(op.stroke);
     this.ops.push(op);
     this.setBusy(true);
     void this.run();
@@ -44,6 +47,7 @@ export class PaintQueue {
     this.running = false;
     this.ops = [];
     this.masks.clear();
+    this.history?.dropQueued();
     this.setBusy(false);
   }
 
@@ -73,7 +77,10 @@ export class PaintQueue {
           }
         }
         this.ops.shift();
-        if (brush(store, this.masks, op.w, op.value, op.erase) === "full") this.on.full();
+        if (op.stroke) this.history?.record(op.stroke, op.w);
+        const full = brush(store, this.masks, op.w, op.value, op.erase) === "full";
+        if (op.stroke) this.history?.applied(op.stroke);
+        if (full) this.on.full();
         keepMasks(store, this.masks, op.w);
         this.on.applied(op.w);
         if (!this.ops.length) this.setBusy(false);

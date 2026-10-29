@@ -1,8 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import { hoverFeatures, jumpTo, labels, message, moveTo, openApp, openRaster, rgbFixture, selectClass, settled, stroke, toScreen, toucher, view } from "./helpers";
 
-// Tester: spec 003 Strokes and "Pan, zoom, touch and pen" beyond criteria 10-12: other buttons,
-// presses during a stroke, Shift-drag, keyboard / control / pinch zoom, contextmenu.
+// Tester: spec 003 Strokes and "Pan, zoom, touch and pen" beyond criteria 10-12: presses during a stroke,
+// Shift-drag, keyboard / control / pinch zoom, contextmenu. The middle button pans now (spec 009, navigation.spec.ts).
 
 async function setup(page: Page, zoom = 9) {
   await openApp(page);
@@ -13,18 +13,6 @@ async function setup(page: Page, zoom = 9) {
 }
 const idle = (page: Page) => page.waitForFunction(() => !(window as any).__geoapp.map.isMoving(), undefined, { timeout: 5000 });
 const count = async (page: Page) => (await labels(page)).size;
-
-test("a middle-button drag in Paint mode paints nothing and leaves the view", async ({ page }) => {
-  const c = await setup(page);
-  const v0 = await view(page);
-  await page.mouse.move(c.x, c.y);
-  await page.mouse.down({ button: "middle" });
-  await moveTo(page, c, { x: c.x + 120, y: c.y + 40 }, 12);
-  await page.mouse.up({ button: "middle" });
-  await settled(page);
-  expect(await count(page)).toBe(0);
-  expect(await view(page)).toEqual(v0);
-});
 
 test("a right press during a left stroke is ignored: the stroke keeps painting and erases nothing", async ({ page }) => {
   const c = await setup(page);
