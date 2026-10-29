@@ -36,6 +36,19 @@ export async function hideBasemap(page: Page): Promise<void> {
   });
 }
 
+/** Hide the preview and every full-resolution imagery tile (spec 020), including tiles added later, so unpainted space shows what lies below. */
+export async function hideImagery(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const { map } = (window as any).__geoapp;
+    for (const id of map.getLayersOrder() as string[]) if (id === "preview" || id.startsWith("imagery-")) map.setLayoutProperty(id, "visibility", "none");
+    if (map.__imageryHidden) return;
+    map.__imageryHidden = true;
+    const add = map.addLayer.bind(map);
+    map.addLayer = (l: { id: string; layout?: object }, before?: string) =>
+      add(l.id.startsWith("imagery-") ? { ...l, layout: { ...l.layout, visibility: "none" } } : l, before);
+  });
+}
+
 /** Adds `<select id="test-select">` (options a, b) to #panel: the app has no select since spec 017, but specs 003 and 009 keep select rules. */
 export const addTestSelect = (page: Page) => page.evaluate(() => {
   document.getElementById("panel")!.insertAdjacentHTML("beforeend", `<select id="test-select"><option value="a">A</option><option value="b">B</option></select>`);

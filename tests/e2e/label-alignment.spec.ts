@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { applyAffine, fromLonLat, toLonLat } from "../../src/core/crs";
 import { footprint, footprintRing } from "../../src/core/pixel";
 import type { Affine, Grid } from "../../src/core/types";
-import { BACKGROUND, clickAt, jumpTo, message, openApp, openRaster, paintMode, settled, tiff, toScreen, type LngLat } from "./helpers";
+import { BACKGROUND, clickAt, hideImagery, jumpTo, message, openApp, openRaster, paintMode, settled, tiff, toScreen, type LngLat } from "./helpers";
 
 // Spec 018 criterion 3: after a dab, the colour covers exactly the pixels the hover outline marks.
 // Positions and sizes are fixed; at least 10 per raster are where main's shared overlay grid put a painted
@@ -76,7 +76,8 @@ for (const [name, grid] of RASTERS) {
     await expect(message(page)).toHaveText("Raster opened.");
     await paintMode(page); // opening selects Pan (spec 016)
     // basemap and imagery hidden, so unpainted space is the background colour
-    await page.evaluate(() => { const { map } = (window as any).__geoapp; for (const id of ["basemap", "preview"]) map.setLayoutProperty(id, "visibility", "none"); });
+    await page.evaluate(() => (window as any).__geoapp.map.setLayoutProperty("basemap", "visibility", "none"));
+    await hideImagery(page); // the preview and spec 020's imagery tiles
     const colour: string = await page.evaluate(() => (window as any).__geoapp.labels.classes[0].colour);
     const bg = hex(BACKGROUND), want = hex(colour).map((v, k) => 0.6 * v + 0.4 * bg[k]!);
     const lonLat = (c: number, r: number) => toLonLat(grid.epsg, ...applyAffine(grid.gt, c, r)) as LngLat;
@@ -130,7 +131,7 @@ for (const [name, grid] of RASTERS.slice(0, 2)) {
     await page.mouse.move(p.x, p.y);
     await expect.poll(async () => (await ids()).some((id) => id.startsWith("brush-hover"))).toBe(true);
     const layers = await ids();
-    const labelLayers = layers.filter((id) => id.startsWith("label-"));
-    expect(layers).toEqual(["background", "basemap", "preview", ...labelLayers, "brush-hover-fill", "brush-hover-line"]);
+    const labelLayers = layers.filter((id) => id.startsWith("label-")), imagery = layers.filter((id) => id.startsWith("imagery-"));
+    expect(layers).toEqual(["background", "basemap", "preview", ...imagery, ...labelLayers, "brush-hover-fill", "brush-hover-line"]);
   });
 }
