@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { applyAffine, fromLonLat, toLonLat } from "../../../src/core/crs";
+import { applyAffine, fromLonLat, invertAffine, toLonLat } from "../../../src/core/crs";
 import { tileWindows } from "../../../src/core/grid";
-import { overlayIndex, overlayPitch, paintOverlay } from "../../../src/core/overlay";
-import { TILE_SIZE, type Affine, type Grid } from "../../../src/core/types";
+import { overlayGrid, overlayIndex, paintOverlay } from "../../../src/core/overlay";
+import type { Affine, Grid } from "../../../src/core/types";
+import { mercBounds } from "../../../src/core/warp";
 
 // Tester edge cases for spec 011: every tile of a raster (partial edge tiles included), not only a 2x2 block.
 const R = 6378137, D2R = Math.PI / 180;
@@ -28,11 +29,11 @@ const PARTIAL: [string, Grid][] = [
 ];
 
 function overlays(g: Grid) {
-  const pitch = overlayPitch(g);
+  const og = overlayGrid(g);
   return tileWindows(g.width, g.height).map((w) => {
-    const o = overlayIndex(w, g, pitch);
+    const o = overlayIndex(w, g, og);
     const rgba = new Uint8ClampedArray(o.width * o.height * 4);
-    paintOverlay(o.index, new Uint8Array(w.width * w.height).fill(1), ["#ff0000"], rgba);
+    paintOverlay(o.index, o.valid, new Uint8Array(w.width * w.height).fill(1), ["#ff0000"], rgba);
     return { ...o, rgba, w };
   });
 }
@@ -54,7 +55,8 @@ function rng(seed: number) {
 
 describe("spec 011 on whole rasters with partial edge tiles (tester)", () => {
   for (const [name, g] of PARTIAL) {
-    it(`partition: exactly one overlay covers each interior point, ${name}`, () => {
+    // a one-pixel raster is all edge: spec 011 guarantees only a valid cell centre in its pixel (checked below)
+    it.skipIf(g.width < 5)(`partition: exactly one overlay covers each interior point, ${name}`, () => {
       const ovs = overlays(g);
       const rand = rng(7);
       const m = Math.min(2, (g.width - 1) / 2);
@@ -68,32 +70,37 @@ describe("spec 011 on whole rasters with partial edge tiles (tester)", () => {
       expect(bad.slice(0, 5), `${bad.length} points`).toEqual([]);
     });
 
-    it(`size: every tile's overlay is at most TILE_SIZE + 2 a side and on one pitch, ${name}`, () => {
-      const pitch = overlayPitch(g);
+    // spec 011 criterion 5's bound replaces ADR 0016's old 258 px
+    it(`size: every tile's overlay is within ceil(bbox side / (k p)) + 2 and on its k p cells, ${name}`, () => {
+      const og = overlayGrid(g);
       for (const o of overlays(g)) {
-        expect(Math.max(o.width, o.height), `tile ${o.w.x0},${o.w.y0}`).toBeLessThanOrEqual(TILE_SIZE + 2);
+        const [kx, ky] = og.k.get(`${o.w.x0},${o.w.y0}`)!;
+        const [x0, y0, x1, y1] = mercBounds(o.w, g.gt, g.epsg);
+        expect(o.width, `tile ${o.w.x0},${o.w.y0}`).toBeLessThanOrEqual(Math.ceil((x1 - x0) / (kx * og.px)) + 2);
+        expect(o.height, `tile ${o.w.x0},${o.w.y0}`).toBeLessThanOrEqual(Math.ceil((y1 - y0) / (ky * og.py)) + 2);
         expect(o.index.length).toBe(o.width * o.height);
         const [tl, , br] = o.corners;
-        expect((mercX(br![0]) - mercX(tl![0])) / o.width).toBeCloseTo(pitch, 6);
+        expect((mercX(br![0]) - mercX(tl![0])) / o.width).toBeCloseTo(kx * og.px, 6);
         // every index is inside the tile
         for (const k of o.index) expect(k < o.w.width * o.w.height).toBe(true);
       }
     });
   }
 });
-
-describe("overlay size outside criterion 1's grids (tester finding)", () => {
-  // ADR 0016 claims canvases stay at most about 258 px a side except across MAX_LAT. A southern-hemisphere
-  // EPSG:4326 raster with a partial last row has its tallest-in-Mercator full row in the middle, which no
-  // corner tile measures. Out of criterion 4's scope (its grids pass); it.fails flips once this is covered.
-  it.fails("a coarse southern EPSG:4326 raster with a partial last row keeps every overlay within TILE_SIZE + 2", () => {
-    const g: Grid = { epsg: 4326, gt: [10, 0.01, 0, -45, 0, -0.01], width: 300, height: 520 };
-    const pitch = overlayPitch(g);
-    const sides = tileWindows(g.width, g.height).map((w) => {
-      const o = overlayIndex(w, g, pitch);
-      return { key: `${w.x0},${w.y0}`, h: o.height, w: o.width };
-    });
-    const worst = Math.max(...sides.map((s) => Math.max(s.w, s.h)));
-    expect(worst, JSON.stringify(sides)).toBeLessThanOrEqual(TILE_SIZE + 2);
-  });
+it("a one-pixel raster: its pixel holds the centre of a valid cell indexing it (spec 011 Precision)", () => {
+  const g: Grid = { ...UTM_SYNTH, width: 1, height: 1 };
+  const [o] = overlays(g);
+  const [tl, , br] = o!.corners;
+  const cx = (mercX(br![0]) - mercX(tl![0])) / o!.width, cy = (mercY(tl![1]) - mercY(br![1])) / o!.height;
+  let hits = 0;
+  for (let v = 0; v < o!.height; v++) for (let u = 0; u < o!.width; u++) {
+    const i = v * o!.width + u;
+    if (!((o!.valid[i >> 3]! >> (i & 7)) & 1)) continue;
+    const lon = (mercX(tl![0]) + (u + 0.5) * cx) / R / D2R, lat = Math.atan(Math.sinh((mercY(tl![1]) - (v + 0.5) * cy) / R)) / D2R;
+    const [c, r] = invertAffine(g.gt, ...fromLonLat(g.epsg, lon, lat)).map(Math.floor);
+    if (c === 0 && r === 0 && o!.index[i] === 0) hits++;
+  }
+  expect(hits).toBeGreaterThan(0);
 });
+
+// The tester's southern-grid it.fails is replaced by spec 011 criteria 3 and 5 (overlaySeams.test.ts).

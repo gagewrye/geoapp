@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { footprint, strokeCells } from "../../../src/core/pixel";
 import { MAX_LABEL_TILES, emptyStore, tileKeys, type LabelStore } from "../../../src/core/labelStore";
-import { overlayIndex, overlayPitch } from "../../../src/core/overlay";
+import { overlayGrid, overlayIndex } from "../../../src/core/overlay";
 import { fromLonLat } from "../../../src/core/crs";
 import { TILE_SIZE, type Grid } from "../../../src/core/types";
 import { tileWindows } from "../../../src/core/grid";
@@ -105,9 +105,9 @@ describe("paint reads stay tile by tile (CLAUDE.md, criterion 8, tester)", { tim
   });
 });
 
-describe("overlay index memory (ADR 0010, tester measurement)", () => {
-  // ADR 0010 counts labels (16 MiB), masks (~2.1 MiB) and the canvases (~256 KiB each); the Int32
-  // index each stored tile keeps (labelOverlay.ts) isn't in that bound. Measure it structurally.
+describe("overlay index memory (ADR 0010 as amended by ADR 0016, tester measurement)", () => {
+  // ADR 0016: a Uint16 index plus a validity bitmask per cell (2.125 B on top of the 4 B canvas), with no
+  // hard ceiling on overlay size. Measure it structurally.
   const [ux, uy] = fromLonLat(32633, 14, 47);
   const grids: Grid[] = [
     { epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01], width: 1000, height: 1000 },
@@ -115,36 +115,29 @@ describe("overlay index memory (ADR 0010, tester measurement)", () => {
     { epsg: 4326, gt: [0, 0.017, 0, 90, 0, -0.017], width: 300, height: 600 }, // up to the pole
     { epsg: 3857, gt: [1e6, 10, 0, 5e6, 0, -10], width: 512, height: 512 }, // square in Mercator
   ];
-  // spec 011 / ADR 0016: one Mercator grid per raster, so a side may reach TILE_SIZE + 2
-  it("each tile's index is width*height Int32 with max side 258: about 260 KiB, so about 65 MiB at the cap", () => {
-    let worst = 0;
-    // The pole grid (grids[2]) is spec 011's documented exception (ADR 0016): it crosses MAX_LAT, and its
-    // middle tile row, clipped at the limit, is far taller in Mercator than any corner tile.
-    for (const g of [grids[0]!, grids[1]!, grids[3]!]) {
-      const pitch = overlayPitch(g);
+  it("each tile's index is a width*height Uint16Array and its validity a ceil(width*height / 8) bitmask", () => {
+    for (const g of grids) {
+      const og = overlayGrid(g);
       for (const w of tileWindows(g.width, g.height)) {
-        const o = overlayIndex(w, g, pitch);
-        expect(o.index).toBeInstanceOf(Int32Array);
+        const o = overlayIndex(w, g, og);
+        expect(o.index).toBeInstanceOf(Uint16Array);
         expect(o.index.length).toBe(o.width * o.height);
-        expect(Math.max(o.width, o.height)).toBeLessThanOrEqual(TILE_SIZE + 2);
-        worst = Math.max(worst, o.index.byteLength);
+        expect(o.valid.byteLength).toBe(Math.ceil((o.width * o.height) / 8));
       }
     }
-    expect(worst).toBeGreaterThanOrEqual(TILE_SIZE * TILE_SIZE * 4);
-    expect(worst).toBeLessThanOrEqual((TILE_SIZE + 2) ** 2 * 4);
-    expect(MAX_LABEL_TILES * worst).toBeLessThanOrEqual(66 * 1024 * 1024);
   });
 
-  it("known gap (spec 011 Exception, ADR 0016): on a raster crossing MAX_LAT, a clipped middle tile's overlay exceeds TILE_SIZE + 2", () => {
-    const g = grids[2]!;
-    const o = overlayIndex({ x0: 0, y0: 256, width: 256, height: 256 }, g, overlayPitch(g));
-    expect(o.height).toBeGreaterThan(TILE_SIZE + 2);
+  it("a mid-latitude UTM tile's overlay stays near tile size (ADR 0016: typically 260-300 px a side)", () => {
+    const g = grids[1]!;
+    const o = overlayIndex({ x0: 0, y0: 0, width: 256, height: 256 }, g, overlayGrid(g));
+    expect(Math.max(o.width, o.height)).toBeLessThanOrEqual(300);
+    expect(Math.min(o.width, o.height)).toBeGreaterThanOrEqual(TILE_SIZE);
   });
 
-  it("a tile wholly beyond MAX_LAT gets a one-row overlay that indexes nothing", () => {
+  it("a tile wholly beyond MAX_LAT gets a one-row overlay that marks nothing valid", () => {
     const g = grids[2]!; // rows 0..255 are 85.65N..90N, all beyond MAX_LAT
-    const o = overlayIndex({ x0: 0, y0: 0, width: 256, height: 256 }, g, overlayPitch(g));
-    expect(o.index.every((k) => k === -1)).toBe(true); // nothing is drawn, as the spec says
+    const o = overlayIndex({ x0: 0, y0: 0, width: 256, height: 256 }, g, overlayGrid(g));
+    expect(o.valid.every((b) => b === 0)).toBe(true); // nothing is drawn, as the spec says
     expect(o.height).toBe(1);
   });
 });

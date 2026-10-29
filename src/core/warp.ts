@@ -4,11 +4,14 @@ import { MAX_LAT, type Affine, type Tile } from "./types";
 
 const R = 6378137;
 const D2R = Math.PI / 180;
-const MERC_MAX_Y = R * Math.log(Math.tan(Math.PI / 4 + (MAX_LAT * D2R) / 2));
+/** Mercator y of MAX_LAT. */
+export const MERC_MAX_Y = R * Math.log(Math.tan(Math.PI / 4 + (MAX_LAT * D2R) / 2));
 const EDGE_STEPS = 32;
 
 const mercX = (lon: number) => R * lon * D2R;
 const mercY = (lat: number) => Math.max(-MERC_MAX_Y, Math.min(MERC_MAX_Y, R * Math.log(Math.tan(Math.PI / 4 + (lat * D2R) / 2))));
+/** Mercator [x, y] of lon/lat, y not clamped (infinite at the poles). */
+export const mercator = (lon: number, lat: number): [number, number] => [R * lon * D2R, R * Math.log(Math.tan(Math.PI / 4 + (lat * D2R) / 2))];
 export const lonOf = (x: number) => x / R / D2R;
 export const latOf = (y: number) => Math.atan(Math.sinh(y / R)) / D2R;
 

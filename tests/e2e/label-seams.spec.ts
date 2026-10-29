@@ -3,7 +3,7 @@ import { applyAffine, fromLonLat, toLonLat } from "../../src/core/crs";
 import type { Affine } from "../../src/core/types";
 import { hideBasemap, jumpTo, message, openApp, openRaster, tiff, toScreen, type LngLat, type Xy } from "./helpers";
 
-// Spec 011 criterion 5: label overlays meet at tile seams with no gaps and no double-opacity strips.
+// Spec 011 criterion 6: label overlays meet at tile seams with no gaps and no double-opacity strips.
 // EPSG:32633, 3 degrees east of its central meridian at 60N, 10 m pixels (as the unit test's synthetic grid).
 const GT: Affine = (() => { const [x, y] = fromLonLat(32633, 18, 60); return [Math.round(x), 10, 0, Math.round(y), 0, -10]; })();
 const SIZE = 512;
@@ -37,7 +37,7 @@ const project = (page: Page, lls: LngLat[]): Promise<Xy[]> => page.evaluate((lls
   return lls.map((p) => { const { x, y } = map.project(p); return { x: r.left + x, y: r.top + y }; });
 }, lls);
 
-test("painted 2x2-tile block: points 0.25 px either side of each seam equal the interior colour (spec 011 criterion 5)", async ({ page }) => {
+test("painted 2x2-tile block: points 0.25 px either side of each seam equal the interior colour (spec 011 criterion 6)", async ({ page }) => {
   // Sub-pixel hairlines from MapLibre rounding each source's corners remain (spec 011 Out, ADR 0016),
   // so up to 2% of samples may differ; the pre-fix design differed on about 38%.
   test.setTimeout(120_000);
@@ -82,6 +82,6 @@ test("painted 2x2-tile block: points 0.25 px either side of each seam equal the 
     }
   }
   expect(checked).toBeGreaterThanOrEqual(900);
-  console.log(`spec 011 criterion 5: ${bad.length} of ${checked} seam samples differ (${((100 * bad.length) / checked).toFixed(2)}%)`);
+  console.log(`spec 011 criterion 6: ${bad.length} of ${checked} seam samples differ (${((100 * bad.length) / checked).toFixed(2)}%)`);
   expect(bad.length / checked, `${bad.length} of ${checked} samples differ, e.g. ${bad.slice(0, 5).join("; ")}`).toBeLessThanOrEqual(0.02);
 });
