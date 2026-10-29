@@ -5,7 +5,7 @@ import { seedLut, sourceCells } from "../../src/core/seed";
 import { MESSAGES } from "../../src/ui/messages";
 import { aefShapedFile, CLASS_GRID, CLASS_MAP, classFile, classItemFile, classValue, ITEM_CLASSES, rgbClassFile, uint16ClassFile, writeFile } from "../unit/helpers/labelFiles";
 import { message, openApp, openRaster, paintTwoClasses, RGB_GRID, rgbFixture } from "./helpers";
-import { classList, importFile, storeTiles, upload } from "./seeding";
+import { classList, effectiveTiles, importFile, storeTiles, upload } from "./seeding";
 
 // Spec 004 criteria 12 (classes) and 15 (refusals), on spec 001's EPSG:4326 fixture.
 
@@ -32,7 +32,7 @@ test.describe("classes (criterion 12)", () => {
     expect(await classList(page)).toEqual([{ name: "Seven", colour: "#123456" }, { name: "Three", colour: paletteColour(1) }]);
     // brute force: the map's value 7 -> 1, 3 -> 2; 0 and 255 unlisted -> unlabelled
     const lut = seedLut(CLASS_MAP, [1, 2]);
-    const tiles = await storeTiles(page);
+    const tiles = await effectiveTiles(page); // spec 014: the file is a base
     let bad = 0, labelled = 0;
     for (const w of tileWindows(1000, 1000)) {
       const t = tiles.get(`${w.x0},${w.y0}`) ?? new Uint8Array(w.width * w.height);

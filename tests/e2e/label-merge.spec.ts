@@ -5,7 +5,7 @@ import { sourceCells } from "../../src/core/seed";
 import { MESSAGES } from "../../src/ui/messages";
 import { CLASS_GRID, classFile, classValue } from "../unit/helpers/labelFiles";
 import { hoverFeatures, jumpTo, labels, message, openApp, openRaster, paintTwoClasses, renameClass, RGB_GRID, rgbFixture, settled, toScreen } from "./helpers";
-import { classList, importFile, openFileGate, openImageryGate, pauseImagery, pauseLabelFile, storeTiles, upload } from "./seeding";
+import { classList, effectiveTiles, importFile, openFileGate, openImageryGate, pauseImagery, pauseLabelFile, storeTiles, upload } from "./seeding";
 
 // Spec 004 criterion 16: Merge, Replace, what's disabled while seeding or painting, and the class cap.
 
@@ -47,7 +47,7 @@ test("a Merge import shows no confirm, keeps every painted pixel's class, labels
   await expect(message(page)).toHaveText(seeded);
   expect((await classList(page)).map((c) => c.name)).toEqual(["Class 1", "Class 7", "Class 0", "Class 3"]);
   const value: Record<number, number> = { 0: 3, 3: 4, 7: 2 }; // 255 is the file's nodata
-  const tiles = await storeTiles(page);
+  const tiles = await effectiveTiles(page);
   let bad = 0, added = 0;
   for (const w of tileWindows(1000, 1000)) {
     const t = tiles.get(`${w.x0},${w.y0}`) ?? new Uint8Array(w.width * w.height);

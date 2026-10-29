@@ -144,15 +144,15 @@ export function rawPointer(cdp: CDPSession, pointerType: "mouse" | "pen" = "mous
 /** rgbFixture's grid. */
 export const RGB_GRID: Grid = { width: 1000, height: 1000, epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01] };
 
-/** Stored labels through the e2e hook, as "col,row" -> value (non-zero only). */
+/** Effective labels through the e2e hook (stored tiles, else the mask's: spec 014's tile(key)), as "col,row" -> value (non-zero only). */
 export async function labels(page: Page): Promise<Map<string, number>> {
-  const flat: number[] = await page.evaluate(() => {
-    const { store } = (window as any).__geoapp.labels;
+  const flat: number[] = await page.evaluate(async () => {
+    const { store, tile } = (window as any).__geoapp.labels;
     const out: number[] = [];
-    for (const [key, t] of store.tiles as Map<string, Uint8Array>) {
-      const [x0, y0] = key.split(",").map(Number) as [number, number];
+    for (let y0 = 0; y0 < store.height; y0 += 256) for (let x0 = 0; x0 < store.width; x0 += 256) {
+      const t: Uint8Array | null = await tile(`${x0},${y0}`);
       const w = Math.min(256, store.width - x0);
-      t.forEach((v, i) => { if (v) out.push(x0 + (i % w), y0 + Math.floor(i / w), v); });
+      t?.forEach((v, i) => { if (v) out.push(x0 + (i % w), y0 + Math.floor(i / w), v); });
     }
     return out;
   });

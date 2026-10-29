@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { toLonLat } from "../../src/core/crs";
 import { CLASS_GRID, classFile } from "../unit/helpers/labelFiles";
 import { jumpTo, labels, message, openApp, openRaster, paintTwoClasses, path, rgbFixture, selectClass, stroke, toScreen, type LngLat } from "./helpers";
-import { classList, download, expectNoNodata, importFile, inNodata, noSavePicker, nodataImagery, storeTiles, upload } from "./seeding";
+import { classList, download, effectiveTiles, expectNoNodata, importFile, inNodata, noSavePicker, nodataImagery, storeTiles, upload } from "./seeding";
 
 // Spec 004 criteria 18 (edit), 13 (its e2e part) and 19 (privacy).
 
@@ -51,7 +51,7 @@ test("after strokes across a nodata block and a Merge import, no imagery-nodata 
   expectNoNodata(await storeTiles(page), 1000, inNodata);
   await importFile(page, upload("classes.tif", classFile("255"))); // Merge: no confirm
   await expect(message(page)).toHaveText(seeded);
-  expectNoNodata(await storeTiles(page), 1000, inNodata);
+  expectNoNodata(await effectiveTiles(page), 1000, inNodata);
 });
 
 test("importing and exporting labels make no network requests (criterion 19)", async ({ page }) => {
