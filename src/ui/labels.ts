@@ -1,7 +1,7 @@
 import type { Map as MapLibreMap } from "maplibre-gl";
 import { MAX_CLASSES, checkName, initialClasses, nextClass, type LabelClass } from "../core/classes";
 import type { Window } from "../core/grid";
-import { emptyStore, keepMasks, paintedClasses, tileKeys, type LabelStore } from "../core/labelStore";
+import { emptyStore, keepMasks, tileKeys, type LabelStore } from "../core/labelStore";
 import { BRUSH_SIZES, DEFAULT_BRUSH } from "../core/pixel";
 import { PaintQueue } from "../io/paintQueue";
 import type { RasterSource } from "../io/source";
@@ -14,12 +14,10 @@ import { initUndo } from "./undo";
 type Deps = {
   map: MapLibreMap;
   say: (text: string) => void;
-  /** The paint queue became busy or idle (Train is disabled while it is busy). */
+  /** The paint queue became busy or idle (Import labels and Export labels wait while it is busy). */
   onBusy: () => void;
   /** The store changed: a cell applied, labels were replaced, or new imagery opened. */
   onChange: () => void;
-  /** Paint mode was chosen: the AlphaEarth area tool must stop (ADR 0009). */
-  onPaint: () => void;
   /** A middle-button pan is in progress (spec 009). */
   panning: () => boolean;
 };
@@ -30,7 +28,7 @@ export const inTextField = (el: Element | null) => el instanceof HTMLTextAreaEle
   || (el instanceof HTMLInputElement && !NOT_TEXT.has(el.type)) || (el instanceof HTMLElement && el.isContentEditable);
 
 /** Brush labels on local imagery (spec 003): panel, classes, shortcuts, store, paint queue and overlays. */
-export function initLabels({ map, say, onBusy, onChange, onPaint, panning }: Deps) {
+export function initLabels({ map, say, onBusy, onChange, panning }: Deps) {
   const panel = $("brush-panel"), list = $("classes"), add = $<HTMLButtonElement>("class-add"), sizeText = $("brush-size");
   const classes: LabelClass[] = initialClasses();
   let selected = 0;
@@ -79,7 +77,6 @@ export function initLabels({ map, say, onBusy, onChange, onPaint, panning }: Dep
     brush.setMode(m);
     $("mode-paint").setAttribute("aria-pressed", String(m === "paint"));
     $("mode-pan").setAttribute("aria-pressed", String(m === "pan"));
-    if (m === "paint") onPaint();
   };
   const step = (d: number) => {
     size = Math.max(0, Math.min(BRUSH_SIZES.length - 1, size + d));
@@ -196,8 +193,6 @@ export function initLabels({ map, say, onBusy, onChange, onPaint, panning }: Dep
     lock,
     /** The labels and class list now, for seeding to build on. */
     current: () => ({ store, classes }),
-    setMode,
-    syncHandlers: brush.syncHandlers,
     /** A paint or erase stroke is in progress. */
     stroking: brush.stroking,
     /** True when any pixel is labelled (no all-zero tile is kept). */
@@ -206,7 +201,5 @@ export function initLabels({ map, say, onBusy, onChange, onPaint, panning }: Dep
     busy: () => (queue?.size ?? 0) > 0,
     store: () => store,
     classes: () => classes,
-    /** Classes with labelled pixels; a stored value with no class doesn't count. */
-    paintedClasses: () => paintedClasses(store, classes.length),
   };
 }

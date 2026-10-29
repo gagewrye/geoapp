@@ -5,7 +5,7 @@ import { hoverFeatures, jumpTo, labels, message, openApp, openRaster, settled, t
 
 // Tester: spec 003 Imagery nodata on a 4-band raster whose GDAL_NODATA (0) appears in the last band
 // only, plus a NaN block in band 1; and the paint queue with reads paused (hover stays synchronous,
-// erase waits its turn, Train waits for the queue).
+// erase waits its turn, Import labels waits for the queue).
 
 const GRID: Grid = { width: 600, height: 300, epsg: 4326, gt: [30, 0.0001, 0, 20, 0, -0.0001] };
 const inZero = (c: number, r: number) => c >= 200 && c < 240 && r >= 130 && r < 170; // band 4 = 0
@@ -43,7 +43,7 @@ async function drag(page: Page, pts: Xy[], button: "left" | "right" = "left") {
   await page.mouse.up({ button });
 }
 
-test("band-4-only nodata (GDAL_NODATA 0) and band-1 NaN are never labelled; Train's N equals the labelled pixels", async ({ page }) => {
+test("band-4-only nodata (GDAL_NODATA 0) and band-1 NaN are never labelled", async ({ page }) => {
   await setup(page);
   const pts = await points(page, 185, 355, 150, 24);
   await drag(page, pts);
@@ -51,16 +51,9 @@ test("band-4-only nodata (GDAL_NODATA 0) and band-1 NaN are never labelled; Trai
   const got = new Set((await labels(page)).keys());
   expect(got).toEqual(await expected(page, pts, 31));
   for (const k of got) { const [c, r] = k.split(",").map(Number) as [number, number]; expect(nodata(c, r), k).toBe(false); }
-  // second class above the blocks, then train
-  await page.locator("#classes li").nth(1).click({ position: { x: 4, y: 4 } });
-  await drag(page, await points(page, 185, 355, 110, 24));
-  await settled(page);
-  const n = (await labels(page)).size;
-  await page.click("#train");
-  await expect(message(page)).toHaveText(`Trained on ${n} pixels, 2 classes.`);
 });
 
-test("with reads paused: the hover over a block still shows at once, an erase queued behind a paint applies after it, Train waits", async ({ page }) => {
+test("with reads paused: the hover over a block still shows at once, an erase queued behind a paint applies after it, Import labels waits", async ({ page }) => {
   await setup(page);
   await page.evaluate(() => {
     const s = (window as any).__geoapp.imagery();
@@ -77,7 +70,7 @@ test("with reads paused: the hover over a block still shows at once, an erase qu
   await page.mouse.move(over.x - 1, over.y);
   await page.mouse.move(over.x, over.y);
   await expect.poll(async () => (await hoverFeatures(page)).length).toBe(1);
-  await expect(page.locator("#train")).toBeDisabled();
+  await expect(page.locator("#import-labels")).toBeDisabled();
   expect((await labels(page)).size).toBe(0);
   await page.evaluate(() => (window as any).__gate.open());
   await settled(page);

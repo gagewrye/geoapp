@@ -4,14 +4,14 @@ import { CLASS_GRID, classFile } from "../unit/helpers/labelFiles";
 import { jumpTo, labels, message, openApp, openRaster, paintTwoClasses, path, rgbFixture, selectClass, stroke, toScreen, type LngLat } from "./helpers";
 import { classList, download, expectNoNodata, importFile, inNodata, noSavePicker, nodataImagery, storeTiles, upload } from "./seeding";
 
-// Spec 004 criteria 18 (edit and retrain), 13 (its e2e part) and 19 (privacy).
+// Spec 004 criteria 18 (edit), 13 (its e2e part) and 19 (privacy).
 
 const seeded = /^Seeded \d+ pixels in \d+ classes\.$/;
 /** Lon/lat of a class raster pixel position (col, row may be fractional). */
 const fileLonLat = (c: number, r: number): LngLat => toLonLat(32633, CLASS_GRID.gt[0] + c * CLASS_GRID.gt[1], CLASS_GRID.gt[3] + r * CLASS_GRID.gt[5]);
 const count = (m: Map<string, number>, v: number) => [...m.values()].filter((x) => x === v).length;
 
-test("after an import, a right drag clears the selected class in a seeded area, a left drag paints, and Train uses every label (criterion 18)", async ({ page }) => {
+test("after an import, a right drag clears the selected class in a seeded area and a left drag paints (criterion 18)", async ({ page }) => {
   test.setTimeout(180_000);
   await openApp(page);
   await openRaster(page, rgbFixture());
@@ -35,15 +35,9 @@ test("after an import, a right drag clears the selected class in a seeded area, 
   await stroke(page, path(await toScreen(page, fileLonLat(33, 8)), await toScreen(page, fileLonLat(39, 8)), 6));
   const painted = await labels(page);
   expect(count(painted, 3)).toBeGreaterThan(count(erased, 3));
-  const n = painted.size;
-  await page.click("#train");
-  // full-batch training on every seeded pixel (about 170k) takes a while
-  await expect(message(page)).toHaveText(`Trained on ${n} pixels, 3 classes.`, { timeout: 90_000 });
-  const model = await page.evaluate(() => (window as any).__geoapp.model());
-  expect(model.classes).toEqual(["Class 0", "Class 3", "Class 7"]);
 });
 
-test("after strokes across a nodata block, a Merge import and a Merge model seed, no imagery-nodata pixel is labelled (criterion 13)", async ({ page }) => {
+test("after strokes across a nodata block and a Merge import, no imagery-nodata pixel is labelled (criterion 13)", async ({ page }) => {
   test.setTimeout(180_000);
   await openApp(page);
   await openRaster(page, nodataImagery());
@@ -58,30 +52,19 @@ test("after strokes across a nodata block, a Merge import and a Merge model seed
   await importFile(page, upload("classes.tif", classFile("255"))); // Merge: no confirm
   await expect(message(page)).toHaveText(seeded);
   expectNoNodata(await storeTiles(page), 1000, inNodata);
-  await page.click("#train");
-  await expect(message(page)).toHaveText(/^Trained on/, { timeout: 90_000 }); // on every seeded pixel
-  await page.click("#seed-model");
-  await expect(message(page)).toHaveText(seeded);
-  const tiles = await storeTiles(page);
-  expect(tiles.size).toBe(16); // the seed reached every window, the block's included
-  expectNoNodata(tiles, 1000, inNodata);
 });
 
-test("importing, seeding and exporting labels make no network requests (criterion 19)", async ({ page }) => {
+test("importing and exporting labels make no network requests (criterion 19)", async ({ page }) => {
   test.setTimeout(120_000);
   await noSavePicker(page);
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
   await paintTwoClasses(page);
-  await page.click("#train");
-  await expect(message(page)).toHaveText(/^Trained on/);
   const requests: string[] = [];
   page.on("request", (r) => requests.push(r.url()));
   await page.setInputFiles("#class-map", upload("map.json", JSON.stringify([{ value: 3, name: "three" }])));
   await importFile(page, upload("classes.tif", classFile("255")));
-  await expect(message(page)).toHaveText(seeded);
-  await page.click("#seed-model");
   await expect(message(page)).toHaveText(seeded);
   await download(page, "#export-labels");
   await expect(message(page)).toHaveText("Labels exported.");

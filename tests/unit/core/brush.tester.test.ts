@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { fromLonLat, normalizeLon } from "../../../src/core/crs";
 import { tileWindows, type Window } from "../../../src/core/grid";
-import { MAX_LABEL_TILES, brush, emptyStore, keepMasks, labelWindows, tileKeys, tileWindow, type LabelStore, type NodataMasks } from "../../../src/core/labelStore";
+import { MAX_LABEL_TILES, brush, emptyStore, keepMasks, tileKeys, tileWindow, type LabelStore, type NodataMasks } from "../../../src/core/labelStore";
 import { maskBit, nodataMask } from "../../../src/core/nodata";
 import { BRUSH_SIZES, footprint, footprintRing, pixelAt, strokeCells, strokeCellsIn } from "../../../src/core/pixel";
 import type { Grid, Tile } from "../../../src/core/types";
@@ -132,10 +132,7 @@ describe("brush on partial edge tiles and with odd inputs (criterion 4, tester)"
       const inW = c >= w.x0 && r >= w.y0;
       expect(label(s, c, r)).toBe(inW && !nd(c, r) ? 4 : 0);
     }
-    expect(labelWindows(s)).toEqual([
-      { x0: 0, y0: 0, width: 256, height: 256 }, { x0: 256, y0: 0, width: 44, height: 256 },
-      { x0: 0, y0: 256, width: 256, height: 4 }, { x0: 256, y0: 256, width: 44, height: 4 },
-    ]);
+    expect([...s.tiles.keys()].sort()).toEqual(["0,0", "0,256", "256,0", "256,256"]);
     for (const [k, t] of s.tiles) { const [x, y] = k.split(",").map(Number) as [number, number]; const tw = tileWindow(s, x, y); expect(t).toHaveLength(tw.width * tw.height); }
   });
 

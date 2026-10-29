@@ -67,10 +67,10 @@ test.describe("pan and zoom (criterion 12)", () => {
 
   test("Space on a focused form control does its native action, not Pan; on the map it pans", async ({ page }) => {
     const c = await setup(page);
-    await page.focus("#aef-year");
-    await expect(page.locator("#aef-year")).toBeFocused();
+    await page.locator("#classes .class-name").first().focus();
+    await expect(page.locator("#classes .class-name").first()).toBeFocused();
     await page.keyboard.down("Space");
-    expect(await spacePan(page)).toBe(false); // held on a select, Space isn't Pan
+    expect(await spacePan(page)).toBe(false); // held in a class name field, Space isn't Pan
     await page.keyboard.up("Space");
     await page.focus("#mode-pan");
     await page.keyboard.down("Space");
@@ -148,16 +148,16 @@ test.describe("pan and zoom (criterion 12)", () => {
     expect(await prevented(page)).toEqual([true]);
   });
 
-  test("after paint and erase strokes Paint mode keeps its handlers off, and Space on a select still isn't Pan", async ({ page }) => {
+  test("after paint and erase strokes Paint mode keeps its handlers off, and Space in a class name field still isn't Pan", async ({ page }) => {
     const c = await setup(page);
     await paintHandlers(page);
     await stroke(page, [c, { x: c.x + 60, y: c.y }]);
     expect(await count(page)).toBeGreaterThan(0);
-    await paintHandlers(page); // terra-draw's adapter re-enables dragRotate on pointerup
+    await paintHandlers(page);
     await stroke(page, [c, { x: c.x + 60, y: c.y }], "right");
     expect(await count(page)).toBe(0);
     await paintHandlers(page);
-    await page.focus("#aef-year");
+    await page.locator("#classes .class-name").first().focus();
     await page.keyboard.down("Space");
     expect(await spacePan(page)).toBe(false);
     await page.keyboard.up("Space");

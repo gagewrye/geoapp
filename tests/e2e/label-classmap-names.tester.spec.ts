@@ -1,12 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
 import { CLASS_MAP, classFile, rgbClassFile } from "../unit/helpers/labelFiles";
-import { labels, message, openApp, openRaster, paintTwoClasses, rgbFixture } from "./helpers";
-import { classList, importFile, openFileGate, pauseImagery, pauseLabelFile, storeTiles, upload } from "./seeding";
+import { message, openApp, openRaster, paintTwoClasses, rgbFixture } from "./helpers";
+import { classList, importFile, openFileGate, pauseLabelFile, storeTiles, upload } from "./seeding";
 
 // Tester checks of spec 004's build clarifications (awaiting Gage): the class map input after each
-// import (criteria 12, 16), selecting during an import (16), and a loaded model with duplicate
-// class names (17).
+// import (criteria 12, 16) and selecting during an import (16).
 
 const seeded = /^Seeded \d+ pixels in \d+ classes\.$/;
 const classMapFiles = (page: Page) => page.evaluate(() => (document.getElementById("class-map") as HTMLInputElement).files?.length ?? 0);
@@ -70,28 +69,4 @@ test("while an import runs, selecting a class still works", async ({ page }) => 
   await expect(page.locator("#classes li").nth(0)).toHaveAttribute("aria-selected", "true");
   await openFileGate(page);
   await expect(message(page)).toHaveText(seeded);
-});
-
-test("a loaded model with duplicate class names shows its refusal, reads no imagery and seeds nothing, in either mode", async ({ page }) => {
-  await setup(page);
-  await paintTwoClasses(page);
-  await page.click("#train");
-  await expect(message(page)).toHaveText(/^Trained on/);
-  const model = await page.evaluate(() => (window as any).__geoapp.model());
-  await page.setInputFiles("#load-model", { name: "dup.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify({ ...model, classes: ["a", "a"] })) });
-  await expect(message(page)).toHaveText("Loaded model with classes: a, a.");
-  const before = { px: await labels(page), list: await classList(page) };
-  await pauseImagery(page);
-  for (const mode of ["merge", "replace"]) {
-    await page.selectOption("#seed-mode", mode);
-    if (mode === "replace") page.once("dialog", (d) => void d.accept()); // Replace's confirm
-    await page.click("#seed-model");
-    await expect(message(page)).toHaveText(MESSAGES.modelNames);
-    expect(await page.evaluate(() => (window as any).__gate.reads)).toBe(0);
-    expect(await labels(page)).toEqual(before.px);
-    expect(await classList(page)).toEqual(before.list);
-    await expect(page.locator("#class-add")).toBeEnabled();
-    await expect(page.locator("#seed-model")).toBeEnabled();
-    await page.evaluate(() => { document.getElementById("message")!.textContent = ""; });
-  }
 });

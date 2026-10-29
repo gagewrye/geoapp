@@ -1,4 +1,4 @@
-import { expect, type CDPSession, type Page } from "@playwright/test";
+import { expect, type CDPSession, type Page, type Request } from "@playwright/test";
 import { geotiffBuffer, type Value } from "../unit/helpers/sources";
 import type { Affine, Grid } from "../../src/core/types";
 
@@ -165,8 +165,15 @@ export async function labels(page: Page): Promise<Map<string, number>> {
 export const tileKeysStored = (page: Page): Promise<string[]> =>
   page.evaluate(() => [...(window as any).__geoapp.labels.store.tiles.keys()].sort());
 
-/** Wait until strokes waiting for nodata masks have applied (Train is disabled meanwhile). */
-export const settled = (page: Page) => expect(page.locator("#train")).toBeEnabled();
+/** Wait until strokes waiting for nodata masks have applied (Import labels is disabled meanwhile). */
+export const settled = (page: Page) => expect(page.locator("#import-labels")).toBeEnabled();
+
+/** Every request the page makes from now on. */
+export function logRequests(page: Page): Request[] {
+  const log: Request[] = [];
+  page.on("request", (r) => log.push(r));
+  return log;
+}
 
 /** Mouse stroke through the points with one button held, then released, and settled. */
 export async function stroke(page: Page, pts: Xy[], button: "left" | "right" = "left"): Promise<void> {

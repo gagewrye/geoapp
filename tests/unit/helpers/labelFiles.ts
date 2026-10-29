@@ -19,7 +19,7 @@ const UTM_KEYS = { GTModelTypeGeoKey: 1, GTRasterTypeGeoKey: 1, ProjectedCSTypeG
 const geoMeta = (g: Grid) => ({ ModelPixelScale: [g.gt[1], -g.gt[5], 0], ModelTiepoint: [0, 0, 0, g.gt[0], g.gt[3], 0] });
 
 /** A strip GeoTIFF written by geotiff.js (an independent writer): nb pixel-interleaved bands of `values`' type. */
-export function writeFile(g: Grid, nb: number, values: Uint8Array | Uint16Array, nodata?: string, keys: Record<string, number> = UTM_KEYS): ArrayBuffer {
+export function writeFile(g: Grid, nb: number, values: Uint8Array | Uint16Array | Int8Array, nodata?: string, keys: Record<string, number> = UTM_KEYS): ArrayBuffer {
   return writeArrayBuffer(values, { width: g.width, height: g.height, SamplesPerPixel: nb, ...geoMeta(g), ...keys, ...(nodata === undefined ? {} : { GDAL_NODATA: nodata }) });
 }
 
@@ -55,6 +55,14 @@ export async function classItemFile(): Promise<ArrayBuffer> {
 /** Refusal fixtures: 3-band Uint8 and single-band Uint16, on CLASS_GRID. */
 export const rgbClassFile = () => writeFile(CLASS_GRID, 3, new Uint8Array(CLASS_GRID.width * CLASS_GRID.height * 3).fill(3));
 export const uint16ClassFile = () => writeFile(CLASS_GRID, 1, new Uint16Array(CLASS_GRID.width * CLASS_GRID.height).fill(3));
+
+/** AlphaEarth's layout (spec 013 criterion 8): 64 Int8 bands, GDAL_NODATA -128 at pixel (0, 0), 32 x 32 px at CLASS_GRID's origin. */
+export function aefShapedFile(): ArrayBuffer {
+  const g: Grid = { ...CLASS_GRID, width: 32, height: 32 };
+  const v = new Int8Array(g.width * g.height * 64);
+  for (let i = 0; i < v.length; i++) v[i] = i < 64 ? -128 : ((i % 64) * 7 + Math.floor(i / 64)) % 200 - 100;
+  return writeFile(g, 64, v, "-128");
+}
 
 /** A class raster computed on demand (for rasters too large to write), logging every window read. */
 export function fakeLabelSource(g: Grid, f: (c: number, r: number) => number, nodata: number | null = null) {

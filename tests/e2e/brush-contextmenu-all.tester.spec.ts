@@ -2,11 +2,11 @@ import { expect, test, type Page } from "@playwright/test";
 import { jumpTo, message, openApp, openRaster, rgbFixture, stroke, tiff, toScreen } from "./helpers";
 
 // Tester pass 4: spec 003 Strokes / criterion 10. contextmenu is prevented on the map while local
-// imagery is open, in every mode and tool, and never on any panel element, whether opened by mouse,
+// imagery is open, in every mode, and never on any panel element, whether opened by mouse,
 // by keyboard or just after an erase stroke.
 
 const PANEL = ["#classes .class-name", "#classes input[type=color]", "#classes input[type=radio]", "#mode-paint", "#brush-larger",
-  "#class-add", "#open-raster", "#aef-year", "#aef-draw", "#train", "#load-model", "#message", "#panel h1"];
+  "#class-add", "#open-raster", "#seed-mode", "#import-labels", "#export-labels", "#message", "#panel h1"];
 const MAP = [".maplibregl-canvas", ".maplibregl-ctrl-zoom-in", ".maplibregl-ctrl-compass", ".maplibregl-ctrl-globe, .maplibregl-ctrl-globe-enabled"];
 
 /** defaultPrevented of a contextmenu dispatched on the first match of each selector. */
@@ -30,14 +30,13 @@ test.describe("contextmenu on every map and panel element (criterion 10, tester 
   test("no imagery: no panel element is prevented", async ({ page }) => {
     await openApp(page);
     expect(await prevented(page, PANEL.filter((s) => !s.startsWith("#classes") && !s.startsWith("#mode") && !s.startsWith("#brush") && s !== "#class-add")))
-      .toEqual(all(["#open-raster", "#aef-year", "#aef-draw", "#train", "#load-model", "#message", "#panel h1"], false));
+      .toEqual(all(["#open-raster", "#seed-mode", "#import-labels", "#export-labels", "#message", "#panel h1"], false));
   });
 
   const states: [string, (page: Page) => Promise<void>][] = [
     ["Paint", async () => {}],
     ["Pan", async (page) => { await page.click("#mode-pan"); }],
     ["Space held", async (page) => { await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur()); await page.keyboard.down(" "); }],
-    ["area tool", async (page) => { await page.click("#aef-draw"); }],
     ["another raster opened", async (page) => {
       await openRaster(page, tiff("b.tif", 1000, 1000, 3, () => 120, { epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01] }));
       await expect(page.locator("#raster-info")).toContainText("b.tif");
@@ -62,7 +61,7 @@ test.describe("contextmenu on every map and panel element (criterion 10, tester 
       const g = (window as any).__menus = [] as unknown[];
       window.addEventListener("contextmenu", (e) => g.push([(e.target as Element).closest("#map") !== null, e.defaultPrevented]));
     });
-    const targets = ["#classes .class-name", "#classes input[type=color]", "#aef-year", "#brush-larger", "#message"];
+    const targets = ["#classes .class-name", "#classes input[type=color]", "#brush-larger", "#message"];
     for (const t of targets) {
       await stroke(page, [c, { x: c.x + 40, y: c.y }], "right");
       const t0 = Date.now();

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { paletteColour, type LabelClass } from "../../../src/core/classes";
 import { tileWindows } from "../../../src/core/grid";
-import { emptyStore, paintedValues, type LabelStore } from "../../../src/core/labelStore";
+import { emptyStore, type LabelStore } from "../../../src/core/labelStore";
 import type { Grid } from "../../../src/core/types";
 import { importLabels, type SeedOutcome } from "../../../src/io/seeding";
 import { fakeLabelSource } from "../helpers/labelFiles";
@@ -49,7 +49,7 @@ describe("Merge", () => {
     expect(Buffer.from(store.tiles.get("0,0")!).equals(Buffer.from(before))).toBe(true);
     expect(classes).toEqual([A, B]);
     // every stored value has a class (spec 003 review handoff)
-    expect(Math.max(...paintedValues(r.store))).toBeLessThanOrEqual(r.classes.length);
+    expect([...r.store.tiles.values()].reduce((m, t) => t.reduce((a, v) => Math.max(a, v), m), 0)).toBeLessThanOrEqual(r.classes.length);
   });
 
   it("gives \"empty\" when every seeded pixel is already labelled, and when the file is all unlisted", async () => {

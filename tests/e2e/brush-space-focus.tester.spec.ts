@@ -1,15 +1,12 @@
-import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
-import type { AefEntry } from "../../src/core/aef";
 import { jumpTo, labels, message, openApp, openRaster, rgbFixture, stroke, toScreen, toucher, rawPointer } from "./helpers";
 
 // Tester: spec 003 Modes rule (Space) / F6. How focus reached a control decides what Space does there: Tab and
-// Shift+Tab keep Space native; mouse, touch, pen and label clicks leave Space as Pan; focus coming
+// Shift+Tab keep Space native; mouse, touch and pen clicks leave Space as Pan; focus coming
 // back after a file chooser or the discard confirm keeps how it was first focused.
 
 const size = (page: Page) => page.locator("#brush-size");
-// Space as Pan is a prevented keydown (dragRotate.isEnabled() isn't a reliable probe: terra-draw's
-// adapter re-enables dragRotate on every pointerup, see brush-handlers.tester.spec.ts)
+// Space as Pan is a prevented keydown
 const spacePan = (page: Page) => page.evaluate(() => { const g = (window as any).__space as boolean[]; return g[g.length - 1] === true; });
 
 async function setup(page: Page) {
@@ -100,34 +97,6 @@ test.describe("Space and focus (F6, tester)", () => {
     await expect(size(page)).toHaveText("Brush: 31 px");
     expect(await prevented(page)).toEqual([true]);
     expect((await labels(page)).size).toBe(0);
-  });
-
-  test("a click on a label focuses its checkbox: Space is Pan; Shift+Tab back to it: Space toggles it", async ({ page }) => {
-    await setup(page);
-    const FIX = "tests/fixtures/aef";
-    const west = (JSON.parse(readFileSync(`${FIX}/aef-index/2021/32617.json`, "utf8")) as AefEntry[])[0]!;
-    await page.setInputFiles("#open-aef", { name: "west.tiff", mimeType: "image/tiff", buffer: readFileSync(`${FIX}/cogs/${west.path}`) });
-    await expect(message(page)).toHaveText("AlphaEarth file opened.");
-    await expect(page.locator("#brush-panel")).toBeVisible(); // local imagery is still open
-    const box = page.locator("#aef-preview");
-    await expect(box).toBeEnabled();
-    const was = await box.isChecked();
-    await page.locator("label", { has: box }).click({ position: { x: 60, y: 6 } }); // the label text, not the box
-    await expect(box).toBeChecked({ checked: !was });
-    const focused = await page.evaluate(() => document.activeElement?.id ?? "");
-    await prevented(page);
-    expect(await holdSpace(page)).toBe(true); // focused by a click (on the label or not), Space is Pan
-    await expect(box).toBeChecked({ checked: !was });
-    expect(await prevented(page)).toEqual([true]);
-    test.info().annotations.push({ type: "focus after label click", description: focused || "(body)" });
-
-    await box.focus();
-    await page.keyboard.press("Shift+Tab");
-    await page.keyboard.press("Tab");
-    await expect(box).toBeFocused();
-    expect(await holdSpace(page)).toBe(false);
-    await expect(box).toBeChecked({ checked: was });
-    expect(await prevented(page)).toEqual([false]);
   });
 
   test("Tab to Open GeoTIFF, Space opens the chooser; after the chooser and the discard confirm, Space still opens it", async ({ page }) => {

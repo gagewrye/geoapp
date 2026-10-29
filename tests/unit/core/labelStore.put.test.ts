@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { emptyStore, MAX_LABEL_TILES, paintedClasses, putTile } from "../../../src/core/labelStore";
+import { emptyStore, MAX_LABEL_TILES, putTile } from "../../../src/core/labelStore";
 
-// Spec 004 criterion 8 (putTile), and the spec 003 review handoff: only values with a class count.
+// Spec 004 criterion 8 (putTile).
 
 const win = (x0: number, y0: number, width = 256, height = 256) => ({ x0, y0, width, height });
 
@@ -43,17 +43,5 @@ describe("putTile (criterion 8)", () => {
 
   it("throws on labels that aren't window-sized", () => {
     expect(() => putTile(emptyStore(300, 300), win(0, 0), new Uint8Array(10))).toThrow(/putTile/);
-  });
-});
-
-describe("paintedClasses", () => {
-  it("counts the classes with labelled pixels, ignoring values with no class", () => {
-    const store = emptyStore(256, 256);
-    const t = new Uint8Array(65536);
-    t[0] = 1; t[1] = 3; t[2] = 3; t[3] = 9;
-    store.tiles.set("0,0", t);
-    expect(paintedClasses(store, 3)).toBe(2);
-    expect(paintedClasses(store, 9)).toBe(3);
-    expect(paintedClasses(emptyStore(10, 10), 2)).toBe(0);
   });
 });

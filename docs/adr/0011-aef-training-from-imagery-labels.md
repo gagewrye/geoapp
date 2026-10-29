@@ -1,6 +1,6 @@
 # 0011: AlphaEarth training from imagery labels: drawn AOI, supersampled majority transfer
 
-**Status:** Accepted (Gage, 2026-10-26)
+**Status:** Accepted (Gage, 2026-10-26). Shelved by spec 013 (2026-10-28).
 
 **Context:** AlphaEarth is never hand-labelled (Gage, 2026-10-26). Labels are painted on local imagery on that imagery's own grid, which can be any ADR 0002 CRS at any resolution (spec 003). They can then train a model on the 10 m UTM AlphaEarth grid (spec 005). ADR 0005 requires AlphaEarth requests that don't depend on the labels. There are three AOI options: (a) spec 002's drawn rectangle; (b) the imagery's extent, which sends a private raster's footprint without any user action and fails above 20 km or across zones; (c) the labels' bounding box, which makes the requests depend on the labels. There are three transfer options: (1) the label at each AlphaEarth pixel centre (nearest neighbour), which labels mixed 10 m pixels by chance and misses thin strokes on fine imagery; (2) k x k supersampling with a purity rule, which drops mixed pixels; (3) k x k supersampling with a majority vote, which gives mixed pixels their dominant class.
 

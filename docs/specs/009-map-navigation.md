@@ -2,7 +2,7 @@
 
 **Goal:** Make map navigation predictable: the wheel zooms about the map centre, a middle-button drag pans in every mode, and holding W/A/S/D pans smoothly.
 
-**Status:** Approved (Gage, 2026-10-27; WASD smooth and continuous, pinch unchanged, middle-drag pans in every mode). **ADRs:** none (no dependency; uses maplibre-gl 6.16.0, ADR 0004).
+**Status:** Approved (Gage, 2026-10-27; WASD smooth and continuous, pinch unchanged, middle-drag pans in every mode). **ADRs:** none (no dependency; uses maplibre-gl 6.16.0, ADR 0004). Partly shelved by spec 013 (2026-10-28), lapsed: the area tool.
 
 ## Scope
 In: wheel zoom about the centre in all modes; middle-button (button 1) drag pan in Paint mode, Pan mode, with no imagery open and with the area tool active; continuous WASD panning while held; lifting the brush when the camera moves mid-stroke.

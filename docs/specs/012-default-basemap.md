@@ -2,7 +2,7 @@
 
 **Goal:** Show a low-resolution shaded-relief earth on the globe at all times, only to orient the user, without revealing the viewed area to anyone.
 
-**Status:** Approved (Gage, 2026-10-27: bundled Natural Earth shaded relief, low resolution, bottom layer, not hideable by users). **ADRs:** 0014 bundled basemap (Accepted).
+**Status:** Approved (Gage, 2026-10-27: bundled Natural Earth shaded relief, low resolution, bottom layer, not hideable by users). **ADRs:** 0014 bundled basemap (Accepted). Partly shelved by spec 013 (2026-10-28), lapsed: AlphaEarth layers and controls.
 
 ## Scope
 In: one bundled Web Mercator image as the bottom map layer, always shown; its provenance file; adapting existing pixel tests.

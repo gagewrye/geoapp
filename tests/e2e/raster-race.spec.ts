@@ -1,9 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
-import { fromArrayBuffer } from "geotiff";
-import { jumpTo, message, openApp, openRaster, rgbFixture, selectClass, stroke, tiff, toScreen } from "./helpers";
+import { message, openApp, openRaster, rgbFixture, tiff } from "./helpers";
 
 // Async actions tied to the raster they started on (spec 003, tester F10): an open that another open
-// overtakes, and a Classify while another raster opens.
+// overtakes.
 
 /** 800 x 600, 3 bands, at 30..38E, 40..46N: a different size and place from rgbFixture. */
 const otherFixture = () => tiff("other.tif", 800, 600, 3, (b, c) => (b === 0 ? (c < 400 ? 200 : 120) : 150),
@@ -91,45 +90,4 @@ test.describe("an open that another open overtakes", () => {
     await expect(message(page)).toHaveText("Raster opened.");
     await expect(info(page)).toHaveText(/^slow\.tif: 1000 x 1000/);
   });
-});
-
-test("Classify exports the raster it was clicked on, even if another opens before the Save dialog returns", async ({ page }) => {
-  await page.addInitScript(() => {
-    const g = (window as any).__save = { pick: null as null | (() => void), parts: [] as Uint8Array[], b64: "" };
-    (window as any).showSaveFilePicker = () => new Promise((r) => {
-      g.pick = () => r({
-        createWritable: async () => ({
-          write: async (d: Uint8Array) => { g.parts.push(d.slice()); },
-          close: async () => {
-            let s = "";
-            for (const p of g.parts) for (let i = 0; i < p.length; i += 0x8000) s += String.fromCharCode(...p.subarray(i, i + 0x8000));
-            g.b64 = btoa(s);
-          },
-          abort: async () => {},
-        }),
-      });
-    });
-  });
-  await openApp(page);
-  await openRaster(page, rgbFixture());
-  await expect(message(page)).toHaveText("Raster opened.");
-  await jumpTo(page, [15, 45], 6);
-  const a = await toScreen(page, [13.005, 45.005]), b = await toScreen(page, [17.005, 44.505]);
-  await stroke(page, [a, { x: a.x + 60, y: a.y }]);
-  await selectClass(page, 1);
-  await stroke(page, [b, { x: b.x + 60, y: b.y }]);
-  await page.click("#train");
-  await expect(message(page)).toHaveText(/^Trained on/);
-  await page.click("#classify");
-  await expect.poll(() => page.evaluate(() => (window as any).__save.pick !== null)).toBe(true);
-  page.once("dialog", (d) => d.accept());
-  await openRaster(page, otherFixture());
-  await expect(message(page)).toHaveText("Raster opened.");
-  await page.evaluate(() => (window as any).__save.pick());
-  await expect(message(page)).toHaveText("Export complete.");
-  const b64 = await page.evaluate(() => (window as any).__save.b64 as string);
-  const buf = Buffer.from(b64, "base64");
-  const out = await (await fromArrayBuffer(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer)).getImage();
-  expect([out.getWidth(), out.getHeight()]).toEqual([1000, 1000]);
-  expect(out.getOrigin().slice(0, 2)).toEqual([10, 50]);
 });

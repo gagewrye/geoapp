@@ -1,6 +1,6 @@
 # Geoplatform
 
-Local-first browser app for classifying geospatial imagery. User data (local rasters, labels, polygons, models) never leaves the user's device. The app may fetch public datasets such as AlphaEarth embeddings; those requests reveal only the area and year requested (ADR 0005). We host only static files, including a catalog index.
+Local-first browser app for labelling geospatial imagery. User data (local rasters, labels) never leaves the user's device. We host only static files.
 
 ## Stack
 - TypeScript (strict), Vite, MapLibre GL, geotiff.js
@@ -10,11 +10,12 @@ Local-first browser app for classifying geospatial imagery. User data (local ras
 ## Layout
 ```
 src/
-  core/   pure logic: sampling, training, inference, model I/O. No DOM.
+  core/   pure logic: projections, preview warping and decimation, nodata masks, classes, label store and brush, overlay grids, undo, label seeding, WASD steps. No DOM.
   io/     raster read/write, file access
-  map/    MapLibre layers, drawing
+  map/    MapLibre layers, brush, navigation
   ui/     DOM wiring only
 tests/    unit (mirrors src/), e2e/
+shelf/    AlphaEarth and training code, unused and outside npm run check (spec 013); reviving any of it needs a spec
 docs/
   specs/  one per feature, NNN-name.md
   adr/    one per decision, NNNN-name.md

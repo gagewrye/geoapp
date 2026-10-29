@@ -4,9 +4,9 @@ import type { ClassEntry } from "../../../src/core/classTable";
 import { tileWindows, type Window } from "../../../src/core/grid";
 import { emptyStore, MAX_LABEL_TILES } from "../../../src/core/labelStore";
 import { applyLut, seedLut, seedWindows, sourceCells } from "../../../src/core/seed";
-import type { Affine, Grid, Model } from "../../../src/core/types";
+import type { Affine, Grid } from "../../../src/core/types";
 import type { LabelSource } from "../../../src/io/labelFile";
-import { importLabels, seedModel } from "../../../src/io/seeding";
+import { importLabels } from "../../../src/io/seeding";
 import type { RasterSource } from "../../../src/io/source";
 import { fakeLabelSource } from "../helpers/labelFiles";
 import { fakeSource } from "../helpers/sources";
@@ -89,13 +89,6 @@ describe("reads (criterion 14)", () => {
     expect(log.filter((e) => e.startsWith("i")).length).toBeGreaterThan(0);
     expect(log.filter((e) => e.startsWith("f")).every((e) => { const [x0, y0, w, h] = e.slice(2).split(",").map(Number); return x0! % 256 === 0 && y0! % 256 === 0 && w! <= 256 && h! <= 256; })).toBe(true);
     expect(maxInFlight()).toBe(1);
-  });
-
-  it("model seeding reads each imagery window exactly once", async () => {
-    const { source, reads } = fakeSource({ ...IMAGERY, bandCount: 1 }, (_b, c) => c);
-    const model: Model = { version: 1, type: "logreg", bands: [1], mean: [500], std: [100], classes: ["w", "e"], W: [[-1], [1]], b: [0, 0] };
-    expect(typeof (await seedModel(source, model, 0, { store: emptyStore(1000, 1000), classes: initialClasses() }, "replace"))).toBe("object");
-    expect(reads.map(key)).toEqual(tileWindows(1000, 1000).map(key));
   });
 });
 

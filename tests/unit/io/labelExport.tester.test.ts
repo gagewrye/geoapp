@@ -4,12 +4,11 @@ import { paletteColour, type LabelClass } from "../../../src/core/classes";
 import { tileWindows } from "../../../src/core/grid";
 import { emptyStore, type LabelStore } from "../../../src/core/labelStore";
 import { nodataMask } from "../../../src/core/nodata";
-import type { Affine, Model } from "../../../src/core/types";
+import type { Affine } from "../../../src/core/types";
 import { openGeoTiff } from "../../../src/io/geotiffSource";
-import { classify } from "../../../src/io/pipeline";
 import { exportLabels } from "../../../src/io/labelExport";
 import { openLabelTiff } from "../../../src/io/labelFile";
-import { importLabels, importTable, seedModel, type SeedOutcome } from "../../../src/io/seeding";
+import { importLabels, importTable, type SeedOutcome } from "../../../src/io/seeding";
 import type { RasterSource } from "../../../src/io/source";
 import { geotiffBuffer, recordingSink } from "../helpers/sources";
 
@@ -115,21 +114,6 @@ describe("export then import restores labels and classes exactly", () => {
   });
 });
 
-describe("spec 001's classification export is unchanged", () => {
-  it("writes GDAL_NODATA 255, pads with 255 and has no GDAL_METADATA", { timeout: 30_000 }, async () => {
-    const src = await imagery(300, 260, 32633, [500000, 30, 0, 5000000, 0, -30]);
-    const model: Model = { version: 1, type: "logreg", bands: [2], mean: [250], std: [100], classes: ["a", "b"], W: [[-1], [1]], b: [0, 0] };
-    const rec = recordingSink();
-    await classify(src, model, rec.sink);
-    const image = await (await fromArrayBuffer(rec.bytes().buffer as ArrayBuffer)).getImage();
-    expect(image.getGDALNoData()).toBe(255);
-    expect(image.fileDirectory.hasTag("GDAL_METADATA")).toBe(false);
-    expect(rec.writes.at(-1)![255 * 256 + 255]).toBe(255);
-    const [px] = (await image.readRasters({ window: [100, 50, 101, 51] })) as unknown as Uint8Array[];
-    expect(px![0]).toBe(255); // band 2 (the model's band) is nodata there
-  });
-});
-
 describe("export memory, structurally", () => {
   it("a 20000 x 20000 export writes the header, then 6241 tiles of exactly 65536 bytes, and reads no imagery", { timeout: 60_000 }, async () => {
     const meta = (await imagery(10, 10, 32633, [500000, 1, 0, 5000000, 0, -1])).meta;
@@ -144,34 +128,5 @@ describe("export memory, structurally", () => {
     expect(writes).toBe(1 + 79 * 79);
     expect(maxBytes).toBe(65536);
     expect(header).toBeLessThan(200_000);
-  });
-});
-
-describe("model class names that spec 003's rule refuses", () => {
-  // Tester FOLLOW-UP F2: spec 001's model validation doesn't apply spec 003's name rule, so a seed
-  // would put names in the list that spec 003 refuses, and its export wouldn't import back the same
-  // (" padded " comes back trimmed; an empty name is refused). Seed from model refuses such a model.
-  const src = () => imagery(300, 260, 32633, [500000, 30, 0, 5000000, 0, -30]);
-  const model = (classes: string[]): Model => ({ version: 1, type: "logreg", bands: [1], mean: [250], std: [100], classes, W: classes.map((_, i) => [i]), b: classes.map(() => 0) });
-  for (const [why, classes] of [["an untrimmed", [" padded ", "b"]], ["an empty", ["", "b"]], ["a blank", ["a", "  "]], ["a duplicate", ["a", "b", "a"]]] as const) {
-    it(`refuses a model with ${why} class name in either mode, changing nothing`, { timeout: 30_000 }, async () => {
-      const s = await src();
-      const current = { store: await storeFor(s, 2), classes: [{ name: "x", colour: "#000000" }, { name: "y", colour: "#111111" }] };
-      const tiles = new Map(current.store.tiles), list = current.classes.map((c) => ({ ...c }));
-      let reads = 0;
-      const counted: RasterSource = { meta: s.meta, readWindow: (...a) => { reads++; return s.readWindow(...a); } };
-      for (const mode of ["merge", "replace"] as const) expect(await seedModel(counted, model([...classes]), 0, current, mode)).toBe("bad names");
-      expect(reads).toBe(0);
-      expect(current.store.tiles).toEqual(tiles);
-      expect(current.classes).toEqual(list);
-    });
-  }
-
-  it("a seed from a model with valid names exports and imports back the same list", { timeout: 30_000 }, async () => {
-    const s = await src();
-    const seeded = ok(await seedModel(s, model(["padded", "b"]), 0, { store: emptyStore(300, 260), classes: [] }, "replace"));
-    expect(seeded.classes.map((c) => c.name)).toEqual(["padded", "b"]);
-    const { r } = await roundTrip(s, seeded.store, seeded.classes);
-    expect(r.classes).toEqual(seeded.classes);
   });
 });

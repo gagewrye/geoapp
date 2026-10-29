@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { fromArrayBuffer, writeArrayBuffer } from "geotiff";
-import { predictTile } from "../../../src/core/predict";
-import { labelSamples } from "../../../src/core/labelSamples";
-import type { Model } from "../../../src/core/types";
+import { maskBit, nodataMask } from "../../../src/core/nodata";
+import type { Tile } from "../../../src/core/types";
 import { openGeoTiff } from "../../../src/io/geotiffSource";
 
 type Typed = Uint8Array | Int8Array | Uint16Array | Int16Array | Uint32Array | Int32Array | Float32Array | Float64Array;
@@ -36,46 +35,43 @@ function write(values: Typed, nodata?: string): ArrayBuffer {
   });
 }
 
-// class 1 above the threshold, class 0 below; 255 at nodata
-const all = new Uint8Array(4).fill(1); // every pixel labelled
-const model = (threshold: number): Model => ({ version: 1, type: "logreg", bands: [1], mean: [threshold], std: [1], classes: ["lo", "hi"], W: [[-1], [1]], b: [0, 0] });
+/** Each pixel's nodata mask bit: 1 where the brush and seeds never label. */
+const maskOf = (t: Tile) => { const m = nodataMask(t); return Array.from({ length: t.width * t.height }, (_, i) => maskBit(m, i)); };
 
-async function run(values: Typed, nodata: string | undefined, threshold: number) {
+async function run(values: Typed, nodata: string | undefined) {
   const src = await openGeoTiff(await fromArrayBuffer(tiff(values, nodata)));
   const t = await src.readWindow(0, 0, values.length, 1);
-  return { src, t, pred: Array.from(predictTile(model(threshold), t)) };
+  return { src, t, mask: maskOf(t) };
 }
 
 describe("GDAL nodata on integer and float rasters (criteria 5, 7, 9)", () => {
-  const cases: [string, Typed, string, number][] = [
-    ["Uint8 0", Uint8Array.from([1, 9, 0, 9]), "0", 5],
-    ["Uint8 255", Uint8Array.from([1, 9, 255, 9]), "255", 5],
-    ["Int8 -128", Int8Array.from([-5, 5, -128, 5]), "-128", 0],
-    ["Uint16 65535", Uint16Array.from([1, 9, 65535, 9]), "65535", 5],
-    ["Int16 -32768", Int16Array.from([-5, 5, -32768, 5]), "-32768", 0],
-    ["Uint32 4294967295", Uint32Array.from([1, 9, 4294967295, 9]), "4294967295", 5],
-    ["Int32 -2147483647 (not float32-exact)", Int32Array.from([-5, 5, -2147483647, 5]), "-2147483647", 0],
-    ["Float32 -3.4028234663852886e+38 (GDAL's FLT_MAX form)", Float32Array.from([-5, 5, -3.4028234663852886e38, 5]), "-3.4028234663852886e+38", 0],
-    ["Float32 -9999.0", Float32Array.from([-5, 5, -9999, 5]), "-9999.0", 0],
-    ["Float32 1e-3", Float32Array.from([-5, 5, 1e-3, 5]), "0.001", 0],
-    ["Float64 0.1", Float64Array.from([-5, 5, 0.1, 5]), "0.1", 0],
-    ["Float64 -1.7976931348623157e+308", Float64Array.from([-5, 5, -1.7976931348623157e308, 5]), "-1.7976931348623157e+308", 0],
-    ["Float32 nan", Float32Array.from([-5, 5, NaN, 5]), "nan", 0],
+  const cases: [string, Typed, string][] = [
+    ["Uint8 0", Uint8Array.from([1, 9, 0, 9]), "0"],
+    ["Uint8 255", Uint8Array.from([1, 9, 255, 9]), "255"],
+    ["Int8 -128", Int8Array.from([-5, 5, -128, 5]), "-128"],
+    ["Uint16 65535", Uint16Array.from([1, 9, 65535, 9]), "65535"],
+    ["Int16 -32768", Int16Array.from([-5, 5, -32768, 5]), "-32768"],
+    ["Uint32 4294967295", Uint32Array.from([1, 9, 4294967295, 9]), "4294967295"],
+    ["Int32 -2147483647 (not float32-exact)", Int32Array.from([-5, 5, -2147483647, 5]), "-2147483647"],
+    ["Float32 -3.4028234663852886e+38 (GDAL's FLT_MAX form)", Float32Array.from([-5, 5, -3.4028234663852886e38, 5]), "-3.4028234663852886e+38"],
+    ["Float32 -9999.0", Float32Array.from([-5, 5, -9999, 5]), "-9999.0"],
+    ["Float32 1e-3", Float32Array.from([-5, 5, 1e-3, 5]), "0.001"],
+    ["Float64 0.1", Float64Array.from([-5, 5, 0.1, 5]), "0.1"],
+    ["Float64 -1.7976931348623157e+308", Float64Array.from([-5, 5, -1.7976931348623157e308, 5]), "-1.7976931348623157e+308"],
+    ["Float32 nan", Float32Array.from([-5, 5, NaN, 5]), "nan"],
   ];
-  it.each(cases)("%s: the nodata pixel predicts 255 and is not sampled", async (_name, values, nd, threshold) => {
-    const { t, pred } = await run(values, nd, threshold);
-    expect(pred).toEqual([0, 1, 255, 1]);
-    expect(labelSamples(t, all, [1]).y.length).toBe(3);
+  it.each(cases)("%s: only the nodata pixel is masked", async (_name, values, nd) => {
+    const { mask } = await run(values, nd);
+    expect(mask).toEqual([0, 0, 1, 0]);
   });
 
   // geotiff.js parses GDAL's "-inf"/"inf" as NaN, which would match no pixel
   it.each([
     ["-inf", -Infinity], ["-Inf", -Infinity], ["inf", Infinity], ["+inf", Infinity], ["INF", Infinity],
-  ] as const)("GDAL_NODATA %s: nodata is %d and that pixel predicts 255 and is not sampled", async (nd, value) => {
-    const { src, t, pred } = await run(Float32Array.from([-5, 5, value, 5]), nd, 0);
+  ] as const)("GDAL_NODATA %s: nodata is %d and only that pixel is masked", async (nd, value) => {
+    const { src, mask } = await run(Float32Array.from([-5, 5, value, 5]), nd);
     expect(src.meta.nodata).toBe(value);
-    expect(pred).toEqual([0, 1, 255, 1]);
-    expect(labelSamples(t, all, [1]).y.length).toBe(3);
+    expect(mask).toEqual([0, 0, 1, 0]);
   });
 
   it("valid neighbours of a float nodata stay valid", async () => {
@@ -83,20 +79,20 @@ describe("GDAL nodata on integer and float rasters (criteria 5, 7, 9)", () => {
     const nd = Math.fround(0.1);
     const up = new Float32Array([nd]);
     new Uint32Array(up.buffer)[0]! += 1;
-    const { pred } = await run(Float32Array.from([-5, up[0]!, 0.1, 5]), "0.1", 0);
-    expect(pred).toEqual([0, 1, 255, 1]);
+    const { mask } = await run(Float32Array.from([-5, up[0]!, 0.1, 5]), "0.1");
+    expect(mask).toEqual([0, 0, 1, 0]);
   });
 
-  it("no GDAL_NODATA: nodata is null and only NaN predicts 255", async () => {
-    const { src, t, pred } = await run(Float32Array.from([-5, 5, -9999, NaN]), undefined, 0);
+  it("no GDAL_NODATA: nodata is null and only NaN is masked", async () => {
+    const { src, t, mask } = await run(Float32Array.from([-5, 5, -9999, NaN]), undefined);
     expect(src.meta.nodata).toBeNull();
     expect(t.nodata).toBeNull();
-    expect(pred).toEqual([0, 1, 0, 255]);
+    expect(mask).toEqual([0, 0, 0, 1]);
   });
 
-  it("an integer raster without nodata never predicts 255", async () => {
-    const { src, pred } = await run(Uint8Array.from([0, 255, 0, 255]), undefined, 100);
+  it("an integer raster without nodata masks nothing", async () => {
+    const { src, mask } = await run(Uint8Array.from([0, 255, 0, 255]), undefined);
     expect(src.meta.nodata).toBeNull();
-    expect(pred).toEqual([0, 1, 0, 1]);
+    expect(mask).toEqual([0, 0, 0, 0]);
   });
 });

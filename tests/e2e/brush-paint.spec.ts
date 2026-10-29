@@ -84,14 +84,15 @@ test.describe("paint and erase (criterion 10)", () => {
       window.addEventListener("contextmenu", (e) => (window as any).__menus.push(e.defaultPrevented));
     });
     const a = await toScreen(page, [14.9995, 45.0005]);
-    await stroke(page, [a, { x: a.x + 400, y: a.y }]); // class 1
+    // Kept inside the 1024 px viewport: a release past it fires contextmenu on <html>, off the map (spec 003)
+    await stroke(page, [a, { x: a.x + 250, y: a.y }]); // class 1
     await selectClass(page, 1);
-    await stroke(page, [{ x: a.x + 200, y: a.y - 300 }, { x: a.x + 200, y: a.y + 300 }]); // class 2 across it
+    await stroke(page, [{ x: a.x + 120, y: a.y - 300 }, { x: a.x + 120, y: a.y + 300 }]); // class 2 across it
     const before = await labels(page);
     expect(keys(before, 1).size).toBeGreaterThan(0);
     expect(keys(before, 2).size).toBeGreaterThan(0);
     await selectClass(page, 0);
-    await stroke(page, [{ x: a.x - 100, y: a.y }, { x: a.x + 500, y: a.y }], "right");
+    await stroke(page, [{ x: a.x - 100, y: a.y }, { x: a.x + 350, y: a.y }], "right");
     const after = await labels(page);
     expect(keys(after, 1).size).toBe(0);
     expect(keys(after, 2)).toEqual(keys(before, 2));

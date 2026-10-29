@@ -1,7 +1,6 @@
 import { expect, test, type Page, type Request } from "@playwright/test";
-import { logRequests } from "./aef";
 import {
-  clickAt, jumpTo, labels, message, moveTo, openApp, openRaster, rgbFixture, selectClass, settled, stroke, toScreen, view, type LngLat, type Xy,
+  jumpTo, labels, logRequests, message, moveTo, openApp, openRaster, rgbFixture, selectClass, settled, stroke, toScreen, view, type LngLat, type Xy,
 } from "./helpers";
 
 // Tester edge cases for specs 009 (navigation), 010 (cursor, undo) and 012 (basemap requests).
@@ -17,18 +16,16 @@ const mapMid = async (page: Page): Promise<Xy> => {
 };
 const snapshot = async (page: Page) => [...(await labels(page))].sort();
 const undoButton = (page: Page) => page.locator("#undo");
-const features = (page: Page) => page.evaluate(() => (window as any).__geoapp.draw.getSnapshot().length as number);
 const cursorAt = (page: Page, p: Xy) => page.evaluate(([x, y]) => getComputedStyle(document.elementFromPoint(x, y)!).cursor, [p.x, p.y] as const);
 const classColour = (page: Page, i: number) => page.evaluate((i) => (window as any).__geoapp.labels.classes[i].colour as string, i);
 
-async function setup(page: Page, how: "paint" | "pan" | "none" | "area", zoom = 14) {
+async function setup(page: Page, how: "paint" | "pan" | "none", zoom = 14) {
   await openApp(page);
   if (how !== "none") {
     await openRaster(page, rgbFixture());
     await expect(message(page)).toHaveText("Raster opened.");
   }
   if (how === "pan") await page.click("#mode-pan");
-  if (how === "area") await page.click("#aef-draw");
   await jumpTo(page, START, zoom);
 }
 
@@ -44,22 +41,8 @@ async function holdW(page: Page, ms: number, during?: () => Promise<void>) {
 }
 
 test.describe("spec 009 edges (tester)", () => {
-  test("criterion 1, area tool active: five off-centre wheel-ups keep the centre and draw nothing", async ({ page }) => {
-    await setup(page, "area");
-    const c0 = await centre(page), z0 = (await view(page)).zoom;
-    const m = await mapMid(page);
-    await page.mouse.move(m.x + 200, m.y + 100);
-    for (let i = 0; i < 5; i++) { await page.mouse.wheel(0, -100); await page.waitForTimeout(30); }
-    await page.waitForTimeout(300);
-    await idle(page);
-    const c1 = await centre(page);
-    expect((await view(page)).zoom).toBeGreaterThan(z0 + 0.3);
-    expect(Math.abs(c1[0] - c0[0])).toBeLessThan(1e-7);
-    expect(Math.abs(c1[1] - c0[1])).toBeLessThan(1e-7);
-    expect(await features(page)).toBe(0);
-  });
 
-  for (const how of ["pan", "area"] as const) {
+  for (const how of ["pan"] as const) {
     test(`WASD works in ${how} mode (every mode): 500 ms of W moves the centre point 150..450 px down`, async ({ page }) => {
       await setup(page, how);
       const dy = await holdW(page, 500);
@@ -88,7 +71,6 @@ test.describe("spec 009 edges (tester)", () => {
 
   const stoppers: [string, (page: Page) => Promise<void>][] = [
     ["focus entering a class name field", (page) => page.focus("#classes .class-name")],
-    ["focus entering a select", (page) => page.focus("#aef-year")],
     ["a Control keydown", async (page) => { await page.keyboard.down("Control"); await page.keyboard.up("Control"); }],
     ["an Alt keydown", async (page) => { await page.keyboard.down("Alt"); await page.keyboard.up("Alt"); }],
     ["visibilitychange to hidden", (page) => page.evaluate(() => {
@@ -123,26 +105,6 @@ test.describe("spec 009 edges (tester)", () => {
     expect(dy).toBeGreaterThanOrEqual(150);
   });
 
-  test("area tool: a middle click and drag start no rectangle; a left rectangle still works afterwards", async ({ page }) => {
-    await setup(page, "area", 12);
-    const m = await mapMid(page);
-    await page.mouse.move(m.x, m.y);
-    await page.mouse.down({ button: "middle" });
-    await page.mouse.up({ button: "middle" });
-    await moveTo(page, m, { x: m.x + 120, y: m.y + 80 }, 8);
-    await page.mouse.down({ button: "middle" });
-    await moveTo(page, { x: m.x + 120, y: m.y + 80 }, { x: m.x + 20, y: m.y + 20 }, 8);
-    await page.mouse.up({ button: "middle" });
-    await moveTo(page, { x: m.x + 20, y: m.y + 20 }, { x: m.x - 50, y: m.y - 50 }, 8);
-    expect(await features(page)).toBe(0);
-    await expect(page.locator("#aef-info")).not.toHaveText(/^Area: /);
-    const a = { x: m.x - 60, y: m.y - 40 }, b = { x: m.x + 60, y: m.y + 40 };
-    await clickAt(page, a);
-    await moveTo(page, a, b, 10);
-    await clickAt(page, b);
-    await expect(page.locator("#aef-info")).toHaveText(/^Area: /);
-  });
-
   test("a middle drag starting on the panel doesn't pan the map", async ({ page }) => {
     await setup(page, "paint");
     const v0 = await view(page);
@@ -173,7 +135,7 @@ test.describe("spec 009 edges (tester)", () => {
 test.describe("spec 010 edges (tester)", () => {
   async function paintSetup(page: Page) { await setup(page, "paint", 9); }
 
-  test("criterion 7: the cursor follows a click-select, and isn't the brush with the area tool on", async ({ page }) => {
+  test("criterion 7: the cursor follows a click-select", async ({ page }) => {
     await paintSetup(page);
     const p = await mapMid(page);
     await page.mouse.move(p.x, p.y);
@@ -181,10 +143,6 @@ test.describe("spec 010 edges (tester)", () => {
     const cur = await cursorAt(page, p);
     expect(cur.startsWith('url("data:image/svg+xml')).toBe(true);
     expect(decodeURIComponent(cur).toLowerCase()).toContain((await classColour(page, 1)).toLowerCase());
-    await page.click("#aef-draw");
-    expect((await cursorAt(page, p)).startsWith("url(")).toBe(false);
-    await page.click("#mode-paint");
-    expect((await cursorAt(page, p)).startsWith("url(")).toBe(true);
   });
 
   test("criterion 7: the cursor's SVG is 32x32 and decodes as valid SVG with black and white outlines", async ({ page }) => {
@@ -242,7 +200,7 @@ test.describe("spec 010 edges (tester)", () => {
     await page.locator("#map canvas").focus();
     await page.keyboard.press("Control+Shift+z");
     expect(await snapshot(page)).toEqual(painted);
-    await page.focus("#aef-year");
+    await page.focus("#seed-mode");
     await page.keyboard.press("Control+z");
     expect(await snapshot(page)).toEqual([]);
     await page.keyboard.press("Control+Shift+z");

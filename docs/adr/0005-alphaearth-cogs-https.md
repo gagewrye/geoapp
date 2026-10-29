@@ -1,6 +1,6 @@
 # 0005: AlphaEarth embeddings from Source Cooperative COGs, cached locally per AOI
 
-**Status:** Accepted (Gage, 2026-10-26)
+**Status:** Accepted (Gage, 2026-10-26). Shelved by spec 013 (2026-10-28).
 
 **Context:** Gage wants users to fetch the embeddings themselves (spec 002). Checked 2026-10-26:
 - **EE catalog** (`GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL`, v1.1): 64 bands at 10 m in local UTM, unit-length vectors, CC-BY 4.0.

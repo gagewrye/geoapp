@@ -18,7 +18,7 @@ const mapCentreXy = async (page: Page): Promise<Xy> => {
 const canvasCursor = (page: Page) => page.evaluate(() => getComputedStyle((window as any).__geoapp.map.getCanvas()).cursor);
 const storeKeys = (page: Page) => labels(page).then((m) => [...m].sort());
 
-type Setup = "paint" | "pan" | "none" | "area";
+type Setup = "paint" | "pan" | "none";
 async function setup(page: Page, how: Setup, zoom = 14, at: LngLat = START) {
   await openApp(page);
   if (how !== "none") {
@@ -26,7 +26,6 @@ async function setup(page: Page, how: Setup, zoom = 14, at: LngLat = START) {
     await expect(message(page)).toHaveText("Raster opened.");
   }
   if (how === "pan") await page.click("#mode-pan");
-  if (how === "area") await page.click("#aef-draw");
   await jumpTo(page, at, zoom);
 }
 
@@ -63,15 +62,13 @@ test.describe("wheel zooms about the centre (criterion 1)", () => {
 });
 
 test.describe("middle-button drag pans (criterion 2)", () => {
-  for (const how of ["paint", "pan", "none", "area"] as const) {
+  for (const how of ["paint", "pan", "none"] as const) {
     test(`${how}: the grabbed point follows the pointer; nothing else changes`, async ({ page }) => {
       await setup(page, how);
       const m = await mapCentreXy(page);
       const a = { x: m.x - 60, y: m.y - 40 }, b = { x: a.x + 150, y: a.y + 80 };
       const [grabbed] = await toLngLat(page, [a]);
       const v0 = await view(page);
-      const features0 = await page.evaluate(() => (window as any).__geoapp.draw.getSnapshot().length);
-      const info0 = await page.locator("#aef-info").textContent();
       await middleDrag(page, a, b);
       await idle(page);
       const p = await toScreen(page, grabbed!);
@@ -79,12 +76,10 @@ test.describe("middle-button drag pans (criterion 2)", () => {
       const v1 = await view(page);
       expect([v1.bearing, v1.pitch, v1.zoom]).toEqual([v0.bearing, v0.pitch, v0.zoom]);
       if (how !== "none") { await settled(page); expect((await labels(page)).size).toBe(0); }
-      expect(await page.evaluate(() => (window as any).__geoapp.draw.getSnapshot().length)).toBe(features0);
-      expect(await page.locator("#aef-info").textContent()).toBe(info0);
     });
   }
 
-  for (const how of ["paint", "pan", "none", "area"] as const) {
+  for (const how of ["paint", "pan", "none"] as const) {
     test(`${how}: at zoom 3 (globe) a rightward drag lowers the centre longitude`, async ({ page }) => {
       await setup(page, how, 3);
       const lon0 = (await centre(page))[0];
@@ -92,7 +87,6 @@ test.describe("middle-button drag pans (criterion 2)", () => {
       await middleDrag(page, m, { x: m.x + 150, y: m.y });
       await idle(page);
       expect((await centre(page))[0]).toBeLessThan(lon0 - 1);
-      expect(await page.evaluate(() => (window as any).__geoapp.draw.getSnapshot().length)).toBe(0);
     });
   }
 });
@@ -257,7 +251,7 @@ test.describe("WASD stops and ignores (criterion 6)", () => {
     await page.keyboard.up("Shift");
   });
 
-  test("W typed in a class name field types and doesn't pan; in a select it doesn't pan", async ({ page }) => {
+  test("W typed in a class name field types and doesn't pan", async ({ page }) => {
     await setup(page, "paint");
     const field = page.locator("#classes .class-name").first();
     await field.click();
@@ -268,11 +262,6 @@ test.describe("WASD stops and ignores (criterion 6)", () => {
     await page.keyboard.up("KeyW");
     expect(await centre(page)).toEqual(c0);
     await expect(field).toHaveValue("Class 1w");
-    await page.focus("#aef-year");
-    await page.keyboard.down("KeyW");
-    await page.waitForTimeout(300);
-    await page.keyboard.up("KeyW");
-    expect(await centre(page)).toEqual(c0);
   });
 
   for (const mod of ["Control", "Alt", "Meta"]) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isNodata, maskBit, nodataMask } from "../../../src/core/nodata";
+import { maskBit, nodataMask } from "../../../src/core/nodata";
 import type { Tile } from "../../../src/core/types";
 
 /** 5x3 tile: band 1 Float32 with NaN at pixel 7, band 2 with -9 at pixel 3, band 3 with -9 nowhere. */
@@ -26,12 +26,6 @@ describe("nodataMask (criterion 18)", () => {
   it("with nodata null only NaN is set", () => {
     const m = nodataMask(tile(null));
     expect(bits(m, 15)).toEqual(Array.from({ length: 15 }, (_, i) => (i === 7 ? 1 : 0)));
-  });
-
-  it("agrees with isNodata over all bands", () => {
-    const t = tile(-9);
-    const m = nodataMask(t);
-    for (let i = 0; i < 15; i++) expect(maskBit(m, i) === 1).toBe(isNodata(t, [1, 2, 3], i));
   });
 
   it("is ceil(width * height / 8) bytes", () => {

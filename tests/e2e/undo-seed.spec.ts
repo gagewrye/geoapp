@@ -39,16 +39,6 @@ test("a successful Merge import clears the history", async ({ page }) => {
   await expect(undoButton(page)).toBeDisabled();
 });
 
-test("a successful model seed clears the history", async ({ page }) => {
-  await twoClasses(page);
-  await page.click("#train");
-  await expect(message(page)).toHaveText(/^Trained on/);
-  await expect(undoButton(page)).toBeEnabled();
-  await page.click("#seed-model"); // Merge: no confirm
-  await expect(message(page)).toHaveText(seeded);
-  await expect(undoButton(page)).toBeDisabled();
-});
-
 test("a cancelled Replace confirm keeps the history; one Undo then removes the stroke", async ({ page }) => {
   const empty = await oneStroke(page);
   await page.selectOption("#seed-mode", "replace");
