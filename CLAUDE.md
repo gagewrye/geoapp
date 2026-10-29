@@ -10,9 +10,9 @@ Local-first browser app for labelling geospatial imagery. User data (local raste
 ## Layout
 ```
 src/
-  core/   pure logic: projections, preview warping, label store and brush, overlay grids, undo, label seeding. No DOM.
+  core/   pure logic: projections, preview warping and decimation, nodata masks, classes, label store and brush, overlay grids, undo, label seeding, WASD steps. No DOM.
   io/     raster read/write, file access
-  map/    MapLibre layers, drawing
+  map/    MapLibre layers, brush, navigation
   ui/     DOM wiring only
 tests/    unit (mirrors src/), e2e/
 shelf/    AlphaEarth and training code, unused and outside npm run check (spec 013); reviving any of it needs a spec
