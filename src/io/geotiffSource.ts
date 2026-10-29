@@ -1,6 +1,7 @@
 import { fromBlob, type GeoTIFF, type GeoTIFFImage } from "geotiff";
 import { affineFromTags } from "../core/geotags";
-import type { GeoTags, RasterMeta, RasterSource } from "./source";
+import type { Overview } from "../core/imagery";
+import type { GeoTags, ImagerySource, RasterMeta } from "./source";
 
 const stripNul = (s: unknown) => (typeof s === "string" ? s.replace(/\0+$/, "") : undefined);
 const nums = (v: unknown) => (v ? Array.from(v as ArrayLike<number>) : undefined);
@@ -24,7 +25,7 @@ export async function readGeoMeta(image: GeoTIFFImage): Promise<Pick<RasterMeta,
 }
 
 /** Wrap the first image of a GeoTIFF/COG; reads only the header until a window is requested. */
-export async function openGeoTiff(tiff: GeoTIFF): Promise<RasterSource> {
+export async function openGeoTiff(tiff: GeoTIFF): Promise<ImagerySource> {
   const image = await tiff.getImage(0);
   const fd = image.fileDirectory;
   const { width, height, gt, epsg, geoTags } = await readGeoMeta(image);
@@ -32,8 +33,30 @@ export async function openGeoTiff(tiff: GeoTIFF): Promise<RasterSource> {
   // Bands are read as Float32Array, so compare against nodata rounded the same way.
   const nd = gdalNoData(image.getGDALNoData(), stripNul(fd.getValue("GDAL_NODATA")));
   const nodata = nd === null ? null : Math.fround(nd);
+  const images = new Map<number, GeoTIFFImage>([[0, image]]);
+  const overviews: Overview[] = [];
+  for (let i = 1, n = await tiff.getImageCount(); i < n; i++) {
+    const im = await tiff.getImage(i);
+    const t = Number(im.fileDirectory.getValue("NewSubfileType") ?? 0);
+    // geotiff's own overview rule (geotiff.js:328-333), minus masks; other bands can't stand in for the image
+    if (!(t & 1) || t & 4 || im.getSamplesPerPixel() !== bandCount) continue;
+    images.set(i, im);
+    overviews.push({ index: i, width: im.getWidth(), height: im.getHeight() });
+  }
+  const bw = image.getTileWidth(), bh = image.getTileHeight();
+  const bytes = bw * bh * (image.planarConfiguration === 2 ? image.getSampleByteSize(0) : image.getBytesPerPixel());
   return {
     meta: { width, height, bandCount, gt, epsg, nodata, geoTags },
+    block: { width: bw, height: bh, bytes },
+    overviews,
+    async readSamples(index, x0, y0, w, h, samples, signal) {
+      signal?.throwIfAborted();
+      const im = images.get(index);
+      if (!im) throw new Error(`No overview ${index}`);
+      const rasters = await im.readRasters({ window: [x0, y0, x0 + w, y0 + h], samples, signal });
+      signal?.throwIfAborted();
+      return Array.from(rasters as unknown as ArrayLike<number>[]);
+    },
     async readWindow(x0, y0, w, h) {
       const rasters = (await image.readRasters({ window: [x0, y0, x0 + w, y0 + h] })) as unknown as ArrayLike<number>[];
       const bands = Array.from(rasters, (r) => (r instanceof Float32Array ? r : Float32Array.from(r)));
@@ -49,6 +72,6 @@ function gdalNoData(parsed: number | null, raw: string | undefined): number | nu
   return /^-inf/i.test(t) ? -Infinity : /^\+?inf/i.test(t) ? Infinity : parsed;
 }
 
-export async function openFile(file: Blob): Promise<RasterSource> {
+export async function openFile(file: Blob): Promise<ImagerySource> {
   return openGeoTiff(await fromBlob(file));
 }
