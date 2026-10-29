@@ -1,42 +1,14 @@
-import { readFile } from "node:fs/promises";
-import { expect, test, type Page } from "@playwright/test";
-import { fromArrayBuffer } from "geotiff";
-import { validate } from "../../src/core/validate";
+import { expect, test } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
 import { message, openApp, openRaster, paintTwoClasses, rgbFixture, tiff } from "./helpers";
 
-async function download(page: Page, click: string): Promise<Buffer> {
-  const [dl] = await Promise.all([page.waitForEvent("download"), page.click(click)]);
-  return readFile((await dl.path())!);
-}
-
-test("open, train, classify, export and save/load a model with no outside requests (criterion 1)", async ({ page, baseURL }) => {
+test("open and paint with no outside requests (criterion 1)", async ({ page, baseURL }) => {
   const requests: string[] = [];
   page.on("request", (r) => requests.push(r.url()));
-  // Force the OPFS + download path so the export can be captured (no native Save dialog in tests).
-  await page.addInitScript(() => { delete (window as { showSaveFilePicker?: unknown }).showSaveFilePicker; });
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
   await paintTwoClasses(page); // spec 003's brush replaces spec 001's polygons
-
-  await page.click("#train");
-  await expect(message(page)).toHaveText(/^Trained on \d+ pixels, 2 classes\.$/);
-
-  const tif = await download(page, "#classify");
-  await expect(message(page)).toHaveText("Export complete.");
-  const img = await (await fromArrayBuffer(tif.buffer.slice(tif.byteOffset, tif.byteOffset + tif.byteLength) as ArrayBuffer)).getImage();
-  expect([img.getWidth(), img.getHeight()]).toEqual([1000, 1000]);
-  const [px] = (await img.readRasters({ window: [100, 500, 101, 501] })) as unknown as Uint8Array[];
-  const [px2] = (await img.readRasters({ window: [900, 500, 901, 501] })) as unknown as Uint8Array[];
-  expect([px![0], px2![0]]).toEqual([0, 1]);
-
-  const json = (await download(page, "#save-model")).toString("utf8");
-  const model: unknown = JSON.parse(json);
-  validate(model, 3);
-  expect(model.classes).toEqual(["left", "right"]);
-  await page.setInputFiles("#load-model", { name: "model.json", mimeType: "application/json", buffer: Buffer.from(json) });
-  await expect(message(page)).toHaveText("Loaded model with classes: left, right.");
 
   const outside = requests.filter((u) => !u.startsWith(baseURL!) && !u.startsWith("blob:") && !u.startsWith("data:"));
   expect(outside).toEqual([]);

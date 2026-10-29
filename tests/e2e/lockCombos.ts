@@ -9,8 +9,8 @@ import { arrayBuffer } from "./seeding";
 // Helpers for the label-lock-*.tester specs.
 // Tester probe of spec 004's shared lock (Settled in build: Locks): while a seed or an Export labels
 // run is active on the open imagery, the brush and class add, rename and recolour are locked, and
-// only then. Exports, seeds, Trains, raster opens and Load model in combination; a cancelled Save
-// dialog and a failed write must unlock.
+// only then. Exports, seeds and raster opens in combination; a cancelled Save dialog and a failed
+// write must unlock.
 
 export const seeded = /^Seeded \d+ pixels in \d+ classes\.$/;
 
@@ -82,11 +82,6 @@ export async function setup(page: Page) {
   await expect(message(page)).toHaveText("Raster opened.");
   await paintTwoClasses(page);
 }
-export async function trained(page: Page) {
-  await setup(page);
-  await page.click("#train");
-  await expect(message(page)).toHaveText(/^Trained on/);
-}
 /** Opens another raster with the same grid, accepting "Discard labels?" if asked. */
 export async function reopen(page: Page) {
   page.once("dialog", (d) => void d.accept());
@@ -94,6 +89,3 @@ export async function reopen(page: Page) {
   await expect(message(page)).toHaveText("Raster opened.");
   await jumpTo(page, [15, 45], 6);
 }
-export const modelJson = (page: Page) => page.evaluate(() => JSON.stringify((window as any).__geoapp.model()));
-export const loadModel = (page: Page, json: string) =>
-  page.setInputFiles("#load-model", { name: "model.json", mimeType: "application/json", buffer: Buffer.from(json) });

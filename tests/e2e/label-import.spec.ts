@@ -1,10 +1,9 @@
-import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import { paletteColour } from "../../src/core/classes";
 import { tileWindows } from "../../src/core/grid";
 import { seedLut, sourceCells } from "../../src/core/seed";
 import { MESSAGES } from "../../src/ui/messages";
-import { CLASS_GRID, CLASS_MAP, classFile, classItemFile, classValue, ITEM_CLASSES, rgbClassFile, uint16ClassFile, writeFile } from "../unit/helpers/labelFiles";
+import { aefShapedFile, CLASS_GRID, CLASS_MAP, classFile, classItemFile, classValue, ITEM_CLASSES, rgbClassFile, uint16ClassFile, writeFile } from "../unit/helpers/labelFiles";
 import { message, openApp, openRaster, paintTwoClasses, RGB_GRID, rgbFixture } from "./helpers";
 import { classList, importFile, storeTiles, upload } from "./seeding";
 
@@ -68,7 +67,7 @@ test.describe("classes (criterion 12)", () => {
 });
 
 test.describe("refusals (criterion 15)", () => {
-  test("3-band, 16-bit and AlphaEarth files, an unsupported CRS and a file off the imagery each show their message and change nothing", async ({ page }) => {
+  test("3-band, 16-bit and AlphaEarth-shaped files, an unsupported CRS and a file off the imagery each show their message and change nothing", async ({ page }) => {
     await setup(page);
     await paintTwoClasses(page);
     const before = { tiles: await storeTiles(page), list: await classList(page) };
@@ -76,8 +75,7 @@ test.describe("refusals (criterion 15)", () => {
       expect(await storeTiles(page)).toEqual(before.tiles);
       expect(await classList(page)).toEqual(before.list);
     };
-    const aef = readFileSync("tests/fixtures/aef/cogs/2021/17N/fixture-west-bottomup.tiff");
-    for (const f of [upload("rgb.tif", rgbClassFile()), upload("u16.tif", uint16ClassFile()), { name: "aef.tif", mimeType: "image/tiff", buffer: aef }]) {
+    for (const f of [upload("rgb.tif", rgbClassFile()), upload("u16.tif", uint16ClassFile()), upload("aef.tif", aefShapedFile())]) {
       await page.evaluate(() => { document.getElementById("message")!.textContent = ""; });
       await importFile(page, f);
       await expect(message(page)).toHaveText(MESSAGES.labelFile);

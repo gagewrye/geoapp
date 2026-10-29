@@ -1,9 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 import { classFile } from "../unit/helpers/labelFiles";
-import { collectErrors, message, openApp, openRaster, paintTwoClasses, rgbFixture } from "./helpers";
-import { classList, importFile, openFileGate, openImageryGate, pauseImagery, pauseLabelFile, storeTiles, upload } from "./seeding";
+import { collectErrors, message, openApp, openRaster, rgbFixture } from "./helpers";
+import { classList, importFile, openFileGate, pauseLabelFile, storeTiles, upload } from "./seeding";
 
-// Spec 003's rule for replaced rasters, applied to spec 004's Import labels and Seed from model:
+// Spec 003's rule for replaced rasters, applied to spec 004's Import labels:
 // a run finishing after another raster opened sets no labels and no message, and the store isn't swapped.
 
 async function reopen(page: Page) {
@@ -31,26 +31,6 @@ test("an import whose raster was replaced while it ran changes nothing on the ne
   const list = await classList(page);
   await reopen(page);
   await openFileGate(page);
-  await expectDropped(page, list);
-  expect(errors).toEqual([]);
-});
-
-test("a model seed whose raster was replaced while it ran changes nothing on the new raster", async ({ page }) => {
-  const errors = collectErrors(page);
-  await openApp(page);
-  await openRaster(page, rgbFixture());
-  await expect(message(page)).toHaveText("Raster opened.");
-  await paintTwoClasses(page);
-  await page.click("#train");
-  await expect(message(page)).toHaveText(/^Trained on/);
-  await pauseImagery(page);
-  await page.click("#seed-model");
-  await expect.poll(() => page.evaluate(() => (window as any).__gate.reads)).toBe(1);
-  await expect(page.locator("#train")).toBeDisabled();
-  const list = await classList(page);
-  await reopen(page);
-  await expect(page.locator("#train")).toBeEnabled();
-  await openImageryGate(page);
   await expectDropped(page, list);
   expect(errors).toEqual([]);
 });

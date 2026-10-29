@@ -2,11 +2,10 @@ import { expect, test } from "@playwright/test";
 import { collectErrors, jumpTo, labels, message, openApp, openRaster, rgbFixture, selectClass, stroke, toScreen } from "./helpers";
 import { fileGate, fileWaiting, holdFile, info, openRgb, otherFixture, paintPair, releaseFiles } from "./raceCombos";
 
-// Tester pass 3 (F9-F11 and the Classify busy fix): Train, Classify, Load model, AlphaEarth and
-// overlapping raster opens in combination, with cancel and failure paths.
+// Tester pass 3 (F9-F11): overlapping raster opens with labels, with cancel paths.
 
 test.describe("overlapping opens with labels (tester)", () => {
-  test("an older open released after a newer one opened and was labelled: no confirm, labels, raster and Train unchanged", async ({ page }) => {
+  test("an older open released after a newer one opened and was labelled: no confirm, labels and raster unchanged", async ({ page }) => {
     const errors = collectErrors(page);
     await fileGate(page);
     await openApp(page);
@@ -30,8 +29,6 @@ test.describe("overlapping opens with labels (tester)", () => {
     expect(asked).toBe(0);
     expect(await labels(page)).toEqual(before);
     await expect(info(page)).toHaveText(/^other\.tif: 800 x 600/);
-    await page.click("#train");
-    await expect(message(page)).toHaveText(`Trained on ${before.size} pixels, 2 classes.`);
     expect(errors).toEqual([]);
   });
 
@@ -60,8 +57,6 @@ test.describe("overlapping opens with labels (tester)", () => {
     await expect(info(page)).toHaveText(/^slow\.tif: 1000 x 1000/);
     expect(await page.evaluate(() => (window as any).__geoapp.map.getSource("preview")?.coordinates[0][0] as number)).toBeCloseTo(10, 6);
     expect((await labels(page)).size).toBe(200);
-    await page.click("#train");
-    await expect(message(page)).toHaveText("Trained on 200 pixels, 2 classes.");
     expect(errors).toEqual([]);
   });
 

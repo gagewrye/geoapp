@@ -1,9 +1,6 @@
-import { readFileSync } from "node:fs";
 import { expect, test, type Page, type Request } from "@playwright/test";
-import type { AefEntry } from "../../src/core/aef";
-import { drawSmallArea, logRequests } from "./aef";
 import {
-  BACKGROUND, hideBasemap, jumpTo, message, openApp, openRaster, pixelAt, rgbFixture, stroke, toLngLat, toScreen, type LngLat, type Xy,
+  BACKGROUND, hideBasemap, jumpTo, logRequests, message, openApp, openRaster, pixelAt, rgbFixture, stroke, toLngLat, toScreen, type LngLat, type Xy,
 } from "./helpers";
 
 // Spec 012: the bundled Natural Earth basemap, always shown as the bottom map layer.
@@ -13,10 +10,6 @@ const ids = (page: Page): Promise<string[]> => page.evaluate(() => (window as an
 const basemapUrl = (page: Page): Promise<string> => page.evaluate(() => (window as any).__geoapp.map.getStyle().sources.basemap.url as string);
 const fileName = (url: string) => new URL(url, "http://x/").pathname.split("/").pop()!;
 const network = (log: Request[]) => log.map((r) => r.url()).filter((u) => !u.startsWith("data:") && !u.startsWith("blob:"));
-
-const FIX = "tests/fixtures/aef";
-const west = (JSON.parse(readFileSync(`${FIX}/aef-index/2021/32617.json`, "utf8")) as AefEntry[])[0]!;
-const westFile = () => ({ name: "west.tiff", mimeType: "image/tiff", buffer: readFileSync(`${FIX}/cogs/${west.path}`) });
 
 test("shown at startup: the Sahara and the Pacific are not the background and differ (criterion 2)", async ({ page }) => {
   await openApp(page);
@@ -133,11 +126,6 @@ test("not hideable: no control names it, and it stays visible, opaque and second
   await stroke(page, [a, { x: a.x + 40, y: a.y }]);
   await page.click("#mode-pan");
   await page.click("#mode-paint");
-  await page.setInputFiles("#open-aef", westFile());
-  await expect(message(page)).toHaveText("AlphaEarth file opened.");
-  await page.locator("#aef-preview").uncheck();
-  await page.locator("#aef-preview").check();
-  await drawSmallArea(page, [16, 46]);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
   const state = await page.evaluate(() => {

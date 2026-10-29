@@ -1,10 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 import { footprint, footprintRing, pixelAt } from "../../src/core/pixel";
 import { MAX_LAT, type Grid } from "../../src/core/types";
-import { MESSAGES } from "../../src/ui/messages";
-import { collectErrors, hoverFeatures, jumpTo, labels, message, openApp, openRaster, pixelAt as screenPixel, selectClass, settled, tiff, tileKeysStored, toLngLat, toScreen, type LngLat, type Xy } from "./helpers";
+import { collectErrors, hoverFeatures, jumpTo, labels, message, openApp, openRaster, pixelAt as screenPixel, settled, tiff, tileKeysStored, toLngLat, toScreen, type LngLat, type Xy } from "./helpers";
 
-// Tester: spec 003 at raster edges and partial tiles, and beyond MAX_LAT (labelled, trained, not drawn).
+// Tester: spec 003 at raster edges and partial tiles, and beyond MAX_LAT (labelled, not drawn).
 
 const EDGE: Grid = { width: 300, height: 260, epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01] };
 const edgeFixture = () => tiff("edge.tif", 300, 260, 3, (b, c, r) => (b === 0 ? (c < 150 ? 40 : 160) : (c + r + b) % 90), { epsg: 4326, gt: EDGE.gt });
@@ -77,7 +76,7 @@ test.describe("beyond MAX_LAT (tester)", () => {
   const POLE: Grid = { width: 300, height: 600, epsg: 4326, gt: [0, 0.017, 0, 90, 0, -0.017] };
   const poleFixture = () => tiff("pole.tif", 300, 600, 2, (b, c, r) => (b === 0 ? (r < 400 ? 20 : 200) : (c + r) % 50), { epsg: 4326, gt: POLE.gt });
 
-  test("an overhanging size-127 footprint labels pixels beyond MAX_LAT, including a tile wholly beyond it; they train normally and nothing throws", async ({ page }) => {
+  test("an overhanging size-127 footprint labels pixels beyond MAX_LAT, including a tile wholly beyond it, and nothing throws", async ({ page }) => {
     const errors = collectErrors(page);
     await openApp(page);
     await openRaster(page, poleFixture());
@@ -101,17 +100,7 @@ test.describe("beyond MAX_LAT (tester)", () => {
     expect(Math.min(...rows)).toBe(row - 63);
     expect(Math.min(...rows)).toBeLessThan(256); // into tile row 0, wholly beyond MAX_LAT
     expect(await tileKeysStored(page)).toContain("0,0");
-    // a second class far south, then Train: N counts the pixels beyond MAX_LAT too
-    await selectClass(page, 1);
-    await jumpTo(page, [2.55, 81], 5);
-    const q = round(await toScreen(page, [2.55, 81]));
-    await page.mouse.click(q.x, q.y);
-    await settled(page);
-    const n = (await labels(page)).size;
-    await page.click("#train");
-    await expect(message(page)).toHaveText(`Trained on ${n} pixels, 2 classes.`);
     await page.waitForTimeout(200);
     expect(errors).toEqual([]);
-    expect(await message(page).textContent()).not.toBe(MESSAGES.noSamples);
   });
 });

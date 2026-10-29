@@ -1,10 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { expect, type Page } from "@playwright/test";
-import { fromArrayBuffer } from "geotiff";
 import type { LabelClass } from "../../src/core/classes";
 import type { LabelStore } from "../../src/core/labelStore";
 import type { Grid } from "../../src/core/types";
-import { openGeoTiff } from "../../src/io/geotiffSource";
 import { tiff } from "./helpers";
 
 // Spec 004 e2e helpers: label files as uploads, the store and list through the hook, downloads, gates.
@@ -72,11 +70,6 @@ export const inNodata = (c: number, r: number) => c >= 400 && c < 460 && r >= 40
 export const nodataImagery = () => tiff("nodata4326.tif", 1000, 1000, 3,
   (b, c, r) => (b === 1 && inNodata(c, r) ? -9999 : b === 0 ? (c < 500 ? 200 : 120) : b === 1 ? 100 + (r % 100) : 150),
   { epsg: 4326, gt: ND_GRID.gt, nodata: "-9999" });
-
-/** An upload's raster as a source, in Node. */
-export async function sourceOf(file: { buffer: Buffer }) {
-  return openGeoTiff(await fromArrayBuffer(arrayBuffer(file.buffer)));
-}
 
 /** Every stored pixel is off imagery nodata. */
 export function expectNoNodata(tiles: Map<string, Uint8Array>, width: number, nodata: (c: number, r: number) => boolean): void {

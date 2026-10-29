@@ -83,17 +83,14 @@ test("Replace shows the confirm: Cancel keeps labels and classes, OK replaces th
   expect(new Set((await labels(page)).values())).toEqual(new Set([1, 2, 3]));
 });
 
-test("while an import runs the brush, Train and class edits are disabled; while mask reads are pending Import labels, Seed and Export labels are", async ({ page }) => {
+test("while an import runs the brush and class edits are disabled; while mask reads are pending Import labels and Export labels are", async ({ page }) => {
   await setup(page);
   await paintTwoClasses(page);
-  await page.click("#train");
-  await expect(message(page)).toHaveText(/^Trained on/);
-  await expect(page.locator("#seed-model")).toBeEnabled();
   const before = await labels(page);
   await pauseLabelFile(page);
   await importFile(page, classes());
   await expect.poll(() => page.evaluate(() => (window as any).__fileGate.reads)).toBe(1);
-  for (const id of ["#train", "#seed-model", "#export-labels", "#import-labels", "#class-add"]) await expect(page.locator(id)).toBeDisabled();
+  for (const id of ["#export-labels", "#import-labels", "#class-add"]) await expect(page.locator(id)).toBeDisabled();
   await expect(page.locator("#classes .class-name").first()).toBeDisabled();
   // a drag paints nothing and shows no footprint
   await jumpTo(page, [15, 45], 6);
@@ -110,7 +107,6 @@ test("while an import runs the brush, Train and class edits are disabled; while 
   // unlocked, the same point shows the footprint again
   await page.mouse.move(a.x + 1, a.y);
   await expect.poll(async () => (await hoverFeatures(page)).length).toBe(1);
-  await expect(page.locator("#train")).toBeEnabled();
   await expect(page.locator("#classes .class-name").first()).toBeEnabled();
 
   // a dab on tile 0,0 (no mask yet: nothing was painted or seeded there) waits for its read
@@ -120,12 +116,10 @@ test("while an import runs the brush, Train and class edits are disabled; while 
   await page.mouse.click(b.x, b.y);
   await expect.poll(() => page.evaluate(() => (window as any).__gate.reads)).toBe(1);
   await expect(page.locator("#import-labels")).toBeDisabled();
-  await expect(page.locator("#seed-model")).toBeDisabled();
   await expect(page.locator("#export-labels")).toBeDisabled(); // its file must hold no half-applied stroke
   await openImageryGate(page);
   await settled(page);
   await expect(page.locator("#import-labels")).toBeEnabled();
-  await expect(page.locator("#seed-model")).toBeEnabled();
   await expect(page.locator("#export-labels")).toBeEnabled();
 });
 

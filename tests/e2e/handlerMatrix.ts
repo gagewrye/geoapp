@@ -52,7 +52,7 @@ export async function gestures(page: Page): Promise<Gestures> {
   return { dblclick, boxZoom, rotate };
 }
 
-export const PAINT = "0001", PAN = "1111", AREA = "1011";
+export const PAINT = "0001", PAN = "1111";
 export const NONE: Gestures = { dblclick: false, boxZoom: false, rotate: false };
 export const ALL: Gestures = { dblclick: true, boxZoom: true, rotate: true };
 

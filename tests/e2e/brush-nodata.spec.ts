@@ -1,12 +1,6 @@
-import { readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
-import { fromArrayBuffer } from "geotiff";
-import { fit } from "../../src/core/fit";
-import { labelSamples } from "../../src/core/labelSamples";
-import { labelWindows, type LabelStore } from "../../src/core/labelStore";
 import { footprint, footprintRing, pixelAt, strokeCells } from "../../src/core/pixel";
 import type { Grid } from "../../src/core/types";
-import { openGeoTiff } from "../../src/io/geotiffSource";
 import { hoverFeatures, jumpTo, labels, message, openApp, openRaster, settled, tiff, tileKeysStored, toLngLat, toScreen, type LngLat, type Xy } from "./helpers";
 
 // Spec 003 criterion 19: the brush never labels imagery nodata.
@@ -81,7 +75,7 @@ test.describe("imagery nodata (criterion 19)", () => {
     });
   }
 
-  test("with the imagery source paused a drag labels the same pixels once reads resume, even after release; Train is disabled until then", async ({ page }) => {
+  test("with the imagery source paused a drag labels the same pixels once reads resume, even after release; Import labels is disabled until then", async ({ page }) => {
     await setup(page);
     await page.evaluate(() => {
       const s = (window as any).__geoapp.imagery();
@@ -93,39 +87,10 @@ test.describe("imagery nodata (criterion 19)", () => {
     const pts = await across(page, 85, 345, 115, 30);
     await drag(page, pts);
     await page.waitForTimeout(300);
-    await expect(page.locator("#train")).toBeDisabled();
+    await expect(page.locator("#import-labels")).toBeDisabled();
     expect((await labels(page)).size).toBe(0);
     await page.evaluate(() => { const g = (window as any).__gate; g.held = false; g.open(); });
     await settled(page);
     expect(new Set((await labels(page)).keys())).toEqual(await expected(page, pts));
-  });
-
-  test("Train's N equals the labelled pixels and the model equals fit on them", async ({ page }) => {
-    await setup(page);
-    await drag(page, await across(page, 85, 345, 110, 20));
-    await settled(page);
-    await page.locator("#classes li").nth(1).click({ position: { x: 4, y: 4 } });
-    await drag(page, await across(page, 85, 345, 140, 20));
-    await settled(page);
-    const n = (await labels(page)).size;
-    await page.click("#train");
-    await expect(message(page)).toHaveText(`Trained on ${n} pixels, 2 classes.`);
-    const [dl] = await Promise.all([page.waitForEvent("download"), page.click("#save-model")]);
-    const model = JSON.parse((await readFile((await dl.path())!)).toString("utf8"));
-    // the same samples, read from the same file in Node
-    const tiles: [string, number[]][] = await page.evaluate(() => [...(window as any).__geoapp.labels.store.tiles].map(([k, v]: [string, Uint8Array]) => [k, Array.from(v)]));
-    const store: LabelStore = { width: 512, height: 512, tiles: new Map(tiles.map(([k, v]) => [k, Uint8Array.from(v)])) };
-    const buf = fixture().buffer;
-    const src = await openGeoTiff(await fromArrayBuffer(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer));
-    const parts = [];
-    for (const w of labelWindows(store)) parts.push(labelSamples(await src.readWindow(w.x0, w.y0, w.width, w.height), store.tiles.get(`${w.x0},${w.y0}`)!, [1, 2, 3]));
-    const X = Float32Array.from(parts.flatMap((p) => [...p.X])), y = Uint8Array.from(parts.flatMap((p) => [...p.y]));
-    expect(y.length).toBe(n);
-    const want = fit(X, y, [1, 2, 3], ["Class 1", "Class 2"]);
-    // same samples in the same order; only Math.exp may differ in the last bits between Chromium and Node
-    expect({ ...model, W: null, b: null }).toEqual({ ...want, W: null, b: null });
-    const close = (a: number[], b: number[]) => a.forEach((v, i) => expect(Math.abs(v - b[i]!)).toBeLessThan(1e-12 * Math.max(1, Math.abs(v))));
-    model.W.forEach((row: number[], i: number) => close(row, want.W[i]!));
-    close(model.b, want.b);
   });
 });

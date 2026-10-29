@@ -112,12 +112,10 @@ test("Undo is disabled while a stroke's cells wait for masks; then one Undo remo
   await expect(undoButton(page)).toBeDisabled();
 });
 
-test("opening another raster clears the history; Train keeps it (criterion 5)", async ({ page }) => {
+test("opening another raster clears the history (criterion 5)", async ({ page }) => {
   await setup(page);
   await paintTwoClasses(page);
   const painted = await snapshot(page);
-  await page.click("#train");
-  await expect(message(page)).toHaveText(/^Trained on /);
   await expect(undoButton(page)).toBeEnabled();
   await undoButton(page).click(); // the class 2 stroke
   const one = await snapshot(page);
