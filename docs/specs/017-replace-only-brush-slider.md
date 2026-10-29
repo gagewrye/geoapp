@@ -2,27 +2,15 @@
 
 **Goal:** Remove the Seed mode select, so every import replaces the labels (after a confirm when any exist), and set the brush size with a 1-127 px slider.
 
-**Status:** Draft for Gage (2026-10-29). The request, verbatim: "Remove the seed mode option. Make the brush a slider instead of fixed sizes. Keep the cap though." **ADRs:** none (no new dependency or architecture change). **Build after spec 014 merges.** This spec amends specs 003, 004, 009, 010 and 014 (see Amendments).
+**Status:** Approved (Gage, 2026-10-29: "yes to all"). The request, verbatim: "Remove the seed mode option. Make the brush a slider instead of fixed sizes. Keep the cap though." **ADRs:** none (no new dependency or architecture change). **Build after spec 014 merges.** This spec amends specs 003, 004, 009, 010 and 014 (see Amendments).
 
-**Open questions (each has a recommended default):**
-1. With no select, what does an import do? Default: it always replaces, with spec 004's `confirm("Replace labels?")` when any label or mask exists. Always Merge is the alternative, but spec 014 refuses Merge while a mask is loaded, so a second mask could never load.
-2. Should the "−" and "+" buttons stay beside the slider? Default: yes, as coarse steps. They then keep spec 003's keyboard and Space tests, and about 15 e2e files that use `#brush-larger`.
-3. What should `[` and `]` do? Default: halve or double the size (`stepBrush`). From 7 that gives today's sizes exactly. The alternative, ±2 px, takes 63 presses to go from 1 to 127.
-4. Should only odd sizes be allowed? Default: yes (step 2). An even square has no centre pixel, so it couldn't centre on the pointer the way `footprint` does.
+**Decided (Gage, 2026-10-29):**
+- Every import replaces, with spec 004's `confirm("Replace labels?")` when any label or mask exists. Always Merge was rejected: spec 014 refuses Merge onto a loaded mask, so a second mask could never load.
+- "−" and "+" stay beside the slider, as coarse steps. `[` and `]` halve or double the size (`stepBrush`), which from 7 gives today's sizes exactly.
+- Sizes are odd only (step 2), so the square centres on the pointer's pixel.
 
-## Spec 014 interaction
-Spec 014 lets Merge run only while no mask is loaded: stored tiles are merged with the base, it refuses with "Merge works only while no mask is loaded. Use Replace.", and its criterion 10 tests this. Under this spec, those parts lapse:
-- Scope's "Merge with no base loaded";
-- the Rules' Merge bullets and their message;
-- criterion 10, which is replaced by criterion 5 below.
-
-Other spec 014 text changes too:
-- "Merge or Replace" in Already built, and "Merge while a mask is loaded is refused" in Decided, now read "Replace only (spec 017)".
-- In `hasLabels`, "drives the discard confirm and Seed mode" becomes "drives the discard confirm and the Replace confirm".
-- The cap message drops "with Replace": "Label limit reached (256 edited tiles of 256 x 256 px). Undo strokes, or export the labels and import the export."
-- Criteria 4 and 9 drop "with Replace".
-
-The base, copy-on-touch, preview, export and undo work are unaffected.
+## Spec 014
+Spec 014 is amended in the same change: Merge, its refusal message and its criterion 10 are gone, so it is Replace only, and its cap message drops "with Replace". Its base, copy-on-touch, preview, export and undo are unaffected.
 
 ## Interfaces (`core/`)
 ```ts

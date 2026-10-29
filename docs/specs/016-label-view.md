@@ -2,13 +2,13 @@
 
 **Goal:** Let the user dim or hide the labels to see the imagery under them, and start each newly loaded label set in Pan mode.
 
-**Status:** Draft for Gage (2026-10-29). The request, verbatim: "We need to implement transparancy and the ability to toggle off view of the labels. In addition, when labels load it should start off in pan mode instead of paint mode." The rest of that request is spec 017, and the outline defect is spec 018. **ADRs:** none. There is no new dependency, and opacity and visibility are ordinary maplibre-gl 6.16.0 paint and layout properties (`raster-opacity`, `visibility`). **Build after spec 014 merges**, because this spec drives spec 014's `mask` layer. Amends specs 003, 010 and 014 as listed under Amendments.
+**Status:** Approved (Gage, 2026-10-29: "yes to all"). The request, verbatim: "We need to implement transparancy and the ability to toggle off view of the labels. In addition, when labels load it should start off in pan mode instead of paint mode." The rest of that request is spec 017, and the outline defect is spec 018. **ADRs:** none. There is no new dependency, and opacity and visibility are ordinary maplibre-gl 6.16.0 paint and layout properties (`raster-opacity`, `visibility`). **Build after spec 014 merges**, because this spec drives spec 014's `mask` layer. Amends specs 003, 010 and 014 as listed under Amendments.
 
-**Open questions (each has a recommended default):**
-1. Should opacity survive a page reload? Default: no. It is kept for the page session, including when another raster opens, and nothing is stored.
-2. While labels are hidden, does painting work blind, or is it blocked? Default: blocked (see Rules). An edit you can't see is easy to make by mistake.
-3. "When labels load": does this mean opening imagery, importing labels or a mask, or both? Today `ui/labels.ts` `open()` sets Paint, and an import keeps the current mode. Default: both. Opening a raster starts in Pan, and so does a successful import.
-4. Should Show labels have a keyboard shortcut? Default: no. That is left Out for now.
+**Decided (Gage, 2026-10-29):**
+- Opacity isn't saved across reloads. It is kept for the page session, including when another raster opens.
+- Painting is blocked while labels are hidden, because an edit you can't see is easy to make by mistake.
+- "When labels load" means both opening a raster and a successful import. Before this, `ui/labels.ts` `open()` set Paint, and an import kept the current mode.
+- Show labels has no keyboard shortcut.
 
 ## Scope
 **In:** an Opacity slider and a Show labels checkbox that act on the label overlays and the mask; blocking the brush while labels are hidden; Pan as the mode after an open or an import.

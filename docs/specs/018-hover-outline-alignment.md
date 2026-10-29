@@ -2,17 +2,20 @@
 
 **Goal:** The brush footprint outline covers exactly the overlay cells that a click there colours, at any display scale.
 
-**Status:** Draft for Gage (2026-10-29). The defect, in his words: "The pixel selector visual is also slightly misaligned with the map. It shows as shifted down and right relative to the pixel it will color." He then added: "Just the outline is off. It still marks where the cursor is at." His Windows display scale is 125% (devicePixelRatio 1.25). **ADRs:** none. Amends spec 003 Hover.
+**Status:** Approved (Gage, 2026-10-29: "yes to all. unsure about projection."). The defect, in his words: "The pixel selector visual is also slightly misaligned with the map. It shows as shifted down and right relative to the pixel it will color." He then added: "Just the outline is off. It still marks where the cursor is at." His Windows display scale is 125% (devicePixelRatio 1.25). **ADRs:** none. Amends spec 003 Hover.
 
-**Open questions (each has a recommended default):**
-1. **The cause is predicted, not observed.** Is the gap at most about half a raster pixel, and does it grow as you zoom in? If so, it is the cause below. If instead it stays a fixed few screen pixels at every zoom, it is a rendering fault, and this spec goes back to the architect. Default: proceed. The implementer runs criterion 1 first and reports the measured offsets before any fix.
-2. **Which fix?** Default: (a), with these options:
-   - (a) Snap the outline to the cells that will be painted. This is cheap, it is exactly what Gage asked for, and it works in any CRS.
-   - (b) Halve the overlay cell size. Labels sit within 0.25 px of their true place, but overlay memory grows about 4x, to about 400-540 MiB at the cap.
-   - (c) A custom WebGL label layer. This is exact, but it needs a new ADR and replaces spec 011's grid.
-3. What CRS is your imagery? This is spec 011's unanswered question. On a rotated grid, such as UTM, fix (a) draws a stepped outline.
+**Decided (Gage, 2026-10-29):**
+- The gap is at most about half a raster pixel and grows as you zoom in, which matches the cause below.
+- The fix snaps the outline to the cells that will be painted. Two options were rejected:
+  - halving the overlay cells (about 4x the overlay memory);
+  - a custom WebGL layer (a new ADR, and it would replace spec 011's grid).
+- The imagery CRS is unknown, so the fix must handle both cases:
+  - **Axis-aligned grids** (EPSG:4326, 3857): the outline is a rectangle.
+  - **Rotated grids** (UTM): the outline is stepped.
 
-## Cause (found by reading the code; maplibre-gl 6.16.0)
+The implementer still runs criterion 1 first and reports the measured offsets.
+
+## Cause (found by reading the code, maplibre-gl 6.16.0; consistent with Gage's description)
 - **The outline is exact.** `footprintRing` traces the outer pixel edges of the same `footprint` window that `brush` paints. The pointer maps to its cell in CSS pixels through the canvas rect, as `unproject` does.
 - **The painted colour is not exact.** Spec 011 draws each label on a shared Mercator cell grid:
   - Each cell is `OVERLAY_MARGIN` 0.98 of the finest pixel, with edges at multiples of the cell size from Mercator (0, 0).
@@ -36,13 +39,14 @@ footprintCells(w: Window, grid: Grid, og: OverlayGrid): [number, number][][]
 **Rules.**
 - **Hover** shows `footprintCells` of the clipped footprint as one MultiPolygon feature, with the same fill, line and colour as before, in place of `footprintRing`.
   - It still reads nothing, and it shows and hides exactly as spec 003 Hover says.
+  - On an axis-aligned grid each ring is a rectangle. On a rotated grid it is the stepped boundary of the cells, not the rotated square, because the cells are what gets painted.
   - Spec 011's extra seam cells, which a coarser tile paints in a finer neighbour, are not outlined. At such seams the outline can differ from the painted colour by up to one coarse cell, which is accepted.
 - **Cost.** About (side + 2)² projections per update: an estimated 8 ms at 127 px, from spec 011's 0.4 s per 845k projections. This is fine at pointer-move rates.
 - **Helper.** `pixelAt` and the seams test read column `floor((x − left)·sx)` and row `canvas.height − 1 − floor((y − top)·sy)`. Existing pixel tests must still pass.
 
 ## Acceptance criteria
 1. Diagnosis (unit, run first; its numbers go in the implementer's report): on spec 011's synthetic EPSG:4326 and EPSG:32633 grids, over every pixel of a 2x2-tile block, measure the largest distance between a pixel's true Mercator edges and the edges of its centre-owned cells. It is at least 0.3 px somewhere, and at most 0.5 cell everywhere.
-2. `footprintCells` (unit, brute force on the same grids, sizes 1, 7 and 127, including a footprint across a tile corner): a cell centre lies inside a returned ring exactly when it is a cell whose centre lies in w. On an EPSG:3857 grid each ring is the rectangle of those cells.
+2. `footprintCells` (unit, brute force on the same grids, sizes 1, 7 and 127, including a footprint across a tile corner): a cell centre lies inside a returned ring exactly when it is a cell whose centre lies in w. On an EPSG:3857 grid each ring is the rectangle of those cells. On the EPSG:32633 grid, every ring edge is horizontal or vertical in Mercator, and at size 127 a ring has more than 4 corners (it steps).
 3. Hover feature (e2e): the hover source's geometry equals `footprintCells` at `pixelAt` of the pointer, within 1e-9°. Spec 003 criterion 9's show and hide cases still hold.
 4. Regression (e2e, Playwright `deviceScaleFactor` 1, 1.25 and 1.5; EPSG:4326 fixture and spec 011's UTM GeoTIFF; zoom where a raster pixel is about 8 CSS px; basemap hidden; sizes 1 and 7):
    - The test picks a pointer pixel where criterion 1's offset is at least 0.3 px in both axes.
