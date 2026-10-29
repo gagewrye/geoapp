@@ -46,16 +46,16 @@ describe("blocks, overviews and sample reads (spec 020)", () => {
       { width: 50, height: 40, bands: 3, value: v, layout: { rows: 40 } }, // a second page, not an overview
     ];
     const src = await openGeoTiff(await fromArrayBuffer(uint8Tiff(images, geo)));
-    expect(src.block).toEqual({ width: 128, height: 64, bytes: 128 * 64 * 3 });
+    expect(src.block).toEqual({ width: 128, height: 64, bytes: 128 * 64 * 3, sampleBytes: 1 });
     expect(src.overviews).toEqual([{ index: 1, width: 300, height: 200 }, { index: 2, width: 150, height: 100 }]);
   });
 
   it("reports a strip as width x RowsPerStrip", async () => {
     const src = await openGeoTiff(await fromArrayBuffer(uint8Tiff([{ width: 70, height: 50, bands: 1, value: v, layout: { rows: 8 } }], geo)));
-    expect(src.block).toEqual({ width: 70, height: 8, bytes: 560 });
+    expect(src.block).toEqual({ width: 70, height: 8, bytes: 560, sampleBytes: 1 });
     expect(src.overviews).toEqual([]);
     const single = await openGeoTiff(await fromArrayBuffer(geotiffBuffer(30, 20, 3, () => 1, geo)));
-    expect(single.block).toEqual({ width: 30, height: 20, bytes: 30 * 20 * 3 * 4 });
+    expect(single.block).toEqual({ width: 30, height: 20, bytes: 30 * 20 * 3 * 4, sampleBytes: 4 });
   });
 
   it("reads the asked bands of a window as raw typed arrays, from the full image or an overview", async () => {

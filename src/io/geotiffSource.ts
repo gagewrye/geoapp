@@ -44,10 +44,12 @@ export async function openGeoTiff(tiff: GeoTIFF): Promise<ImagerySource> {
     overviews.push({ index: i, width: im.getWidth(), height: im.getHeight() });
   }
   const bw = image.getTileWidth(), bh = image.getTileHeight();
-  const bytes = bw * bh * (image.planarConfiguration === 2 ? image.getSampleByteSize(0) : image.getBytesPerPixel());
+  const sampleBytes = Math.max(...Array.from({ length: bandCount }, (_, k) => image.getSampleByteSize(k)));
+  // a separate-planes block holds one band
+  const bytes = bw * bh * (image.planarConfiguration === 2 ? sampleBytes : image.getBytesPerPixel());
   return {
     meta: { width, height, bandCount, gt, epsg, nodata, geoTags },
-    block: { width: bw, height: bh, bytes },
+    block: { width: bw, height: bh, bytes, sampleBytes },
     overviews,
     async readSamples(index, x0, y0, w, h, samples, signal) {
       signal?.throwIfAborted();
