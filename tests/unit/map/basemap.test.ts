@@ -1,5 +1,6 @@
 import { readFileSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { baseStyle } from "../../../src/map/style";
 
 const JPG = "src/map/basemap.jpg";
 const NOTICE = "src/map/basemap.NOTICE.md";
@@ -36,5 +37,11 @@ describe("bundled basemap asset (spec 012 criterion 1)", () => {
     expect(n.toLowerCase()).toContain("public domain");
     expect(n).toContain("gdalwarp -s_srs EPSG:4326 -t_srs EPSG:3857 -te -20037508.34 -20037508.34 20037508.34 20037508.34 -ts 2048 2048 -r average");
     expect(n).toContain("gdal_translate -of JPEG -co QUALITY=85");
+  });
+});
+
+describe("base style (spec 015 criterion 1)", () => {
+  it("has no sky, so MapLibre draws no atmosphere over or around the globe", () => {
+    expect(baseStyle()).not.toHaveProperty("sky");
   });
 });
