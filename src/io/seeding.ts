@@ -53,7 +53,7 @@ async function build(windows: Window[], current: Labels, mode: SeedMode, incomin
   const merged = mergeClasses(mode === "merge" ? current.classes : [], incoming);
   if (merged === "too many") return merged;
   const { width, height } = current.store;
-  const store: LabelStore = mode === "merge" ? { width, height, tiles: new Map(current.store.tiles) } : emptyStore(width, height);
+  const store: LabelStore = mode === "merge" ? { width, height, tiles: new Map(current.store.tiles), base: current.store.base } : emptyStore(width, height);
   let pixels = 0;
   const seen = new Set<number>();
   for (const w of windows) {

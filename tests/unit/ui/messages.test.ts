@@ -9,7 +9,7 @@ describe("seedMessage", () => {
     expect(seedMessage("too many")).toBe("Too many classes (max 255). Nothing was seeded.");
     expect(seedMessage("empty")).toBe("No labels to seed here.");
     expect(seedMessage("stale")).toBeNull();
-    expect(seedMessage({ store: { width: 1, height: 1, tiles: new Map() }, classes: [], pixels: 1234, classCount: 3 })).toBe("Seeded 1234 pixels in 3 classes.");
+    expect(seedMessage({ store: { width: 1, height: 1, tiles: new Map(), base: false }, classes: [], pixels: 1234, classCount: 3 })).toBe("Seeded 1234 pixels in 3 classes.");
   });
 
   it("holds spec 004's fixed strings", () => {
