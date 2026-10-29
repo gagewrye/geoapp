@@ -35,6 +35,9 @@ const checkAborted = (signal?: AbortSignal) => {
   if (signal?.aborted) throw new DOMException("Preview aborted", "AbortError");
 };
 
+/** Pause before the warp when progress is reported, a little over one 60 Hz frame. */
+const FRAME_YIELD_MS = 20;
+
 /** Decimate window by window, then warp to a Mercator-aligned RGBA preview. */
 export async function buildPreview(source: RasterSource, maxSide: number, { stretch, onProgress, signal }: PreviewOptions = {}) {
   const { width, height, bandCount, gt, epsg, nodata } = source.meta;
@@ -46,8 +49,8 @@ export async function buildPreview(source: RasterSource, maxSide: number, { stre
     decimateInto(dec, await source.readWindow(w.x0, w.y0, w.width, w.height), f, width, height);
     onProgress?.(i + 1, windows.length);
   }
-  // The warp blocks the main thread, so give the page past a frame (at 60 Hz) to draw the last progress first
-  if (onProgress) await new Promise((r) => setTimeout(r, 20));
+  // For the caller's display: the warp blocks the main thread, so this usually yields past a frame (at 60 Hz) to draw the last progress first
+  if (onProgress) await new Promise((r) => setTimeout(r, FRAME_YIELD_MS));
   checkAborted(signal);
   return warpPreview(dec, decimatedAffine(gt, f), epsg, maxSide, stretch);
 }
