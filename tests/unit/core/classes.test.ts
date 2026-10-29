@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_CLASSES, PALETTE, badClassName, checkName, initialClasses, nextClass } from "../../../src/core/classes";
+import { MAX_CLASSES, PALETTE, checkName, initialClasses, nextClass } from "../../../src/core/classes";
 
 describe("label classes (spec 003 Classes)", () => {
   it("starts as Class 1 and Class 2 with the first palette colours", () => {
@@ -31,15 +31,5 @@ describe("label classes (spec 003 Classes)", () => {
     expect(checkName(list, 0, " Class 2 ")).toBeNull();
     expect(checkName(list, 0, "Class 1")).toBe("Class 1");
     expect(checkName(list, 1, "  Mangrove & <salt> ")).toBe("Mangrove & <salt>");
-  });
-
-  it("badClassName gives the first name spec 003's rule refuses as it stands, else null (spec 004, model classes)", () => {
-    expect(badClassName(["a", "b", "Mangrove & <salt>"])).toBeNull();
-    expect(badClassName(["a", " padded "])).toBe(1);
-    expect(badClassName(["a", "b "])).toBe(1);
-    expect(badClassName(["", "b"])).toBe(0);
-    expect(badClassName(["a", "   "])).toBe(1);
-    expect(badClassName(["a", "b", "a"])).toBe(0);
-    expect(badClassName([])).toBeNull();
   });
 });

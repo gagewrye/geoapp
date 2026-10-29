@@ -1,17 +1,15 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { fromArrayBuffer } from "geotiff";
 import { initialClasses, paletteColour } from "../../../src/core/classes";
 import { ClassTableError, type ClassEntry } from "../../../src/core/classTable";
 import { tileWindows, type Window } from "../../../src/core/grid";
 import { emptyStore } from "../../../src/core/labelStore";
-import { seedFromModel } from "../../../src/core/predict";
 import { seedLut, sourceCells } from "../../../src/core/seed";
-import type { Affine, Grid, Model } from "../../../src/core/types";
+import type { Affine, Grid } from "../../../src/core/types";
 import { LabelFileRefused, openLabelTiff, type LabelSource } from "../../../src/io/labelFile";
 import { RasterRefusedError } from "../../../src/io/pipeline";
-import { importLabels, importTable, seedModel, type SeedOutcome } from "../../../src/io/seeding";
-import { CLASS_GRID, CLASS_MAP, classFile, classItemFile, classValue, ITEM_CLASSES, rgbClassFile, uint16ClassFile, writeFile } from "../helpers/labelFiles";
+import { importLabels, importTable, type SeedOutcome } from "../../../src/io/seeding";
+import { aefShapedFile, CLASS_GRID, CLASS_MAP, classFile, classItemFile, classValue, ITEM_CLASSES, rgbClassFile, uint16ClassFile, writeFile } from "../helpers/labelFiles";
 import { fakeSource } from "../helpers/sources";
 
 // Spec 004 criteria 12 and 15 (their io part) and 13 (resampling and mask, brute force).
@@ -41,9 +39,8 @@ function expected(w: Window, lut: Uint8Array, file: Grid = CLASS_GRID, f: (c: nu
 }
 
 describe("refusals (criterion 15, io)", () => {
-  it("refuses 3-band, 16-bit and AlphaEarth files as not single-band 8-bit", async () => {
-    const aef = readFileSync("tests/fixtures/aef/cogs/2021/17N/fixture-west-bottomup.tiff");
-    for (const buf of [rgbClassFile(), uint16ClassFile(), aef.buffer.slice(aef.byteOffset, aef.byteOffset + aef.byteLength) as ArrayBuffer]) {
+  it("refuses 3-band, 16-bit and AlphaEarth-shaped files as not single-band 8-bit", async () => {
+    for (const buf of [rgbClassFile(), uint16ClassFile(), aefShapedFile()]) {
       await expect(open(buf)).rejects.toBeInstanceOf(LabelFileRefused);
     }
   });
@@ -124,18 +121,6 @@ describe("resampling and mask (criterion 13, io brute force)", () => {
       }
     });
   }
-
-  it("model seeding gives 0 on imagery nodata and NaN, and seedFromModel elsewhere", { timeout: 30_000 }, async () => {
-    const model: Model = { version: 1, type: "logreg", bands: [1], mean: [100], std: [50], classes: ["lo", "hi"], W: [[-1], [1]], b: [0, 0] };
-    const { source } = imagery();
-    const r = ok(await seedModel(source, model, 0, fresh(), "replace"));
-    for (const w of tileWindows(1000, 1000)) {
-      const want = seedFromModel(model, await source.readWindow(w.x0, w.y0, w.width, w.height), 0, [1, 2]);
-      for (let i = 0; i < want.length; i++) if (inNodata(w.x0 + (i % w.width), w.y0 + Math.floor(i / w.width)) || inNan(w.x0 + (i % w.width), w.y0 + Math.floor(i / w.width))) want[i] = 0;
-      expect(Buffer.from(at(r.store, w)).equals(Buffer.from(want)), `${w.x0},${w.y0}`).toBe(true);
-    }
-    expect(at(r.store, { x0: 256, y0: 256, width: 256, height: 256 })[(420 - 256) * 256 + (420 - 256)]).toBe(0);
-  });
 });
 
 describe("stale runs (spec 003's rule for replaced rasters)", () => {
@@ -143,9 +128,5 @@ describe("stale runs (spec 003's rule for replaced rasters)", () => {
     let calls = 0;
     const file: LabelSource = await open(classFile("255"));
     expect(await importLabels(imagery().source, file, null, fresh(), "replace", () => ++calls > 2)).toBe("stale");
-    const { source, reads } = imagery();
-    const model: Model = { version: 1, type: "logreg", bands: [1], mean: [0], std: [1], classes: ["a", "b"], W: [[1], [-1]], b: [0, 0] };
-    expect(await seedModel(source, model, 0, fresh(), "replace", () => reads.length >= 2)).toBe("stale");
-    expect(reads).toHaveLength(2);
   });
 });

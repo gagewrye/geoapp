@@ -3,9 +3,9 @@ import { initialClasses, type LabelClass } from "../../../src/core/classes";
 import type { ClassEntry } from "../../../src/core/classTable";
 import { tileWindows, type Window } from "../../../src/core/grid";
 import { emptyStore, MAX_LABEL_TILES, type LabelStore } from "../../../src/core/labelStore";
-import type { Affine, Grid, Model } from "../../../src/core/types";
+import type { Affine, Grid } from "../../../src/core/types";
 import type { LabelSource } from "../../../src/io/labelFile";
-import { importLabels, seedModel, type Labels, type SeedOutcome } from "../../../src/io/seeding";
+import { importLabels, type Labels, type SeedOutcome } from "../../../src/io/seeding";
 import type { RasterSource } from "../../../src/io/source";
 import { fakeLabelSource } from "../helpers/labelFiles";
 import { fakeSource } from "../helpers/sources";
@@ -169,19 +169,13 @@ describe("memory, structurally", () => {
     expect(io.log.filter((e) => e.kind === "i")).toHaveLength(tileWindows(600, 500).length);
   });
 
-  it("a capped import and a capped model seed on a 65536 x 65536 imagery stop reading after the 257th tile", { timeout: 120_000 }, async () => {
+  it("a capped import on a 65536 x 65536 imagery stops reading after the 257th tile", { timeout: 120_000 }, async () => {
     const big: Grid = { width: 65536, height: 65536, epsg: 32633, gt: GT };
     const io = instrument(fakeSource({ ...big, bandCount: 1 }, () => 1).source, fakeLabelSource(big, () => 4).source);
     expect(await importLabels(io.imagery, io.file, [{ value: 4, name: "four" }], { store: emptyStore(65536, 65536), classes: initialClasses() }, "replace")).toBe("full");
     expect(io.log.filter((e) => e.kind === "i")).toHaveLength(MAX_LABEL_TILES + 1);
     expect(io.log.filter((e) => e.kind === "f")).toHaveLength(MAX_LABEL_TILES + 1);
     expect(io.max()).toBe(1);
-
-    const { source, reads } = fakeSource({ ...big, bandCount: 1 }, () => 1);
-    const model: Model = { version: 1, type: "logreg", bands: [1], mean: [0], std: [1], classes: ["a", "b"], W: [[1], [-1]], b: [0, 0] };
-    expect(await seedModel(source, model, 0, { store: emptyStore(65536, 65536), classes: initialClasses() }, "replace")).toBe("full");
-    expect(reads).toHaveLength(MAX_LABEL_TILES + 1);
-    expect(reads.every(aligned)).toBe(true);
   });
 
   it("a stale run reads nothing more once stale", { timeout: 30_000 }, async () => {
@@ -194,14 +188,6 @@ describe("memory, structurally", () => {
     // in the labelling pass: file read 64 + 3 is the third window's, so its imagery read never starts
     expect(await importLabels(later.imagery, later.file, null, { store: emptyStore(2048, 2048), classes: initialClasses() }, "replace", () => later.log.length >= 64 + 5)).toBe("stale");
     expect(later.log.slice(64).map((e) => e.kind)).toEqual(["f", "i", "f", "i", "f"]);
-  });
-
-  it("model seeding on a partial-tile raster reads every window once, each its clipped tile window", async () => {
-    const { source, reads } = fakeSource({ width: 600, height: 300, epsg: 32633, gt: GT, bandCount: 1 }, (_b, c) => c);
-    const model: Model = { version: 1, type: "logreg", bands: [1], mean: [300], std: [100], classes: ["w", "e"], W: [[-1], [1]], b: [0, 0] };
-    const r = ok(await seedModel(source, model, 0, { store: emptyStore(600, 300), classes: initialClasses() }, "replace"));
-    expect(reads).toEqual(tileWindows(600, 300));
-    for (const w of tileWindows(600, 300)) expect(r.store.tiles.get(`${w.x0},${w.y0}`)).toHaveLength(w.width * w.height);
   });
 });
 

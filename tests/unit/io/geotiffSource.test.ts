@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { fromArrayBuffer } from "geotiff";
-import { predictTile } from "../../../src/core/predict";
-import type { Model } from "../../../src/core/types";
+import { maskBit, nodataMask } from "../../../src/core/nodata";
 import { openGeoTiff } from "../../../src/io/geotiffSource";
 import { geotiffBuffer } from "../helpers/sources";
 
@@ -29,7 +28,7 @@ describe("geotiff.js source", () => {
     const buf = geotiffBuffer(4, 1, 1, (_b, c) => (c === 2 ? Number(nd) : c), { epsg: 32633, gt: [400000, 30, 0, 5300000, 0, -30], nodata: nd });
     const src = await openGeoTiff(await fromArrayBuffer(buf));
     const t = await src.readWindow(0, 0, 4, 1);
-    const model: Model = { version: 1, type: "logreg", bands: [1], mean: [0], std: [1], classes: ["a", "b"], W: [[-1], [1]], b: [0, 0] };
-    expect(Array.from(predictTile(model, t))).toEqual([0, 1, 255, 1]);
+    const m = nodataMask(t);
+    expect([0, 1, 2, 3].map((i) => maskBit(m, i))).toEqual([0, 0, 1, 0]);
   });
 });
