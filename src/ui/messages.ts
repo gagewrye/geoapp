@@ -16,7 +16,6 @@ export const MESSAGES = {
   // spec 014
   editLimit: "Label limit reached (256 edited tiles of 256 x 256 px). Undo strokes, or export the labels and import the export.",
   maskGone: "The label mask can't be read any more. Import it again.",
-  // spec 016
 } as const;
 
 /** What a seeding run says (spec 004); null for a run dropped because another raster opened. */
