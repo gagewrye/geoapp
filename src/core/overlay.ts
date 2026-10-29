@@ -18,7 +18,8 @@ const keyOf = (c: number, r: number) => `${Math.floor(c / TILE_SIZE) * TILE_SIZE
 export function pixelWidths(grid: Grid, col: number, row: number): [number, number] | null {
   const m = merc(grid, col, row), p = merc(grid, col + 1, row), q = merc(grid, col, row + 1);
   const ax = p[0] - m[0], ay = p[1] - m[1], bx = q[0] - m[0], by = q[1] - m[1];
-  // the fourth corner as the parallelogram's, so a sample costs three projections
+  // the fourth corner as the parallelogram's, so a sample costs three projections; that can only misclassify
+  // a pixel straddling ±MAX_LAT, and the OVERLAY_MARGIN covers the width it would misjudge there
   for (const y of [m[1], p[1], q[1], m[1] + ay + by]) if (!(Math.abs(y) <= MERC_MAX_Y)) return null;
   const cross = Math.abs(ax * by - ay * bx);
   return [cross / (Math.abs(ay) + Math.abs(by)), cross / (Math.abs(ax) + Math.abs(bx))];
