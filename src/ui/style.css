@@ -14,7 +14,29 @@ body { display: flex; }
 #brush-size { align-self: center; }
 #panel button[aria-pressed="true"] { font-weight: bold; }
 #message { color: #a40000; min-height: 2em; }
-#map { flex: 1; height: 100%; }
+/* Space behind the globe (spec 015): CSS-drawn stars, no asset. Tile sizes 137, 211 and 293 px share
+   no factor, so the pattern doesn't look regular. The canvas is transparent off the globe. */
+#map {
+  flex: 1; height: 100%;
+  background-color: #03050a;
+  background-image:
+    radial-gradient(circle 2px at 23px 41px, #fff 50%, transparent),
+    radial-gradient(circle 2px at 97px 12px, #fff 50%, transparent),
+    radial-gradient(circle 1.5px at 64px 108px, rgba(255,255,255,.55) 50%, transparent),
+    radial-gradient(circle 1.5px at 120px 77px, rgba(255,255,255,.4) 50%, transparent),
+    radial-gradient(circle 2px at 45px 170px, #cfe0ff 50%, transparent),
+    radial-gradient(circle 2.5px at 150px 33px, #fff 50%, transparent),
+    radial-gradient(circle 1.5px at 188px 140px, rgba(255,255,255,.5) 50%, transparent),
+    radial-gradient(circle 1.5px at 12px 95px, rgba(255,255,255,.35) 50%, transparent),
+    radial-gradient(circle 2px at 103px 200px, #ffeccc 50%, transparent),
+    radial-gradient(circle 2.5px at 70px 250px, #fff 50%, transparent),
+    radial-gradient(circle 2px at 210px 60px, #dbe6ff 50%, transparent),
+    radial-gradient(circle 1.5px at 260px 190px, rgba(255,255,255,.45) 50%, transparent),
+    radial-gradient(circle 1.5px at 30px 20px, rgba(255,255,255,.3) 50%, transparent),
+    radial-gradient(circle 2px at 140px 150px, #fff4e0 50%, transparent),
+    radial-gradient(circle 1.5px at 280px 280px, rgba(255,255,255,.5) 50%, transparent);
+  background-size: 137px 137px, 137px 137px, 137px 137px, 137px 137px, 211px 211px, 211px 211px, 211px 211px, 211px 211px, 211px 211px, 293px 293px, 293px 293px, 293px 293px, 293px 293px, 293px 293px, 293px 293px;
+}
 #panel .row label { margin: 0; align-self: center; }
 #aef-attribution { font-size: 12px; color: #444; }
 /* !important beats terra-draw's inline canvas cursor; the middle pan comes last so it wins (specs 009, 010) */
