@@ -38,6 +38,8 @@ test("layers: background, basemap, preview, label overlays, then hover; none is 
   await openApp(page);
   await openAndPaint(page);
   await expect.poll(async () => (await layerIds(page)).some((id) => id.startsWith("brush-hover"))).toBe(true);
+  // overlays are created on the frame after a stroke applies, so wait for them before reading the order
+  await expect.poll(async () => (await layerIds(page)).some((id) => id.startsWith("label-"))).toBe(true);
   const layers = await layerIds(page);
   const labelLayers = layers.filter((id) => id.startsWith("label-"));
   expect(labelLayers.length).toBeGreaterThan(0);
