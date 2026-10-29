@@ -2,7 +2,7 @@
 
 **Goal:** Import a label mask covering any part of the imagery, however large, edit it with the brush, undo those edits back to the mask, and export the result. Nothing ever holds the whole mask or imagery in memory.
 
-**Status:** Draft. Build after spec 013, which shelves Train and model seeding, so nothing else reads the label store. **ADRs:** 0018 mask base plus sparse edits (Proposed; amends 0010 and 0015). Uses 0002 and 0013.
+**Status:** Approved (Gage, 2026-10-28). Build after spec 013, which shelves Train and model seeding, so nothing else reads the label store. Amends spec 004's untagged-file rule and criterion 12. **ADRs:** 0018 mask base plus sparse edits (Accepted; amends 0010 and 0015). Uses 0002 and 0013.
 
 **Already built (spec 004 Import labels, ADR 0013), unchanged here:**
 - Formats: a single-band 8-bit unsigned GeoTIFF or COG. Anything else gets "Label files must be single-band 8-bit GeoTIFFs."
@@ -13,18 +13,12 @@
 
 **The gap:** imports write into the 256-tile in-memory store (ADR 0010). A dense mask over more than 256 tiles (more than about a 4096 x 4096 px area) stops with "Label limit reached", so most real masks can't be loaded.
 
-**Open questions (Gage).**
-1. Do your masks cover more than about 4096 x 4096 imagery pixels? If not, spec 004 already does what you asked and this spec can be dropped.
-2. Is it acceptable that the mask shows at preview resolution (at most 1024 px across the raster, like the imagery) and at full resolution only on tiles you have painted?
-3. Merge while a mask is loaded is refused (proposed). Should masks stack instead?
-4. A file with no GDAL_NODATA reads value 0 as "Class 0" (spec 004). Should 0 mean unlabelled by default?
-5. Should PNGs, un-georeferenced masks the size of the imagery, or 16-bit masks also be accepted? This spec doesn't accept them.
-6. Should an import itself be undoable? Proposed no: spec 010 clears history on import.
+**Decided (Gage, 2026-10-28):** "There will be masks larger than 4096." Accepted: the mask shows at preview resolution (at most 1024 px across the raster, like the imagery) and at full resolution only on painted tiles; Merge while a mask is loaded is refused; value 0 means unlabelled when the file has no GDAL_NODATA; GeoTIFF only for now; an import itself is not undoable (spec 010 clears history on import).
 
 ## Scope
-**In:** the mask as a read-only base under sparse edit tiles; its preview layer; copy-on-touch for the brush; export of base plus edits; Merge with a base.
+**In:** the mask as a read-only base under sparse edit tiles; its preview layer; copy-on-touch for the brush; export of base plus edits; Merge with no base loaded; value 0 unlabelled in untagged files.
 
-**Out:** the six options in the open questions; a full-resolution base display; more than one base.
+**Out:** stacked masks (Merge onto a loaded mask); PNG, 16-bit and un-georeferenced masks (later); undoing an import; a full-resolution display of unedited tiles; more than one base.
 
 ## Interfaces (`core/`)
 ```ts
@@ -43,6 +37,7 @@ paintPreview(values: Uint8Array, hidden: Uint8Array, colours: string[], rgba: Ui
 
 **Rules.**
 - **Import labels** keeps spec 004's checks, class table, resampling and reads (criterion 14). It no longer copies labels into tiles; the file becomes the base.
+  - **Untagged files.** `openLabelTiff` gives `meta.nodata` 0 where it gave null (no GDAL_NODATA, or one that isn't an integer 0..255). So value 0 is unlabelled, `classesFromValues` skips it, and a class map entry with value 0 is refused by `parseClasses`'s existing nodata rule. Files with an integer GDAL_NODATA are unchanged.
   - The labelling pass counts N and K and fills the preview values (`previewCells`, `PREVIEW_MAX_SIDE` 1024) window by window.
   - **Replace:** the new base, an empty `tiles` with `base: true`, and `mergeClasses([], incoming)`.
   - **Merge**, only while no base is loaded: each stored tile becomes `mergeTile(tile, baseTile)`, read once each. Classes are `mergeClasses(list, incoming)`, and N counts only pixels that were unlabelled before.
@@ -52,7 +47,7 @@ paintPreview(values: Uint8Array, hidden: Uint8Array, colours: string[], rgba: Ui
   - This applies to paint and erase alike. Hover still reads nothing.
   - If storing a tile would pass `MAX_LABEL_TILES`, the cell changes nothing and ui shows "Label limit reached (256 edited tiles of 256 x 256 px). Undo strokes, or export the labels and import the export with Replace."
   - Undo deletes a null-recorded tile, so the mask shows again and the space is freed.
-- **Display.** The base is one canvas image source with nearest resampling and `raster-opacity` 0.6, in a new layer slot `label-base` between the imagery preview and the label overlays.
+- **Display.** The base is one canvas image source with nearest resampling and `raster-opacity` 0.6, layer and source id `mask`, in a new slot `mask` between the imagery preview and the label overlays. The id must not start with `label-`, which `beforeSlot` and existing tests treat as an overlay.
   - Preview pixels whose cell lies in a key present in `tiles` are hidden, so that tile's full-resolution overlay (ADR 0016) alone shows there.
   - It repaints when a key is added to or removed from `tiles`, and on recolour.
 - **Export labels** writes, for each window, the stored tile, else the base tile, else zeros. It reads files only for base windows with no stored tile.
@@ -79,4 +74,5 @@ paintPreview(values: Uint8Array, hidden: Uint8Array, colours: string[], rgba: Ui
     - After painting another class over that pixel's tile, pixels in the tile show only overlay colours.
     - After Undo, the mask colour returns. Recolouring a class changes the mask preview's colour.
 12. File gone (io): a mask source whose read rejects with `NotReadableError` makes a copy-on-touch cell and an export fail with the message, with the store and classes unchanged.
-13. Opening another raster (OK on the confirm) leaves `hasLabels` false and no `label-base` layer. Importing, painting and exporting make no network requests.
+13. Opening another raster (OK on the confirm) leaves `hasLabels` false and no `mask` layer. Importing, painting and exporting make no network requests.
+14. Untagged (io, spec 004's 0/3/7/255 file without GDAL_NODATA): classes are "Class 3", "Class 7", "Class 255", and value-0 pixels are unlabelled; a class map with a value-0 entry is refused naming `[i].value`. The tagged file still gives "Class 0", "Class 3", "Class 7". Spec 004's Status line says its untagged rule and criterion 12 are amended by spec 014.
