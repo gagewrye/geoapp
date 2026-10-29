@@ -13,8 +13,8 @@
       <fieldset id="brush-panel" hidden>
         <legend>Labels</legend>
         <div class="row">
-          <button id="mode-paint" type="button" aria-pressed="true">Paint</button>
-          <button id="mode-pan" type="button" aria-pressed="false">Pan</button>
+          <button id="mode-paint" type="button" aria-pressed="false">Paint</button>
+          <button id="mode-pan" type="button" aria-pressed="true">Pan</button>
         </div>
         <div class="row">
           <button id="brush-smaller" type="button" aria-label="Smaller brush">&minus;</button>
@@ -22,6 +22,9 @@
           <button id="brush-larger" type="button" aria-label="Larger brush">+</button>
         </div>
         <input id="brush-size-range" type="range" min="1" max="127" step="2" value="7" aria-label="Brush size" />
+        <div id="label-opacity-text">Opacity: 60%</div>
+        <input id="label-opacity" type="range" min="0" max="100" step="5" value="60" aria-label="Opacity" />
+        <label><input id="show-labels" type="checkbox" checked /> Show labels</label>
         <button id="undo" type="button" disabled>Undo</button>
         <ul id="classes"></ul>
         <button id="class-add" type="button">Add class</button>

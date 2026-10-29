@@ -9,6 +9,7 @@ import type { RasterSource } from "../io/source";
 import { createBrush, type BrushMode } from "../map/brush";
 import { markSelected, renderClasses } from "./classList";
 import { labelDisplay } from "./labelDisplay";
+import { initLabelView } from "./labelView";
 import { MESSAGES, readErrorMessage } from "./messages";
 import { initUndo } from "./undo";
 
@@ -62,7 +63,9 @@ export function initLabels({ map, say, onBusy, onChange, panning }: Deps) {
     cells: (ws, erase) => { if (!locked) for (const w of ws) queue?.push({ w, value: selected + 1, erase, stroke: undo.current() ?? undefined }); },
     onStroke: undo.stroke,
     panning,
+    refused: () => say(MESSAGES.labelsHidden),
   });
+  const view = initLabelView(map, (visible) => brush.setHidden(!visible));
 
   const setMode = (m: BrushMode) => {
     brush.setMode(m);
@@ -148,7 +151,7 @@ export function initLabels({ map, say, onBusy, onChange, panning }: Deps) {
   }
 
   return {
-    /** Start labelling newly opened local imagery: an empty store, no masks, Paint mode. */
+    /** Start labelling newly opened local imagery: an empty store, no masks, labels shown, Pan mode (spec 016). */
     open(source: RasterSource): void {
       queue?.clear();
       undo.clear(); // after the queue, which hands its dropped strokes to the history
@@ -164,11 +167,12 @@ export function initLabels({ map, say, onBusy, onChange, panning }: Deps) {
         busy: () => { onBusy(); undo.sync(); },
         error: (e) => say(readErrorMessage(e)),
       }, undo.history, () => base);
+      view.reset();
       display.open(grid);
       open = true;
       panel.hidden = false;
       brush.setImagery(grid);
-      setMode("paint");
+      setMode("pan");
       onChange();
       undo.sync();
     },
