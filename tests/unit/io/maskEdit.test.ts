@@ -45,6 +45,11 @@ async function setup(side = 1024) {
 }
 
 const snapshot = (s: LabelStore) => new Map([...s.tiles].map(([k, t]) => [k, t.slice()]));
+/** Same keys, byte-equal tiles (toEqual on 16 MiB of typed arrays is slow). */
+function expectSameTiles(s: LabelStore, held: Map<string, Uint8Array>) {
+  expect([...s.tiles.keys()].sort()).toEqual([...held.keys()].sort());
+  for (const [k, t] of held) expect(Buffer.from(s.tiles.get(k)!).equals(Buffer.from(t)), k).toBe(true);
+}
 
 describe("copy on touch (spec 014 Rules)", () => {
   it("a paint dab across a tile corner copies the 4 base tiles; only the dab's pixels change; undo shows the mask again", { timeout: 60_000 }, async () => {
@@ -87,7 +92,7 @@ describe("the cap with a base (criterion 8)", () => {
     const held = snapshot(t.store);
     await t.strokeAt([[w257.x0 + 5, w257.y0 + 5]], 2);
     expect(t.events.full).toBe(1);
-    expect(snapshot(t.store)).toEqual(held);
+    expectSameTiles(t.store, held);
     expect(t.history.size).toBe(1); // the refused stroke changed nothing, so it isn't an undo step
     expect(t.history.undo()).toEqual([`${w256.x0},${w256.y0}`]);
     expect(t.store.tiles.size).toBe(MAX_LABEL_TILES - 1);
@@ -111,7 +116,7 @@ describe("the mask file gone (criterion 12, a cell)", () => {
       expect(t.events.errors).toHaveLength(1);
       expect(maskReadFailed(t.events.errors[0])).toBe(true);
       expect(readErrorMessage(t.events.errors[0])).toBe("The label mask can't be read any more. Import it again.");
-      expect(snapshot(t.store)).toEqual(held);
+      expectSameTiles(t.store, held);
       expect(t.r.classes).toEqual(classes);
       expect(t.q.size).toBe(0);
     });
