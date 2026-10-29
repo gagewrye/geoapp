@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { applyAffine, fromLonLat, invertAffine, toLonLat } from "../../../src/core/crs";
+import { tileWindows } from "../../../src/core/grid";
 import { tileWindow } from "../../../src/core/labelStore";
 import { overlayIndex, overlayPitch, paintOverlay } from "../../../src/core/overlay";
 import { TILE_SIZE, type Affine, type Grid } from "../../../src/core/types";
 import type { Window } from "../../../src/core/grid";
+import { mercBounds } from "../../../src/core/warp";
 
 // Spec 011: overlays of one raster share one Mercator pixel grid, so tiles partition the overlay pixels.
 const R = 6378137, D2R = Math.PI / 180;
@@ -105,19 +107,35 @@ describe("overlay completeness (spec 011 criterion 2, brute force)", () => {
   });
 });
 
+/** Criterion 1's grids, the tester's southern grid with a partial last row, and one crossing MAX_LAT in its first tile row. */
+const SIZE_GRIDS: [string, Grid][] = [
+  ...GRIDS,
+  ["tester's southern EPSG:4326, 300x520", { epsg: 4326, gt: [10, 0.01, 0, -45, 0, -0.01], width: 300, height: 520 }],
+  ["EPSG:4326 0.01 deg, 600x600 from 87N (crosses MAX_LAT)", { epsg: 4326, gt: [10, 0.01, 0, 87, 0, -0.01], width: 600, height: 600 }],
+];
+
 describe("overlay size and pitch (spec 011 criterion 4)", () => {
-  for (const [name, g] of GRIDS) {
-    it(`at most TILE_SIZE + 2 a side, every tile on the same pitch: ${name}`, () => {
+  for (const [name, g] of SIZE_GRIDS) {
+    it(`every tile window's overlay is at most TILE_SIZE + 2 a side, on one pitch: ${name}`, () => {
       const pitch = overlayPitch(g);
       expect(pitch).toBeGreaterThan(0);
       expect(overlayPitch({ ...g })).toBe(pitch);
-      for (const o of block(g)) {
-        expect(o.width).toBeLessThanOrEqual(TILE_SIZE + 2);
-        expect(o.height).toBeLessThanOrEqual(TILE_SIZE + 2);
+      for (const w of tileWindows(g.width, g.height)) {
+        const o = overlayIndex(w, g, pitch);
+        expect(Math.max(o.width, o.height), `tile ${w.x0},${w.y0}`).toBeLessThanOrEqual(TILE_SIZE + 2);
         const [tl, , br] = o.corners as [number, number][];
         expect((mercX(br![0]) - mercX(tl![0])) / o.width).toBeCloseTo(pitch, 6);
-        expect((mercY(tl![1]) - mercY(br![1])) / o.height).toBeCloseTo(pitch, 6);
       }
+    });
+
+    it(`overlayPitch is the brute-force maximum over all tile windows' bbox sides / TILE_SIZE: ${name}`, () => {
+      let side = 0;
+      for (const w of tileWindows(g.width, g.height)) {
+        const [x0, y0, x1, y1] = mercBounds(w, g.gt, g.epsg);
+        side = Math.max(side, x1 - x0, y1 - y0);
+      }
+      const want = side / TILE_SIZE;
+      expect(Math.abs(overlayPitch(g) - want) / want).toBeLessThanOrEqual(1e-9);
     });
   }
 });
