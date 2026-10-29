@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { overlayIndex, paintOverlay } from "../../../src/core/overlay";
+import { overlayIndex, overlayPitch, paintOverlay } from "../../../src/core/overlay";
 import { TILE_SIZE, type Affine, type Grid } from "../../../src/core/types";
-import { warpPreview } from "../../../src/core/warp";
-import { makeTile } from "../helpers/tiles";
 
 const R = 6378137;
 const mercY = (lat: number) => R * Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360));
@@ -13,8 +11,8 @@ const gt: Affine = [613504.343 - 356.5 * 30, 30, 0, 5234037.466 + 300.5 * 30, 0,
 const grid: Grid = { epsg: 32633, gt, width: 600, height: 520 };
 const w = { x0: 256, y0: 256, width: 256, height: 256 };
 
-describe("overlayIndex + paintOverlay (criterion 6)", () => {
-  const ov = overlayIndex(w, grid, TILE_SIZE);
+describe("overlayIndex + paintOverlay (spec 003 criterion 6, as spec 011 criterion 3)", () => {
+  const ov = overlayIndex(w, grid, overlayPitch(grid));
   const labels = new Uint8Array(w.width * w.height);
   for (let r = 298; r <= 302; r++) for (let c = 354; c <= 358; c++) labels[(r - 256) * 256 + (c - 256)] = 2;
   const colours = ["#102030", "#ff8001"];
@@ -33,7 +31,7 @@ describe("overlayIndex + paintOverlay (criterion 6)", () => {
     expect(Math.hypot(sx / n - px, sy / n - py)).toBeLessThanOrEqual(1);
   });
 
-  it("has corners forming an axis-aligned Mercator rectangle (TL, TR, BR, BL), at most maxSide", () => {
+  it("has corners forming an axis-aligned Mercator rectangle (TL, TR, BR, BL), at most TILE_SIZE + 2 a side", () => {
     const [tl, tr, br, bl] = ov.corners as [number, number][];
     expect(tl![0]).toBe(bl![0]);
     expect(tr![0]).toBe(br![0]);
@@ -41,16 +39,9 @@ describe("overlayIndex + paintOverlay (criterion 6)", () => {
     expect(bl![1]).toBe(br![1]);
     expect(tr![0]).toBeGreaterThan(tl![0]);
     expect(tl![1]).toBeGreaterThan(bl![1]);
-    expect(Math.max(ov.width, ov.height)).toBe(TILE_SIZE);
+    expect(Math.max(ov.width, ov.height)).toBeLessThanOrEqual(TILE_SIZE + 2);
+    expect(Math.max(ov.width, ov.height)).toBeGreaterThanOrEqual(TILE_SIZE - 2);
     expect(ov.index).toHaveLength(ov.width * ov.height);
-  });
-
-  it("uses the same grid and corners as warpPreview of the window", () => {
-    const t = makeTile(w.x0, w.y0, w.width, w.height, 1, (_k, c, r) => c * 1000 + r);
-    const p = warpPreview(t, gt, 32633, TILE_SIZE);
-    expect([p.width, p.height]).toEqual([ov.width, ov.height]);
-    expect(p.corners).toEqual(ov.corners);
-    for (let i = 0; i < ov.index.length; i++) expect(p.rgba[4 * i + 3] === 255).toBe(ov.index[i]! >= 0);
   });
 
   it("indexes into w's tile and gives -1 off it", () => {

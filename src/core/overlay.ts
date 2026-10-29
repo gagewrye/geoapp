@@ -1,15 +1,43 @@
+import { fromLonLat, invertAffine } from "./crs";
 import type { Window } from "./grid";
-import type { Grid } from "./types";
-import { mercatorGrid } from "./warp";
+import { tileWindow } from "./labelStore";
+import { TILE_SIZE, type Grid } from "./types";
+import { latOf, lonOf, mercBounds } from "./warp";
 
-/** Per overlay pixel, the index into w's tile, or -1; the same Mercator grid and corners as warpPreview. */
-export function overlayIndex(w: Window, grid: Grid, maxSide: number) {
-  const { width, height, corners, each } = mercatorGrid(w, grid.gt, grid.epsg, maxSide);
+/** Mercator metres per overlay pixel: the longest Mercator bbox side of the raster's four corner tile windows / TILE_SIZE. */
+// One pitch per raster puts every overlay on one grid (spec 011, ADR 0016); the corner tiles are the
+// largest in Mercator for the grids we expect, so overlays stay about TILE_SIZE a side.
+export function overlayPitch(grid: Grid): number {
+  const xl = Math.floor((grid.width - 1) / TILE_SIZE) * TILE_SIZE, yl = Math.floor((grid.height - 1) / TILE_SIZE) * TILE_SIZE;
+  let side = 0;
+  for (const [x0, y0] of [[0, 0], [xl, 0], [0, yl], [xl, yl]] as const) {
+    const [mx0, my0, mx1, my1] = mercBounds(tileWindow(grid, x0, y0), grid.gt, grid.epsg);
+    side = Math.max(side, mx1 - mx0, my1 - my0);
+  }
+  return side / TILE_SIZE;
+}
+
+/**
+ * Per overlay pixel, the index into w's tile of the raster pixel holding its centre, or -1. Pixel edges
+ * lie at multiples of pitch from Mercator (0, 0), so overlays of one raster partition the pixels; corners TL, TR, BR, BL.
+ */
+export function overlayIndex(w: Window, grid: Grid, pitch: number) {
+  const [mx0, my0, mx1, my1] = mercBounds(w, grid.gt, grid.epsg);
+  // every cell meeting the bbox, so a centre the densified bbox misses by under half a cell is still covered
+  const u0 = Math.floor(mx0 / pitch), t0 = Math.floor(my0 / pitch);
+  const width = Math.max(1, Math.ceil(mx1 / pitch) - u0), height = Math.max(1, Math.ceil(my1 / pitch) - t0);
+  const t1 = t0 + height;
   const index = new Int32Array(width * height).fill(-1);
-  each((o, c, r) => {
-    const i = Math.floor(c - w.x0), j = Math.floor(r - w.y0);
-    if (i >= 0 && i < w.width && j >= 0 && j < w.height) index[o] = j * w.width + i;
-  });
+  for (let v = 0; v < height; v++) {
+    const lat = latOf((t1 - v - 0.5) * pitch);
+    for (let u = 0; u < width; u++) {
+      const [c, r] = invertAffine(grid.gt, ...fromLonLat(grid.epsg, lonOf((u0 + u + 0.5) * pitch), lat));
+      const i = Math.floor(c - w.x0), j = Math.floor(r - w.y0);
+      if (i >= 0 && i < w.width && j >= 0 && j < w.height) index[v * width + u] = j * w.width + i;
+    }
+  }
+  const W = lonOf(u0 * pitch), E = lonOf((u0 + width) * pitch), N = latOf(t1 * pitch), S = latOf(t0 * pitch);
+  const corners: [number, number][] = [[W, N], [E, N], [E, S], [W, S]];
   return { index, width, height, corners };
 }
 

@@ -2,6 +2,7 @@ import { Point, type Map as MapLibreMap } from "maplibre-gl";
 import type { Window } from "../core/grid";
 import { footprint, footprintRing, pixelAt, strokeCellsIn } from "../core/pixel";
 import type { Grid } from "../core/types";
+import { brushCursor } from "./cursor";
 import { showHover } from "./hover";
 
 export type BrushMode = "paint" | "pan";
@@ -10,6 +11,10 @@ type Deps = {
   colour: () => string;
   /** Footprints of the stroke cells one pointer position reaches, in order. */
   cells: (ws: Window[], erase: boolean) => void;
+  /** A stroke began (before its first cells) or ended. */
+  onStroke: (active: boolean) => void;
+  /** A middle-button pan is in progress (spec 009): presses paint nothing. */
+  panning: () => boolean;
 };
 type Stroke = { pointerId: number; erase: boolean; prev: [number, number] | null };
 
@@ -28,6 +33,14 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
   let pointer: { x: number; y: number; target: EventTarget | null } | null = null; // last mouse or pen position
   const painting = () => grid !== null && mode === "paint" && !space;
 
+  // The brush cursor (spec 010) is a class plus a variable: terra-draw rewrites the canvas's inline cursor
+  let cursor = "";
+  const syncCursor = () => {
+    container.classList.toggle("brush-cursor", painting());
+    const c = brushCursor(deps.colour());
+    if (c !== cursor) container.style.setProperty("--brush-cursor", cursor = c);
+  };
+
   // Only handlers the brush turned off are turned back on: outside Paint mode terra-draw and MapLibre own them
   const handlers = [map.dragRotate, map.doubleClickZoom, map.boxZoom];
   let owned = false;
@@ -39,6 +52,7 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
       for (const h of handlers) h.enable();
       owned = false;
     }
+    syncCursor();
   };
 
   /** The raster pixel under a client point, or null off the map canvas or off the globe. */
@@ -75,13 +89,18 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
     if (ws.length) deps.cells(ws, s.erase);
   };
 
-  const end = () => { stroke = null; };
+  const end = () => {
+    if (!stroke) return;
+    stroke = null;
+    deps.onStroke(false);
+  };
 
   container.addEventListener("pointerdown", (e) => {
     lastType = e.pointerType;
     if (e.pointerType === "touch") { pointer = null; hover(); return; }
-    if (!painting() || locked || stroke || (e.button !== 0 && e.button !== 2)) return;
+    if (!painting() || locked || stroke || deps.panning() || (e.button !== 0 && e.button !== 2)) return;
     stroke = { pointerId: e.pointerId, erase: e.button === 2, prev: null };
+    deps.onStroke(true);
     apply(stroke, e);
   });
   window.addEventListener("pointermove", (e) => {
@@ -97,7 +116,11 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
   window.addEventListener("pointercancel", (e) => { if (stroke?.pointerId === e.pointerId) end(); });
   window.addEventListener("blur", () => { end(); space = false; syncHandlers(); pointer = null; hover(); });
   container.addEventListener("pointerleave", (e) => { if (e.pointerType !== "touch") { pointer = null; hover(); } });
-  map.on("move", hover); // wheel and keyboard zoom keep the footprint under the pointer
+  map.on("move", () => {
+    // the map moved under the pointer (centre zoom, WASD): the next cell starts afresh, with no line across the jump
+    if (stroke) stroke.prev = null;
+    hover(); // and the footprint follows the pointer
+  });
 
   // Capture on the map container runs before MapLibre's mousedown listener on the canvas container.
   map.getContainer().addEventListener("mousedown", (e) => {
@@ -118,7 +141,9 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
     setSpace(held: boolean): void { if (space !== held) { space = held; syncHandlers(); hover(); } },
     /** Locked, the brush neither paints nor shows its footprint; a stroke in progress ends. */
     setLocked(on: boolean): void { locked = on; if (on) end(); hover(); },
-    /** Redraw the footprint after a size or colour change. */
-    refresh: hover,
+    /** Redraw the footprint and cursor after a size or colour change. */
+    refresh(): void { syncCursor(); hover(); },
+    /** A stroke is in progress. */
+    stroking: () => stroke !== null,
   };
 }

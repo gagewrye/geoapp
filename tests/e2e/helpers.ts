@@ -24,6 +24,18 @@ export async function openApp(page: Page): Promise<void> {
   await expect(page.locator("#map[data-ready=true]")).toBeVisible();
 }
 
+/** src/map/style.ts BACKGROUND; that module imports a Vite `?url` asset, which Playwright can't load. */
+export const BACKGROUND = "#1d2b3a";
+
+/** Hide the basemap through the test hook, so map pixels can be compared with BACKGROUND (spec 012 Tests). */
+export async function hideBasemap(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const { map } = (window as any).__geoapp;
+    map.setLayoutProperty("basemap", "visibility", "none");
+    await new Promise<void>((r) => { map.once("idle", () => r()); map.triggerRepaint(); });
+  });
+}
+
 export async function openRaster(page: Page, file: ReturnType<typeof tiff>): Promise<void> {
   await page.setInputFiles("#open-raster", file);
 }
