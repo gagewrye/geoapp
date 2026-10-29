@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 
@@ -33,7 +33,8 @@ const NEW_YEARS = "[2017,2018,2021,2025]";
 async function snapshot(dir: string): Promise<Record<string, string>> {
   const out: Record<string, string> = {};
   for (const d of await readdir(dir, { withFileTypes: true, recursive: true })) {
-    if (d.isFile()) out[join(d.parentPath, d.name).slice(dir.length + 1)] = await readFile(join(d.parentPath, d.name), "utf8");
+    // keys use "/" on every OS, so the expected snapshots read the same on Windows
+    if (d.isFile()) out[join(d.parentPath, d.name).slice(dir.length + 1).split(sep).join("/")] = await readFile(join(d.parentPath, d.name), "utf8");
   }
   return out;
 }
