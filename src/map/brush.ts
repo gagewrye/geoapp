@@ -33,10 +33,12 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
   let pointer: { x: number; y: number; target: EventTarget | null } | null = null; // last mouse or pen position
   const painting = () => grid !== null && mode === "paint" && !space;
 
-  // The brush cursor (spec 010) is a class plus a variable: terra-draw rewrites the canvas's inline cursor
+  // The brush cursor (spec 010) is a class plus a variable: terra-draw rewrites the canvas's inline cursor.
+  // Locked, a left drag neither paints nor pans, so neither the brush nor MapLibre's grab would be true.
   let cursor = "";
   const syncCursor = () => {
-    container.classList.toggle("brush-cursor", painting());
+    container.classList.toggle("brush-cursor", painting() && !locked);
+    container.classList.toggle("locked-cursor", painting() && locked);
     const c = brushCursor(deps.colour());
     if (c !== cursor) container.style.setProperty("--brush-cursor", cursor = c);
   };
@@ -140,7 +142,7 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
     /** Space held acts as Pan. */
     setSpace(held: boolean): void { if (space !== held) { space = held; syncHandlers(); hover(); } },
     /** Locked, the brush neither paints nor shows its footprint; a stroke in progress ends. */
-    setLocked(on: boolean): void { locked = on; if (on) end(); hover(); },
+    setLocked(on: boolean): void { locked = on; if (on) end(); syncCursor(); hover(); },
     /** Redraw the footprint and cursor after a size or colour change. */
     refresh(): void { syncCursor(); hover(); },
     /** A stroke is in progress. */
