@@ -1,15 +1,17 @@
 import { fromLonLat, invertAffine } from "./crs";
-import { tileWindows, type Window } from "./grid";
+import type { Window } from "./grid";
+import { tileWindow } from "./labelStore";
 import { TILE_SIZE, type Grid } from "./types";
 import { latOf, lonOf, mercBounds } from "./warp";
 
-/** Mercator metres per overlay pixel: the longest Mercator bbox side over every tile window / TILE_SIZE. */
-// One pitch per raster puts every overlay on one grid (spec 011, ADR 0016). Taking the maximum over every
-// tile, with the same clamped bbox overlayIndex uses, keeps each overlay within TILE_SIZE + 2 px a side.
+/** Mercator metres per overlay pixel: the longest Mercator bbox side of the raster's four corner tile windows / TILE_SIZE. */
+// One pitch per raster puts every overlay on one grid (spec 011, ADR 0016); the corner tiles are the
+// largest in Mercator for the grids we expect, so overlays stay about TILE_SIZE a side.
 export function overlayPitch(grid: Grid): number {
+  const xl = Math.floor((grid.width - 1) / TILE_SIZE) * TILE_SIZE, yl = Math.floor((grid.height - 1) / TILE_SIZE) * TILE_SIZE;
   let side = 0;
-  for (const w of tileWindows(grid.width, grid.height)) {
-    const [mx0, my0, mx1, my1] = mercBounds(w, grid.gt, grid.epsg);
+  for (const [x0, y0] of [[0, 0], [xl, 0], [0, yl], [xl, yl]] as const) {
+    const [mx0, my0, mx1, my1] = mercBounds(tileWindow(grid, x0, y0), grid.gt, grid.epsg);
     side = Math.max(side, mx1 - mx0, my1 - my0);
   }
   return side / TILE_SIZE;

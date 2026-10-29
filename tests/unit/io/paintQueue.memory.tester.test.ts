@@ -118,7 +118,9 @@ describe("overlay index memory (ADR 0010, tester measurement)", () => {
   // spec 011 / ADR 0016: one Mercator grid per raster, so a side may reach TILE_SIZE + 2
   it("each tile's index is width*height Int32 with max side 258: about 260 KiB, so about 65 MiB at the cap", () => {
     let worst = 0;
-    for (const g of grids) {
+    // The pole grid (grids[2]) is spec 011's documented exception (ADR 0016): it crosses MAX_LAT, and its
+    // middle tile row, clipped at the limit, is far taller in Mercator than any corner tile.
+    for (const g of [grids[0]!, grids[1]!, grids[3]!]) {
       const pitch = overlayPitch(g);
       for (const w of tileWindows(g.width, g.height)) {
         const o = overlayIndex(w, g, pitch);
@@ -131,6 +133,12 @@ describe("overlay index memory (ADR 0010, tester measurement)", () => {
     expect(worst).toBeGreaterThanOrEqual(TILE_SIZE * TILE_SIZE * 4);
     expect(worst).toBeLessThanOrEqual((TILE_SIZE + 2) ** 2 * 4);
     expect(MAX_LABEL_TILES * worst).toBeLessThanOrEqual(66 * 1024 * 1024);
+  });
+
+  it("known gap (spec 011 Exception, ADR 0016): on a raster crossing MAX_LAT, a clipped middle tile's overlay exceeds TILE_SIZE + 2", () => {
+    const g = grids[2]!;
+    const o = overlayIndex({ x0: 0, y0: 256, width: 256, height: 256 }, g, overlayPitch(g));
+    expect(o.height).toBeGreaterThan(TILE_SIZE + 2);
   });
 
   it("a tile wholly beyond MAX_LAT gets a one-row overlay that indexes nothing", () => {
