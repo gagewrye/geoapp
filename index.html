@@ -21,10 +21,10 @@
           <span id="brush-size">Brush: 7 px</span>
           <button id="brush-larger" type="button" aria-label="Larger brush">+</button>
         </div>
+        <input id="brush-size-range" type="range" min="1" max="127" step="2" value="7" aria-label="Brush size" />
         <button id="undo" type="button" disabled>Undo</button>
         <ul id="classes"></ul>
         <button id="class-add" type="button">Add class</button>
-        <label>Seed mode <select id="seed-mode" disabled><option value="merge">Merge</option><option value="replace">Replace</option></select></label>
         <label>Class map (optional) <input id="class-map" type="file" accept=".json,application/json" /></label>
         <label>Import labels <input id="import-labels" type="file" accept=".tif,.tiff,image/tiff" /></label>
         <button id="export-labels" type="button">Export labels</button>

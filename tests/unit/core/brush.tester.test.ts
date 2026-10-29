@@ -3,7 +3,7 @@ import { fromLonLat, normalizeLon } from "../../../src/core/crs";
 import { tileWindows, type Window } from "../../../src/core/grid";
 import { MAX_LABEL_TILES, brush, emptyStore, keepMasks, tileKeys, tileWindow, type LabelStore, type NodataMasks } from "../../../src/core/labelStore";
 import { maskBit, nodataMask } from "../../../src/core/nodata";
-import { BRUSH_SIZES, footprint, footprintRing, pixelAt, strokeCells, strokeCellsIn } from "../../../src/core/pixel";
+import { footprint, footprintRing, pixelAt, strokeCells, strokeCellsIn } from "../../../src/core/pixel";
 import type { Grid, Tile } from "../../../src/core/types";
 import { makeTile } from "../helpers/tiles";
 
@@ -63,7 +63,7 @@ describe("pixelAt across 180 and world copies (criterion 1, tester)", () => {
 describe("footprint at edges for every brush size (criterion 2, tester)", () => {
   const dims = { width: 300, height: 260 }; // partial edge tiles: 44 x 4 columns/rows past 256
   it("is the centred square for every size when it fits", () => {
-    for (const s of BRUSH_SIZES) {
+    for (let s = 1; s <= 127; s += 2) {
       const h = (s - 1) / 2;
       expect(footprint(dims, 150, 130, s)).toEqual({ x0: 150 - h, y0: 130 - h, width: s, height: s });
     }

@@ -2,7 +2,7 @@ import type { Map as MapLibreMap } from "maplibre-gl";
 import { MAX_CLASSES, checkName, initialClasses, nextClass, type LabelClass } from "../core/classes";
 import type { Window } from "../core/grid";
 import { emptyStore, keepMasks, tileKeys, tileWindow, type LabelStore } from "../core/labelStore";
-import { BRUSH_SIZES, DEFAULT_BRUSH } from "../core/pixel";
+import { BRUSH_MAX, BRUSH_MIN, BRUSH_STEP, DEFAULT_BRUSH, stepBrush } from "../core/pixel";
 import { baseTile, type MaskBase } from "../io/maskBase";
 import { PaintQueue } from "../io/paintQueue";
 import type { RasterSource } from "../io/source";
@@ -30,10 +30,11 @@ export const inTextField = (el: Element | null) => el instanceof HTMLTextAreaEle
 
 /** Brush labels on local imagery (spec 003): panel, classes, shortcuts, store, paint queue and overlays. */
 export function initLabels({ map, say, onBusy, onChange, panning }: Deps) {
-  const panel = $("brush-panel"), list = $("classes"), add = $<HTMLButtonElement>("class-add"), sizeText = $("brush-size");
+  const panel = $("brush-panel"), list = $("classes"), add = $<HTMLButtonElement>("class-add");
+  const sizeText = $("brush-size"), sizeRange = $<HTMLInputElement>("brush-size-range");
   const classes: LabelClass[] = initialClasses();
   let selected = 0;
-  let size = BRUSH_SIZES.indexOf(DEFAULT_BRUSH);
+  let size = DEFAULT_BRUSH; // kept when another raster opens (spec 017)
   let open = false;
   let locked = false; // while seeding or exporting labels (spec 004): no painting and no class edits, so no list or tile changes under them
   let store: LabelStore = emptyStore(0, 0);
@@ -51,12 +52,12 @@ export function initLabels({ map, say, onBusy, onChange, panning }: Deps) {
     undone: (keys) => {
       keepMasks(store, queue!.masks, null);
       redraw(keys);
-      onChange(); // Seed mode, Import, Seed and Export follow the store (spec 004)
+      onChange(); // Import and Export follow the store (spec 004)
     },
   });
 
   const brush = createBrush(map, {
-    side: () => BRUSH_SIZES[size]!,
+    side: () => size,
     colour: () => classes[selected]!.colour,
     cells: (ws, erase) => { if (!locked) for (const w of ws) queue?.push({ w, value: selected + 1, erase, stroke: undo.current() ?? undefined }); },
     onStroke: undo.stroke,
@@ -68,11 +69,13 @@ export function initLabels({ map, say, onBusy, onChange, panning }: Deps) {
     $("mode-paint").setAttribute("aria-pressed", String(m === "paint"));
     $("mode-pan").setAttribute("aria-pressed", String(m === "pan"));
   };
-  const step = (d: number) => {
-    size = Math.max(0, Math.min(BRUSH_SIZES.length - 1, size + d));
-    sizeText.textContent = `Brush: ${BRUSH_SIZES[size]} px`;
-    brush.refresh();
+  const setSize = (side: number) => {
+    size = side;
+    sizeRange.value = String(side);
+    sizeText.textContent = `Brush: ${side} px`;
+    brush.refresh(); // the footprint redraws at once; a stroke in progress uses it from its next cell
   };
+  const step = (d: 1 | -1) => setSize(stepBrush(size, d));
   const select = (i: number) => {
     selected = i;
     markSelected(list, i);
@@ -103,6 +106,9 @@ export function initLabels({ map, say, onBusy, onChange, panning }: Deps) {
   $("mode-pan").addEventListener("click", () => setMode("pan"));
   $("brush-smaller").addEventListener("click", () => step(-1));
   $("brush-larger").addEventListener("click", () => step(1));
+  Object.assign(sizeRange, { min: String(BRUSH_MIN), max: String(BRUSH_MAX), step: String(BRUSH_STEP) });
+  setSize(size); // a reload starts at the default even where the browser restores form values
+  sizeRange.addEventListener("input", () => setSize(Number(sizeRange.value))); // live while dragging
   add.addEventListener("click", () => {
     if (locked || classes.length >= MAX_CLASSES) return;
     classes.push(nextClass(classes));

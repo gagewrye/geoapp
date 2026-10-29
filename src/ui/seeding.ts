@@ -24,7 +24,7 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 // message (spec 003's rule for replaced rasters), and the new raster's controls are free at once.
 export function initSeeding({ labels, imagery, say, error, opened }: Deps) {
   const importInput = $<HTMLInputElement>("import-labels"), classMap = $<HTMLInputElement>("class-map");
-  const mode = $<HTMLSelectElement>("seed-mode"), exportBtn = $<HTMLButtonElement>("export-labels");
+  const exportBtn = $<HTMLButtonElement>("export-labels");
   let running: RasterSource | null = null; // the imagery a seeding run started on
   let exporting: RasterSource | null = null; // the imagery an export started on
 
@@ -37,8 +37,6 @@ export function initSeeding({ labels, imagery, say, error, opened }: Deps) {
     const s = imagery(), busy = seeding(), queued = labels.busy();
     importInput.disabled = classMap.disabled = !s || busy || queued;
     exportBtn.disabled = !s || busy || queued || exporting !== null;
-    if (!labels.hasLabels()) mode.value = "merge"; // Merge is the default whenever labels appear
-    mode.disabled = !labels.hasLabels() || busy;
   }
 
   /** Every import replaces (spec 017): true unless labels exist and the user cancels the confirm. */

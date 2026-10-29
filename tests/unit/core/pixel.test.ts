@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fixture from "../../fixtures/crs-points.json";
 import { applyAffine, fromLonLat, toLonLat } from "../../../src/core/crs";
-import { BRUSH_SIZES, footprint, footprintRing, pixelAt, strokeCells, strokeCellsIn } from "../../../src/core/pixel";
+import { BRUSH_MAX, BRUSH_MIN, BRUSH_STEP, DEFAULT_BRUSH, footprint, footprintRing, pixelAt, stepBrush, strokeCells, strokeCellsIn } from "../../../src/core/pixel";
 import type { Affine, Grid } from "../../../src/core/types";
 
 const grid = (epsg: number, gt: Affine, width = 1000, height = 1000): Grid => ({ epsg, gt, width, height });
@@ -83,8 +83,24 @@ describe("footprint (criterion 2)", () => {
     expect(footprint(dims, 100, 0, 1)).toBeNull();
     expect(footprint(dims, -1, -1, 1)).toBeNull();
   });
-  it("lists odd sizes 1..127 with the default 7", () => {
-    expect(BRUSH_SIZES).toEqual([1, 3, 7, 15, 31, 63, 127]);
+});
+
+describe("stepBrush (spec 017 criterion 1)", () => {
+  it("keeps the 1..127 odd range with the default 7", () => {
+    expect([BRUSH_MIN, BRUSH_MAX, BRUSH_STEP, DEFAULT_BRUSH]).toEqual([1, 127, 2, 7]);
+  });
+  it("steps up to 2s + 1, capped at 127", () => {
+    for (const [s, want] of [[1, 3], [3, 7], [7, 15], [9, 19], [63, 127], [99, 127], [127, 127]]) expect(stepBrush(s!, 1)).toBe(want);
+  });
+  it("steps down to 2·floor((s - 1) / 4) + 1, floored at 1", () => {
+    for (const [s, want] of [[127, 63], [9, 5], [7, 3], [5, 3], [3, 1], [1, 1]]) expect(stepBrush(s!, -1)).toBe(want);
+  });
+  it("gives an odd size in 1..127 from every odd size", () => {
+    for (let s = 1; s <= 127; s += 2) for (const d of [1, -1] as const) {
+      const n = stepBrush(s, d);
+      expect(n % 2).toBe(1);
+      expect(n >= 1 && n <= 127).toBe(true);
+    }
   });
 });
 

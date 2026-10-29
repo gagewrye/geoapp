@@ -1,5 +1,4 @@
 import { expect, test, type Page } from "@playwright/test";
-import { BRUSH_SIZES } from "../../src/core/pixel";
 import { MESSAGES } from "../../src/ui/messages";
 import { hoverFeatures, jumpTo, labels, message, openApp, openRaster, rgbFixture, selectClass, settled, toScreen } from "./helpers";
 
@@ -29,7 +28,6 @@ test.describe("brush size (criterion 13)", () => {
     for (let i = 0; i < 4; i++) { await page.keyboard.press("["); down.push((await sizeText(page).textContent())!); }
     for (let i = 0; i < 4; i++) { await page.click("#brush-smaller"); down.push((await sizeText(page).textContent())!); }
     expect(down).toEqual(["Brush: 63 px", "Brush: 31 px", "Brush: 15 px", "Brush: 7 px", "Brush: 3 px", "Brush: 1 px", "Brush: 1 px", "Brush: 1 px"]);
-    expect(BRUSH_SIZES[0]).toBe(1);
   });
 
   test("a size-15 dab labels 15x15 pixels", async ({ page }) => {
