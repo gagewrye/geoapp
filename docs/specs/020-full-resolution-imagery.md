@@ -1,6 +1,6 @@
 # 020: Full-resolution imagery when zoomed in
 
-Status: Approved (Gage, 2026-10-29: "approve all"). Builds on spec 019. ADR 0020.
+Status: Approved (Gage, 2026-10-29: "approve all"). The tile cache was raised from 192 to 512 tiles (Gage, 2026-10-29: "yes increase cache"). Builds on spec 019. ADR 0020.
 
 The request (Gage, 2026-10-29): "It also displays as much lower resolution than the source image. If you are labelling, you want that full resolution when you zoom in to see the details."
 
@@ -24,7 +24,9 @@ The request (Gage, 2026-10-29): "It also displays as much lower resolution than 
 - **Loading:**
   - After `moveend`, visible tiles are requested centre first. Reads no longer visible are aborted.
   - Finer tiles draw above coarser ones.
-  - At most `IMAGERY_TILES` = 192 tiles are kept, least recently used first out (96 MiB: 48 of canvas, 48 of GPU).
+  - At most `IMAGERY_TILES` = 512 tiles are kept, and the least recently used are dropped first.
+  - That is 256 MiB: 128 MiB of canvas and 128 MiB of GPU.
+  - The cap is the same on every device. `navigator.deviceMemory` is Chromium-only and coarse, so the cap isn't scaled from it.
   - Opening a raster drops them all.
 - **Reads:**
   - Reads use geotiff's `samples` option (bands 0–2, or band 0 alone) and keep the raw typed arrays (no Float32 copy).
@@ -41,7 +43,7 @@ The request (Gage, 2026-10-29): "It also displays as much lower resolution than 
 
 ## Interfaces (`core/imagery.ts`, pure)
 ```ts
-export const IMAGERY_TILES = 192, MAX_DECIMATE = 4, MAX_BLOCK_BYTES = 32 * 2 ** 20, MAX_READ_BYTES = 32 * 2 ** 20;
+export const IMAGERY_TILES = 512, MAX_DECIMATE = 4, MAX_BLOCK_BYTES = 32 * 2 ** 20, MAX_READ_BYTES = 32 * 2 ** 20;
 export type Overview = { index: number; width: number; height: number };
 export type Level = { s: number; grid: Grid; overview: number | null };   // null: sample full resolution
 export function planView(full: Grid, overviews: Overview[], bounds: [number, number, number, number], cssW: number, cssH: number): { level: Level; tiles: Window[] } | null;
@@ -72,7 +74,10 @@ export function toRgba(bands: ArrayLike<number>[], n: number, ranges: [number, n
    - A painted pixel's colour edges fall on imagery edges, within 1 device pixel.
 5. **Unit, `toRgba`:** matches `warpPreview`'s mapping, and gives alpha 0 for NaN and nodata.
 6. **Unit, `rowReads`:** each read ≤ `MAX_READ_BYTES`, and their union covers the tiles' source pixels.
-7. **E2E:** after zooming across the raster, there are never more than `IMAGERY_TILES` `imagery-` sources. Opening another raster removes them all.
+7. **Unit and E2E, the cache cap:**
+   - Unit, fake map: after 600 distinct tiles are drawn, exactly 512 remain, and the 88 least recently used are gone.
+   - E2E: after zooming across the raster, there are never more than `IMAGERY_TILES` `imagery-` sources.
+   - E2E: opening another raster removes them all.
 8. **Unit, fake source:** panning away aborts queued reads, and an aborted read draws nothing.
 9. **Unit and E2E:**
    - A header with a block over `MAX_BLOCK_BYTES` shows the message, adds no `imagery-` layer, and still shows the preview.
@@ -84,7 +89,7 @@ export function toRgba(bands: ArrayLike<number>[], n: number, ranges: [number, n
 11. `npm run check` passes.
 
 ## Estimates for the 1.49 GB file (assumed ~22,300² px, 3 bands, 8-bit; not measured)
-- **Memory:** up to 96 MiB of tiles plus at most 2 x 32 MiB of reads in flight, on top of ADR 0015's 178 MiB. That is about 350 MiB at worst.
+- **Memory:** up to 256 MiB of tiles plus at most 2 x 32 MiB of reads in flight, on top of ADR 0015's 178 MiB. That is about 500 MiB at worst (178 + 256 + 64 = 498).
 - **Open:** about 1 s with overviews. Without them:
   - a striped file reads about 1/22 of its strips (seconds);
   - a tiled file still decodes every block once.
