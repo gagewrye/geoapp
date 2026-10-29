@@ -11,10 +11,9 @@ import { fakeLabelSource } from "../helpers/labelFiles";
 import { fakeSource } from "../helpers/sources";
 
 // Tester checks of spec 004's Merge or Replace build and its memory rule: the current labels are
-// never written (success, "full", "too many", "empty", "stale"), the cap at its exact boundary in
-// both modes, the N and K counts, and, structurally, that every read is one aligned window of at
-// most 256x256 with one read in flight, that a capped or stale run stops reading, and that huge
-// rasters are never read whole.
+// never written (success, "too many", "empty", "stale"), imports no longer reach the cap (spec 014),
+// the N and K counts, and, structurally, that every read is one aligned window of at most 256x256
+// with one read in flight, that a stale run stops reading, and that huge rasters are never read whole.
 
 const GT: Affine = [500000, 10, 0, 5000000, 0, -10];
 const ok = (r: SeedOutcome) => { if (typeof r === "string") throw new Error(r); return r; };
@@ -73,7 +72,7 @@ describe("the current labels are never written", () => {
   });
 });
 
-describe("Merge and Replace at the cap", () => {
+describe("Merge and Replace never reach the cap (spec 014: the file is a base)", () => {
   const size = 256 * 17; // 289 tiles
   const g: Grid = { width: size, height: size, epsg: 32633, gt: GT };
   const imagery = () => fakeSource({ ...g, bandCount: 1 }, () => 1).source;
@@ -86,23 +85,19 @@ describe("Merge and Replace at the cap", () => {
   };
   const all = tileWindows(size, size);
 
-  it("Merge with 256 stored tiles: a seed inside them succeeds (putTile replaces), one more tile is \"full\"", { timeout: 120_000 }, async () => {
+  it("Merge with 256 stored tiles merges those and stores no new tile, however many the file labels", { timeout: 120_000 }, async () => {
     const cur = labelsWith(MAX_LABEL_TILES, size);
-    const r = ok(await importLabels(imagery(), fileOn(all.slice(250, 256)), table, cur, "merge"));
-    expect(r.store.tiles.size).toBe(MAX_LABEL_TILES);
-    expect(r.pixels).toBe(6 * (65536 - 1)); // painted first pixels win
-    const s = snapshot(cur);
-    expect(await importLabels(imagery(), fileOn(all.slice(250, 257)), table, cur, "merge")).toBe("full");
-    expectUntouched(cur, s);
+    const r = ok(await importLabels(imagery(), fileOn(all.slice(250, 289)), table, cur, "merge"));
+    expect([...r.store.tiles.keys()]).toEqual([...cur.store.tiles.keys()]);
+    expect(r.pixels).toBe(6 * (65536 - 1) + 33 * 65536); // painted first pixels win
   });
 
-  it("Replace with 256 stored tiles elsewhere succeeds and keeps only the seed; exactly 256 seeded tiles fit, 257 don't", { timeout: 120_000 }, async () => {
+  it("Replace with 256 stored tiles stores none, with all 289 tiles labelled", { timeout: 120_000 }, async () => {
     const cur = labelsWith(MAX_LABEL_TILES, size);
-    const r = ok(await importLabels(imagery(), fileOn(all.slice(280, 289)), table, cur, "replace"));
-    expect([...r.store.tiles.keys()]).toEqual(all.slice(280, 289).map((w) => `${w.x0},${w.y0}`));
+    const r = ok(await importLabels(imagery(), fileOn(all), table, cur, "replace"));
+    expect(r.store.tiles.size).toBe(0);
+    expect(r.base.count).toBe(size * size);
     expect(r.classes).toEqual([{ name: "three", colour: expect.any(String) }]);
-    expect(typeof (await importLabels(imagery(), fileOn(all.slice(0, 256)), table, cur, "replace"))).toBe("object");
-    expect(await importLabels(imagery(), fileOn(all.slice(0, 257)), table, cur, "replace")).toBe("full");
   });
 });
 
@@ -167,15 +162,6 @@ describe("memory, structurally", () => {
     expect(new Set(fileReads.map((e) => `${e.w.x0},${e.w.y0}`)).size).toBeLessThanOrEqual(16 * 13);
     expect(fileReads.length).toBeLessThanOrEqual(16 * 13 + 6 * 16 + 6 * 13); // window seams read twice at most
     expect(io.log.filter((e) => e.kind === "i")).toHaveLength(tileWindows(600, 500).length);
-  });
-
-  it("a capped import on a 65536 x 65536 imagery stops reading after the 257th tile", { timeout: 120_000 }, async () => {
-    const big: Grid = { width: 65536, height: 65536, epsg: 32633, gt: GT };
-    const io = instrument(fakeSource({ ...big, bandCount: 1 }, () => 1).source, fakeLabelSource(big, () => 4).source);
-    expect(await importLabels(io.imagery, io.file, [{ value: 4, name: "four" }], { store: emptyStore(65536, 65536), classes: initialClasses() }, "replace")).toBe("full");
-    expect(io.log.filter((e) => e.kind === "i")).toHaveLength(MAX_LABEL_TILES + 1);
-    expect(io.log.filter((e) => e.kind === "f")).toHaveLength(MAX_LABEL_TILES + 1);
-    expect(io.max()).toBe(1);
   });
 
   it("a stale run reads nothing more once stale", { timeout: 30_000 }, async () => {

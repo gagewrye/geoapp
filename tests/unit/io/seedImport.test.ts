@@ -11,8 +11,9 @@ import { RasterRefusedError } from "../../../src/io/pipeline";
 import { importLabels, importTable, type SeedOutcome } from "../../../src/io/seeding";
 import { aefShapedFile, CLASS_GRID, CLASS_MAP, classFile, classItemFile, classValue, ITEM_CLASSES, rgbClassFile, uint16ClassFile, writeFile } from "../helpers/labelFiles";
 import { fakeSource } from "../helpers/sources";
+import { effectiveTile } from "../../../src/io/maskBase";
 
-// Spec 004 criteria 12 and 15 (their io part) and 13 (resampling and mask, brute force).
+// Spec 004 criteria 12 and 15 (their io part) and 13 (resampling and mask, brute force), on effective tiles (spec 014 criterion 5).
 
 const GT: Affine = [10, 0.01, 0, 50, 0, -0.01];
 const IMAGERY: Grid = { width: 1000, height: 1000, epsg: 4326, gt: GT }; // spec 001's EPSG:4326 fixture grid
@@ -24,7 +25,8 @@ const imagery = () => fakeSource({ ...IMAGERY, nodata: -9999 }, value);
 const open = async (buf: ArrayBuffer) => openLabelTiff(await fromArrayBuffer(buf));
 const fresh = () => ({ store: emptyStore(1000, 1000), classes: initialClasses() });
 const ok = (r: SeedOutcome) => { if (typeof r === "string") throw new Error(r); return r; };
-const at = (store: { tiles: Map<string, Uint8Array> }, w: Window) => store.tiles.get(`${w.x0},${w.y0}`) ?? new Uint8Array(w.width * w.height);
+/** The effective tile (spec 014: stored, else the mask's, else zeros), as `tile(key)` gives it. */
+const at = (r: Exclude<SeedOutcome, string>, w: Window) => effectiveTile(imagery().source, r.store, r.base, w);
 
 /** Brute force: every imagery pixel, from the whole file at once: 0 on imagery nodata or NaN, else lut[file value at its cell]. */
 function expected(w: Window, lut: Uint8Array, file: Grid = CLASS_GRID, f: (c: number, r: number) => number = classValue): Uint8Array {
@@ -77,7 +79,7 @@ describe("classes (criterion 12, io)", () => {
     const r = ok(await importLabels(imagery().source, file, table, fresh(), "replace"));
     expect(r.classes).toEqual([{ name: "Seven", colour: "#123456" }, { name: "Three", colour: paletteColour(1) }]);
     const lut = seedLut(table, [1, 2]); // 0 and 255 unlisted
-    for (const w of tileWindows(1000, 1000)) expect(Buffer.from(at(r.store, w)).equals(Buffer.from(expected(w, lut))), `${w.x0},${w.y0}`).toBe(true);
+    for (const w of tileWindows(1000, 1000)) expect(Buffer.from(await at(r, w)).equals(Buffer.from(expected(w, lut))), `${w.x0},${w.y0}`).toBe(true);
     expect(r.classCount).toBe(2);
   });
 
@@ -99,7 +101,7 @@ describe("classes (criterion 12, io)", () => {
   });
 });
 
-describe("resampling and mask (criterion 13, io brute force)", () => {
+describe("resampling and mask (criterion 13, io brute force; spec 014 criterion 5)", () => {
   const entries: ClassEntry[] = [{ value: 0, name: "Class 0" }, { value: 3, name: "Class 3" }, { value: 7, name: "Class 7" }, { value: 255, name: "Class 255" }];
 
   for (const nd of ["255", null]) {
@@ -110,9 +112,10 @@ describe("resampling and mask (criterion 13, io brute force)", () => {
       for (const w of tileWindows(1000, 1000)) {
         const want = expected(w, lut);
         labelled += want.filter((v) => v).length;
-        expect(Buffer.from(at(r.store, w)).equals(Buffer.from(want)), `${w.x0},${w.y0}`).toBe(true);
+        expect(Buffer.from(await at(r, w)).equals(Buffer.from(want)), `${w.x0},${w.y0}`).toBe(true);
       }
       expect(r.pixels).toBe(labelled);
+      expect(r.store.tiles.size).toBe(0); // the file is the base; nothing is copied (spec 014)
       // without the mask, both blocks would get labels: the mask mattered
       for (const [x0, y0] of [[400, 400], [600, 500]] as const) {
         const cells = sourceCells(IMAGERY, CLASS_GRID, { x0, y0, width: 40, height: 40 });

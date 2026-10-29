@@ -9,6 +9,7 @@ import { openGeoTiff } from "../../../src/io/geotiffSource";
 import { exportLabels } from "../../../src/io/labelExport";
 import { openLabelTiff } from "../../../src/io/labelFile";
 import { importLabels, importTable, type SeedOutcome } from "../../../src/io/seeding";
+import { effectiveTiles } from "../helpers/effective";
 import type { RasterSource } from "../../../src/io/source";
 import { geotiffBuffer, recordingSink } from "../helpers/sources";
 
@@ -52,9 +53,13 @@ async function roundTrip(src: RasterSource, store: LabelStore, classes: LabelCla
   return { r, rec, file };
 }
 
-function expectSame(a: LabelStore, b: LabelStore) {
-  expect([...a.tiles.keys()].sort()).toEqual([...b.tiles.keys()].sort());
-  for (const [k, t] of a.tiles) expect(Buffer.from(b.tiles.get(k)!).equals(Buffer.from(t)), k).toBe(true);
+/** Every window's effective tile after the import (spec 014) equals the exported store's tile, or zeros. */
+async function expectSame(src: RasterSource, a: LabelStore, r: Exclude<SeedOutcome, string>) {
+  const b = await effectiveTiles(src, r);
+  for (const [k, t] of b) {
+    const want = a.tiles.get(k) ?? new Uint8Array(t.length);
+    expect(Buffer.from(t).equals(Buffer.from(want)), k).toBe(true);
+  }
 }
 
 const NAMES = ["Mangrove & <salt>", "\"q\" 'a'", "</Item>", "Wald üß", "水 water", "wave \u{1F30A}", "&amp;lt;"];
@@ -75,7 +80,7 @@ describe("export then import restores labels and classes exactly", () => {
       expect(file.meta.nodata).toBe(0);
       expect([file.meta.width, file.meta.height, file.meta.epsg]).toEqual([w, h, epsg]);
       expect(file.meta.gt).toEqual(src.meta.gt);
-      expectSame(store, r.store);
+      await expectSame(src, store, r);
       expect(r.classes).toEqual(classes);
     });
   }
@@ -87,7 +92,7 @@ describe("export then import restores labels and classes exactly", () => {
     const last = tileWindows(777, 513).at(-1)!;
     expect(store.tiles.get(`${last.x0},${last.y0}`)!.at(-1)).toBe(255);
     const { r } = await roundTrip(src, store, classes);
-    expectSame(store, r.store);
+    await expectSame(src, store, r);
     expect(r.classes).toEqual(classes);
   });
 

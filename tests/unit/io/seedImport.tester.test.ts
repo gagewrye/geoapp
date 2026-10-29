@@ -10,6 +10,7 @@ import { LabelFileRefused, openLabelTiff } from "../../../src/io/labelFile";
 import { RasterRefusedError } from "../../../src/io/pipeline";
 import { importLabels, importTable, type SeedOutcome } from "../../../src/io/seeding";
 import { classFile, fakeLabelSource, writeFile } from "../helpers/labelFiles";
+import { effectiveTiles } from "../helpers/effective";
 import { fakeSource } from "../helpers/sources";
 
 // Tester brute force of Import labels (spec 004 criteria 12, 13, 15) on more CRS pairs than the
@@ -57,8 +58,9 @@ function check(dst: Grid, src: Grid, nodata: number | null) {
     expect(r.classes).toEqual(values.map((v, i) => ({ name: `Class ${v}`, colour: paletteColour(i) })));
     let bad = 0, labelled = 0, edge = 0;
     const lut = new Map(values.map((v, i) => [v, i + 1]));
+    const tiles = await effectiveTiles(imagery, r);
     for (const w of tileWindows(W, H)) {
-      const t = r.store.tiles.get(`${w.x0},${w.y0}`) ?? new Uint8Array(w.width * w.height);
+      const t = tiles.get(`${w.x0},${w.y0}`)!;
       expect(t).toHaveLength(w.width * w.height);
       for (let i = 0; i < t.length; i++) {
         const col = w.x0 + (i % w.width), row = w.y0 + Math.floor(i / w.width);
@@ -139,7 +141,7 @@ describe("Import labels: classes and outcomes", () => {
     const r = ok(await importLabels(source, fakeLabelSource(g, f, 255).source, null, fresh(256, 256), "replace"));
     expect(r.classes).toHaveLength(255);
     expect(r.classes[254]!.name).toBe("Class 254");
-    const t = r.store.tiles.get("0,0")!;
+    const t = (await effectiveTiles(source, r)).get("0,0")!;
     expect([t[0], t[1], t[254], t[255]]).toEqual([1, 2, 255, 0]);
     expect(r.classCount).toBe(255);
   });

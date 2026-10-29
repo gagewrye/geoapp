@@ -9,6 +9,7 @@ import { checkLabelExport, exportLabels } from "../../../src/io/labelExport";
 import { openLabelTiff } from "../../../src/io/labelFile";
 import { importLabels, importTable } from "../../../src/io/seeding";
 import type { RasterSource } from "../../../src/io/source";
+import { effectiveTiles } from "../helpers/effective";
 import { fakeSource, geotiffBuffer, recordingSink } from "../helpers/sources";
 
 // Spec 004 criteria 9 (the written item) and 10 (export).
@@ -86,8 +87,9 @@ describe("Export labels (criteria 9 and 10)", () => {
     const r = await importLabels(source, file, importTable(file), { store: emptyStore(1000, 1000), classes: initialClasses() }, "replace");
     if (typeof r === "string") throw new Error(r);
     expect(r.classes).toEqual(classes);
-    expect([...r.store.tiles.keys()]).toEqual(["0,0"]);
-    expect(Buffer.from(r.store.tiles.get("0,0")!).equals(Buffer.from(t))).toBe(true);
+    const back = await effectiveTiles(source, r); // spec 014: the file is the base
+    expect([...back].filter(([, v]) => v.some((x) => x)).map(([k]) => k)).toEqual(["0,0"]);
+    expect(Buffer.from(back.get("0,0")!).equals(Buffer.from(t))).toBe(true);
   });
 
   it("checkLabelExport rejects output beyond the classic TIFF limit before anything is written", () => {

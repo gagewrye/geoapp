@@ -5,6 +5,7 @@ import { emptyStore, type LabelStore } from "../../../src/core/labelStore";
 import type { Grid } from "../../../src/core/types";
 import { importLabels, type SeedOutcome } from "../../../src/io/seeding";
 import { fakeLabelSource } from "../helpers/labelFiles";
+import { effectiveTiles } from "../helpers/effective";
 import { fakeSource } from "../helpers/sources";
 
 // Spec 004 Merge or Replace (criterion 16's rules, here at the io level): new labels are built
@@ -24,9 +25,10 @@ function painted(): LabelStore {
   store.tiles.set("0,0", t);
   return store;
 }
-const valueAt = (store: LabelStore, c: number, r: number) => {
+/** The effective label at (c, r) (spec 014: stored tile, else the mask's), from effectiveTiles. */
+const valueAt = (tiles: Map<string, Uint8Array>, c: number, r: number) => {
   const x0 = c - (c % 256), y0 = r - (r % 256), w = Math.min(256, GRID.width - x0);
-  return store.tiles.get(`${x0},${y0}`)?.[(r - y0) * w + (c - x0)] ?? 0;
+  return tiles.get(`${x0},${y0}`)![(r - y0) * w + (c - x0)]!;
 };
 const ok = (r: SeedOutcome) => { if (typeof r === "string") throw new Error(r); return r; };
 
@@ -38,10 +40,11 @@ describe("Merge", () => {
     expect(r.classes).toEqual([A, B, { name: "C", colour: paletteColour(2) }]);
     expect(r.pixels).toBe(512 * 300 - 1500);
     expect(r.classCount).toBe(2);
+    const tiles = await effectiveTiles(imagery(), r);
     let bad = 0;
     for (let row = 0; row < 300; row++) for (let c = 0; c < 512; c++) {
       const want = row < 10 && c < 150 ? (c < 100 ? 1 : 2) : c < 300 ? 2 : 3;
-      if (valueAt(r.store, c, row) !== want) bad++;
+      if (valueAt(tiles, c, row) !== want) bad++;
     }
     expect(bad).toBe(0);
     // the current labels are untouched until the caller swaps the new ones in
@@ -49,7 +52,7 @@ describe("Merge", () => {
     expect(Buffer.from(store.tiles.get("0,0")!).equals(Buffer.from(before))).toBe(true);
     expect(classes).toEqual([A, B]);
     // every stored value has a class (spec 003 review handoff)
-    expect([...r.store.tiles.values()].reduce((m, t) => t.reduce((a, v) => Math.max(a, v), m), 0)).toBeLessThanOrEqual(r.classes.length);
+    expect([...tiles.values()].reduce((m, t) => t.reduce((a, v) => Math.max(a, v), m), 0)).toBeLessThanOrEqual(r.classes.length);
   });
 
   it("gives \"empty\" when every seeded pixel is already labelled, and when the file is all unlisted", async () => {
@@ -73,6 +76,8 @@ describe("Replace", () => {
     const r = ok(await importLabels(imagery(), file(), MAP, { store: painted(), classes: [A, B] }, "replace"));
     expect(r.classes).toEqual([{ name: "B", colour: paletteColour(0) }, { name: "C", colour: paletteColour(1) }]);
     expect(r.pixels).toBe(512 * 300);
-    expect([valueAt(r.store, 0, 0), valueAt(r.store, 299, 5), valueAt(r.store, 300, 5)]).toEqual([1, 1, 2]);
+    const tiles = await effectiveTiles(imagery(), r);
+    expect([valueAt(tiles, 0, 0), valueAt(tiles, 299, 5), valueAt(tiles, 300, 5)]).toEqual([1, 1, 2]);
+    expect(r.store.tiles.size).toBe(0);
   });
 });

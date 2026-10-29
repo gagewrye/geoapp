@@ -92,13 +92,13 @@ describe("reads (criterion 14)", () => {
   });
 });
 
-describe("the label cap (criterion 16, io)", () => {
+describe("no label cap on imports (spec 014 supersedes criterion 16's io cap)", () => {
   // 4352 = 17 x 256, so 289 tiles; generated in memory on a grid equal to the imagery's
   const gt: Affine = [500000, 10, 0, 5000000, 0, -10];
   const grid: Grid = { width: 4352, height: 4352, epsg: 32633, gt };
 
   for (const mode of ["merge", "replace"] as const) {
-    it(`stops with "full" in ${mode} mode, leaving store and list unchanged`, { timeout: 120_000 }, async () => {
+    it(`imports as a base in ${mode} mode, leaving the current store and list unchanged`, { timeout: 120_000 }, async () => {
       const { source: imagery } = fakeSource({ ...grid, bandCount: 1 }, () => 1);
       const { source: file } = fakeLabelSource(grid, () => 1);
       const store = emptyStore(4352, 4352);
@@ -106,7 +106,10 @@ describe("the label cap (criterion 16, io)", () => {
       store.tiles.set("256,256", tile);
       const classes = initialClasses();
       const r = await importLabels(imagery, file, [{ value: 1, name: "new" }], { store, classes }, mode);
-      expect(r).toBe("full");
+      if (typeof r === "string") throw new Error(r);
+      expect([...r.store.tiles.keys()]).toEqual(mode === "merge" ? ["256,256"] : []);
+      expect(r.base.count).toBe(4352 * 4352);
+      expect(r.pixels).toBe(4352 * 4352 - (mode === "merge" ? 65536 : 0));
       expect([...store.tiles.keys()]).toEqual(["256,256"]);
       expect(store.tiles.get("256,256")).toBe(tile);
       expect(tile.every((v) => v === 2)).toBe(true);
