@@ -1,6 +1,7 @@
 import { expect, type CDPSession, type Page } from "@playwright/test";
 import { geotiffBuffer, type Value } from "../unit/helpers/sources";
 import type { Affine, Grid } from "../../src/core/types";
+import { SKY } from "../../src/map/sky";
 
 export type LngLat = [number, number];
 export type Ring = LngLat[];
@@ -34,6 +35,15 @@ export async function hideBasemap(page: Page): Promise<void> {
     map.setLayoutProperty("basemap", "visibility", "none");
     await new Promise<void>((r) => { map.once("idle", () => r()); map.triggerRepaint(); });
   });
+}
+
+/** Remove the atmosphere glow through the test hook, so globe-view pixels are the layers' alone (spec 015). */
+export async function hideSky(page: Page): Promise<void> {
+  await page.evaluate(async (sky) => {
+    const { map } = (window as any).__geoapp;
+    map.setSky(sky);
+    await new Promise<void>((r) => { map.once("idle", () => r()); map.triggerRepaint(); });
+  }, { ...SKY, "atmosphere-blend": 0 });
 }
 
 export async function openRaster(page: Page, file: ReturnType<typeof tiff>): Promise<void> {
