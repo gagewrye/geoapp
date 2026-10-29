@@ -1,6 +1,7 @@
 import type { LabelClass } from "../core/classes";
 import { encodeClasses } from "../core/classTable";
 import type { LabelStore } from "../core/labelStore";
+import { effectiveTile, type MaskBase } from "./maskBase";
 import { tiffLayout, writeTiff, type TiffText } from "./tiffWriter";
 import type { RasterSource, Sink } from "./source";
 
@@ -13,8 +14,9 @@ export function checkLabelExport(imagery: RasterSource, classes: LabelClass[]): 
   tiffLayout(width, height, geoTags, text(classes));
 }
 
-/** Streams the label GeoTIFF on the imagery's whole grid: stored tiles or zeros, and every class. Reads no imagery. */
-export async function exportLabels(imagery: RasterSource, store: LabelStore, classes: LabelClass[], sink: Sink): Promise<void> {
+/** Streams the label GeoTIFF on the imagery's whole grid: per window the stored tile, else the mask's, else zeros; and every class. */
+// Only windows with no stored tile that the mask labels read the mask file (and imagery); without a mask nothing is read.
+export async function exportLabels(imagery: RasterSource, store: LabelStore, classes: LabelClass[], sink: Sink, base: MaskBase | null = null): Promise<void> {
   const { width, height, geoTags } = imagery.meta;
-  await writeTiff(sink, width, height, geoTags, async (w) => store.tiles.get(`${w.x0},${w.y0}`) ?? new Uint8Array(w.width * w.height), text(classes));
+  await writeTiff(sink, width, height, geoTags, (w) => effectiveTile(imagery, store, base, w), text(classes));
 }
