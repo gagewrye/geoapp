@@ -9,7 +9,7 @@ import {
 } from "./helpers";
 import { arrayBuffer, classList, download, importFile, noSavePicker, upload } from "./seeding";
 
-// Spec 014 criteria 6 (fine-tune), 7 (undo), 9 (round trip), 11 (display), 13 (raster open, privacy) and 14 (classes).
+// Spec 014 criteria 6 (fine-tune), 7 (undo), 9 (round trip), 10 (Replace), 11 (display), 13 (raster open, privacy) and 14 (classes).
 
 /** The generated mask on rgbFixture's grid: 16 x 16 px blocks of 0..3, GDAL_NODATA 0, so classes 1, 2, 3 are values 1, 2, 3. */
 const maskValue = (c: number, r: number) => ((c >> 4) + (r >> 4)) % 4;
@@ -28,10 +28,13 @@ async function setup(page: Page) {
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
 }
-async function importMask(page: Page) {
-  await importFile(page, maskFile()); // no labels yet: no confirm
+/** Imports the mask (no labels yet: no confirm); an import selects Pan, so `paint` selects Paint again (spec 014 Tests). */
+async function importMask(page: Page, paint = true) {
+  await importFile(page, maskFile());
   await expect(message(page)).toHaveText(seeded);
   await expect.poll(() => page.evaluate(() => (window as any).__geoapp.map.getLayer("mask") !== undefined)).toBe(true);
+  await expect(page.locator("#mode-pan")).toHaveAttribute("aria-pressed", "true");
+  if (paint) await page.click("#mode-paint");
 }
 
 /** Every pixel under the size-7 footprints of a stroke through these screen points (same unproject and pixelAt as the app). */
@@ -147,6 +150,28 @@ test("opening another raster after an import (OK on the confirm) leaves no label
   page.on("dialog", (d) => { throw new Error(`unexpected dialog ${d.message()}`); });
   await openRaster(page, { ...rgbFixture(), name: "third.tif" });
   await expect(message(page)).toHaveText("Raster opened.");
+});
+
+test("with only a mask loaded an import asks to replace: Cancel keeps the mask and classes, OK replaces the mask; Pan is selected (criterion 10)", async ({ page }) => {
+  await setup(page);
+  await importMask(page, false);
+  expect(await tileKeysStored(page)).toEqual([]);
+  const before = { labels: await labels(page), list: await classList(page) };
+  const asked: string[] = [];
+  page.once("dialog", (d) => { asked.push(d.message()); void d.dismiss(); });
+  await importFile(page, upload("classes.tif", classFile("255")));
+  await expect.poll(() => asked).toEqual(["Replace labels?"]);
+  await page.waitForTimeout(300);
+  expect(await labels(page)).toEqual(before.labels);
+  expect(await classList(page)).toEqual(before.list);
+  page.once("dialog", (d) => { asked.push(d.message()); void d.accept(); });
+  await importFile(page, upload("classes.tif", classFile("255")));
+  await expect(message(page)).toHaveText(seeded);
+  expect(asked).toEqual(["Replace labels?", "Replace labels?"]);
+  expect((await classList(page)).map((c) => c.name)).toEqual(["Class 0", "Class 3", "Class 7"]);
+  expect(await labels(page)).not.toEqual(before.labels);
+  expect(await tileKeysStored(page)).toEqual([]);
+  await expect(page.locator("#mode-pan")).toHaveAttribute("aria-pressed", "true");
 });
 
 const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
