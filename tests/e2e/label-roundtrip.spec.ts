@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { jumpTo, labels, message, openApp, openRaster, path, renameClass, selectClass, stroke, toScreen } from "./helpers";
+import { jumpTo, labels, message, openApp, openRaster, paintMode, path, renameClass, selectClass, stroke, toScreen } from "./helpers";
 import { classList, download, effectiveTiles, expectNoNodata, importFile, inNodata, noSavePicker, nodataImagery, storeTiles, upload } from "./seeding";
 
 // Spec 004 criterion 11: Export labels, then Import labels, saves and loads labels exactly.
@@ -10,6 +10,7 @@ test("export then import restores every tile byte for byte and the class list, w
   await openApp(page);
   await openRaster(page, nodataImagery());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await jumpTo(page, [14.3, 45.75], 8);
   await page.click("#brush-larger"); // size 15
   await page.click("#class-add"); // Class 3
@@ -38,6 +39,7 @@ test("export then import restores every tile byte for byte and the class list, w
   page.once("dialog", (d) => { expect(d.message()).toBe("Discard labels?"); void d.accept(); });
   await openRaster(page, nodataImagery());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   expect((await storeTiles(page)).size).toBe(0);
   await renameClass(page, 0, "scratch"); // so the list below can only come from the file
   page.on("dialog", (d) => { throw new Error(`unexpected dialog ${d.message()}`); });

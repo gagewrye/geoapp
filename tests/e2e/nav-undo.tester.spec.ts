@@ -1,6 +1,6 @@
 import { expect, test, type Page, type Request } from "@playwright/test";
 import {
-  jumpTo, labels, logRequests, message, moveTo, openApp, openRaster, rgbFixture, selectClass, settled, stroke, toScreen, view, type LngLat, type Xy,
+  addTestSelect, jumpTo, labels, logRequests, message, moveTo, openApp, openRaster, paintMode, rgbFixture, selectClass, settled, stroke, toScreen, view, type LngLat, type Xy,
 } from "./helpers";
 
 // Tester edge cases for specs 009 (navigation), 010 (cursor, undo) and 012 (basemap requests).
@@ -24,6 +24,7 @@ async function setup(page: Page, how: "paint" | "pan" | "none", zoom = 14) {
   if (how !== "none") {
     await openRaster(page, rgbFixture());
     await expect(message(page)).toHaveText("Raster opened.");
+    await paintMode(page);
   }
   if (how === "pan") await page.click("#mode-pan");
   await jumpTo(page, START, zoom);
@@ -200,7 +201,8 @@ test.describe("spec 010 edges (tester)", () => {
     await page.locator("#map canvas").focus();
     await page.keyboard.press("Control+Shift+z");
     expect(await snapshot(page)).toEqual(painted);
-    await page.focus("#seed-mode");
+    await addTestSelect(page); // the app has no select since spec 017
+    await page.focus("#test-select");
     await page.keyboard.press("Control+z");
     expect(await snapshot(page)).toEqual([]);
     await page.keyboard.press("Control+Shift+z");
@@ -211,6 +213,7 @@ test.describe("spec 010 edges (tester)", () => {
     await openApp(page);
     await openRaster(page, rgbFixture());
     await expect(message(page)).toHaveText("Raster opened.");
+    await paintMode(page);
     await jumpTo(page, [19.98, 40.02], 11); // the raster's SE corner (lon 20, lat 40)
     const a = await toScreen(page, [19.95, 40.06]), b = await toScreen(page, [20.03, 39.98]);
     await stroke(page, [a, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, b]);

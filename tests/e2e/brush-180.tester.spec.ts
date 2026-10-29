@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { fromLonLat } from "../../src/core/crs";
 import { footprint, footprintRing, pixelAt, strokeCells } from "../../src/core/pixel";
 import type { Grid } from "../../src/core/types";
-import { collectErrors, hoverFeatures, jumpTo, labels, message, openApp, openRaster, pixelAt as screenPixel, settled, tiff, toLngLat, toScreen, type LngLat, type Xy } from "./helpers";
+import { collectErrors, hoverFeatures, jumpTo, labels, message, openApp, openRaster, paintMode, pixelAt as screenPixel, settled, tiff, toLngLat, toScreen, type LngLat, type Xy } from "./helpers";
 
 // Tester: spec 003 "180 and MAX_LAT": longitude is normalised so every world copy hits the same pixel.
 // An EPSG:32660 raster straddling 180 (zone 60 opens, spec 001 criterion 16): strokes and hover across
@@ -18,6 +18,7 @@ async function setup(page: Page, centreLon: number) {
   await openApp(page);
   await openRaster(page, fixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await jumpTo(page, [centreLon, 9.9995], 12);
 }
 

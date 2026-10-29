@@ -98,11 +98,3 @@ export function maskNodata(tile: Tile, labels: Uint8Array): void {
   const { nodata } = tile;
   for (const band of tile.bands) for (let i = 0; i < labels.length; i++) { const v = band[i]!; if (v === nodata || v !== v) labels[i] = 0; }
 }
-
-/** old where old > 0, else seed; a new array unless old is undefined (then the seed itself). */
-export function mergeTile(old: Uint8Array | undefined, seed: Uint8Array): Uint8Array {
-  if (!old) return seed;
-  const out = seed.slice();
-  for (let i = 0; i < out.length; i++) if (old[i]) out[i] = old[i]!;
-  return out;
-}

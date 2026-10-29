@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { jumpTo, message, openApp, openRaster, rgbFixture, stroke, toScreen } from "./helpers";
+import { jumpTo, message, openApp, openRaster, paintMode, rgbFixture, stroke, toScreen } from "./helpers";
 
 // Tester: spec 003 Strokes / criterion 10. contextmenu is prevented on the map while local imagery is
 // open (MapLibre prevents it on its canvas anyway), and never on the panel, even within 500 ms of an
@@ -27,6 +27,7 @@ test.describe("contextmenu (criterion 10, tester)", () => {
     await openApp(page);
     await openRaster(page, rgbFixture());
     await expect(message(page)).toHaveText("Raster opened.");
+    await paintMode(page);
     await jumpTo(page, [15, 45], 7);
     await record(page);
     const c = await toScreen(page, [15.005, 45.005]);
@@ -46,6 +47,7 @@ test.describe("contextmenu (criterion 10, tester)", () => {
     await openApp(page);
     await openRaster(page, rgbFixture());
     await expect(message(page)).toHaveText("Raster opened.");
+    await paintMode(page);
     await jumpTo(page, [15, 45], 7);
     const c = await toScreen(page, [15.005, 45.005]);
     await stroke(page, [c, { x: c.x + 40, y: c.y }]);
@@ -68,6 +70,7 @@ test.describe("contextmenu (criterion 10, tester)", () => {
     await openApp(page);
     await openRaster(page, rgbFixture());
     await expect(message(page)).toHaveText("Raster opened.");
+    await paintMode(page);
     await jumpTo(page, [15, 45], 7);
     const c = await toScreen(page, [15.005, 45.005]);
     await stroke(page, [c, { x: c.x + 40, y: c.y }]);
@@ -95,6 +98,7 @@ test.describe("contextmenu (criterion 10, tester)", () => {
     await openApp(page);
     await openRaster(page, rgbFixture());
     await expect(message(page)).toHaveText("Raster opened.");
+    await paintMode(page);
     await jumpTo(page, [15, 45], 7);
     const c = await toScreen(page, [15.005, 45.005]);
     await stroke(page, [c, { x: c.x + 40, y: c.y }]);

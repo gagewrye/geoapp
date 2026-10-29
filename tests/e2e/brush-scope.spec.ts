@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
-import { jumpTo, labels, message, openApp, openRaster, rgbFixture, settled, stroke, tiff, toScreen } from "./helpers";
+import { jumpTo, labels, message, openApp, openRaster, paintMode, rgbFixture, settled, stroke, tiff, toScreen } from "./helpers";
 
 // Spec 003 criteria 7 (no polygons; the brush is for local imagery only) and 16 (discard).
 
@@ -12,6 +12,7 @@ test.describe("no polygons (criterion 7)", () => {
     await expect(page.getByRole("button", { name: /polygon|edit/i })).toHaveCount(0);
     await openRaster(page, rgbFixture());
     await expect(message(page)).toHaveText("Raster opened.");
+    await paintMode(page);
     await expect(page.locator("#brush-panel")).toBeVisible();
     await jumpTo(page, [15, 45], 7);
     const c = await toScreen(page, [15.005, 45.005]);
@@ -27,6 +28,7 @@ test.describe("discard (criterion 16)", () => {
     await openApp(page);
     await openRaster(page, rgbFixture());
     await expect(message(page)).toHaveText("Raster opened.");
+    await paintMode(page);
     await jumpTo(page, [15, 45], 7);
     const c = await toScreen(page, [15.005, 45.005]);
     await stroke(page, [c, { x: c.x + 80, y: c.y }]);
@@ -46,6 +48,7 @@ test.describe("discard (criterion 16)", () => {
     page.once("dialog", (d) => { dialogs.push(d.message()); void d.accept(); });
     await openRaster(page, other());
     await expect(message(page)).toHaveText("Raster opened.");
+    await paintMode(page);
     expect(dialogs).toEqual([MESSAGES.discard, MESSAGES.discard]);
     await expect(page.locator("#raster-info")).toHaveText(/^other\.tif: 300 x 300/);
     expect(await page.evaluate(() => { const s = (window as any).__geoapp.labels.store; return [s.width, s.height, s.tiles.size]; })).toEqual([300, 300, 0]);
@@ -59,9 +62,11 @@ test.describe("discard (criterion 16)", () => {
     page.on("dialog", (d) => { dialogs++; void d.dismiss(); });
     await openRaster(page, rgbFixture());
     await expect(message(page)).toHaveText("Raster opened.");
+    await paintMode(page);
     await openRaster(page, other());
     await expect(page.locator("#raster-info")).toHaveText(/^other\.tif/);
     await expect(message(page)).toHaveText("Raster opened.");
+    await paintMode(page);
     expect(dialogs).toBe(0);
   });
 });

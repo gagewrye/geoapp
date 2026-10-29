@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { classesFromValues } from "../../../src/core/classTable";
 import { applyAffine, fromLonLat, invertAffine, normalizeLon, toLonLat } from "../../../src/core/crs";
 import { tileWindows, type Window } from "../../../src/core/grid";
-import { applyLut, gatherCells, markValues, maskNodata, mergeTile, seedLut, seedWindows, sourceCells } from "../../../src/core/seed";
+import { applyLut, gatherCells, markValues, maskNodata, seedLut, seedWindows, sourceCells } from "../../../src/core/seed";
 import type { Grid, Tile } from "../../../src/core/types";
 
 // Tester edge cases for spec 004's core seeding: pixel-centre edges, partial windows, CRS pairs
@@ -152,18 +152,5 @@ describe("maskNodata edges", () => {
   });
   it("throws on a label array of the wrong length", () => {
     expect(() => maskNodata(tile([[1, 2, 3, 4]], null), new Uint8Array(3))).toThrow();
-  });
-});
-
-describe("mergeTile never writes into its inputs", () => {
-  it("returns a new array and leaves old and seed unchanged", () => {
-    const old = new Uint8Array([0, 2, 0, 3]), seed = new Uint8Array([5, 5, 0, 5]);
-    const o = old.slice(), s = seed.slice();
-    const m = mergeTile(old, seed);
-    expect([...m]).toEqual([5, 2, 0, 3]);
-    expect(m).not.toBe(old);
-    expect(m).not.toBe(seed);
-    expect(old).toEqual(o);
-    expect(seed).toEqual(s);
   });
 });

@@ -1,7 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { BRUSH_SIZES } from "../../src/core/pixel";
 import { MESSAGES } from "../../src/ui/messages";
-import { hoverFeatures, jumpTo, labels, message, openApp, openRaster, rgbFixture, selectClass, settled, toScreen } from "./helpers";
+import { hoverFeatures, jumpTo, labels, message, openApp, openRaster, paintMode, rgbFixture, selectClass, settled, toScreen } from "./helpers";
 
 // Spec 003 criteria 13 (brush size) and 14 (classes).
 
@@ -9,6 +8,7 @@ async function setup(page: Page) {
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await jumpTo(page, [15, 45], 9);
 }
 const sizeText = (page: Page) => page.locator("#brush-size");
@@ -29,7 +29,6 @@ test.describe("brush size (criterion 13)", () => {
     for (let i = 0; i < 4; i++) { await page.keyboard.press("["); down.push((await sizeText(page).textContent())!); }
     for (let i = 0; i < 4; i++) { await page.click("#brush-smaller"); down.push((await sizeText(page).textContent())!); }
     expect(down).toEqual(["Brush: 63 px", "Brush: 31 px", "Brush: 15 px", "Brush: 7 px", "Brush: 3 px", "Brush: 1 px", "Brush: 1 px", "Brush: 1 px"]);
-    expect(BRUSH_SIZES[0]).toBe(1);
   });
 
   test("a size-15 dab labels 15x15 pixels", async ({ page }) => {

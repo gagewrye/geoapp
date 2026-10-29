@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
 import { CLASS_MAP, classFile, rgbClassFile } from "../unit/helpers/labelFiles";
-import { message, openApp, openRaster, paintTwoClasses, rgbFixture } from "./helpers";
+import { message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture } from "./helpers";
 import { classList, importFile, openFileGate, pauseLabelFile, storeTiles, upload } from "./seeding";
 
 // Tester checks of spec 004's build clarifications (awaiting Gage): the class map input after each
@@ -15,6 +15,7 @@ async function setup(page: Page) {
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
 }
 
 test("the class map input is empty after an import that succeeds, one refused and one with an invalid map", async ({ page }) => {
@@ -41,7 +42,6 @@ test("a cancelled Replace keeps the chosen class map, and the next import uses i
   await setup(page);
   await paintTwoClasses(page);
   const before = { tiles: await storeTiles(page), list: await classList(page) };
-  await page.selectOption("#seed-mode", "replace");
   page.once("dialog", (d) => void d.dismiss());
   await importFile(page, upload("classes.tif", classFile("255")), mapFile());
   await page.waitForTimeout(300);

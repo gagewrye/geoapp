@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { CLASS_GRID, classFile } from "../unit/helpers/labelFiles";
 import { MESSAGES } from "../../src/ui/messages";
-import { jumpTo, labels, message, openApp, openRaster, rgbFixture, stroke, toScreen } from "./helpers";
+import { jumpTo, labels, message, openApp, openRaster, paintMode, rgbFixture, stroke, toScreen } from "./helpers";
 import { expectFileHolds, gateWrites, openWrite, seeded, setup as twoClasses, writeHeld } from "./lockCombos";
 import { importFile, noSavePicker, openFileGate, pauseLabelFile, storeTiles, upload } from "./seeding";
 
@@ -15,6 +15,7 @@ async function oneStroke(page: Page) {
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await jumpTo(page, [15, 45], 9);
   const empty = await snapshot(page);
   const c = await toScreen(page, [15.005, 45.005]);
@@ -42,7 +43,6 @@ test("a successful import clears the history", async ({ page }) => {
 
 test("a cancelled Replace confirm keeps the history; one Undo then removes the stroke", async ({ page }) => {
   const empty = await oneStroke(page);
-  await page.selectOption("#seed-mode", "replace");
   page.once("dialog", (d) => { expect(d.message()).toBe(MESSAGES.replace); void d.dismiss(); });
   await importFile(page, classes());
   await page.waitForTimeout(300);
@@ -94,14 +94,4 @@ test("while Export labels runs (paused sink) Undo is disabled; the file holds th
   expect(one.length).toBeLessThan(painted.length);
   expect(one.every(([, v]) => v === 1)).toBe(true);
   await expect(undoButton(page)).toBeEnabled(); // the class 1 stroke remains
-});
-
-test("an Undo that empties the store resets Seed mode to Merge and disables it", async ({ page }) => {
-  await oneStroke(page);
-  await expect(page.locator("#seed-mode")).toBeEnabled();
-  await page.selectOption("#seed-mode", "replace");
-  await undoButton(page).click();
-  expect(await snapshot(page)).toEqual([]);
-  await expect(page.locator("#seed-mode")).toHaveValue("merge");
-  await expect(page.locator("#seed-mode")).toBeDisabled();
 });

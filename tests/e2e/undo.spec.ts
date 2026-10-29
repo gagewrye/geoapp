@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { jumpTo, labels, message, openApp, openRaster, paintTwoClasses, rgbFixture, selectClass, settled, stroke, toScreen, type Xy } from "./helpers";
+import { jumpTo, labels, message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture, selectClass, settled, stroke, toScreen, type Xy } from "./helpers";
 
 // Spec 010: undo of paint and erase strokes (button and Ctrl+Z), and the brush cursor.
 const undoButton = (page: Page) => page.locator("#undo");
@@ -9,6 +9,7 @@ async function setup(page: Page) {
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await jumpTo(page, [15, 45], 9);
 }
 
@@ -125,6 +126,7 @@ test("opening another raster clears the history (criterion 5)", async ({ page })
   page.on("dialog", (d) => void d.accept());
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await expect(undoButton(page)).toBeDisabled();
   await page.keyboard.press("Control+z");
   expect(await snapshot(page)).toEqual([]);
@@ -145,6 +147,7 @@ test("the brush cursor shows the selected colour in Paint mode only (criterion 7
   expect((await cursorAt(page, p)).startsWith("url(")).toBe(false); // no imagery
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await page.mouse.move(p.x, p.y);
   expectBrush(await cursorAt(page, p), await classColour(page, 0));
   await page.keyboard.press("2");

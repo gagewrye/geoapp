@@ -3,7 +3,7 @@ import { expect, type Page } from "@playwright/test";
 import { fromArrayBuffer } from "geotiff";
 import { CLASS_ITEM, decodeClasses } from "../../src/core/classTable";
 import { tileWindows } from "../../src/core/grid";
-import { hoverFeatures, jumpTo, message, openApp, openRaster, paintTwoClasses, rgbFixture, toScreen } from "./helpers";
+import { hoverFeatures, jumpTo, message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture, toScreen } from "./helpers";
 import { arrayBuffer } from "./seeding";
 
 // Helpers for the label-lock-*.tester specs.
@@ -80,6 +80,7 @@ export async function setup(page: Page) {
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await paintTwoClasses(page);
 }
 /** Opens another raster with the same grid, accepting "Discard labels?" if asked. */
@@ -87,5 +88,6 @@ export async function reopen(page: Page) {
   page.once("dialog", (d) => void d.accept());
   await openRaster(page, { ...rgbFixture(), name: "other.tif" });
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await jumpTo(page, [15, 45], 6);
 }

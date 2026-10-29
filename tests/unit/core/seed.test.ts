@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { tileWindows } from "../../../src/core/grid";
-import { applyLut, gatherCells, markValues, maskNodata, mergeTile, seedLut, seedWindows, sourceCells } from "../../../src/core/seed";
+import { applyLut, gatherCells, markValues, maskNodata, seedLut, seedWindows, sourceCells } from "../../../src/core/seed";
 import type { Affine, Grid, Tile } from "../../../src/core/types";
 
-// Spec 004 criteria 1 (sourceCells), 2 (seedWindows), 4 (seedLut, applyLut), 6 (mergeTile) and 7 (maskNodata).
+// Spec 004 criteria 1 (sourceCells), 2 (seedWindows), 4 (seedLut, applyLut) and 7 (maskNodata).
 
 const points = JSON.parse(readFileSync("tests/fixtures/crs-points.json", "utf8")) as
   { cases: { epsg: number; gt: Affine; points: { lonlat: [number, number]; pixel: [number, number] }[] }[] };
@@ -109,16 +109,6 @@ describe("seedLut and applyLut (criterion 4)", () => {
   it("applyLut maps -1 to 0", () => {
     const lut = seedLut(entries, [5, 1, 9]);
     expect([...applyLut(Int16Array.from([-1, 0, 3, 7, 255, 4]), lut)]).toEqual([0, 5, 1, 9, 0, 0]);
-  });
-});
-
-describe("mergeTile (criterion 6)", () => {
-  it("keeps every non-zero old pixel and takes the seed elsewhere; undefined old gives the seed", () => {
-    const old = Uint8Array.from([0, 2, 0, 3, 1]);
-    const seed = Uint8Array.from([4, 4, 0, 0, 5]);
-    expect([...mergeTile(old, seed)]).toEqual([4, 2, 0, 3, 1]);
-    expect([...old]).toEqual([0, 2, 0, 3, 1]);
-    expect([...mergeTile(undefined, seed)]).toEqual([4, 4, 0, 0, 5]);
   });
 });
 

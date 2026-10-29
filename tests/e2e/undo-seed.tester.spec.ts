@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { classFile, rgbClassFile } from "../unit/helpers/labelFiles";
 import { MESSAGES } from "../../src/ui/messages";
-import { jumpTo, labels, message, openApp, openRaster, rgbFixture, stroke, toScreen, view, type Xy } from "./helpers";
+import { jumpTo, labels, message, openApp, openRaster, paintMode, rgbFixture, stroke, toScreen, view, type Xy } from "./helpers";
 import { expectFileHolds, gateWrites, openWrite, seeded, setup as twoClasses, writeHeld } from "./lockCombos";
 import { importFile, noSavePicker, openFileGate, pauseLabelFile, storeTiles, upload } from "./seeding";
 
@@ -19,6 +19,7 @@ async function oneStroke(page: Page) {
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await jumpTo(page, [15, 45], 9);
   const empty = await snapshot(page);
   const c = await toScreen(page, [15.005, 45.005]);
@@ -29,7 +30,6 @@ async function oneStroke(page: Page) {
 
 test("a confirmed Replace import clears the history; Ctrl+Z then changes nothing", async ({ page }) => {
   await oneStroke(page);
-  await page.selectOption("#seed-mode", "replace");
   page.once("dialog", (d) => void d.accept());
   await importFile(page, classes());
   await expect(message(page)).toHaveText(seeded);
@@ -55,7 +55,7 @@ test("after an import, new strokes are undoable and Undo stops at the imported l
   page.once("dialog", (d) => void d.accept()); // "Replace labels?": every import replaces (spec 017)
   await importFile(page, classes());
   await expect(message(page)).toHaveText(seeded);
-  await page.click("#mode-paint"); // an import selects Pan (spec 014 Tests)
+  await paintMode(page); // an import selects Pan (spec 014 Tests)
   const imported = await snapshot(page);
   await stroke(page, [{ x: c.x, y: c.y + 40 }, { x: c.x + 60, y: c.y + 40 }]);
   await expect(undoButton(page)).toBeEnabled();
@@ -112,13 +112,4 @@ test("an Export labels run after an Undo writes the store as undone; the remaini
   await undoButton(page).click();
   expect(await snapshot(page)).toEqual([]);
   await expect(undoButton(page)).toBeDisabled();
-});
-
-test("an Undo that leaves labels keeps Seed mode enabled", async ({ page }) => {
-  const { c } = await oneStroke(page);
-  await stroke(page, [{ x: c.x, y: c.y + 40 }, { x: c.x + 60, y: c.y + 40 }]);
-  await expect(page.locator("#seed-mode")).toBeEnabled();
-  await undoButton(page).click();
-  expect((await snapshot(page)).length).toBeGreaterThan(0);
-  await expect(page.locator("#seed-mode")).toBeEnabled();
 });
