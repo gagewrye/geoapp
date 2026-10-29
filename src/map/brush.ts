@@ -33,7 +33,7 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
   let pointer: { x: number; y: number; target: EventTarget | null } | null = null; // last mouse or pen position
   const painting = () => grid !== null && mode === "paint" && !space;
 
-  // The brush cursor (spec 010) is a class plus a variable: terra-draw rewrites the canvas's inline cursor.
+  // The brush cursor (spec 010) is a class plus a variable, which style.css applies to the canvas over MapLibre's cursors.
   // Locked, a left drag neither paints nor pans, so neither the brush nor MapLibre's grab would be true.
   let cursor = "";
   const syncCursor = () => {
@@ -43,7 +43,7 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
     if (c !== cursor) container.style.setProperty("--brush-cursor", cursor = c);
   };
 
-  // Only handlers the brush turned off are turned back on: outside Paint mode terra-draw and MapLibre own them
+  // Only handlers the brush turned off are turned back on: outside Paint mode MapLibre owns them
   const handlers = [map.dragRotate, map.doubleClickZoom, map.boxZoom];
   let owned = false;
   const syncHandlers = () => {
@@ -137,8 +137,6 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
     setImagery(g: Grid | null): void { end(); grid = g; syncHandlers(); hover(); },
     setMode(m: BrushMode): void { mode = m; syncHandlers(); hover(); },
     mode: () => mode,
-    /** Re-apply the mode's MapLibre handler state after something else changed it. */
-    syncHandlers,
     /** Space held acts as Pan. */
     setSpace(held: boolean): void { if (space !== held) { space = held; syncHandlers(); hover(); } },
     /** Locked, the brush neither paints nor shows its footprint; a stroke in progress ends. */

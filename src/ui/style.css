@@ -16,8 +16,7 @@ body { display: flex; }
 #message { color: #a40000; min-height: 2em; }
 #map { flex: 1; height: 100%; }
 #panel .row label { margin: 0; align-self: center; }
-#aef-attribution { font-size: 12px; color: #444; }
-/* !important beats terra-draw's inline canvas cursor; the middle pan comes last so it wins (specs 009, 010) */
+/* !important beats MapLibre's canvas cursor rules; the middle pan comes last so it wins (specs 009, 010) */
 #map .maplibregl-canvas-container.brush-cursor .maplibregl-canvas { cursor: var(--brush-cursor) !important; }
 #map .maplibregl-canvas-container.locked-cursor .maplibregl-canvas { cursor: not-allowed !important; }
 #map .maplibregl-canvas-container.middle-pan .maplibregl-canvas { cursor: grabbing !important; }

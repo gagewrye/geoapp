@@ -1,9 +1,7 @@
 import { ClassTableError } from "../core/classTable";
-import type { Model } from "../core/types";
-import { validate } from "../core/validate";
 import { checkLabelExport, exportLabels } from "../io/labelExport";
 import { LabelFileRefused, openLabelFile, type LabelSource } from "../io/labelFile";
-import { importLabels, importTable, seedModel, type SeedMode, type SeedOutcome } from "../io/seeding";
+import { importLabels, importTable, type SeedMode, type SeedOutcome } from "../io/seeding";
 import { openSink } from "../io/sink";
 import type { RasterSource } from "../io/source";
 import type { initLabels } from "./labels";
@@ -12,54 +10,32 @@ import { MESSAGES, seedMessage } from "./messages";
 type Deps = {
   labels: ReturnType<typeof initLabels>;
   imagery: () => RasterSource | undefined;
-  model: () => Model | undefined;
-  /** A Train runs: its label snapshot is the one extra store allowed besides the current one (ADR 0010). */
-  training: () => boolean;
   say: (text: string) => void;
   /** Shows an error the way main's other actions do. */
   error: (e: unknown) => string;
-  /** Seeding started or ended (Train is disabled meanwhile). */
-  onBusy: () => void;
   /** e2e hook: sees each opened label file before it is read. */
   opened: (file: LabelSource) => void;
 };
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
-/** Import labels, Seed from model and Export labels (spec 004). */
+/** Import labels and Export labels (spec 004). */
 // A run belongs to the imagery it started on: once another raster opens it sets no labels and no
 // message (spec 003's rule for replaced rasters), and the new raster's controls are free at once.
-export function initSeeding({ labels, imagery, model, training, say, error, onBusy, opened }: Deps) {
+export function initSeeding({ labels, imagery, say, error, opened }: Deps) {
   const importInput = $<HTMLInputElement>("import-labels"), classMap = $<HTMLInputElement>("class-map");
-  const mode = $<HTMLSelectElement>("seed-mode"), minConf = $<HTMLInputElement>("min-confidence");
-  const seedBtn = $<HTMLButtonElement>("seed-model"), exportBtn = $<HTMLButtonElement>("export-labels");
+  const mode = $<HTMLSelectElement>("seed-mode"), exportBtn = $<HTMLButtonElement>("export-labels");
   let running: RasterSource | null = null; // the imagery a seeding run started on
   let exporting: RasterSource | null = null; // the imagery an export started on
 
   const seeding = () => running !== null && running === imagery();
   // Seeding and exporting each lock the brush and class edits; the lock lifts once neither runs on this imagery.
   const relock = () => labels.lock(seeding() || (exporting !== null && exporting === imagery()));
-  const confidence = () => { const v = minConf.valueAsNumber; return v >= 0 && v <= 1 ? v : null; };
-  // sync runs on every applied paint cell, and validate costs k x d, so it runs once per (model, imagery);
-  // a train or Load model sets a new model object, and an open a new source
-  let fit: { m: Model; s: RasterSource; ok: boolean } | null = null;
-  const modelFits = (s: RasterSource) => {
-    const m = model();
-    if (!m) return false;
-    if (fit?.m !== m || fit.s !== s) {
-      let ok = true;
-      try { validate(m, s.meta.bandCount); } catch { ok = false; }
-      fit = { m, s, ok };
-    }
-    return fit.ok;
-  };
 
-  /** Enables each control for the imagery, model, paint queue and runs in progress. */
-  // A seed builds its new store beside the current one, so it waits for a Train's snapshot to go.
+  /** Enables each control for the imagery, paint queue and runs in progress. */
   function sync(): void {
-    const s = imagery(), busy = seeding(), queued = labels.busy(), trains = training();
-    importInput.disabled = classMap.disabled = !s || busy || queued || trains;
-    seedBtn.disabled = !s || busy || queued || trains || !modelFits(s) || confidence() === null;
+    const s = imagery(), busy = seeding(), queued = labels.busy();
+    importInput.disabled = classMap.disabled = !s || busy || queued;
     exportBtn.disabled = !s || busy || queued || exporting !== null;
     if (!labels.hasLabels()) mode.value = "merge"; // Merge is the default whenever labels appear
     mode.disabled = !labels.hasLabels() || busy;
@@ -78,7 +54,6 @@ export function initSeeding({ labels, imagery, model, training, say, error, onBu
     running = s;
     relock();
     sync();
-    onBusy();
     say("Seeding labels...");
     try {
       const r = await task(s, stale);
@@ -93,7 +68,6 @@ export function initSeeding({ labels, imagery, model, training, say, error, onBu
         relock(); // a new raster's open() has unlocked already
       }
       sync();
-      onBusy();
     }
   }
 
@@ -111,20 +85,6 @@ export function initSeeding({ labels, imagery, model, training, say, error, onBu
       opened(file);
       return importLabels(s, file, importTable(file, text), labels.current(), m, stale);
     });
-  });
-
-  minConf.addEventListener("input", () => {
-    if (confidence() === null) say(MESSAGES.minConfidence);
-    else if ($("message").textContent === MESSAGES.minConfidence) say("");
-    sync();
-  });
-
-  seedBtn.addEventListener("click", () => {
-    const m = model(), p = confidence();
-    if (seedBtn.disabled || !m || p === null) return;
-    const sm = chosenMode();
-    if (!sm) return;
-    void start((s, stale) => seedModel(s, m, p, labels.current(), sm, stale));
   });
 
   exportBtn.addEventListener("click", async () => {

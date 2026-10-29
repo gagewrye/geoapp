@@ -13,7 +13,7 @@ const MODIFIERS = new Set(["Control", "Meta", "Alt", "Shift"]);
 
 /** Middle-button drag pan and held-WASD panning, in every mode (spec 009). */
 // MapLibre leaves button 1 unused, so the middle pan is ours: its presses are stopped at the map
-// container's capture phase and never reach MapLibre, terra-draw or the brush.
+// container's capture phase and never reach MapLibre or the brush.
 export function createNavigation(map: MapLibreMap, deps: Deps) {
   const root = map.getContainer(), container = map.getCanvasContainer();
   const onCanvas = (e: Event) => e.target instanceof Node && container.contains(e.target);

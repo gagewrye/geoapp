@@ -26,7 +26,7 @@ export async function openSink(name: string): Promise<Sink> {
   };
 }
 
-export function downloadBlob(blob: Blob, name: string): void {
+function downloadBlob(blob: Blob, name: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
