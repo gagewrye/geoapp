@@ -1,7 +1,7 @@
 import { ClassTableError } from "../core/classTable";
 import { checkLabelExport, exportLabels } from "../io/labelExport";
-import { LabelFileRefused, openLabelFile, type LabelSource } from "../io/labelFile";
-import { importLabels, importTable, type SeedMode, type SeedOutcome } from "../io/seeding";
+import { LabelFileRefused, maskReadFailed, openLabelFile, type LabelSource } from "../io/labelFile";
+import { importLabels, importTable, type SeedOutcome } from "../io/seeding";
 import { openSink } from "../io/sink";
 import type { RasterSource } from "../io/source";
 import type { initLabels } from "./labels";
@@ -41,12 +41,8 @@ export function initSeeding({ labels, imagery, say, error, opened }: Deps) {
     mode.disabled = !labels.hasLabels() || busy;
   }
 
-  /** Merge or Replace; null when the user cancels Replace's confirm. Without labels it replaces with no confirm. */
-  function chosenMode(): SeedMode | null {
-    if (!labels.hasLabels()) return "replace";
-    if (mode.value === "merge") return "merge";
-    return confirm(MESSAGES.replace) ? "replace" : null;
-  }
+  /** Every import replaces (spec 017): true unless labels exist and the user cancels the confirm. */
+  const replaceConfirmed = () => !labels.hasLabels() || confirm(MESSAGES.replace);
 
   async function start(task: (s: RasterSource, stale: () => boolean) => Promise<SeedOutcome>): Promise<void> {
     const s = imagery()!;
@@ -58,7 +54,7 @@ export function initSeeding({ labels, imagery, say, error, opened }: Deps) {
     try {
       const r = await task(s, stale);
       if (stale()) return;
-      if (typeof r !== "string") labels.replace(r.store, r.classes);
+      if (typeof r !== "string") labels.replace(r.store, r.classes, r.base);
       say(seedMessage(r) ?? "");
     } catch (e) {
       if (!stale()) say(e instanceof LabelFileRefused ? MESSAGES.labelFile : e instanceof ClassTableError ? MESSAGES.classTable(e.field) : error(e));
@@ -75,15 +71,14 @@ export function initSeeding({ labels, imagery, say, error, opened }: Deps) {
     const tif = importInput.files?.[0], json = classMap.files?.[0];
     importInput.value = "";
     if (!tif || importInput.disabled || !imagery()) return;
-    const m = chosenMode();
-    if (!m) return;
+    if (!replaceConfirmed()) return;
     classMap.value = ""; // a class map applies to one import
     void start(async (s, stale) => {
       const text = json ? await json.text() : undefined;
       const file = await openLabelFile(tif);
       if (stale()) return "stale";
       opened(file);
-      return importLabels(s, file, importTable(file, text), labels.current(), m, stale);
+      return importLabels(s, file, importTable(file, text), stale);
     });
   });
 
@@ -97,19 +92,20 @@ export function initSeeding({ labels, imagery, say, error, opened }: Deps) {
     sync();
     const store = { ...labels.store(), tiles: new Map(labels.store().tiles) };
     const list = labels.classes().map((c) => ({ ...c }));
+    const base = labels.base(); // read only: it changes only on an import or a raster open
     try {
       checkLabelExport(s, list); // before the Save dialog, so a rejected export leaves no empty file
       const sink = await openSink("labels.tif");
       say("Exporting labels...");
       try {
-        await exportLabels(s, store, list, sink);
+        await exportLabels(s, store, list, sink, base);
       } catch (e) {
         await sink.abort?.().catch(() => {});
         throw e;
       }
       say("Labels exported.");
     } catch (e) {
-      say(error(e));
+      say(maskReadFailed(e) ? MESSAGES.maskGone : error(e));
     } finally {
       exporting = null;
       relock();

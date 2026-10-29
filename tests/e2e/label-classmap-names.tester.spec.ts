@@ -22,7 +22,7 @@ test("the class map input is empty after an import that succeeds, one refused an
   await importFile(page, upload("classes.tif", classFile("255")), mapFile());
   await expect(message(page)).toHaveText(seeded);
   expect(await classMapFiles(page)).toBe(0);
-  // Merge from here on (labels exist): no confirm
+  page.on("dialog", (d) => void d.accept()); // labels exist from here on: every import asks "Replace labels?" (spec 017)
   await importFile(page, upload("rgb.tif", rgbClassFile()), mapFile());
   await expect(message(page)).toHaveText(MESSAGES.labelFile);
   expect(await classMapFiles(page)).toBe(0);
@@ -59,6 +59,7 @@ test("while an import runs, selecting a class still works", async ({ page }) => 
   await setup(page);
   await paintTwoClasses(page);
   await pauseLabelFile(page);
+  page.once("dialog", (d) => void d.accept()); // "Replace labels?": every import replaces (spec 017)
   await importFile(page, upload("classes.tif", classFile("255")));
   await expect.poll(() => page.evaluate(() => (window as any).__fileGate.reads)).toBe(1);
   await expect(page.locator("#class-add")).toBeDisabled();

@@ -42,6 +42,7 @@ test("a confirmed Replace import clears the history; Ctrl+Z then changes nothing
 
 test("a refused import (3-band file) keeps the history; one Undo then removes the stroke", async ({ page }) => {
   const { empty } = await oneStroke(page);
+  page.once("dialog", (d) => void d.accept()); // "Replace labels?": every import replaces (spec 017)
   await importFile(page, upload("rgb.tif", rgbClassFile()));
   await expect(message(page)).toHaveText(MESSAGES.labelFile);
   await expect(undoButton(page)).toBeEnabled();
@@ -49,10 +50,12 @@ test("a refused import (3-band file) keeps the history; one Undo then removes th
   expect(await snapshot(page)).toEqual(empty);
 });
 
-test("after a Merge import, new strokes are undoable and Undo stops at the imported store", async ({ page }) => {
+test("after an import, new strokes are undoable and Undo stops at the imported labels", async ({ page }) => {
   const { c } = await oneStroke(page);
+  page.once("dialog", (d) => void d.accept()); // "Replace labels?": every import replaces (spec 017)
   await importFile(page, classes());
   await expect(message(page)).toHaveText(seeded);
+  await page.click("#mode-paint"); // an import selects Pan (spec 014 Tests)
   const imported = await snapshot(page);
   await stroke(page, [{ x: c.x, y: c.y + 40 }, { x: c.x + 60, y: c.y + 40 }]);
   await expect(undoButton(page)).toBeEnabled();
@@ -64,6 +67,7 @@ test("after a Merge import, new strokes are undoable and Undo stops at the impor
 test("while an import is paused: a drag paints nothing and adds no undo step; WASD and a middle drag still pan; the cursor stays", async ({ page }) => {
   const { c } = await oneStroke(page);
   await pauseLabelFile(page);
+  page.once("dialog", (d) => void d.accept()); // "Replace labels?": every import replaces (spec 017)
   await importFile(page, classes());
   await expect.poll(() => page.evaluate(() => (window as any).__fileGate.reads)).toBeGreaterThan(0);
   const before = await snapshot(page);

@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { jumpTo, labels, message, openApp, openRaster, path, renameClass, selectClass, stroke, toScreen } from "./helpers";
-import { classList, download, expectNoNodata, importFile, inNodata, noSavePicker, nodataImagery, storeTiles, upload } from "./seeding";
+import { classList, download, effectiveTiles, expectNoNodata, importFile, inNodata, noSavePicker, nodataImagery, storeTiles, upload } from "./seeding";
 
 // Spec 004 criterion 11: Export labels, then Import labels, saves and loads labels exactly.
 
@@ -44,7 +44,7 @@ test("export then import restores every tile byte for byte and the class list, w
   await importFile(page, upload("labels.tif", file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength) as ArrayBuffer));
   const n = [...tiles.values()].reduce((s, t) => s + t.filter((v) => v).length, 0);
   await expect(message(page)).toHaveText(`Seeded ${n} pixels in 3 classes.`);
-  const back = await storeTiles(page);
+  const back = await effectiveTiles(page); // spec 014: the file is a base
   expect([...back.keys()].sort()).toEqual([...tiles.keys()].sort());
   for (const [k, t] of tiles) expect(Buffer.from(back.get(k)!).equals(Buffer.from(t)), k).toBe(true);
   expectNoNodata(back, 1000, inNodata);

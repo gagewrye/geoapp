@@ -40,11 +40,20 @@ export async function openLabelTiff(tiff: GeoTIFF): Promise<LabelSource> {
     meta,
     classItem: typeof item === "string" ? item : null,
     async read(w) {
-      const [band] = (await image.readRasters({ window: [w.x0, w.y0, w.x0 + w.width, w.y0 + w.height], samples: [0] })) as unknown as Uint8Array[];
-      return band!;
+      try {
+        const [band] = (await image.readRasters({ window: [w.x0, w.y0, w.x0 + w.width, w.y0 + w.height], samples: [0] })) as unknown as Uint8Array[];
+        return band!;
+      } catch (e) {
+        // geotiff.js's blob source rejects with the FileReader's error event; the File API's error is on its target
+        const inner = (e as { target?: { error?: unknown } } | null)?.target?.error;
+        throw inner instanceof Error ? inner : e;
+      }
     },
   };
 }
+
+/** The mask file can't be read any more: it changed on disk (NotReadableError) or is gone (NotFoundError), per the W3C File API. */
+export const maskReadFailed = (e: unknown): boolean => e instanceof Error && (e.name === "NotReadableError" || e.name === "NotFoundError");
 
 export async function openLabelFile(file: Blob): Promise<LabelSource> {
   return openLabelTiff(await fromBlob(file));

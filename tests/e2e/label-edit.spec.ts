@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { toLonLat } from "../../src/core/crs";
 import { CLASS_GRID, classFile } from "../unit/helpers/labelFiles";
 import { jumpTo, labels, message, openApp, openRaster, paintTwoClasses, path, rgbFixture, selectClass, stroke, toScreen, type LngLat } from "./helpers";
-import { classList, download, expectNoNodata, importFile, inNodata, noSavePicker, nodataImagery, storeTiles, upload } from "./seeding";
+import { classList, download, effectiveTiles, expectNoNodata, importFile, inNodata, noSavePicker, nodataImagery, storeTiles, upload } from "./seeding";
 
 // Spec 004 criteria 18 (edit), 13 (its e2e part) and 19 (privacy).
 
@@ -19,6 +19,7 @@ test("after an import, a right drag clears the selected class in a seeded area a
   await importFile(page, upload("classes.tif", classFile("255")));
   await expect(message(page)).toHaveText(seeded);
   expect((await classList(page)).map((c) => c.name)).toEqual(["Class 0", "Class 3", "Class 7"]);
+  await page.click("#mode-paint"); // an import selects Pan (spec 014 Tests)
   // file block cols 24..47, rows 0..19 holds 3, which is label value 2 ("Class 3")
   const centre = fileLonLat(36, 10);
   await jumpTo(page, centre, 7);
@@ -37,7 +38,7 @@ test("after an import, a right drag clears the selected class in a seeded area a
   expect(count(painted, 3)).toBeGreaterThan(count(erased, 3));
 });
 
-test("after strokes across a nodata block and a Merge import, no imagery-nodata pixel is labelled (criterion 13)", async ({ page }) => {
+test("after strokes across a nodata block and an import, no imagery-nodata pixel is labelled (criterion 13)", async ({ page }) => {
   test.setTimeout(180_000);
   await openApp(page);
   await openRaster(page, nodataImagery());
@@ -49,9 +50,10 @@ test("after strokes across a nodata block and a Merge import, no imagery-nodata 
     await stroke(page, path(await toScreen(page, [13.8, lat]), await toScreen(page, [14.8, lat]), 12));
   }
   expectNoNodata(await storeTiles(page), 1000, inNodata);
-  await importFile(page, upload("classes.tif", classFile("255"))); // Merge: no confirm
+  page.once("dialog", (d) => void d.accept()); // "Replace labels?": every import replaces (spec 017)
+  await importFile(page, upload("classes.tif", classFile("255")));
   await expect(message(page)).toHaveText(seeded);
-  expectNoNodata(await storeTiles(page), 1000, inNodata);
+  expectNoNodata(await effectiveTiles(page), 1000, inNodata);
 });
 
 test("importing and exporting labels make no network requests (criterion 19)", async ({ page }) => {
@@ -64,6 +66,7 @@ test("importing and exporting labels make no network requests (criterion 19)", a
   const requests: string[] = [];
   page.on("request", (r) => requests.push(r.url()));
   await page.setInputFiles("#class-map", upload("map.json", JSON.stringify([{ value: 3, name: "three" }])));
+  page.once("dialog", (d) => void d.accept()); // "Replace labels?": every import replaces (spec 017)
   await importFile(page, upload("classes.tif", classFile("255")));
   await expect(message(page)).toHaveText(seeded);
   await download(page, "#export-labels");

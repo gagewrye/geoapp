@@ -2,7 +2,10 @@
 
 **Goal:** Label a local GeoTIFF by painting classes onto its pixel grid with a resizable brush, and train spec 001's logistic regression on the painted pixels.
 
-**Status:** Approved (Gage, 2026-10-26; nodata amendment the same day, with spec 004). Clarifications approved 2026-10-27 (Gage); class-name clarification (names are trimmed) approved 2026-10-28 (Gage). **ADRs (Accepted):** 0009 brush only, 0010 sparse label tiles. Followed by specs 004 (seeding, label export) and 005 (AlphaEarth training). Partly shelved by spec 013 (2026-10-28), lapsed: Training, the AOI clause, the AlphaEarth refusal and layer, and criteria 15, 17's training part and 19's Train part.
+**Status:** Approved (Gage, 2026-10-26; nodata amendment the same day, with spec 004). Clarifications approved 2026-10-27 (Gage); class-name clarification (names are trimmed) approved 2026-10-28 (Gage). **ADRs (Accepted):** 0009 brush only, 0010 sparse label tiles. Followed by specs 004 (seeding, label export) and 005 (AlphaEarth training). Partly shelved by spec 013 (2026-10-28), lapsed: Training, the AOI clause, the AlphaEarth refusal and layer, and criteria 15, 17's training part and 19's Train part. Amended 2026-10-29 (Gage):
+- Spec 016: Pan is the default on open and after an import, and the overlays' `raster-opacity` is the Opacity value (default 0.6), shown only while Show labels is on.
+- Spec 017: `BRUSH_SIZES` becomes a 1-127 px odd-size slider, and "−"/"+" and `[`/`]` apply `stepBrush`. Criterion 13 holds as written.
+- Spec 018: Hover outlines `footprintCells` in place of `footprintRing`.
 
 **Decided (Gage)**, besides what Scope and Rules state: polygon code is deleted, not flagged off (2026-10-26). Train's snapshot copies the stored tiles, at most 16 MiB (ADR 0010); the 500 ms post-erase `contextmenu` guard applies on the map only, not the panel; a model loaded while a Train runs is replaced when that Train finishes (2026-10-27).
 

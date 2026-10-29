@@ -10,6 +10,7 @@ import { LabelFileRefused, openLabelTiff } from "../../../src/io/labelFile";
 import { RasterRefusedError } from "../../../src/io/pipeline";
 import { importLabels, importTable, type SeedOutcome } from "../../../src/io/seeding";
 import { classFile, fakeLabelSource, writeFile } from "../helpers/labelFiles";
+import { effectiveTiles } from "../helpers/effective";
 import { fakeSource } from "../helpers/sources";
 
 // Tester brute force of Import labels (spec 004 criteria 12, 13, 15) on more CRS pairs than the
@@ -46,7 +47,7 @@ function check(dst: Grid, src: Grid, nodata: number | null) {
   return async () => {
     const { source: imagery } = fakeSource({ ...dst, bandCount: 3, nodata: -9999 }, imageryValue);
     const { source: file } = fakeLabelSource(src, fileValue, nodata);
-    const r = ok(await importLabels(imagery, file, null, fresh(W, H), "replace"));
+    const r = ok(await importLabels(imagery, file, null));
     // classes: the values at sampled cells, nodata skipped, ascending
     const seen = new Set<number>();
     for (let row = 0; row < H; row++) for (let col = 0; col < W; col++) {
@@ -57,8 +58,9 @@ function check(dst: Grid, src: Grid, nodata: number | null) {
     expect(r.classes).toEqual(values.map((v, i) => ({ name: `Class ${v}`, colour: paletteColour(i) })));
     let bad = 0, labelled = 0, edge = 0;
     const lut = new Map(values.map((v, i) => [v, i + 1]));
+    const tiles = await effectiveTiles(imagery, r);
     for (const w of tileWindows(W, H)) {
-      const t = r.store.tiles.get(`${w.x0},${w.y0}`) ?? new Uint8Array(w.width * w.height);
+      const t = tiles.get(`${w.x0},${w.y0}`)!;
       expect(t).toHaveLength(w.width * w.height);
       for (let i = 0; i < t.length; i++) {
         const col = w.x0 + (i % w.width), row = w.y0 + Math.floor(i / w.width);
@@ -105,18 +107,18 @@ describe("Import labels: classes and outcomes", () => {
     const src: Grid = { width: 2 * W, height: H, epsg: 32633, gt: grid.gt };
     const { source: imagery } = fakeSource({ ...grid, bandCount: 1 }, () => 1);
     const { source: file } = fakeLabelSource(src, (c) => (c >= W ? 42 : 5));
-    const r = ok(await importLabels(imagery, file, null, fresh(W, H), "replace"));
+    const r = ok(await importLabels(imagery, file, null));
     expect(r.classes.map((c) => c.name)).toEqual(["Class 5"]);
     expect([r.pixels, r.classCount]).toEqual([W * H, 1]);
   });
 
   it("a single-class file gives one class; all-nodata and disjoint files give \"empty\" and read no imagery", { timeout: 30_000 }, async () => {
     const one = fakeSource({ ...grid, bandCount: 1 }, () => 1);
-    expect(ok(await importLabels(one.source, fakeLabelSource(grid, () => 3).source, null, fresh(W, H), "replace")).classes.map((c) => c.name)).toEqual(["Class 3"]);
+    expect(ok(await importLabels(one.source, fakeLabelSource(grid, () => 3).source, null)).classes.map((c) => c.name)).toEqual(["Class 3"]);
     for (const [g, v] of [[grid, 255], [{ ...grid, gt: [900000, 30, 0, 5000000, 0, -30] } as Grid, 3]] as const) {
       const { source, reads } = fakeSource({ ...grid, bandCount: 1 }, () => 1);
       const f = fakeLabelSource(g, () => v, 255);
-      expect(await importLabels(source, f.source, null, fresh(W, H), "replace")).toBe("empty");
+      expect(await importLabels(source, f.source, null)).toBe("empty");
       expect(reads).toEqual([]);
     }
   });
@@ -126,7 +128,7 @@ describe("Import labels: classes and outcomes", () => {
     const current = fresh(W, H);
     const before = structuredClone(current.classes);
     const table: ClassEntry[] = [{ value: 77, name: "never" }];
-    expect(await importLabels(source, fakeLabelSource(grid, () => 3).source, table, current, "merge")).toBe("empty");
+    expect(await importLabels(source, fakeLabelSource(grid, () => 3).source, table)).toBe("empty");
     expect(current.classes).toEqual(before);
     expect(current.store.tiles.size).toBe(0);
   });
@@ -135,11 +137,11 @@ describe("Import labels: classes and outcomes", () => {
     const g: Grid = { width: 256, height: 256, epsg: 32633, gt: grid.gt };
     const { source } = fakeSource({ ...g, bandCount: 1 }, () => 1);
     const f = (c: number) => c; // column c holds value c
-    expect(await importLabels(source, fakeLabelSource(g, f, null).source, null, fresh(256, 256), "replace")).toBe("too many");
-    const r = ok(await importLabels(source, fakeLabelSource(g, f, 255).source, null, fresh(256, 256), "replace"));
+    expect(await importLabels(source, fakeLabelSource(g, f, null).source, null)).toBe("too many");
+    const r = ok(await importLabels(source, fakeLabelSource(g, f, 255).source, null));
     expect(r.classes).toHaveLength(255);
     expect(r.classes[254]!.name).toBe("Class 254");
-    const t = r.store.tiles.get("0,0")!;
+    const t = (await effectiveTiles(source, r)).get("0,0")!;
     expect([t[0], t[1], t[254], t[255]]).toEqual([1, 2, 255, 0]);
     expect(r.classCount).toBe(255);
   });
@@ -149,7 +151,7 @@ describe("Import labels: classes and outcomes", () => {
     const file = await openLabelTiff(await fromArrayBuffer(classFile("7", g, (c) => (c < 50 ? 7 : 8))));
     expect(file.meta.nodata).toBe(7);
     const { source } = fakeSource({ ...grid, bandCount: 1 }, () => 1);
-    const r = ok(await importLabels(source, file, importTable(file), fresh(W, H), "replace"));
+    const r = ok(await importLabels(source, file, importTable(file)));
     expect(r.classes.map((c) => c.name)).toEqual(["Class 8"]);
     expect(r.pixels).toBe(50 * 100);
   });

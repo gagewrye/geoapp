@@ -6,12 +6,14 @@ import { TILE_SIZE } from "./types";
 export const MAX_LABEL_TILES = 256;
 
 /** Painted labels on the source grid: 0 = unlabelled, else class index + 1. */
-// Keys are `${x0},${y0}` of tileWindows() windows; tiles are row-major and window-sized; no all-zero tile is kept.
-export type LabelStore = { width: number; height: number; tiles: Map<string, Uint8Array> };
+// Keys are `${x0},${y0}` of tileWindows() windows; tiles are row-major and window-sized. base: a mask is
+// loaded (spec 014), shown where a key is absent; a stored tile overrides it whole, so with base an emptied
+// or all-zero tile is kept (it hides the mask), and without base none is kept.
+export type LabelStore = { width: number; height: number; tiles: Map<string, Uint8Array>; base: boolean };
 /** Imagery-nodata masks (nodataMask) by LabelStore key. */
 export type NodataMasks = Map<string, Uint8Array>;
 
-export const emptyStore = (width: number, height: number): LabelStore => ({ width, height, tiles: new Map() });
+export const emptyStore = (width: number, height: number): LabelStore => ({ width, height, tiles: new Map(), base: false });
 
 /** The tileWindows() window whose origin is (x0, y0), clipped to the raster. */
 export function tileWindow(dims: { width: number; height: number }, x0: number, y0: number): Window {
@@ -44,7 +46,7 @@ function isEmpty(tile: Uint8Array): boolean {
   return true;
 }
 
-/** Paint w (mask bit 0 pixels only; throws on a missing mask) or erase value in w; "full" changes nothing. */
+/** Paint w (mask bit 0 pixels only; throws on a missing mask) or erase value in w (an emptied tile goes unless store.base); "full" changes nothing. */
 export function brush(store: LabelStore, masks: NodataMasks, w: Window, value: number, erase: boolean): "ok" | "full" {
   if (!Number.isInteger(value) || value < 1 || value > 255) throw new Error(`brush: label value ${value} is not 1..255`);
   const keys = tileKeys(w);
@@ -54,7 +56,7 @@ export function brush(store: LabelStore, masks: NodataMasks, w: Window, value: n
       if (!tile) continue;
       let cleared = false;
       eachPixel(tileWindow(store, ...origin(key)), w, (i) => { if (tile[i] === value) { tile[i] = 0; cleared = true; } });
-      if (cleared && isEmpty(tile)) store.tiles.delete(key);
+      if (cleared && !store.base && isEmpty(tile)) store.tiles.delete(key);
     }
     return "ok";
   }
@@ -83,11 +85,11 @@ export function keepMasks(store: LabelStore, masks: NodataMasks, w: Window | nul
   for (const key of [...masks.keys()]) if (!store.tiles.has(key) && !met.has(key)) masks.delete(key);
 }
 
-/** Replaces w's tile with window-sized labels; all zeros deletes it; "full" (a new key at the cap) changes nothing. */
+/** Replaces w's tile with window-sized labels; all zeros deletes it unless store.base; "full" (a new key at the cap) changes nothing. */
 export function putTile(store: LabelStore, w: Window, labels: Uint8Array): "ok" | "full" {
   if (labels.length !== w.width * w.height) throw new Error(`putTile: ${labels.length} labels for a ${w.width}x${w.height} window`);
   const key = `${w.x0},${w.y0}`;
-  if (isEmpty(labels)) { store.tiles.delete(key); return "ok"; }
+  if (!store.base && isEmpty(labels)) { store.tiles.delete(key); return "ok"; }
   if (!store.tiles.has(key) && store.tiles.size >= MAX_LABEL_TILES) return "full";
   store.tiles.set(key, labels);
   return "ok";

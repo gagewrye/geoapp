@@ -31,6 +31,23 @@ export async function storeTiles(page: Page): Promise<Map<string, Uint8Array>> {
   return new Map(entries.map(([k, b]) => [k, new Uint8Array(Buffer.from(b, "base64"))]));
 }
 
+/** Every window's effective tile (spec 014's tile(key): stored, else the mask's) that holds a label, by key. */
+export async function effectiveTiles(page: Page): Promise<Map<string, Uint8Array>> {
+  const entries: [string, string][] = await page.evaluate(async () => {
+    const { store, tile } = (window as any).__geoapp.labels;
+    const out: [string, string][] = [];
+    for (let y0 = 0; y0 < store.height; y0 += 256) for (let x0 = 0; x0 < store.width; x0 += 256) {
+      const t: Uint8Array | null = await tile(`${x0},${y0}`);
+      if (!t || !t.some((v) => v)) continue;
+      let s = "";
+      for (let i = 0; i < t.length; i += 8192) s += String.fromCharCode(...t.subarray(i, i + 8192));
+      out.push([`${x0},${y0}`, btoa(s)]);
+    }
+    return out;
+  });
+  return new Map(entries.map(([k, b]) => [k, new Uint8Array(Buffer.from(b, "base64"))]));
+}
+
 export const classList = (page: Page): Promise<LabelClass[]> =>
   page.evaluate(() => (window as any).__geoapp.labels.classes.map((c: LabelClass) => ({ ...c })));
 

@@ -38,6 +38,8 @@ test("layers: background, basemap, preview, label overlays, then hover; none is 
   await openApp(page);
   await openAndPaint(page);
   await expect.poll(async () => (await layerIds(page)).some((id) => id.startsWith("brush-hover"))).toBe(true);
+  // overlays are created on the frame after a stroke applies, so wait for them before reading the order
+  await expect.poll(async () => (await layerIds(page)).some((id) => id.startsWith("label-"))).toBe(true);
   const layers = await layerIds(page);
   const labelLayers = layers.filter((id) => id.startsWith("label-"));
   expect(labelLayers.length).toBeGreaterThan(0);
@@ -56,7 +58,8 @@ test("every request from load through open, paint, undo, import, export and anot
   await openAndPaint(page);
   await page.click("#undo");
   await paintBeside(page);
-  await importFile(page, upload("classes.tif", classFile("255"))); // Merge: no confirm
+  page.once("dialog", (d) => void d.accept()); // "Replace labels?": every import replaces (spec 017)
+  await importFile(page, upload("classes.tif", classFile("255")));
   await expect(message(page)).toHaveText(/^Seeded \d+ pixels in \d+ classes\.$/);
   await download(page, "#export-labels");
   await expect(message(page)).toHaveText("Labels exported.");

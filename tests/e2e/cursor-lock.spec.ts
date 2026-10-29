@@ -51,7 +51,13 @@ test("during an import the map shows not-allowed, grabbing while middle-panning,
   expect(await cursorAt(page, p)).toBe("not-allowed");
   await openFileGate(page);
   await expect(message(page)).toHaveText(seeded);
-  await expectBrush(page, p); // no pointer move since
+  // an import selects Pan (spec 014 as amended by spec 016): MapLibre's cursor, then the brush once Paint is chosen
+  const after = await cursorAt(page, p); // no pointer move since
+  expect(after).not.toBe("not-allowed");
+  expect(after.startsWith("url(")).toBe(false);
+  await page.click("#mode-paint");
+  await page.mouse.move(p.x, p.y);
+  await expectBrush(page, p);
 });
 
 test("during an Export labels run the map shows not-allowed, and the brush once it ends", async ({ page }) => {

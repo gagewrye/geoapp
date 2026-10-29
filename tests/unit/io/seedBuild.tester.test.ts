@@ -10,11 +10,10 @@ import type { RasterSource } from "../../../src/io/source";
 import { fakeLabelSource } from "../helpers/labelFiles";
 import { fakeSource } from "../helpers/sources";
 
-// Tester checks of spec 004's Merge or Replace build and its memory rule: the current labels are
-// never written (success, "full", "too many", "empty", "stale"), the cap at its exact boundary in
-// both modes, the N and K counts, and, structurally, that every read is one aligned window of at
-// most 256x256 with one read in flight, that a capped or stale run stops reading, and that huge
-// rasters are never read whole.
+// Tester checks of spec 004's import build and its memory rule: the current labels are never
+// written (success, "empty", "stale"), imports replace (spec 017) and no longer reach the cap (spec 014),
+// the N and K counts, and, structurally, that every read is one aligned window of at most 256x256
+// with one read in flight, that a stale run stops reading, and that huge rasters are never read whole.
 
 const GT: Affine = [500000, 10, 0, 5000000, 0, -10];
 const ok = (r: SeedOutcome) => { if (typeof r === "string") throw new Error(r); return r; };
@@ -40,85 +39,41 @@ describe("the current labels are never written", () => {
   const file = (f: (c: number, r: number) => number = () => 3) => fakeLabelSource(g, f).source;
   const table: ClassEntry[] = [{ value: 3, name: "three" }];
 
-  for (const mode of ["merge", "replace"] as const) {
-    it(`${mode}: success, "too many", "empty" and "stale" leave the current store, its tile arrays and the list unchanged`, { timeout: 30_000 }, async () => {
-      const cur = labelsWith(5, 1024);
-      const s = snapshot(cur);
-      const r = ok(await importLabels(imagery(), file(), table, cur, mode));
-      expectUntouched(cur, s);
-      expect(r.store).not.toBe(cur.store);
-      expect(r.store.tiles).not.toBe(cur.store.tiles);
-      const many = { ...cur, classes: Array.from({ length: 255 }, (_, i) => ({ name: `c${i}`, colour: "#000000" })) };
-      const sm = snapshot(many);
-      // Replace starts from no classes, so only Merge can pass 255
-      if (mode === "merge") expect(await importLabels(imagery(), file(), table, many, mode)).toBe("too many");
-      else expect(typeof (await importLabels(imagery(), file(), table, many, mode))).toBe("object");
-      expectUntouched(many, sm);
-      expect(await importLabels(imagery(), file(), [{ value: 9, name: "absent" }], cur, mode)).toBe("empty");
-      expectUntouched(cur, s);
-      let calls = 0;
-      expect(await importLabels(imagery(), file(), table, cur, mode, () => ++calls > 3)).toBe("stale");
-      expectUntouched(cur, s);
-    });
-  }
-
-  it("a Merge result shares only tiles it didn't seed; every seeded tile is a new array", { timeout: 30_000 }, async () => {
-    const cur = labelsWith(16, 1024);
-    // the file labels only the top-left 512 x 512, i.e. tiles 0,0 256,0 0,256 256,256
-    const r = ok(await importLabels(imagery(), file((c, rr) => (c < 512 && rr < 512 ? 3 : 0)), table, cur, "merge"));
-    for (const [k, t] of r.store.tiles) {
-      const seeded = ["0,0", "256,0", "0,256", "256,256"].includes(k);
-      if (seeded) expect(t, k).not.toBe(cur.store.tiles.get(k)); else expect(t, k).toBe(cur.store.tiles.get(k));
-    }
+  it("success, \"empty\" and \"stale\" leave the current store, its tile arrays and the list unchanged (imports only build new labels)", { timeout: 30_000 }, async () => {
+    const cur = labelsWith(5, 1024);
+    const s = snapshot(cur);
+    const r = ok(await importLabels(imagery(), file(), table));
+    expectUntouched(cur, s);
+    expect(r.store).not.toBe(cur.store);
+    expect(r.store.tiles).not.toBe(cur.store.tiles);
+    expect(await importLabels(imagery(), file(), [{ value: 9, name: "absent" }])).toBe("empty");
+    expectUntouched(cur, s);
+    let calls = 0;
+    expect(await importLabels(imagery(), file(), table, () => ++calls > 3)).toBe("stale");
+    expectUntouched(cur, s);
   });
 });
 
-describe("Merge and Replace at the cap", () => {
+describe("imports never reach the cap (spec 014: the file is a base)", () => {
   const size = 256 * 17; // 289 tiles
   const g: Grid = { width: size, height: size, epsg: 32633, gt: GT };
-  const imagery = () => fakeSource({ ...g, bandCount: 1 }, () => 1).source;
-  const table: ClassEntry[] = [{ value: 3, name: "three" }];
-  /** File labelling only the given tile windows. */
-  const fileOn = (ws: Window[]) => {
-    const on = new Uint8Array(17 * 17);
-    for (const w of ws) on[(w.y0 >> 8) * 17 + (w.x0 >> 8)] = 1;
-    return fakeLabelSource(g, (c, r) => (on[(r >> 8) * 17 + (c >> 8)] ? 3 : 0)).source;
-  };
-  const all = tileWindows(size, size);
-
-  it("Merge with 256 stored tiles: a seed inside them succeeds (putTile replaces), one more tile is \"full\"", { timeout: 120_000 }, async () => {
-    const cur = labelsWith(MAX_LABEL_TILES, size);
-    const r = ok(await importLabels(imagery(), fileOn(all.slice(250, 256)), table, cur, "merge"));
-    expect(r.store.tiles.size).toBe(MAX_LABEL_TILES);
-    expect(r.pixels).toBe(6 * (65536 - 1)); // painted first pixels win
-    const s = snapshot(cur);
-    expect(await importLabels(imagery(), fileOn(all.slice(250, 257)), table, cur, "merge")).toBe("full");
-    expectUntouched(cur, s);
-  });
-
-  it("Replace with 256 stored tiles elsewhere succeeds and keeps only the seed; exactly 256 seeded tiles fit, 257 don't", { timeout: 120_000 }, async () => {
-    const cur = labelsWith(MAX_LABEL_TILES, size);
-    const r = ok(await importLabels(imagery(), fileOn(all.slice(280, 289)), table, cur, "replace"));
-    expect([...r.store.tiles.keys()]).toEqual(all.slice(280, 289).map((w) => `${w.x0},${w.y0}`));
+  it("a mask labelling all 289 tiles stores none", { timeout: 120_000 }, async () => {
+    const r = ok(await importLabels(fakeSource({ ...g, bandCount: 1 }, () => 1).source, fakeLabelSource(g, () => 3).source, [{ value: 3, name: "three" }]));
+    expect(r.store.tiles.size).toBe(0);
+    expect(r.base.count).toBe(size * size);
     expect(r.classes).toEqual([{ name: "three", colour: expect.any(String) }]);
-    expect(typeof (await importLabels(imagery(), fileOn(all.slice(0, 256)), table, cur, "replace"))).toBe("object");
-    expect(await importLabels(imagery(), fileOn(all.slice(0, 257)), table, cur, "replace")).toBe("full");
+    expect(MAX_LABEL_TILES).toBeLessThan(289);
   });
 });
 
 describe("N and K", () => {
-  it("count only newly labelled pixels and their classes: a class seeded only under painted pixels isn't counted", async () => {
+  it("count every labelled pixel and its classes; a listed value that never occurs isn't counted", async () => {
     const g: Grid = { width: 256, height: 256, epsg: 32633, gt: GT };
-    const cur = labelsWith(0, 256);
-    const t = new Uint8Array(65536); t.fill(2, 0, 256); // row 0 painted Class 2
-    cur.store.tiles.set("0,0", t);
-    // file: row 0 is 8, everything else 5
     const { source } = fakeSource({ ...g, bandCount: 1 }, () => 1);
-    const r = ok(await importLabels(source, fakeLabelSource(g, (_c, r) => (r === 0 ? 8 : 5)).source, [{ value: 5, name: "five" }, { value: 8, name: "eight" }], cur, "merge"));
-    expect(r.pixels).toBe(65536 - 256);
-    expect(r.classCount).toBe(1);
-    expect(r.classes.map((c) => c.name)).toEqual(["Class 1", "Class 2", "five", "eight"]);
-    expect(r.store.tiles.get("0,0")!.subarray(0, 256).every((v) => v === 2)).toBe(true);
+    const r = ok(await importLabels(source, fakeLabelSource(g, (_c, r) => (r === 0 ? 8 : 5)).source, [{ value: 5, name: "five" }, { value: 8, name: "eight" }, { value: 9, name: "nine" }]));
+    expect(r.pixels).toBe(65536);
+    expect(r.classCount).toBe(2);
+    expect(r.classes.map((c) => c.name)).toEqual(["five", "eight", "nine"]);
   });
 });
 
@@ -146,7 +101,7 @@ describe("memory, structurally", () => {
     const f: Grid = { width: 700, height: 500, epsg: 4326, gt: [15.0, 0.0002, 0, 45.0, 0, -0.0002] };
     const { source: img } = fakeSource({ ...big, bandCount: 2 }, () => 1);
     const io = instrument(img, fakeLabelSource(f, () => 6).source);
-    ok(await importLabels(io.imagery, io.file, null, { store: emptyStore(65536, 65536), classes: initialClasses() }, "replace"));
+    ok(await importLabels(io.imagery, io.file, null));
     expect(io.max()).toBe(1);
     expect(io.log.every((e) => aligned(e.w))).toBe(true);
     const imageryReads = io.log.filter((e) => e.kind === "i");
@@ -159,7 +114,7 @@ describe("memory, structurally", () => {
     const img: Grid = { width: 600, height: 500, epsg: 32633, gt: [500000, 30, 0, 5000000, 0, -30] };
     const f: Grid = { width: 200000, height: 200000, epsg: 32633, gt: [0, 5, 0, 5500000, 0, -5] };
     const io = instrument(fakeSource({ ...img, bandCount: 1 }, () => 1).source, fakeLabelSource(f, () => 2).source);
-    ok(await importLabels(io.imagery, io.file, [{ value: 2, name: "two" }], { store: emptyStore(600, 500), classes: initialClasses() }, "replace"));
+    ok(await importLabels(io.imagery, io.file, [{ value: 2, name: "two" }]));
     expect(io.max()).toBe(1);
     expect(io.log.every((e) => aligned(e.w))).toBe(true);
     // the imagery covers 18 x 15 km = 3600 x 3000 file px: at most 16 x 13 file windows, each read once per imagery window
@@ -169,24 +124,15 @@ describe("memory, structurally", () => {
     expect(io.log.filter((e) => e.kind === "i")).toHaveLength(tileWindows(600, 500).length);
   });
 
-  it("a capped import on a 65536 x 65536 imagery stops reading after the 257th tile", { timeout: 120_000 }, async () => {
-    const big: Grid = { width: 65536, height: 65536, epsg: 32633, gt: GT };
-    const io = instrument(fakeSource({ ...big, bandCount: 1 }, () => 1).source, fakeLabelSource(big, () => 4).source);
-    expect(await importLabels(io.imagery, io.file, [{ value: 4, name: "four" }], { store: emptyStore(65536, 65536), classes: initialClasses() }, "replace")).toBe("full");
-    expect(io.log.filter((e) => e.kind === "i")).toHaveLength(MAX_LABEL_TILES + 1);
-    expect(io.log.filter((e) => e.kind === "f")).toHaveLength(MAX_LABEL_TILES + 1);
-    expect(io.max()).toBe(1);
-  });
-
   it("a stale run reads nothing more once stale", { timeout: 30_000 }, async () => {
     const g: Grid = { width: 2048, height: 2048, epsg: 32633, gt: GT };
     const io = instrument(fakeSource({ ...g, bandCount: 1 }, () => 1).source, fakeLabelSource(g, () => 4).source);
     // stale from the 5th read on (a raster opened meanwhile); on equal grids each imagery window needs one file window
-    expect(await importLabels(io.imagery, io.file, null, { store: emptyStore(2048, 2048), classes: initialClasses() }, "replace", () => io.log.length >= 5)).toBe("stale");
+    expect(await importLabels(io.imagery, io.file, null, () => io.log.length >= 5)).toBe("stale");
     expect(io.log).toHaveLength(5);
     const later = instrument(fakeSource({ ...g, bandCount: 1 }, () => 1).source, fakeLabelSource(g, () => 4).source);
     // in the labelling pass: file read 64 + 3 is the third window's, so its imagery read never starts
-    expect(await importLabels(later.imagery, later.file, null, { store: emptyStore(2048, 2048), classes: initialClasses() }, "replace", () => later.log.length >= 64 + 5)).toBe("stale");
+    expect(await importLabels(later.imagery, later.file, null, () => later.log.length >= 64 + 5)).toBe("stale");
     expect(later.log.slice(64).map((e) => e.kind)).toEqual(["f", "i", "f", "i", "f"]);
   });
 });
