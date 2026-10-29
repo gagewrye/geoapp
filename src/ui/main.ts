@@ -1,4 +1,5 @@
 import "./style.css";
+import { PREVIEW_MAX_SIDE } from "../core/maskPreview";
 import { openFile } from "../io/geotiffSource";
 import { buildPreview, openRaster, RasterRefusedError } from "../io/pipeline";
 import type { RasterSource } from "../io/source";
@@ -9,7 +10,6 @@ import { initLabels, inTextField } from "./labels";
 import { MESSAGES } from "./messages";
 import { initSeeding } from "./seeding";
 
-const PREVIEW_MAX_SIDE = 1024;
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const message = $("message");
 const say = (text: string) => { message.textContent = text; };
