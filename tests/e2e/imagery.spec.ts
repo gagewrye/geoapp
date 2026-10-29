@@ -161,3 +161,23 @@ test("a single-strip file over the block limit shows the message and the preview
   const i = 4 * (Math.floor((p.y - o.y) * f.scale) * f.w + Math.floor((p.x - o.x) * f.scale));
   expect(f.px.slice(i, i + 3)).toEqual([255, 0, 255]); // the preview
 });
+
+test("Paint enables once the preview shows, while the imagery tiles' reads are still held (spec 019 with spec 020)", async ({ page }) => {
+  await openApp(page);
+  await page.evaluate(() => {
+    const g = ((window as any).__tileReads = { held: 0 });
+    (window as any).__geoapp.rasterFile = (src: any) => {
+      const read = src.readSamples.bind(src);
+      // reads made once the preview is on the map are the tiles'; hold them for good
+      src.readSamples = (...a: unknown[]) => ((window as any).__geoapp.map.getSource("preview") ? (g.held++, new Promise(() => {})) : read(...a));
+    };
+  });
+  await openRaster(page, checkerboard());
+  await expect(message(page)).toHaveText("Raster opened.");
+  await expect(page.locator("#mode-paint")).toBeEnabled();
+  await zoomTo(page, CHECK_GT, 700.5, 700.5, 10);
+  await expect.poll(() => page.evaluate(() => (window as any).__tileReads.held as number)).toBeGreaterThan(0);
+  expect(await imagerySources(page)).toEqual([]);
+  await paintMode(page);
+  await expect(page.locator("#mode-paint")).toHaveAttribute("aria-pressed", "true");
+});

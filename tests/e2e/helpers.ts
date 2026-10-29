@@ -1,5 +1,6 @@
 import { expect, type CDPSession, type Page, type Request } from "@playwright/test";
 import { geotiffBuffer, type Value } from "../unit/helpers/sources";
+import { uint8Tiff } from "../unit/helpers/tiffFixtures";
 import type { Affine, Grid } from "../../src/core/types";
 
 export type LngLat = [number, number];
@@ -11,13 +12,21 @@ export function tiff(name: string, width: number, height: number, nb: number, f:
   return { name, mimeType: "image/tiff", buffer: Buffer.from(geotiffBuffer(width, height, nb, f, geo)) };
 }
 
+/** Like tiff(), but 8-bit in 256 px tiles: spec 020's preview reads a file block by block, and tiff()'s single strip is one read. */
+export function tiledTiff(name: string, width: number, height: number, nb: number, f: Value, geo: { epsg: number; gt: Affine }) {
+  return { name, mimeType: "image/tiff", buffer: Buffer.from(uint8Tiff([{ width, height, bands: nb, value: f, layout: { tile: [256, 256] } }], geo)) };
+}
+
 /** 10x10 degree RGB raster at 10..20E, 40..50N; a white block marks 15.5E 45.5N. */
 export const FEATURE: LngLat = [15.5, 45.5];
-export const rgbFixture = () => tiff("rgb4326.tif", 1000, 1000, 3, (b, c, r) => {
+const rgbValue: Value = (b, c, r) => {
   const lon = 10 + (c + 0.5) * 0.01, lat = 50 - (r + 0.5) * 0.01;
   if (Math.abs(lon - FEATURE[0]) < 0.05 && Math.abs(lat - FEATURE[1]) < 0.05) return 255;
   return b === 0 ? (c < 500 ? 200 : 120) : b === 1 ? 100 + (r % 100) : 150;
-}, { epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01] });
+};
+export const rgbFixture = () => tiff("rgb4326.tif", 1000, 1000, 3, rgbValue, { epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01] });
+/** rgbFixture's pixels in 16 tiles, so its preview takes 16 reads (spec 019's bar and read gates). */
+export const rgbTiled = () => tiledTiff("rgb4326.tif", 1000, 1000, 3, rgbValue, { epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01] });
 
 export async function openApp(page: Page): Promise<void> {
   await page.goto("/");

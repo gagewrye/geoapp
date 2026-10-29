@@ -69,3 +69,32 @@ describe("preview reads (criterion 10)", () => {
     }
   });
 });
+
+describe("progress and abort on the sample reads (spec 019 criteria 1 and 3, after spec 020)", () => {
+  const files: [string, ArrayBuffer][] = [
+    ["blocks", uint8Tiff([{ width: 2500, height: 1300, bands: 3, value: v, layout: { tile: [256, 256] } }], GEO)],
+    ["an overview", uint8Tiff(withOverviews(4100, 3000, 3, v, [2, 4], [256, 256]), GEO)],
+  ];
+
+  it.each(files)("reports once per sample read through %s, done 1..total in order, and passes the signal", async (_n, buf) => {
+    const { source, reads } = await logged(buf);
+    const signals: (AbortSignal | undefined)[] = [];
+    const inner = source.readSamples;
+    source.readSamples = (...a) => { signals.push(a[6]); return inner(...a); };
+    const ac = new AbortController();
+    const calls: [number, number, number][] = [];
+    await buildPreview(source, 1024, { signal: ac.signal, onProgress: (d, t) => calls.push([d, t, reads.length]) });
+    expect(reads.length).toBeGreaterThan(1);
+    expect(calls).toEqual(reads.map((_, i) => [i + 1, reads.length, i + 1]));
+    expect(signals.every((s) => s === ac.signal)).toBe(true);
+  });
+
+  it.each(files)("an abort during sample read 3 of %s stops the reads after it and rejects with AbortError", async (_n, buf) => {
+    const { source, reads } = await logged(buf);
+    const ac = new AbortController();
+    const inner = source.readSamples;
+    source.readSamples = async (...a) => { const r = await inner(...a); if (reads.length === 3) ac.abort(); return r; };
+    await expect(buildPreview(source, 1024, { signal: ac.signal })).rejects.toSatisfy((e) => (e as Error).name === "AbortError");
+    expect(reads).toHaveLength(3);
+  });
+});

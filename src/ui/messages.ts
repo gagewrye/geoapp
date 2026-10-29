@@ -1,4 +1,5 @@
 import { maskReadFailed } from "../io/labelFile";
+import { RasterRefusedError } from "../io/pipeline";
 import type { SeedOutcome } from "../io/seeding";
 
 /** Bytes as MiB rounded up: whole numbers from 10 MiB, else two decimals (a test hook lowers the limit). */
@@ -19,6 +20,10 @@ export const MESSAGES = {
   // spec 014
   editLimit: "Label limit reached (256 edited tiles of 256 x 256 px). Undo strokes, or export the labels and import the export.",
   maskGone: "The label mask can't be read any more. Import it again.",
+  // spec 019
+  rasterUnreadable: "Couldn't read this file.",
+  buildingPreview: "Building preview…",
+  drawingPreview: "Drawing preview…",
   // spec 020
   largeBlocks: (bytes: number, limit: number) => `Full resolution isn't available: this file stores pixels in ${mib(bytes)} MiB blocks (limit ${mib(limit)} MiB). Re-save it tiled, e.g. gdal_translate -of COG.`,
 } as const;
@@ -31,7 +36,15 @@ export function seedMessage(r: SeedOutcome): string | null {
   return `Seeded ${r.pixels} pixels in ${r.classCount} classes.`;
 }
 
+// A FileReader failure rejects with a ProgressEvent, which has no message (spec 019)
+const messageOf = (e: unknown) => (e instanceof Error && e.message ? e.message : MESSAGES.rasterUnreadable);
+
+/** An action's error as shown to the user. */
+export function errorText(e: unknown): string {
+  return e instanceof RasterRefusedError && e.reason === "antimeridian" ? MESSAGES.rasterAntimeridian : messageOf(e);
+}
+
 /** A paint or export error as shown: a mask file that can't be read any more gets spec 014's message. */
 export function readErrorMessage(e: unknown): string {
-  return maskReadFailed(e) ? MESSAGES.maskGone : (e as Error).message;
+  return maskReadFailed(e) ? MESSAGES.maskGone : messageOf(e);
 }
