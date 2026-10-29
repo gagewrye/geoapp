@@ -16,9 +16,7 @@
   "dependencies": {
     "geotiff": "3.0.5",
     "maplibre-gl": "6.16.0",
-    "proj4": "2.22.0",
-    "terra-draw": "1.38.0",
-    "terra-draw-maplibre-gl-adapter": "1.5.0"
+    "proj4": "2.22.0"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
