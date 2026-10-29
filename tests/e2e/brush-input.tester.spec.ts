@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { hoverFeatures, jumpTo, labels, message, moveTo, openApp, openRaster, rgbFixture, selectClass, settled, stroke, toScreen, toucher, view } from "./helpers";
+import { hoverFeatures, jumpTo, labels, message, moveTo, openApp, openRaster, paintMode, rgbFixture, selectClass, settled, stroke, toScreen, toucher, view } from "./helpers";
 
 // Tester: spec 003 Strokes and "Pan, zoom, touch and pen" beyond criteria 10-12: presses during a stroke,
 // Shift-drag, keyboard / control / pinch zoom, contextmenu. The middle button pans now (spec 009, navigation.spec.ts).
@@ -8,6 +8,7 @@ async function setup(page: Page, zoom = 9) {
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await jumpTo(page, [15, 45], zoom);
   return toScreen(page, [15.005, 45.005]);
 }
@@ -95,6 +96,7 @@ test("contextmenu: prevented on the map with local imagery open", async ({ page 
   const box = (await page.locator("#map canvas").boundingBox())!;
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   expect(await fire(box.x + 300, box.y + 300)).toBe(true);
 });
 

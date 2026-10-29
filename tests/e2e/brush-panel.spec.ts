@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
-import { hoverFeatures, jumpTo, labels, message, openApp, openRaster, rgbFixture, selectClass, settled, toScreen } from "./helpers";
+import { hoverFeatures, jumpTo, labels, message, openApp, openRaster, paintMode, rgbFixture, selectClass, settled, toScreen } from "./helpers";
 
 // Spec 003 criteria 13 (brush size) and 14 (classes).
 
@@ -8,6 +8,7 @@ async function setup(page: Page) {
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await jumpTo(page, [15, 45], 9);
 }
 const sizeText = (page: Page) => page.locator("#brush-size");

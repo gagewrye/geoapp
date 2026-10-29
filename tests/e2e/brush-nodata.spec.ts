@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { footprint, footprintRing, pixelAt, strokeCells } from "../../src/core/pixel";
 import type { Grid } from "../../src/core/types";
-import { hoverFeatures, jumpTo, labels, message, openApp, openRaster, settled, tiff, tileKeysStored, toLngLat, toScreen, type LngLat, type Xy } from "./helpers";
+import { hoverFeatures, jumpTo, labels, message, openApp, openRaster, paintMode, settled, tiff, tileKeysStored, toLngLat, toScreen, type LngLat, type Xy } from "./helpers";
 
 // Spec 003 criterion 19: the brush never labels imagery nodata.
 
@@ -18,6 +18,7 @@ async function setup(page: Page, centre: [number, number] = [215, 115]) {
   await openApp(page);
   await openRaster(page, fixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await jumpTo(page, lonLat(...centre), 14); // about 2.3 screen px per pixel, so a 260 px drag stays on the map
   await page.click("#brush-larger"); // size 15
   await expect(page.locator("#brush-size")).toHaveText("Brush: 15 px");

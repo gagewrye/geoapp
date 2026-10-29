@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { fromArrayBuffer } from "geotiff";
 import { decodeClasses, CLASS_ITEM } from "../../src/core/classTable";
-import { hoverFeatures, jumpTo, message, openApp, openRaster, path, rgbFixture, selectClass, stroke, toScreen } from "./helpers";
+import { hoverFeatures, jumpTo, message, openApp, openRaster, paintMode, path, rgbFixture, selectClass, stroke, toScreen } from "./helpers";
 import { arrayBuffer, noSavePicker, storeTiles } from "./seeding";
 
 // Tester probe of Export labels' snapshot (spec 004 Rules: Export labels; criterion 11's "saves and
@@ -28,6 +28,7 @@ test("while Export writes, strokes and class edits are refused, so the file hold
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   // Class 1 across tile 512,512 (lon 15.12..17.68E, lat 42.33..44.88N), centred on pixel 640,640
   await jumpTo(page, [16.4, 43.6], 7);
   await page.click("#brush-larger"); // 15 px

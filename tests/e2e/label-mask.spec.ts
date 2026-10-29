@@ -2,31 +2,23 @@ import { expect, test, type Page } from "@playwright/test";
 import { paletteColour } from "../../src/core/classes";
 import { toLonLat } from "../../src/core/crs";
 import { footprint, pixelAt, strokeCells } from "../../src/core/pixel";
-import { CLASS_GRID, classFile, writeFile } from "../unit/helpers/labelFiles";
+import { CLASS_GRID, classFile } from "../unit/helpers/labelFiles";
 import {
-  clickAt, hideBasemap, jumpTo, labels, logRequests, message, openApp, openRaster, path, pixelAt as screenPixel, renameClass, RGB_GRID, rgbFixture,
+  clickAt, hideBasemap, jumpTo, labels, logRequests, message, openApp, openRaster, paintMode, path, pixelAt as screenPixel, renameClass, RGB_GRID, rgbFixture,
   selectClass, stroke, tileKeysStored, toLngLat, toScreen, type LngLat, type Xy,
 } from "./helpers";
-import { arrayBuffer, classList, download, importFile, noSavePicker, upload } from "./seeding";
+import { arrayBuffer, at, classList, download, importFile, maskFile, maskValue, noSavePicker, upload } from "./seeding";
 
 // Spec 014 criteria 6 (fine-tune), 7 (undo), 9 (round trip), 10 (Replace), 11 (display), 13 (raster open, privacy) and 14 (classes).
 
-/** The generated mask on rgbFixture's grid: 16 x 16 px blocks of 0..3, GDAL_NODATA 0, so classes 1, 2, 3 are values 1, 2, 3. */
-const maskValue = (c: number, r: number) => ((c >> 4) + (r >> 4)) % 4;
-function maskFile() {
-  const v = new Uint8Array(1000 * 1000);
-  for (let r = 0; r < 1000; r++) for (let c = 0; c < 1000; c++) v[r * 1000 + c] = maskValue(c, r);
-  return upload("mask.tif", writeFile(RGB_GRID, 1, v, "0", { GTModelTypeGeoKey: 2, GTRasterTypeGeoKey: 1, GeographicTypeGeoKey: 4326 }));
-}
 const seeded = /^Seeded \d+ pixels in \d+ classes\.$/;
-/** Lon/lat of rgbFixture pixel position (col, row may be fractional). */
-const at = (c: number, r: number): LngLat => [10 + c * 0.01, 50 - r * 0.01];
 const undoButton = (page: Page) => page.locator("#undo");
 
 async function setup(page: Page) {
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
 }
 /** Imports the mask (no labels yet: no confirm); an import selects Pan, so `paint` selects Paint again (spec 014 Tests). */
 async function importMask(page: Page, paint = true) {
@@ -34,7 +26,7 @@ async function importMask(page: Page, paint = true) {
   await expect(message(page)).toHaveText(seeded);
   await expect.poll(() => page.evaluate(() => (window as any).__geoapp.map.getLayer("mask") !== undefined)).toBe(true);
   await expect(page.locator("#mode-pan")).toHaveAttribute("aria-pressed", "true");
-  if (paint) await page.click("#mode-paint");
+  if (paint) await paintMode(page);
 }
 
 /** Every pixel under the size-7 footprints of a stroke through these screen points (same unproject and pixelAt as the app). */
@@ -125,9 +117,9 @@ test("export, reopen and import the export with Replace restores every tile and 
   page.once("dialog", (d) => { expect(d.message()).toBe("Discard labels?"); void d.accept(); });
   await openRaster(page, { ...rgbFixture(), name: "again.tif" });
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   // criterion 13: no labels and no mask layer
   expect(await page.evaluate(() => (window as any).__geoapp.map.getLayer("mask"))).toBeUndefined();
-  await expect(page.locator("#seed-mode")).toBeDisabled();
   expect((await labels(page)).size).toBe(0);
   page.on("dialog", (d) => { throw new Error(`unexpected dialog ${d.message()}`); });
   await importFile(page, upload("labels.tif", arrayBuffer(file)));
@@ -144,12 +136,13 @@ test("opening another raster after an import (OK on the confirm) leaves no label
   page.once("dialog", (d) => void d.accept());
   await openRaster(page, { ...rgbFixture(), name: "other.tif" });
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   expect(await page.evaluate(() => (window as any).__geoapp.map.getLayer("mask"))).toBeUndefined();
-  await expect(page.locator("#seed-mode")).toBeDisabled();
   // hasLabels is false: the next open asks nothing
   page.on("dialog", (d) => { throw new Error(`unexpected dialog ${d.message()}`); });
   await openRaster(page, { ...rgbFixture(), name: "third.tif" });
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
 });
 
 test("with only a mask loaded an import asks to replace: Cancel keeps the mask and classes, OK replaces the mask; Pan is selected (criterion 10)", async ({ page }) => {

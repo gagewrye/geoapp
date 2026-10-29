@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { jumpTo, labels, message, moveTo, openApp, openRaster, rgbFixture, settled, stroke, toScreen, view } from "./helpers";
+import { jumpTo, labels, message, moveTo, openApp, openRaster, paintMode, rgbFixture, settled, stroke, toScreen, view } from "./helpers";
 
 // Tester: spec 003 criterion 12 after a paint stroke: map.dragRotate stays off in Paint mode. These
 // check that nothing the user sees changes: right drags still erase, double-click and Shift-drag
@@ -9,6 +9,7 @@ async function setup(page: Page) {
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await jumpTo(page, [15, 45], 7);
   const c = await toScreen(page, [15.005, 45.005]);
   await stroke(page, [c, { x: c.x + 60, y: c.y }]);
@@ -55,6 +56,7 @@ test.describe("MapLibre handlers stay off in Paint mode after a stroke (criterio
     await openApp(page);
     await openRaster(page, rgbFixture());
     await expect(message(page)).toHaveText("Raster opened.");
+    await paintMode(page);
     await jumpTo(page, [15, 45], 7);
     const rot = () => page.evaluate(() => (window as any).__geoapp.map.dragRotate.isEnabled() as boolean);
     const before = await rot();

@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { toLonLat } from "../../src/core/crs";
 import { CLASS_GRID, classFile } from "../unit/helpers/labelFiles";
-import { jumpTo, labels, message, openApp, openRaster, paintTwoClasses, path, rgbFixture, selectClass, stroke, toScreen, type LngLat } from "./helpers";
+import { jumpTo, labels, message, openApp, openRaster, paintMode, paintTwoClasses, path, rgbFixture, selectClass, stroke, toScreen, type LngLat } from "./helpers";
 import { classList, download, effectiveTiles, expectNoNodata, importFile, inNodata, noSavePicker, nodataImagery, storeTiles, upload } from "./seeding";
 
 // Spec 004 criteria 18 (edit), 13 (its e2e part) and 19 (privacy).
@@ -16,10 +16,11 @@ test("after an import, a right drag clears the selected class in a seeded area a
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await importFile(page, upload("classes.tif", classFile("255")));
   await expect(message(page)).toHaveText(seeded);
   expect((await classList(page)).map((c) => c.name)).toEqual(["Class 0", "Class 3", "Class 7"]);
-  await page.click("#mode-paint"); // an import selects Pan (spec 014 Tests)
+  await paintMode(page); // an import selects Pan (spec 014 Tests)
   // file block cols 24..47, rows 0..19 holds 3, which is label value 2 ("Class 3")
   const centre = fileLonLat(36, 10);
   await jumpTo(page, centre, 7);
@@ -43,6 +44,7 @@ test("after strokes across a nodata block and an import, no imagery-nodata pixel
   await openApp(page);
   await openRaster(page, nodataImagery());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await jumpTo(page, [14.3, 45.75], 8);
   await page.click("#brush-larger");
   for (const [i, lat] of [[0, 45.9], [1, 45.6]] as const) {
@@ -62,6 +64,7 @@ test("importing and exporting labels make no network requests (criterion 19)", a
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await paintTwoClasses(page);
   const requests: string[] = [];
   page.on("request", (r) => requests.push(r.url()));

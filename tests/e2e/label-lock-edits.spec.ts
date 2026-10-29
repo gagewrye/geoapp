@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { message, openApp, openRaster, paintTwoClasses, rgbFixture } from "./helpers";
+import { message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture } from "./helpers";
 import { classList } from "./seeding";
 
 // Spec 004 Locks: rename and recolour refuse while locked, even if their disabled inputs fire.
@@ -15,6 +15,7 @@ test("while an export holds the Save dialog, a forced rename or recolour changes
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await paintTwoClasses(page);
   const before = await classList(page);
   await page.click("#export-labels");

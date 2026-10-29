@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { jumpTo, labels, message, openApp, openRaster, rgbFixture, stroke, toScreen, toucher, rawPointer } from "./helpers";
+import { jumpTo, labels, message, openApp, openRaster, paintMode, rgbFixture, stroke, toScreen, toucher, rawPointer } from "./helpers";
 
 // Tester: spec 003 Modes rule (Space) / F6. How focus reached a control decides what Space does there: Tab and
 // Shift+Tab keep Space native; mouse, touch and pen clicks leave Space as Pan; focus coming
@@ -13,6 +13,7 @@ async function setup(page: Page) {
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await jumpTo(page, [15, 45], 7);
   await page.evaluate(() => {
     const g = (window as any).__space = [] as boolean[];

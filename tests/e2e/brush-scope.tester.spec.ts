@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
-import { hoverFeatures, jumpTo, labels, message, openApp, openRaster, renameClass, rgbFixture, stroke, tiff, toScreen } from "./helpers";
+import { hoverFeatures, jumpTo, labels, message, openApp, openRaster, paintMode, renameClass, rgbFixture, stroke, tiff, toScreen } from "./helpers";
 
 // Tester: spec 003 Local imagery (refused files keep the labels), the paint queue when another raster
 // opens, and shortcuts in text fields.
@@ -11,6 +11,7 @@ async function paintSome(page: Page) {
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await jumpTo(page, [15, 45], 7);
   const c = await toScreen(page, [15.005, 45.005]);
   await stroke(page, [c, { x: c.x + 80, y: c.y }]);
@@ -37,6 +38,7 @@ test("another raster opened while mask reads are paused drops the queue: Import 
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await page.evaluate(() => {
     const s = (window as any).__geoapp.imagery();
     const read = s.readWindow.bind(s);
@@ -55,6 +57,7 @@ test("another raster opened while mask reads are paused drops the queue: Import 
   const seen = dialogs(page); // no pixel is labelled yet, so no confirm
   await openRaster(page, other());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   expect(seen).toEqual([]);
   await expect(page.locator("#import-labels")).toBeEnabled();
   await page.evaluate(() => (window as any).__gate.open());
@@ -73,6 +76,7 @@ test.describe("classes and shortcuts (tester)", () => {
     await openApp(page);
     await openRaster(page, rgbFixture());
     await expect(message(page)).toHaveText("Raster opened.");
+    await paintMode(page);
     await renameClass(page, 1, "  Class 1 ");
     await expect(message(page)).toHaveText(MESSAGES.className);
     await renameClass(page, 1, "Class 3");
@@ -91,6 +95,7 @@ test.describe("classes and shortcuts (tester)", () => {
     await openApp(page);
     await openRaster(page, rgbFixture());
     await expect(message(page)).toHaveText("Raster opened.");
+    await paintMode(page);
     await jumpTo(page, [15, 45], 7);
     const field = page.locator("#classes .class-name").first();
     await field.click();

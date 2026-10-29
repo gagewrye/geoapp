@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
-import { message, openApp, openRaster, paintTwoClasses, rgbFixture, tiff } from "./helpers";
+import { message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture, tiff } from "./helpers";
 
 test("open and paint with no outside requests (criterion 1)", async ({ page, baseURL }) => {
   const requests: string[] = [];
@@ -8,6 +8,7 @@ test("open and paint with no outside requests (criterion 1)", async ({ page, bas
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await paintTwoClasses(page); // spec 003's brush replaces spec 001's polygons
 
   const outside = requests.filter((u) => !u.startsWith(baseURL!) && !u.startsWith("blob:") && !u.startsWith("data:"));

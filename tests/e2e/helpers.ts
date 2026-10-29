@@ -36,6 +36,17 @@ export async function hideBasemap(page: Page): Promise<void> {
   });
 }
 
+/** Adds `<select id="test-select">` (options a, b) to #panel: the app has no select since spec 017, but specs 003 and 009 keep select rules. */
+export const addTestSelect = (page: Page) => page.evaluate(() => {
+  document.getElementById("panel")!.insertAdjacentHTML("beforeend", `<select id="test-select"><option value="a">A</option><option value="b">B</option></select>`);
+});
+
+/** Select Paint: an open or a successful import selects Pan (spec 016 Tests), so tests that paint after one call this. */
+export async function paintMode(page: Page): Promise<void> {
+  await page.click("#mode-paint");
+  await expect(page.locator("#mode-paint")).toHaveAttribute("aria-pressed", "true");
+}
+
 export async function openRaster(page: Page, file: ReturnType<typeof tiff>): Promise<void> {
   await page.setInputFiles("#open-raster", file);
 }

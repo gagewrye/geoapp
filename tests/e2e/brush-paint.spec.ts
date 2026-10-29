@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { footprint, pixelAt, strokeCells } from "../../src/core/pixel";
-import { RGB_GRID, jumpTo, labels, message, openApp, openRaster, path, rgbFixture, selectClass, stroke, toLngLat, toScreen, view, type Xy } from "./helpers";
+import { paintMode, RGB_GRID, jumpTo, labels, message, openApp, openRaster, path, rgbFixture, selectClass, stroke, toLngLat, toScreen, view, type Xy } from "./helpers";
 
 // Spec 003 criterion 10: paint and erase on spec 001's EPSG:4326 fixture.
 
@@ -8,6 +8,7 @@ async function setup(page: Page, zoom: number) {
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await jumpTo(page, [15, 45], zoom);
 }
 

@@ -1,7 +1,7 @@
 import { expect, test, type CDPSession, type Page } from "@playwright/test";
 import { pixelAt as cellOf, strokeCells } from "../../src/core/pixel";
 import {
-  RGB_GRID, jumpTo, labels, message, moveTo, openApp, openRaster, rgbFixture, settled, toLngLat, toScreen, view, type LngLat, type Xy,
+  paintMode, RGB_GRID, jumpTo, labels, message, moveTo, openApp, openRaster, rgbFixture, settled, toLngLat, toScreen, view, type LngLat, type Xy,
 } from "./helpers";
 
 // Spec 009: centre wheel zoom, middle-button pan, smooth WASD, and lifting the brush on a camera move.
@@ -24,6 +24,7 @@ async function setup(page: Page, how: Setup, zoom = 14, at: LngLat = START) {
   if (how !== "none") {
     await openRaster(page, rgbFixture());
     await expect(message(page)).toHaveText("Raster opened.");
+    await paintMode(page);
   }
   if (how === "pan") await page.click("#mode-pan");
   await jumpTo(page, at, zoom);

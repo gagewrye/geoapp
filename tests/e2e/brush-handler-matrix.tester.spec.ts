@@ -19,14 +19,14 @@ const nothing = async () => {};
 const CASES: Case[] = [
   { name: "no imagery", imagery: false, steps: nothing, flags: PAN, gestures: ALL },
   { name: "no imagery, Space held", imagery: false, steps: spaceDown, flags: PAN, gestures: ALL, space: true },
-  { name: "Paint (default on open)", imagery: true, steps: nothing, flags: PAINT, gestures: NONE },
+  { name: "Paint", imagery: true, steps: nothing, flags: PAINT, gestures: NONE },
   { name: "Pan", imagery: true, steps: click("#mode-pan"), flags: PAN, gestures: ALL },
   { name: "Pan, then Paint", imagery: true, steps: seq(click("#mode-pan"), click("#mode-paint")), flags: PAINT, gestures: NONE },
   { name: "Paint with Space held", imagery: true, steps: spaceDown, flags: PAN, gestures: ALL, space: true },
   { name: "Paint after Space released", imagery: true, steps: seq(spaceDown, spaceUp), flags: PAINT, gestures: NONE },
   { name: "Pan with Space pressed and released", imagery: true, steps: seq(click("#mode-pan"), spaceDown, spaceUp), flags: PAN, gestures: ALL },
   { name: "Space held in Paint, Pan chosen, Space released", imagery: true, steps: seq(spaceDown, click("#mode-pan"), spaceUp), flags: PAN, gestures: ALL },
-  { name: "Pan, then another raster opens", imagery: true, steps: seq(click("#mode-pan"), openOther), flags: PAINT, gestures: NONE },
+  { name: "Paint, then another raster opens (it selects Pan: spec 016)", imagery: true, steps: openOther, flags: PAN, gestures: ALL },
   { name: "Space held in Paint, window blur, Space released", imagery: true, steps: seq(spaceDown, blurWindow, spaceUp), flags: PAINT, gestures: NONE },
   { name: "Pan, window blur", imagery: true, steps: seq(click("#mode-pan"), blurWindow), flags: PAN, gestures: ALL },
 ];

@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { footprint, pixelAt, strokeCells } from "../../src/core/pixel";
 import type { Grid } from "../../src/core/types";
 import { writeTiff } from "../../src/io/tiffWriter";
-import { jumpTo, labels, message, openApp, openRaster, settled, tiff, toLngLat, toScreen, type Xy } from "./helpers";
+import { jumpTo, labels, message, openApp, openRaster, paintMode, settled, tiff, toLngLat, toScreen, type Xy } from "./helpers";
 
 // Tester: spec 003 Strokes at low zoom: no gaps on fast drags over a very wide raster, reads stay
 // tile by tile, and a position off the globe lifts the brush with no interpolation across the gap.
@@ -38,6 +38,7 @@ test("a fast size-127 drag at zoom 4 over a 65792 px wide strip labels every pix
   await openApp(page);
   await openRaster(page, { name: "strip.tif", mimeType: "image/tiff", buffer: Buffer.concat(parts) });
   await expect(message(page)).toHaveText("Raster opened.", { timeout: 30_000 });
+  await paintMode(page);
   await setSize(page, 127);
   await jumpTo(page, [-20, 9.995], 4);
   await page.evaluate(() => {
@@ -73,6 +74,7 @@ test("a stroke that leaves the globe and comes back is lifted: nothing is interp
   await openApp(page);
   await openRaster(page, tiff("wide.tif", 320, 280, 1, (_b, c) => c, { epsg: 4326, gt: grid.gt }));
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await jumpTo(page, [0, 0], 1.5);
   const box = (await page.locator("#map canvas").boundingBox())!;
   const A = round(await toScreen(page, [-29.75, 9.75])), B = round(await toScreen(page, [30.25, 9.75]));

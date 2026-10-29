@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { classFile } from "../unit/helpers/labelFiles";
-import { jumpTo, message, openApp, openRaster, rgbFixture, type Xy } from "./helpers";
+import { jumpTo, message, openApp, openRaster, paintMode, rgbFixture, type Xy } from "./helpers";
 import { gateWrites, openWrite, seeded, setup as twoClasses, writeHeld } from "./lockCombos";
 import { importFile, noSavePicker, openFileGate, pauseLabelFile, upload } from "./seeding";
 
@@ -31,6 +31,7 @@ test("during an import the map shows not-allowed, grabbing while middle-panning,
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await jumpTo(page, [15, 45], 9);
   const p = await centre(page);
   await page.mouse.move(p.x, p.y);
@@ -55,7 +56,7 @@ test("during an import the map shows not-allowed, grabbing while middle-panning,
   const after = await cursorAt(page, p); // no pointer move since
   expect(after).not.toBe("not-allowed");
   expect(after.startsWith("url(")).toBe(false);
-  await page.click("#mode-paint");
+  await paintMode(page);
   await page.mouse.move(p.x, p.y);
   await expectBrush(page, p);
 });

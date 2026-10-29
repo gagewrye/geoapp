@@ -4,7 +4,7 @@ import { tileWindows } from "../../src/core/grid";
 import { seedLut, sourceCells } from "../../src/core/seed";
 import { MESSAGES } from "../../src/ui/messages";
 import { aefShapedFile, CLASS_GRID, CLASS_MAP, classFile, classItemFile, classValue, ITEM_CLASSES, rgbClassFile, uint16ClassFile, writeFile } from "../unit/helpers/labelFiles";
-import { message, openApp, openRaster, paintTwoClasses, RGB_GRID, rgbFixture } from "./helpers";
+import { message, openApp, openRaster, paintMode, paintTwoClasses, RGB_GRID, rgbFixture } from "./helpers";
 import { classList, effectiveTiles, importFile, storeTiles, upload } from "./seeding";
 
 // Spec 004 criteria 12 (classes) and 15 (refusals), on spec 001's EPSG:4326 fixture.
@@ -14,6 +14,7 @@ async function setup(page: Page, replace = false) {
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   page.on("dialog", (d) => {
     if (!replace || d.message() !== MESSAGES.replace) throw new Error(`unexpected dialog ${d.message()}`);
     void d.accept();

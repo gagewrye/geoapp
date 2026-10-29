@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { footprint, pixelAt, strokeCells } from "../../src/core/pixel";
 import type { Grid } from "../../src/core/types";
-import { hoverFeatures, jumpTo, labels, message, openApp, openRaster, settled, tiff, toLngLat, toScreen, type LngLat, type Xy } from "./helpers";
+import { hoverFeatures, jumpTo, labels, message, openApp, openRaster, paintMode, settled, tiff, toLngLat, toScreen, type LngLat, type Xy } from "./helpers";
 
 // Tester: spec 003 Imagery nodata on a 4-band raster whose GDAL_NODATA (0) appears in the last band
 // only, plus a NaN block in band 1; and the paint queue with reads paused (hover stays synchronous,
@@ -20,6 +20,7 @@ async function setup(page: Page) {
   await openApp(page);
   await openRaster(page, fixture());
   await expect(message(page)).toHaveText("Raster opened.");
+  await paintMode(page);
   await jumpTo(page, lonLat(270, 150), 14);
   for (let i = 0; i < 2; i++) await page.click("#brush-larger"); // 31
   await expect(page.locator("#brush-size")).toHaveText("Brush: 31 px");
