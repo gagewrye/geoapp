@@ -1,6 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { initialClasses } from "../../../src/core/classes";
-import { emptyStore } from "../../../src/core/labelStore";
 import type { Affine, Grid } from "../../../src/core/types";
 import type { LabelSource } from "../../../src/io/labelFile";
 import { importLabels } from "../../../src/io/seeding";
@@ -46,7 +44,7 @@ function instrumented() {
 describe("a large mask (criterion 4)", () => {
   it("an 8192 x 8192 fully labelled mask imports with Replace, storing no tile, reading each window once, one read at a time", { timeout: 300_000 }, async () => {
     const io = instrumented();
-    const r = await importLabels(io.imagery, io.file, [{ value: 1, name: "one" }], { store: emptyStore(SIDE, SIDE), classes: initialClasses(), base: null }, "replace");
+    const r = await importLabels(io.imagery, io.file, [{ value: 1, name: "one" }]);
     if (typeof r === "string") throw new Error(r);
     expect(r.store.tiles.size).toBe(0);
     expect(r.store.base).toBe(true);
@@ -64,21 +62,17 @@ describe("a large mask (criterion 4)", () => {
   });
 });
 
-describe("Merge while a mask is loaded (spec 014 Rules)", () => {
-  it("changes nothing and reads nothing; Replace still works", { timeout: 60_000 }, async () => {
+describe("an import while a mask is loaded (spec 014 Rules, spec 017)", () => {
+  it("replaces the base and the classes", { timeout: 60_000 }, async () => {
     const g: Grid = { width: 600, height: 300, epsg: 32633, gt };
     const imagery = fakeSource({ ...g, bandCount: 1 }, () => 1);
     const file = fakeLabelSource(g, () => 4);
-    const first = await importLabels(imagery.source, file.source, [{ value: 4, name: "four" }], { store: emptyStore(600, 300), classes: initialClasses() }, "replace");
+    const first = await importLabels(imagery.source, file.source, [{ value: 4, name: "four" }]);
     if (typeof first === "string") throw new Error(first);
-    const reads = [imagery.reads.length, file.reads.length];
-    const classes = first.classes.map((c) => ({ ...c }));
-    expect(await importLabels(imagery.source, file.source, [{ value: 4, name: "four" }], first, "merge")).toBe("mask loaded");
-    expect([imagery.reads.length, file.reads.length]).toEqual(reads);
-    expect(first.classes).toEqual(classes);
-    const again = await importLabels(imagery.source, file.source, [{ value: 4, name: "again" }], first, "replace");
+    const again = await importLabels(imagery.source, file.source, [{ value: 4, name: "again" }]);
     if (typeof again === "string") throw new Error(again);
     expect(again.classes.map((c) => c.name)).toEqual(["again"]);
     expect(again.base).not.toBe(first.base);
+    expect(again.store.tiles.size).toBe(0);
   });
 });

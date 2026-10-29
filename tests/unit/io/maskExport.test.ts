@@ -1,8 +1,6 @@
 import { fromArrayBuffer } from "geotiff";
 import { describe, expect, it } from "vitest";
-import { initialClasses } from "../../../src/core/classes";
 import { tileWindows } from "../../../src/core/grid";
-import { emptyStore } from "../../../src/core/labelStore";
 import type { Affine, Grid } from "../../../src/core/types";
 import { exportLabels } from "../../../src/io/labelExport";
 import type { LabelSource } from "../../../src/io/labelFile";
@@ -28,7 +26,7 @@ async function setup() {
   const log: string[] = [];
   const imagery: RasterSource = { meta: img.source.meta, readWindow: (x0, y0, w, h) => { log.push(`i ${x0},${y0}`); return img.source.readWindow(x0, y0, w, h); } };
   const f: LabelSource = { ...file.source, read: (w) => { log.push(`f ${w.x0},${w.y0}`); return file.source.read(w); } };
-  const r = await importLabels(imagery, f, TABLE, { store: emptyStore(1000, 700), classes: initialClasses() }, "replace");
+  const r = await importLabels(imagery, f, TABLE);
   if (typeof r === "string") throw new Error(r);
   // edits: a changed copy of a base tile, a zeroed tile hiding the mask, and a tile where the mask is empty
   const ws = tileWindows(1000, 700);

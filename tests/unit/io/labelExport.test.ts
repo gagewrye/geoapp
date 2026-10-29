@@ -84,7 +84,7 @@ describe("Export labels (criteria 9 and 10)", () => {
     expect([px![10], px![11], px![12]]).toEqual([255, 1, 0]);
     const file = await openLabelTiff(await fromArrayBuffer(buf));
     expect(file.meta.nodata).toBe(0);
-    const r = await importLabels(source, file, importTable(file), { store: emptyStore(1000, 1000), classes: initialClasses() }, "replace");
+    const r = await importLabels(source, file, importTable(file));
     if (typeof r === "string") throw new Error(r);
     expect(r.classes).toEqual(classes);
     const back = await effectiveTiles(source, r); // spec 014: the file is the base

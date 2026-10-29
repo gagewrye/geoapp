@@ -14,7 +14,6 @@ export const MESSAGES = {
   replace: "Replace labels?",
   classTable: (field: string) => `The class table is invalid: ${field}.`,
   // spec 014
-  mergeMask: "Merge works only while no mask is loaded. Use Replace.",
   editLimit: "Label limit reached (256 edited tiles of 256 x 256 px). Undo strokes, or export the labels and import the export.",
   maskGone: "The label mask can't be read any more. Import it again.",
 } as const;
@@ -22,7 +21,6 @@ export const MESSAGES = {
 /** What a seeding run says (spec 004); null for a run dropped because another raster opened. */
 export function seedMessage(r: SeedOutcome): string | null {
   if (r === "stale") return null;
-  if (r === "mask loaded") return MESSAGES.mergeMask;
   if (r === "too many") return MESSAGES.tooMany;
   if (r === "empty") return MESSAGES.noSeed;
   return `Seeded ${r.pixels} pixels in ${r.classCount} classes.`;

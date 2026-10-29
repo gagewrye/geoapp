@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { initialClasses } from "../../../src/core/classes";
 import { tileWindows } from "../../../src/core/grid";
-import { emptyStore, MAX_LABEL_TILES, type LabelStore } from "../../../src/core/labelStore";
+import { MAX_LABEL_TILES, type LabelStore } from "../../../src/core/labelStore";
 import { footprint } from "../../../src/core/pixel";
 import type { Affine, Grid } from "../../../src/core/types";
 import { maskReadFailed } from "../../../src/io/labelFile";
@@ -26,7 +25,7 @@ async function setup(side = 1024) {
   const grid: Grid = { width: side, height: side, epsg: 32633, gt };
   const imagery = fakeSource({ ...grid, bandCount: 1 }, () => 1);
   const file = fakeLabelSource(grid, maskValue);
-  const r = await importLabels(imagery.source, file.source, TABLE, { store: emptyStore(side, side), classes: initialClasses() }, "replace");
+  const r = await importLabels(imagery.source, file.source, TABLE);
   if (typeof r === "string") throw new Error(r);
   const store: LabelStore = r.store;
   const history = new UndoHistory(() => store);

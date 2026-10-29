@@ -11,7 +11,7 @@ import type { RasterSource } from "../../../src/io/source";
 import { fakeLabelSource } from "../helpers/labelFiles";
 import { fakeSource } from "../helpers/sources";
 
-// Spec 004 criteria 14 (reads) and 16 (the cap in both modes, io).
+// Spec 004 criteria 14 (reads) and 16 (the cap, io; spec 014: imports no longer reach it).
 
 const IMAGERY: Grid = { width: 1000, height: 1000, epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01] };
 /** A generated 900 x 700 EPSG:32633 class raster at 600 m (4 x 3 file windows), inside IMAGERY: 1 on its north-west part, else 5. */
@@ -59,10 +59,9 @@ function gathered(w: Window, lut: Uint8Array): Uint8Array {
 describe("reads (criterion 14)", () => {
   it("the values pass reads no imagery and only aligned file windows holding a cell of the current imagery window, once each", { timeout: 60_000 }, async () => {
     const { imagery, file, log, maxInFlight } = instrumented();
-    // 254 classes plus the 2 the values give is "too many", so the run stops after the values pass
-    const list = Array.from({ length: 254 }, (_, i) => ({ name: `c${i}`, colour: "#000000" }));
-    expect(await importLabels(imagery, file, null, { store: emptyStore(1000, 1000), classes: list }, "merge")).toBe("too many");
     const want = seedWindows(IMAGERY, FILE).flatMap((w) => fileWindowsOf(w).map((fw) => `f ${key(fw)}`));
+    // stale once the values pass has read its windows, so the run stops before the labelling pass
+    expect(await importLabels(imagery, file, null, () => log.length >= want.length)).toBe("stale");
     expect(log).toEqual(want);
     expect(log.filter((e) => e.startsWith("i"))).toEqual([]);
     expect(maxInFlight()).toBe(1);
@@ -71,7 +70,7 @@ describe("reads (criterion 14)", () => {
   it("the labelling pass reads exactly the imagery windows whose gathered labels are non-zero, once each, after their file windows", { timeout: 60_000 }, async () => {
     const { imagery, file, log, maxInFlight } = instrumented();
     const table: ClassEntry[] = [{ value: 1, name: "one" }];
-    const r = await importLabels(imagery, file, table, { store: emptyStore(1000, 1000), classes: initialClasses() }, "replace");
+    const r = await importLabels(imagery, file, table);
     expect(typeof r).toBe("object");
     const lut = seedLut(table, [1]);
     const want: string[] = [];
@@ -97,19 +96,19 @@ describe("no label cap on imports (spec 014 supersedes criterion 16's io cap)", 
   const gt: Affine = [500000, 10, 0, 5000000, 0, -10];
   const grid: Grid = { width: 4352, height: 4352, epsg: 32633, gt };
 
-  for (const mode of ["merge", "replace"] as const) {
-    it(`imports as a base in ${mode} mode, leaving the current store and list unchanged`, { timeout: 120_000 }, async () => {
+  for (const mode of ["replace"] as const) {
+    it(`imports as a base (${mode}), leaving the current store and list unchanged`, { timeout: 120_000 }, async () => {
       const { source: imagery } = fakeSource({ ...grid, bandCount: 1 }, () => 1);
       const { source: file } = fakeLabelSource(grid, () => 1);
       const store = emptyStore(4352, 4352);
       const tile = new Uint8Array(65536).fill(2);
       store.tiles.set("256,256", tile);
       const classes = initialClasses();
-      const r = await importLabels(imagery, file, [{ value: 1, name: "new" }], { store, classes }, mode);
+      const r = await importLabels(imagery, file, [{ value: 1, name: "new" }]);
       if (typeof r === "string") throw new Error(r);
-      expect([...r.store.tiles.keys()]).toEqual(mode === "merge" ? ["256,256"] : []);
+      expect([...r.store.tiles.keys()]).toEqual([]);
       expect(r.base.count).toBe(4352 * 4352);
-      expect(r.pixels).toBe(4352 * 4352 - (mode === "merge" ? 65536 : 0));
+      expect(r.pixels).toBe(4352 * 4352);
       expect([...store.tiles.keys()]).toEqual(["256,256"]);
       expect(store.tiles.get("256,256")).toBe(tile);
       expect(tile.every((v) => v === 2)).toBe(true);

@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { MESSAGES, seedMessage } from "../../../src/ui/messages";
 
-// Spec 004 criterion 16: ui maps "too many" to its message, and spec 014 a Merge onto a loaded mask; the rest of the Merge or Replace messages.
+// Spec 004 criterion 16: ui maps "too many" to its message; the rest of the import messages.
 
 describe("seedMessage", () => {
   it("maps each outcome to the spec's message, and a stale run to none", () => {
-    expect(seedMessage("mask loaded")).toBe("Merge works only while no mask is loaded. Use Replace.");
     expect(seedMessage("too many")).toBe("Too many classes (max 255). Nothing was seeded.");
     expect(seedMessage("empty")).toBe("No labels to seed here.");
     expect(seedMessage("stale")).toBeNull();

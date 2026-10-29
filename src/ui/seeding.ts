@@ -1,7 +1,7 @@
 import { ClassTableError } from "../core/classTable";
 import { checkLabelExport, exportLabels } from "../io/labelExport";
 import { LabelFileRefused, maskReadFailed, openLabelFile, type LabelSource } from "../io/labelFile";
-import { importLabels, importTable, type SeedMode, type SeedOutcome } from "../io/seeding";
+import { importLabels, importTable, type SeedOutcome } from "../io/seeding";
 import { openSink } from "../io/sink";
 import type { RasterSource } from "../io/source";
 import type { initLabels } from "./labels";
@@ -41,12 +41,8 @@ export function initSeeding({ labels, imagery, say, error, opened }: Deps) {
     mode.disabled = !labels.hasLabels() || busy;
   }
 
-  /** Merge or Replace; null when the user cancels Replace's confirm. Without labels it replaces with no confirm. */
-  function chosenMode(): SeedMode | null {
-    if (!labels.hasLabels()) return "replace";
-    if (mode.value === "merge") return "merge";
-    return confirm(MESSAGES.replace) ? "replace" : null;
-  }
+  /** Every import replaces (spec 017): true unless labels exist and the user cancels the confirm. */
+  const replaceConfirmed = () => !labels.hasLabels() || confirm(MESSAGES.replace);
 
   async function start(task: (s: RasterSource, stale: () => boolean) => Promise<SeedOutcome>): Promise<void> {
     const s = imagery()!;
@@ -75,15 +71,14 @@ export function initSeeding({ labels, imagery, say, error, opened }: Deps) {
     const tif = importInput.files?.[0], json = classMap.files?.[0];
     importInput.value = "";
     if (!tif || importInput.disabled || !imagery()) return;
-    const m = chosenMode();
-    if (!m) return;
+    if (!replaceConfirmed()) return;
     classMap.value = ""; // a class map applies to one import
     void start(async (s, stale) => {
       const text = json ? await json.text() : undefined;
       const file = await openLabelFile(tif);
       if (stale()) return "stale";
       opened(file);
-      return importLabels(s, file, importTable(file, text), labels.current(), m, stale);
+      return importLabels(s, file, importTable(file, text), stale);
     });
   });
 

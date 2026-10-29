@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { fromArrayBuffer } from "geotiff";
-import { initialClasses, paletteColour } from "../../../src/core/classes";
+import { paletteColour } from "../../../src/core/classes";
 import { ClassTableError, type ClassEntry } from "../../../src/core/classTable";
 import { tileWindows, type Window } from "../../../src/core/grid";
-import { emptyStore } from "../../../src/core/labelStore";
 import { seedLut, sourceCells } from "../../../src/core/seed";
 import type { Affine, Grid } from "../../../src/core/types";
 import { LabelFileRefused, openLabelTiff, type LabelSource } from "../../../src/io/labelFile";
@@ -23,7 +22,6 @@ const inNan = (c: number, r: number) => c >= 600 && c < 640 && r >= 500 && r < 5
 const value = (b: number, c: number, r: number) => (b === 1 && inNodata(c, r) ? -9999 : b === 2 && inNan(c, r) ? NaN : b === 0 ? c % 200 : b === 1 ? r % 100 : 150);
 const imagery = () => fakeSource({ ...IMAGERY, nodata: -9999 }, value);
 const open = async (buf: ArrayBuffer) => openLabelTiff(await fromArrayBuffer(buf));
-const fresh = () => ({ store: emptyStore(1000, 1000), classes: initialClasses() });
 const ok = (r: SeedOutcome) => { if (typeof r === "string") throw new Error(r); return r; };
 /** The effective tile (spec 014: stored, else the mask's, else zeros), as `tile(key)` gives it. */
 const at = (r: Exclude<SeedOutcome, string>, w: Window) => effectiveTile(imagery().source, r.store, r.base, w);
@@ -68,7 +66,7 @@ describe("classes (criterion 12, io)", () => {
     const file = await open(await classItemFile());
     expect(file.meta.nodata).toBe(0);
     expect(importTable(file)).toEqual(ITEM_CLASSES.map((c, i) => ({ value: i + 1, ...c })));
-    const r = ok(await importLabels(imagery().source, file, importTable(file), fresh(), "replace"));
+    const r = ok(await importLabels(imagery().source, file, importTable(file)));
     expect(r.classes).toEqual(ITEM_CLASSES);
   });
 
@@ -76,7 +74,7 @@ describe("classes (criterion 12, io)", () => {
     const file = await open(classFile("255"));
     const table = importTable(file, JSON.stringify(CLASS_MAP))!;
     expect(table).toEqual(CLASS_MAP);
-    const r = ok(await importLabels(imagery().source, file, table, fresh(), "replace"));
+    const r = ok(await importLabels(imagery().source, file, table));
     expect(r.classes).toEqual([{ name: "Seven", colour: "#123456" }, { name: "Three", colour: paletteColour(1) }]);
     const lut = seedLut(table, [1, 2]); // 0 and 255 unlisted
     for (const w of tileWindows(1000, 1000)) expect(Buffer.from(await at(r, w)).equals(Buffer.from(expected(w, lut))), `${w.x0},${w.y0}`).toBe(true);
@@ -85,9 +83,9 @@ describe("classes (criterion 12, io)", () => {
 
   it("from values gives Class 0, 3, 7, and without GDAL_NODATA 255 becomes a class too", { timeout: 30_000 }, async () => {
     expect(importTable(await open(classFile("255")))).toBeNull();
-    const a = ok(await importLabels(imagery().source, await open(classFile("255")), null, fresh(), "replace"));
+    const a = ok(await importLabels(imagery().source, await open(classFile("255")), null));
     expect(a.classes.map((c) => c.name)).toEqual(["Class 0", "Class 3", "Class 7"]);
-    const b = ok(await importLabels(imagery().source, await open(classFile(null)), null, fresh(), "replace"));
+    const b = ok(await importLabels(imagery().source, await open(classFile(null)), null));
     expect(b.classes.map((c) => c.name)).toEqual(["Class 0", "Class 3", "Class 7", "Class 255"]);
     expect(b.classes.map((c) => c.colour)).toEqual([0, 1, 2, 3].map(paletteColour));
   });
@@ -106,7 +104,7 @@ describe("resampling and mask (criterion 13, io brute force; spec 014 criterion 
 
   for (const nd of ["255", null]) {
     it(`each imported pixel is 0 on imagery nodata or NaN, else seedLut of the file value at its sourceCells (GDAL_NODATA ${nd ?? "unset"})`, { timeout: 60_000 }, async () => {
-      const r = ok(await importLabels(imagery().source, await open(classFile(nd)), null, fresh(), "replace"));
+      const r = ok(await importLabels(imagery().source, await open(classFile(nd)), null));
       const lut = seedLut(nd ? entries.slice(0, 3) : entries, [1, 2, 3, 4]);
       let labelled = 0;
       for (const w of tileWindows(1000, 1000)) {
@@ -130,6 +128,6 @@ describe("stale runs (spec 003's rule for replaced rasters)", () => {
   it("stops and returns \"stale\" once another raster opened", async () => {
     let calls = 0;
     const file: LabelSource = await open(classFile("255"));
-    expect(await importLabels(imagery().source, file, null, fresh(), "replace", () => ++calls > 2)).toBe("stale");
+    expect(await importLabels(imagery().source, file, null, () => ++calls > 2)).toBe("stale");
   });
 });
