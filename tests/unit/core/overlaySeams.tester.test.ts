@@ -59,10 +59,10 @@ describe("spec 011 on whole rasters with partial edge tiles (tester)", () => {
     it.skipIf(g.width < 5)(`partition: exactly one overlay covers each interior point, ${name}`, () => {
       const ovs = overlays(g);
       const rand = rng(7);
-      const m = Math.min(2, (g.width - 1) / 2);
+      const m = 2; // pixels in from the raster's edge
       const bad: string[] = [];
       for (let i = 0; i < 5000; i++) {
-        const c = g.width < 5 ? 0.25 + rand() * 0.5 : m + rand() * (g.width - 2 * m), r = g.height < 5 ? 0.25 + rand() * 0.5 : m + rand() * (g.height - 2 * m);
+        const c = m + rand() * (g.width - 2 * m), r = m + rand() * (g.height - 2 * m);
         const [lon, lat] = toLonLat(g.epsg, ...applyAffine(g.gt, c, r));
         const n = ovs.filter((o) => covers(o, lon, lat)).length;
         if (n !== 1) bad.push(`(${c.toFixed(2)}, ${r.toFixed(2)}): ${n}`);
