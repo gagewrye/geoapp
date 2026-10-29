@@ -2,7 +2,7 @@ import type { CanvasSource, Map as MapLibreMap } from "maplibre-gl";
 import { tileWindow } from "../core/labelStore";
 import { overlayGrid, overlayIndex, paintOverlay, type OverlayGrid } from "../core/overlay";
 import type { Grid } from "../core/types";
-import { beforeSlot, LABEL_OPACITY } from "./layers";
+import { beforeSlot, labelViewProps } from "./layers";
 
 type Corners = [[number, number], [number, number], [number, number], [number, number]];
 type Overlay = { id: string; canvas: HTMLCanvasElement; index: Uint16Array; valid: Uint8Array; corners: Corners };
@@ -60,8 +60,9 @@ export class LabelOverlays {
   private add(key: string, o: Overlay): void {
     this.overlays.set(key, o);
     this.map.addSource(o.id, { type: "canvas", canvas: o.canvas, coordinates: o.corners, animate: false });
+    const view = labelViewProps(this.map); // spec 016: Opacity and Show labels
     this.map.addLayer({ id: o.id, type: "raster", source: o.id,
-      paint: { "raster-opacity": LABEL_OPACITY, "raster-fade-duration": 0, "raster-resampling": "nearest" } }, beforeSlot(this.map, "label-"));
+      paint: { ...view.paint, "raster-fade-duration": 0, "raster-resampling": "nearest" }, layout: view.layout }, beforeSlot(this.map, "label-"));
   }
 
   private remove(key: string, id: string): void {
