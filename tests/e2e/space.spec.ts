@@ -1,13 +1,13 @@
 import { expect, test, type Page } from "@playwright/test";
-import { hideSky, jumpTo, openApp, pixelAt, type Xy } from "./helpers";
+import { jumpTo, openApp, pixelAt, type Xy } from "./helpers";
 
-// Spec 015: CSS stars behind the map canvas; in Mercator the sky changes nothing.
+// Spec 015: CSS stars behind the map canvas; in Mercator the opaque map hides them.
 
 const SIDE = 120;
 
-/** RGBA of a SIDE x SIDE page screenshot region with top-left `at`, decoded in the page. */
-async function shot(page: Page, at: Xy): Promise<Uint8ClampedArray> {
-  const png = await page.screenshot({ clip: { x: at.x, y: at.y, width: SIDE, height: SIDE } });
+/** RGBA of a side x side page screenshot region with top-left `at`, decoded in the page. */
+async function shot(page: Page, at: Xy, side = SIDE): Promise<Uint8ClampedArray> {
+  const png = await page.screenshot({ clip: { x: at.x, y: at.y, width: side, height: side } });
   const data = await page.evaluate(async (b64) => {
     const img = new Image();
     img.src = `data:image/png;base64,${b64}`;
@@ -47,18 +47,17 @@ test("stars: off the globe the bottom-left corner is dark with bright points; th
 });
 
 for (const zoom of [12, 14]) {
-  test(`Mercator at zoom ${zoom}: the sky changes no pixel and the map is opaque (criterion 4)`, async ({ page }) => {
+  test(`Mercator at zoom ${zoom}: the map is opaque and the page shows its pixels, not stars (criterion 3)`, async ({ page }) => {
     await openApp(page);
     await jumpTo(page, [10, 45], zoom);
     const box = await mapBox(page);
-    const pts: Xy[] = [[0.5, 0.5], [0.1, 0.1], [0.9, 0.1], [0.1, 0.9], [0.9, 0.9]].map(([fx, fy]) => ({ x: box.x + box.width * fx!, y: box.y + box.height * fy! }));
-    const withSky: number[][] = [];
-    for (const p of pts) withSky.push(await pixelAt(page, p));
-    await hideSky(page);
-    for (const [i, p] of pts.entries()) {
-      const bare = await pixelAt(page, p);
-      expect(bare.every((v, k) => Math.abs(v - withSky[i]![k]!) <= 1), `${JSON.stringify(p)}: ${withSky[i]} vs ${bare}`).toBe(true);
-      expect([withSky[i]![3], bare[3]]).toEqual([255, 255]);
+    const pts: Xy[] = [[0.5, 0.5], [0.1, 0.1], [0.9, 0.1], [0.1, 0.9], [0.9, 0.9]]
+      .map(([fx, fy]) => ({ x: Math.round(box.x + box.width * fx!), y: Math.round(box.y + box.height * fy!) }));
+    for (const p of pts) {
+      const gl = await pixelAt(page, p);
+      expect(gl[3], JSON.stringify(p)).toBe(255);
+      const seen = Array.from((await shot(page, p, 1)).slice(0, 3));
+      expect(seen.every((v, k) => Math.abs(v - gl[k]!) <= 2), `${JSON.stringify(p)}: page ${seen} vs canvas ${gl}`).toBe(true);
     }
   });
 }
