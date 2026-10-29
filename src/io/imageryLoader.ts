@@ -6,7 +6,7 @@ import type { ImagerySource } from "./source";
 /** Where drawn tiles go: `use` says whether a tile is already drawn, marking it recently used. */
 export type TileSink = {
   use(key: string): boolean;
-  draw(key: string, level: Level, tile: Window, rgba: Uint8ClampedArray): void;
+  draw(key: string, level: Level, tile: Window, rgba: Uint8ClampedArray<ArrayBuffer>): void;
 };
 
 /** A tile's key: its level's step and its corner in the level grid. */
