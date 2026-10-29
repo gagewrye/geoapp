@@ -18,7 +18,11 @@ const labelLayers = (page: Page) => page.evaluate(() => {
   const { map } = (window as any).__geoapp;
   const out: Record<string, [number, string]> = {};
   for (const { id } of map.getStyle().layers as { id: string }[]) {
-    if (id.startsWith("label-") || id === "mask") out[id] = [map.getPaintProperty(id, "raster-opacity"), map.getLayoutProperty(id, "visibility") ?? "visible"];
+    if (!id.startsWith("label-") && id !== "mask") continue;
+    // a tile's quads (label-${key}-${i}, spec 018) report as one entry, or as "mixed" if they disagree
+    const k = id.replace(/^(label-[^-]+)-\d+$/, "$1");
+    const v: [number, string] = [map.getPaintProperty(id, "raster-opacity"), map.getLayoutProperty(id, "visibility") ?? "visible"];
+    out[k] = k in out && JSON.stringify(out[k]) !== JSON.stringify(v) ? [NaN, "mixed"] : v;
   }
   return out;
 });

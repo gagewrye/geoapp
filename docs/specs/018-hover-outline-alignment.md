@@ -1,56 +1,55 @@
-# 018: The hover outline matches the pixels a dab paints
+# 018: Painted labels land exactly on the outlined pixels
 
-**Goal:** The brush footprint outline covers exactly the overlay cells that a click there colours, at any display scale.
+**Goal:** The colour a dab paints covers exactly the raster pixels the hover outline marks, in any CRS, at any zoom and display scale.
 
-**Status:** Approved (Gage, 2026-10-29: "yes to all. unsure about projection."). The defect, in his words: "The pixel selector visual is also slightly misaligned with the map. It shows as shifted down and right relative to the pixel it will color." He then added: "Just the outline is off. It still marks where the cursor is at." His Windows display scale is 125% (devicePixelRatio 1.25). **ADRs:** none. Amends spec 003 Hover.
+**Status:** Approved (Gage, 2026-10-29: "yes approve both"), with ADR 0019 (Accepted; supersedes ADR 0016). This is the third revision. The earlier ones, an outline snapped to the overlay cells (`footprintCells`) and a cursor-hotspot fix, were never merged and are dropped. Amends spec 003 Display and criterion 6, and spec 011: criteria 1-5 lapse and criterion 6 holds. Written against main 768e958.
 
-**Decided (Gage, 2026-10-29):**
-- The gap is at most about half a raster pixel and grows as you zoom in, which matches the cause below.
-- The fix snaps the outline to the cells that will be painted. Two options were rejected:
-  - halving the overlay cells (about 4x the overlay memory);
-  - a custom WebGL layer (a new ADR, and it would replace spec 011's grid).
-- The imagery CRS is unknown, so the fix must handle both cases:
-  - **Axis-aligned grids** (EPSG:4326, 3857): the outline is a rectangle.
-  - **Rotated grids** (UTM): the outline is stepped.
+**What Gage reported** (testing main, display scale 125%):
+- "The highlight is under the pointer and correct. When it paints it is off. Its weird, the direction of the offset seems to change based on the area selected."
+- The offset is about one or two image pixels, the same at every zoom, and the pre-009 build (90f8f00) has it too.
+- His answer to the deciding test: with brush size 1, the colour spills partly outside the outline's square.
 
-The implementer still runs criterion 1 first and reports the measured offsets.
-
-## Cause (found by reading the code, maplibre-gl 6.16.0; consistent with Gage's description)
-- **The outline is exact.** `footprintRing` traces the outer pixel edges of the same `footprint` window that `brush` paints. The pointer maps to its cell in CSS pixels through the canvas rect, as `unproject` does.
-- **The painted colour is not exact.** Spec 011 draws each label on a shared Mercator cell grid:
-  - Each cell is `OVERLAY_MARGIN` 0.98 of the finest pixel, with edges at multiples of the cell size from Mercator (0, 0).
-  - Each cell shows the pixel that holds its centre (`core/overlay.ts` `overlayIndex`).
-  - So each painted edge sits up to half a cell (about 0.49 px) from the true pixel edge.
-  - The cell pitch differs from the pixel pitch by 2%, so the error drifts only slowly, over about 50 px. Locally it is one consistent shift: the colour lands up-left of the outline, so the outline looks shifted down and right.
-  - The store and exports are exact; only the display is off.
-- **Display scale is not the cause.**
-  - Nothing in `src/` rounds to device pixels.
-  - MapLibre's `_resizeCanvas` makes the canvas `round(dpr·w)` device px, with a CSS size within 0.4 px of the container.
-  - So the same offset should show at 100%. Criterion 4 checks this at 1, 1.25 and 1.5.
-- **Test helper bug.** The spec 015 clue, a reading one row above the screenshot pixel, comes from `tests/e2e/helpers.ts` `pixelAt` and from `label-seams.spec.ts`. They read GL row `round(canvas.height − y·sy)`, where the right row is `canvas.height − 1 − floor(y·sy)`. That bug is test-only, but criterion 4 needs it fixed.
+## Cause (traced in the code)
+- **The cells written are exact.** The hover and the paint both use `cellAt`, then `footprint(grid, col, row, side)` (`map/brush.ts`). Sizes are odd and the centre pixel is floored, the paint queue applies the same window, and `brush` writes exactly its pixels. The outline, `footprintRing` of that window, is at the true pixel edges.
+- **Where they are drawn is not.** Main (spec 011, ADR 0016) resamples each stored tile onto Mercator cells 0.98 of the finest pixel wide, and each cell shows the pixel holding its centre (`core/overlay.ts` `overlayIndex`).
+  - So each painted edge sits up to half a cell from the true edge. The direction of that error drifts with position, through the 2% pitch mismatch, the k steps and the steps on rotated grids.
+  - Spec 003's per-tile grid, as built in 90f8f00, had the same flaw with coarser cells: 1/cos φ px wide on EPSG:4326 (2 px at 60°), and (cos θ + sin θ) px on rotated grids.
 
 ## Interfaces (`core/`)
 ```ts
-footprintCells(w: Window, grid: Grid, og: OverlayGrid): [number, number][][]
-  // lon/lat rings, one per tile w meets: the outer boundary of the overlay cells (that tile's k)
-  // whose centre lies in w; rectilinear in Mercator; a rectangle on axis-aligned grids
+type Quad = { window: Window; corners: [number, number][] } // lon/lat of the window's pixel-grid corners TL, TR, BR, BL
+tileQuads(grid: Grid, w: Window, maxErr: number): Quad[]
+  // splits w into 2^b x 2^c bands (fewest first) so that bilinear interpolation of each band's corners, in
+  // Mercator, puts every pixel corner within maxErr x that pixel's width of its true position; row-major
+paintLabels(labels: Uint8Array, colours: string[], rgba: Uint8ClampedArray): void // one texel per pixel; 0 transparent
 ```
+Removed from main: `overlayGrid`, `overlayIndex`, `paintOverlay`, `pixelWidths`, `OVERLAY_SAMPLE` and `OVERLAY_MARGIN`, and the open-time `overlayGrid` call in `map/labelOverlay.ts`.
 
 **Rules.**
-- **Hover** shows `footprintCells` of the clipped footprint as one MultiPolygon feature, with the same fill, line and colour as before, in place of `footprintRing`.
-  - It still reads nothing, and it shows and hides exactly as spec 003 Hover says.
-  - On an axis-aligned grid each ring is a rectangle. On a rotated grid it is the stepped boundary of the cells, not the rotated square, because the cells are what gets painted.
-  - Spec 011's extra seam cells, which a coarser tile paints in a finer neighbour, are not outlined. At such seams the outline can differ from the painted colour by up to one coarse cell, which is accepted.
-- **Cost.** About (side + 2)² projections per update: an estimated 8 ms at 127 px, from spec 011's 0.4 s per 845k projections. This is fine at pointer-move rates.
-- **Helper.** `pixelAt` and the seams test read column `floor((x − left)·sx)` and row `canvas.height − 1 − floor((y − top)·sy)`. Existing pixel tests must still pass.
+- **Display.** `LabelOverlays` draws each stored tile as `tileQuads(grid, w, 0.05)`.
+  - Each quad is a canvas of its window's pixels, painted by `paintLabels`.
+  - It is a canvas source with the quad's corners and `setWarp('flat')` (maplibre-gl 6.16.0), raster layer with nearest resampling, `LABEL_OPACITY`, and the slot `label-`.
+  - Layer ids are `label-${key}` for a single quad, else `label-${key}-${i}`. Spec 016's view applies to every `label-` layer, so it covers these too.
+  - Spec 014's mask layer and its hidden cells are unchanged.
+- **Hover** stays `footprintRing`, as on main. Its GeoJSON source gains `maxzoom: 24` and `tolerance: 0`, so overzoomed tiles neither round nor simplify the ring.
+- **Seams.** Neighbouring quads share corner positions, so they meet without gaps or overlap. Only MapLibre's per-source corner rounding is left (the hairlines ADR 0016 accepted).
+- **Test helper.** `pixelAt` in `tests/e2e/helpers.ts` and the seams test read column `floor((x − left)·sx)` and row `canvas.height − 1 − floor((y − top)·sy)`. Main reads one row high.
 
 ## Acceptance criteria
-1. Diagnosis (unit, run first; its numbers go in the implementer's report): on spec 011's synthetic EPSG:4326 and EPSG:32633 grids, over every pixel of a 2x2-tile block, measure the largest distance between a pixel's true Mercator edges and the edges of its centre-owned cells. It is at least 0.3 px somewhere, and at most 0.5 cell everywhere.
-2. `footprintCells` (unit, brute force on the same grids, sizes 1, 7 and 127, including a footprint across a tile corner): a cell centre lies inside a returned ring exactly when it is a cell whose centre lies in w. On an EPSG:3857 grid each ring is the rectangle of those cells. On the EPSG:32633 grid, every ring edge is horizontal or vertical in Mercator, and at size 127 a ring has more than 4 corners (it steps).
-3. Hover feature (e2e): the hover source's geometry equals `footprintCells` at `pixelAt` of the pointer, within 1e-9°. Spec 003 criterion 9's show and hide cases still hold.
-4. Regression (e2e, Playwright `deviceScaleFactor` 1, 1.25 and 1.5; EPSG:4326 fixture and spec 011's UTM GeoTIFF; zoom where a raster pixel is about 8 CSS px; basemap hidden; sizes 1 and 7):
-   - The test picks a pointer pixel where criterion 1's offset is at least 0.3 px in both axes.
-   - It finds the hover fill's extent along a row and a column through the pointer, by comparing with the same render without hover. Then it clicks, moves the pointer off the map, and finds the painted extent the same way.
-   - All four edges agree within 1 device px.
-   - On the pre-fix code, this fails at 1.25.
-5. Helper (e2e, `deviceScaleFactor` 1.25): `pixelAt` at a point equals the page screenshot's pixel there within 2 per channel (spec 015 criterion 3's check), with no row offset.
+1. `tileQuads` (unit, brute force over every pixel corner): the bilinear error is at most 0.05 px on each of these grids:
+   - spec 011's fixtures (EPSG:32633, the synthetic UTM grid at 60°N, 4326 at 45°N, 0.01° 4326 from 60°N to 85°N, and gt with rotation and shear);
+   - an EPSG:3857 grid.
+
+   The 32633 and 45°N tiles each give one quad. Quads tile the window exactly, and a quad's corners equal `footprintRing`'s corners of its window, within 1e-9°.
+2. `paintLabels` (unit): a labelled pixel gets its class colour at alpha 255, and 0 gets alpha 0, texel for texel.
+3. **Regression** (e2e; it must fail on main):
+   - Setup: `deviceScaleFactor` 1.25; basemap hidden; zoom where a pixel is about 16 CSS px.
+   - Rasters, all generated: an EPSG:32633 GeoTIFF placed 3° off its central meridian, an EPSG:4326 one at 45°N and one at 60°N.
+   - Placement: dabs of sizes 1 and 7 at 40 positions per raster. At least 10 of them are where main's `overlayIndex` puts a painted edge 0.3 px or more from the true pixel edge.
+   - After each dab, with the pointer off the map, check sample points every 2 device px over the outline's bounds plus 8 px:
+     - points at least 1.5 device px inside the projected `footprintRing` show the class colour;
+     - points at least 1.5 device px outside it, in unpainted space, show none.
+   - Where practical, the tester also runs it, adapted to the old hooks, on 90f8f00, where it is expected to fail on the 4326 rasters.
+4. Seams (e2e): spec 011 criterion 6 passes, with at most 2% of seam samples off.
+5. Layers (e2e): on the 32633 and 45°N rasters, each stored tile adds exactly one `label-` layer, and spec 013 criterion 5's layer order holds.
+6. Existing (e2e): spec 003 criteria 9 and 10, spec 010 criterion 3 and spec 014 criteria 6, 7 and 11 pass. Spec 003 criterion 6 is met by criteria 1 and 2 here.

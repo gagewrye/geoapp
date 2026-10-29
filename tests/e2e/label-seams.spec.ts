@@ -21,7 +21,7 @@ function pixelsAt(page: Page, pts: Xy[]): Promise<number[][]> {
         const gl = (canvas.getContext("webgl2") ?? canvas.getContext("webgl")) as WebGLRenderingContext;
         resolve(pts.map((p) => {
           const px = new Uint8Array(4);
-          gl.readPixels(Math.round((p.x - r.left) * sx), Math.round(canvas.height - (p.y - r.top) * sy), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+          gl.readPixels(Math.floor((p.x - r.left) * sx), canvas.height - 1 - Math.floor((p.y - r.top) * sy), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
           return Array.from(px);
         }));
       });

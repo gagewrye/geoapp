@@ -1,6 +1,6 @@
 # 0016: Label overlays of one raster share one Mercator pixel grid, sized to the finest pixel
 
-**Status:** Accepted (Gage, 2026-10-27, with spec 011); kept 2026-10-28 with its residual hairlines ("keep the grid as is with no gpu layer for now"); pitch rule replaced 2026-10-28 ("we need labelling precision, even if there is overlap. slow opening is fine"; "your recommendations are good"). Amends ADR 0010 (overlay resolution, index type, memory).
+**Status:** Accepted (Gage, 2026-10-27, with spec 011); kept 2026-10-28 with its residual hairlines ("keep the grid as is with no gpu layer for now"); pitch rule replaced 2026-10-28 ("we need labelling precision, even if there is overlap. slow opening is fine"; "your recommendations are good"). Amends ADR 0010 (overlay resolution, index type, memory). Superseded by ADR 0019 (2026-10-29).
 
 **Context:** ADR 0010 gives each label tile its own canvas, sampled on a Mercator grid fitted to that tile, so on grids rotated against Mercator neighbouring grids are offset and seams get gaps and double-opacity strips (spec 011). One grid for the raster (pixel edges at multiples of a pitch from Mercator (0, 0), each cell painted by the tile holding its centre) fixes this. Two pitch rules sized it to the largest tile, first the corner tiles, then all tiles, and both were rejected. The corner rule broke its 258 px bound (270 px on a middle row; about 910 px at ±`MAX_LAT`). The all-tiles rule draws tiles coarser than their raster pixels, losing labelling precision.
 

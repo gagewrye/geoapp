@@ -90,7 +90,7 @@ export async function pixelAt(page: Page, p: Xy): Promise<number[]> {
       map.once("render", () => {
         const gl = (canvas.getContext("webgl2") ?? canvas.getContext("webgl")) as WebGLRenderingContext;
         const px = new Uint8Array(4);
-        gl.readPixels(Math.round((p.x - r.left) * sx), Math.round(canvas.height - (p.y - r.top) * sy), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+        gl.readPixels(Math.floor((p.x - r.left) * sx), canvas.height - 1 - Math.floor((p.y - r.top) * sy), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
         resolve(Array.from(px));
       });
       map.triggerRepaint();

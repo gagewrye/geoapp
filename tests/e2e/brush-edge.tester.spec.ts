@@ -62,7 +62,9 @@ test.describe("raster edges and partial tiles (tester)", () => {
     for (let r = 196; r < 260; r++) for (let c = 236; c < 300; c++) want.add(`${c},${r}`);
     expect(got).toEqual(want);
     expect(await tileKeysStored(page)).toEqual(["0,0", "0,256", "256,0", "256,256"]);
-    await expect.poll(async () => (await labelLayers(page)).filter((id) => id.startsWith("label-")).length).toBe(4);
+    // a tile is one or more quads, label-${key} or label-${key}-${i} (spec 018)
+    const tilesDrawn = async () => new Set((await labelLayers(page)).filter((id) => id.startsWith("label-")).map((id) => id.split("-")[1])).size;
+    await expect.poll(tilesDrawn).toBe(4);
     const ids = await labelLayers(page);
     const pos = (pred: (id: string) => boolean) => ids.findIndex(pred);
     const labelIdx = ids.map((id, i) => (id.startsWith("label-") ? i : -1)).filter((i) => i >= 0);
