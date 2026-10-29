@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { AEF_BANDS } from "../../../src/core/aef";
 import type { CacheStore } from "../../../src/io/aefCache";
 import { fakeOpfs } from "../helpers/fakeOpfs";
@@ -35,6 +35,8 @@ function origin() {
 }
 
 const busy = (m: CacheModule) => (e: unknown) => expect(e).toBeInstanceOf(m.CacheBusyError);
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe("F10 lock: three tabs, races, replacements and failures (tester)", () => {
   it("three tabs: only the holder has the folder; it passes to whichever tab asks after the holder lets go", async () => {
@@ -140,8 +142,9 @@ describe("F10 lock: three tabs, races, replacements and failures (tester)", () =
   it("with no Web Locks at all, an open fails with an error (not busy), frees the folder in this tab, and deletes nothing", async () => {
     const o = origin();
     const a = await tab();
+    // Node 24 has navigator.locks; take it away so this is a browser without Web Locks
+    vi.stubGlobal("navigator", {});
     const e = await a.opfsStore("aef-cache", o.handle, { locks: undefined as unknown as LockManager }).then(() => null, (x: unknown) => x);
-    // in Node 22, navigator.locks is absent, as in a browser without Web Locks
     expect((globalThis.navigator as { locks?: unknown } | undefined)?.locks).toBeUndefined();
     expect(e).toBeInstanceOf(Error);
     expect(e).not.toBeInstanceOf(a.CacheBusyError);

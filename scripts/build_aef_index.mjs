@@ -4,7 +4,7 @@
 // Writes {out}/years.json, {out}/{year}/{epsg}.json (AefEntry[], spec 002) and {out}/NOTICE.
 // The CSV is ~800 MB, so it is streamed line by line.
 import { createReadStream } from "node:fs";
-import { mkdir, mkdtemp, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { Readable } from "node:stream";
@@ -130,6 +130,10 @@ async function swapIn(tmp, out) {
       }
     }
     for (const name of await readdir(tmp)) {
+      // POSIX refuses to rename a dir onto a file, but Windows replaces it: check, or a user's file is lost.
+      if (await lstat(join(out, name)).then(() => true, (e) => e.code !== "ENOENT" && Promise.reject(e))) {
+        throw new Error(`${join(out, name)} exists and is not part of the index; move it and run again`);
+      }
       await rename(join(tmp, name), join(out, name));
       movedIn.push(name);
     }
