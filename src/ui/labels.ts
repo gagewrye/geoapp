@@ -59,7 +59,8 @@ export function initLabels({ map, say, onBusy, onChange, onPaint, panning }: Dep
     panning,
   });
 
-  const canUndo = () => history.size > 0 && !brush.stroking() && (queue?.size ?? 0) === 0;
+  // locked: an export must write the tiles as they were at its click, and a seed builds on the store it started from
+  const canUndo = () => history.size > 0 && !locked && !brush.stroking() && (queue?.size ?? 0) === 0;
   const syncUndo = () => { undoButton.disabled = !canUndo(); };
 
   // A redraw walks a whole tile, so tiles changed by many cells are redrawn once per frame.
@@ -84,6 +85,7 @@ export function initLabels({ map, say, onBusy, onChange, onPaint, panning }: Dep
     if (keys) {
       keepMasks(store, queue!.masks, null);
       redraw(keys);
+      onChange(); // Seed mode, Import, Seed and Export follow the store (spec 004)
     }
     syncUndo();
   };
@@ -171,6 +173,7 @@ export function initLabels({ map, say, onBusy, onChange, onPaint, panning }: Dep
     locked = on;
     brush.setLocked(on);
     render();
+    syncUndo();
   }
 
   return {
@@ -202,6 +205,7 @@ export function initLabels({ map, say, onBusy, onChange, onPaint, panning }: Dep
     replace(next: LabelStore, list: LabelClass[]): void {
       const keys = new Set([...store.tiles.keys(), ...next.tiles.keys()]);
       store = next;
+      clearHistory(); // a seed isn't undoable, and strokes recorded against the old store can't be undone over it
       classes.splice(0, classes.length, ...list);
       if (selected >= classes.length) selected = 0;
       // the queue is empty (seeding waits for it), so no footprint is pending (spec 003 Storage)
