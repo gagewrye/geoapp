@@ -30,6 +30,9 @@ test("selecting class 2 by key during a lock keeps not-allowed; when the lock en
   expect(await cursorAt(page, p)).toBe("not-allowed");
   await openFileGate(page);
   await expect(message(page)).toHaveText(seeded);
+  expect(await cursorAt(page, p)).not.toBe("not-allowed");
+  await page.click("#mode-paint"); // an import selects Pan (spec 016)
+  await page.mouse.move(p.x, p.y);
   const cur = await cursorAt(page, p);
   expect(cur.startsWith('url("data:image/svg+xml')).toBe(true);
   expect(decodeURIComponent(cur).toLowerCase()).toContain((await colourOf(page, 1)).toLowerCase());
@@ -47,5 +50,8 @@ test("with Space held when the lock ends, neither not-allowed nor the brush show
   expect(held).not.toBe("not-allowed");
   expect(held.startsWith("url(")).toBe(false);
   await page.keyboard.up("Space");
+  expect((await cursorAt(page, p)).startsWith("url(")).toBe(false); // the import selected Pan (spec 016)
+  await page.click("#mode-paint");
+  await page.mouse.move(p.x, p.y);
   expect((await cursorAt(page, p)).startsWith('url("data:image/svg+xml')).toBe(true);
 });

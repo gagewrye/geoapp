@@ -62,7 +62,8 @@ test("a run whose raster stays because Discard labels? was cancelled still appli
   await paintTwoClasses(page);
   const painted = await labels(page);
   await pauseLabelFile(page);
-  await importFile(page, upload("classes.tif", classFile("255"))); // Merge: no confirm
+  page.once("dialog", (d) => void d.accept()); // "Replace labels?": every import replaces (spec 017)
+  await importFile(page, upload("classes.tif", classFile("255")));
   await expect.poll(() => page.evaluate(() => (window as any).__fileGate.reads)).toBe(1);
   const asked: string[] = [];
   page.once("dialog", (d) => { asked.push(d.message()); void d.dismiss(); });
@@ -72,6 +73,5 @@ test("a run whose raster stays because Discard labels? was cancelled still appli
   await expect(message(page)).toHaveText(seeded);
   const after = await labels(page);
   expect(after.size).toBeGreaterThan(painted.size);
-  for (const [k, v] of painted) expect(after.get(k), k).toBe(v);
-  expect((await classList(page)).map((c) => c.name)).toEqual(["left", "right", "Class 0", "Class 3", "Class 7"]);
+  expect((await classList(page)).map((c) => c.name)).toEqual(["Class 0", "Class 3", "Class 7"]); // it replaced
 });

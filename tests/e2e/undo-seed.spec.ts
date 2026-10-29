@@ -32,8 +32,9 @@ async function undoBlocked(page: Page, why: string) {
   expect(await snapshot(page), why).toEqual(before);
 }
 
-test("a successful Merge import clears the history", async ({ page }) => {
+test("a successful import clears the history", async ({ page }) => {
   await oneStroke(page);
+  page.once("dialog", (d) => void d.accept()); // "Replace labels?": every import replaces (spec 017)
   await importFile(page, classes());
   await expect(message(page)).toHaveText(seeded);
   await expect(undoButton(page)).toBeDisabled();
@@ -52,6 +53,7 @@ test("a cancelled Replace confirm keeps the history; one Undo then removes the s
 
 test("an import showing 'No labels to seed here.' keeps the history; one Undo then removes the stroke", async ({ page }) => {
   const empty = await oneStroke(page);
+  page.once("dialog", (d) => void d.accept()); // "Replace labels?": every import replaces (spec 017)
   await importFile(page, upload("blank.tif", classFile("255", CLASS_GRID, () => 255)));
   await expect(message(page)).toHaveText(MESSAGES.noSeed);
   await expect(undoButton(page)).toBeEnabled();
@@ -62,6 +64,7 @@ test("an import showing 'No labels to seed here.' keeps the history; one Undo th
 test("while an import runs (paused file) Undo is disabled and Ctrl+Z changes nothing", async ({ page }) => {
   await oneStroke(page);
   await pauseLabelFile(page);
+  page.once("dialog", (d) => void d.accept()); // "Replace labels?": every import replaces (spec 017)
   await importFile(page, classes());
   await expect.poll(() => page.evaluate(() => (window as any).__fileGate.reads)).toBeGreaterThan(0);
   await undoBlocked(page, "import running");

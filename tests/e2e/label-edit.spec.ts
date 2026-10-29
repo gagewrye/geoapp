@@ -19,6 +19,7 @@ test("after an import, a right drag clears the selected class in a seeded area a
   await importFile(page, upload("classes.tif", classFile("255")));
   await expect(message(page)).toHaveText(seeded);
   expect((await classList(page)).map((c) => c.name)).toEqual(["Class 0", "Class 3", "Class 7"]);
+  await page.click("#mode-paint"); // an import selects Pan (spec 014 Tests)
   // file block cols 24..47, rows 0..19 holds 3, which is label value 2 ("Class 3")
   const centre = fileLonLat(36, 10);
   await jumpTo(page, centre, 7);
@@ -37,7 +38,7 @@ test("after an import, a right drag clears the selected class in a seeded area a
   expect(count(painted, 3)).toBeGreaterThan(count(erased, 3));
 });
 
-test("after strokes across a nodata block and a Merge import, no imagery-nodata pixel is labelled (criterion 13)", async ({ page }) => {
+test("after strokes across a nodata block and an import, no imagery-nodata pixel is labelled (criterion 13)", async ({ page }) => {
   test.setTimeout(180_000);
   await openApp(page);
   await openRaster(page, nodataImagery());
@@ -49,7 +50,8 @@ test("after strokes across a nodata block and a Merge import, no imagery-nodata 
     await stroke(page, path(await toScreen(page, [13.8, lat]), await toScreen(page, [14.8, lat]), 12));
   }
   expectNoNodata(await storeTiles(page), 1000, inNodata);
-  await importFile(page, upload("classes.tif", classFile("255"))); // Merge: no confirm
+  page.once("dialog", (d) => void d.accept()); // "Replace labels?": every import replaces (spec 017)
+  await importFile(page, upload("classes.tif", classFile("255")));
   await expect(message(page)).toHaveText(seeded);
   expectNoNodata(await effectiveTiles(page), 1000, inNodata);
 });
@@ -64,6 +66,7 @@ test("importing and exporting labels make no network requests (criterion 19)", a
   const requests: string[] = [];
   page.on("request", (r) => requests.push(r.url()));
   await page.setInputFiles("#class-map", upload("map.json", JSON.stringify([{ value: 3, name: "three" }])));
+  page.once("dialog", (d) => void d.accept()); // "Replace labels?": every import replaces (spec 017)
   await importFile(page, upload("classes.tif", classFile("255")));
   await expect(message(page)).toHaveText(seeded);
   await download(page, "#export-labels");

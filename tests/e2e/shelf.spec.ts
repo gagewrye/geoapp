@@ -56,7 +56,8 @@ test("every request from load through open, paint, undo, import, export and anot
   await openAndPaint(page);
   await page.click("#undo");
   await paintBeside(page);
-  await importFile(page, upload("classes.tif", classFile("255"))); // Merge: no confirm
+  page.once("dialog", (d) => void d.accept()); // "Replace labels?": every import replaces (spec 017)
+  await importFile(page, upload("classes.tif", classFile("255")));
   await expect(message(page)).toHaveText(/^Seeded \d+ pixels in \d+ classes\.$/);
   await download(page, "#export-labels");
   await expect(message(page)).toHaveText("Labels exported.");
