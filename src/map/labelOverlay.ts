@@ -1,11 +1,8 @@
 import type { CanvasSource, Map as MapLibreMap } from "maplibre-gl";
-import { paintLabels, tileQuads } from "../core/labelQuads";
+import { paintLabels, QUAD_ERR, tileQuads } from "../core/labelQuads";
 import { tileWindow } from "../core/labelStore";
 import type { Grid } from "../core/types";
 import { beforeSlot, labelViewProps } from "./layers";
-
-/** Largest bilinear placement error of a quad's pixels, in pixels (spec 018). */
-const MAX_ERR = 0.05;
 
 type Corners = [[number, number], [number, number], [number, number], [number, number]];
 type Part = { id: string; canvas: HTMLCanvasElement; dx: number; dy: number; corners: Corners };
@@ -45,7 +42,7 @@ export class LabelOverlays {
   private create(key: string): Overlay {
     const [x0, y0] = key.split(",").map(Number) as [number, number];
     const w = tileWindow(this.grid, x0, y0);
-    const quads = tileQuads(this.grid, w, MAX_ERR);
+    const quads = tileQuads(this.grid, w, QUAD_ERR);
     const parts = quads.map((q, i): Part => {
       const canvas = document.createElement("canvas");
       canvas.width = q.window.width;

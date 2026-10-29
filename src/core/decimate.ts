@@ -15,13 +15,16 @@ export function decimatedTile(width: number, height: number, f: number, nb: numb
 // Output pixel i samples source pixel i*f + floor(f/2), clamped to the raster.
 const srcIndex = (i: number, f: number, size: number) => Math.min(i * f + Math.floor(f / 2), size - 1);
 
-/** Copy the decimated samples that fall inside one source window into out. */
-export function decimateInto(out: Tile, win: Tile, f: number, srcWidth: number, srcHeight: number): void {
+/** A window of source pixels, bands as Float32 tiles or raw typed arrays. */
+export type SourceWindow = Omit<Tile, "bands" | "nodata"> & { bands: ArrayLike<number>[] };
+
+/** Copy the decimated samples that fall inside one source window into out, whose x0, y0 are in decimated pixels. */
+export function decimateInto(out: Tile, win: SourceWindow, f: number, srcWidth: number, srcHeight: number): void {
   for (let j = 0; j < out.height; j++) {
-    const r = srcIndex(j, f, srcHeight) - win.y0;
+    const r = srcIndex(out.y0 + j, f, srcHeight) - win.y0;
     if (r < 0 || r >= win.height) continue;
     for (let i = 0; i < out.width; i++) {
-      const c = srcIndex(i, f, srcWidth) - win.x0;
+      const c = srcIndex(out.x0 + i, f, srcWidth) - win.x0;
       if (c < 0 || c >= win.width) continue;
       for (let k = 0; k < out.bands.length; k++) out.bands[k]![j * out.width + i] = win.bands[k]![r * win.width + c]!;
     }
