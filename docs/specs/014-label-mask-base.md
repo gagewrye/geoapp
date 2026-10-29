@@ -15,12 +15,12 @@
 
 **Decided (Gage, 2026-10-28):** "There will be masks larger than 4096." Accepted: the mask shows at preview resolution (at most 1024 px across the raster, like the imagery) and at full resolution only on painted tiles; Merge while a mask is loaded is refused; GeoTIFF only for now; an import itself is not undoable (spec 010 clears history on import). Spec 004's untagged-file rule stays as shipped ("accept all except value 0"): with no GDAL_NODATA, 0 imports as "Class 0", and a class map may name 0.
 
-**Open question (Gage).** You first accepted "0 means unlabelled when the file has no nodata" for masks, then rejected it for imports. In this spec every import is a mask (the file becomes the base), so the two can't be told apart without a new control. Options: (a) leave it as now: an untagged mask's 0 is "Class 0", and you can clear it with the brush or a class map that leaves 0 out; (b) a "0 is unlabelled" checkbox next to Import labels, off by default, so spec 004 behaviour is unchanged unless you tick it. This spec builds (a) unless you choose (b).
+Because every import is a mask here, the same holds for masks (Gage accepted this, 2026-10-28): an untagged mask's 0 is "Class 0", with no "0 is unlabelled" option. The user can clear it with the brush, or use a class map that leaves 0 out.
 
 ## Scope
 **In:** the mask as a read-only base under sparse edit tiles; its preview layer; copy-on-touch for the brush; export of base plus edits; Merge with no base loaded.
 
-**Out:** a "0 is unlabelled" rule for untagged files (open question); stacked masks (Merge onto a loaded mask); PNG, 16-bit and un-georeferenced masks (later); undoing an import; a full-resolution display of unedited tiles; more than one base.
+**Out:** a "0 is unlabelled" rule or option for untagged files; stacked masks (Merge onto a loaded mask); PNG, 16-bit and un-georeferenced masks (later); undoing an import; a full-resolution display of unedited tiles; more than one base.
 
 ## Interfaces (`core/`)
 ```ts

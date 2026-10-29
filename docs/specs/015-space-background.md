@@ -2,9 +2,9 @@
 
 **Goal:** Around the globe, show a dark starfield with a soft atmosphere glow at the globe's edge, like Google Maps, using nothing fetched or bundled.
 
-**Status:** Draft. Gage asked on 2026-10-28: "Add a space backgroun to the globe view similar to what google maps has". **ADRs:** none. There is no new dependency or asset, and privacy is unchanged (ADRs 0005 and 0014). This spec is independent of specs 013 and 014, so it can be built first or in parallel (see Build order).
+**Status:** Approved (Gage, 2026-10-28). Gage asked: "Add a space backgroun to the globe view similar to what google maps has". He then accepted that the stars stay still. **ADRs:** none. There is no new dependency or asset, and privacy is unchanged (ADRs 0005 and 0014). This spec is independent of specs 013 and 014, so it can be built first or in parallel (see Build order).
 
-**Open question (Gage).** The stars stay still while the globe turns or zooms; only the globe moves in front of them. Stars that turn with the globe would need a custom WebGL layer. Is still acceptable? This spec assumes yes.
+**Decided (Gage, 2026-10-28):** the stars stay still while the globe turns or zooms; only the globe moves in front of them. Stars that turn with the globe would need a custom WebGL layer.
 
 ## What maplibre-gl 6.16.0 does (checked in `node_modules`, `dist/maplibre-gl-dev.mjs`, style-spec 26.4.4)
 - **No starfield.** The style's `sky` has only colours and blends: `sky-color`, `horizon-color`, `fog-color`, `fog-ground-blend`, `horizon-fog-blend`, `sky-horizon-blend` and `atmosphere-blend`. All are marked experimental.

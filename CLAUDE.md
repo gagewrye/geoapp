@@ -1,6 +1,6 @@
 # Geoplatform
 
-Local-first browser app for labelling geospatial imagery. User data (local rasters, labels, polygons) never leaves the user's device. We host only static files.
+Local-first browser app for labelling geospatial imagery. User data (local rasters, labels) never leaves the user's device. We host only static files.
 
 ## Stack
 - TypeScript (strict), Vite, MapLibre GL, geotiff.js
