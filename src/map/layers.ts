@@ -31,7 +31,7 @@ export function labelViewProps(map: MapLibreMap) {
 export function applyLabelView(map: MapLibreMap, view: LabelView): void {
   views.set(map, { ...view });
   const { paint, layout } = labelViewProps(map);
-  for (const { id } of map.getStyle().layers) {
+  for (const id of map.getLayersOrder()) { // ids only: getStyle() would copy every layer on each slider tick
     if (!isLabelLayer(id)) continue;
     map.setPaintProperty(id, "raster-opacity", paint["raster-opacity"]);
     map.setLayoutProperty(id, "visibility", layout.visibility);

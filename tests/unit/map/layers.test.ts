@@ -6,7 +6,7 @@ import { applyLabelView, DEFAULT_LABEL_OPACITY, labelViewProps } from "../../../
 function fakeMap(ids: string[]) {
   const set: string[] = [];
   const map = {
-    getStyle: () => ({ layers: ids.map((id) => ({ id })) }),
+    getLayersOrder: () => ids,
     setPaintProperty: (id: string, k: string, v: unknown) => set.push(`${id} ${k} ${v}`),
     setLayoutProperty: (id: string, k: string, v: unknown) => set.push(`${id} ${k} ${v}`),
   };
