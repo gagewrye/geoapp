@@ -1,6 +1,6 @@
 # 0007: Python dev script for AlphaEarth test fixtures
 
-**Status:** Accepted (Gage, 2026-10-26)
+**Status:** Accepted (Gage, 2026-10-26). Shelved by spec 013 (2026-10-28).
 
 **Context:** Spec 002 needs offline AlphaEarth fixtures and a reference accuracy. Gage's real embeddings live in mangrove-embed `data/chips/*/chip_NNNN.npz`: compressed numpy, float16 [64,128,128], uint8 labels, about 0.7 MB each, 2.1 GB in total. Reading npz and float16 in Node would mean hand-parsing zip and `.npy`. The reference should be the same model mangrove-embed benchmarks (sklearn `LogisticRegression(max_iter=3000)`, `pixel.py`), not a reimplementation. mangrove-embed's environment already has numpy and scikit-learn (`pyproject.toml`).
 

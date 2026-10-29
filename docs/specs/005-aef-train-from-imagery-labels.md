@@ -2,7 +2,7 @@
 
 **Goal:** Transfer brush labels painted on local imagery onto an AlphaEarth AOI, train spec 001's logistic regression on the 64 embedding bands, and classify and export the AOI on the AlphaEarth grid.
 
-**Status:** Approved (Gage, 2026-10-26). Needs specs 002 and 003; build order: after spec 004. **ADRs:** 0011 drawn AOI + supersampled majority transfer (Accepted); uses 0001, 0002, 0005 and 0010.
+**Status:** Approved (Gage, 2026-10-26). Needs specs 002 and 003; build order: after spec 004. **ADRs:** 0011 drawn AOI + supersampled majority transfer (Accepted); uses 0001, 0002, 0005 and 0010. Shelved by spec 013 (2026-10-28); never built.
 
 **Decided (Gage, 2026-10-26)**, besides what Scope and Rules state: `K_MAX` stays 8. The user picks the year, with no check against the imagery's date. The `meta.aef.aoi` tag stays as specified, with no ADR for the tag format.
 

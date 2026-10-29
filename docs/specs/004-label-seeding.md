@@ -2,7 +2,7 @@
 
 **Goal:** Fill spec 003's label store on the open imagery, never on imagery nodata, from a classified GeoTIFF or from a model run on that imagery, merged with or replacing existing labels, so the user corrects it with the brush, exports it as a label GeoTIFF that imports back unchanged, and retrains.
 
-**Status:** Approved (Gage, 2026-10-26). Build order: after spec 003, before spec 005. **ADRs:** 0013 label GeoTIFF format (Accepted; amends 0001); uses 0002; external models are ADR 0012's. Build clarifications approved 2026-10-28 (Gage): the "Settled in build" rule and the words it adds to criteria 9, 12, 16 and 17.
+**Status:** Approved (Gage, 2026-10-26). Build order: after spec 003, before spec 005. **ADRs:** 0013 label GeoTIFF format (Accepted; amends 0001); uses 0002; external models are ADR 0012's. Build clarifications approved 2026-10-28 (Gage): the "Settled in build" rule and the words it adds to criteria 9, 12, 16 and 17. Partly shelved by spec 013 (2026-10-28), lapsed: Seed from model, Min. confidence, Train locks, and criteria 5, 17, 18's Train part and 15's AlphaEarth case.
 
 **Decided (Gage, 2026-10-26)**, besides what Scope and Rules state: the 256-tile cap stays in v1 (an OPFS store or view-only seeding can follow); spec 001's classification export doesn't write the class table.
 

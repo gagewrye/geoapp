@@ -2,7 +2,7 @@
 
 **Goal:** Fetch Google AlphaEarth annual embeddings for a user-drawn area and year into a local cache, as training and classification data for spec 005.
 
-**Status:** Approved (Gage, 2026-10-26). Cache rule amended 2026-10-27 (Gage). **ADRs (Accepted):** 0005 AlphaEarth COGs from Source Cooperative + local AOI cache, 0006 static per-zone index, 0007 Python fixture script, 0008 interim fixtures from public data. Related: 0011, see spec 005.
+**Status:** Approved (Gage, 2026-10-26). Cache rule amended 2026-10-27 (Gage). **ADRs (Accepted):** 0005 AlphaEarth COGs from Source Cooperative + local AOI cache, 0006 static per-zone index, 0007 Python fixture script, 0008 interim fixtures from public data. Related: 0011, see spec 005. Shelved by spec 013 (2026-10-28).
 
 Built and tested (2026-10-27): criteria 1–17.
 

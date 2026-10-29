@@ -1,6 +1,6 @@
 # 0006: Static per-zone AlphaEarth tile index, hosted with the app
 
-**Status:** Accepted (Gage, 2026-10-26)
+**Status:** Accepted (Gage, 2026-10-26). Shelved by spec 013 (2026-10-28).
 *Decision amended by Gage on 2026-10-26.*
 
 **Context:** COG file names contain an Earth Engine asset id, so they can't be computed from coordinates, and an index is needed. Google's readme and the Source Cooperative README both describe `aef_index.{parquet,gpkg,csv}` under `v1/annual/`. It has one row per file: WGS84 footprint, CRS, year, UTM zone, and UTM and WGS84 bounds. Footprints never cross the antimeridian (checked 2026-10-26). The live CSV is about 800 MB, and the full shard set is 43 MB over 1,080 shards. Reading GeoParquet in the browser would need a new dependency. Fetching the full index every session wastes bandwidth.

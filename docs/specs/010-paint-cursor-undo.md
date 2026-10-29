@@ -2,7 +2,7 @@
 
 **Goal:** Show a paintbrush cursor in the selected class colour while painting, and let the user undo their latest strokes with a button or Ctrl+Z.
 
-**Status:** Approved (Gage, 2026-10-27; undo cap raised to 32 MiB, 50 steps kept; no redo; class edits not undoable). **ADRs:** 0015 undo history (Accepted). Amends spec 003 (undo was out of scope). Spec 004 is built on main (72cccbe). The clauses marked *(spec 004)* were checked against that build (`ui/labels.ts` `replace`/`lock`, `ui/seeding.ts`, 2026-10-28) and apply once this branch includes it.
+**Status:** Approved (Gage, 2026-10-27; undo cap raised to 32 MiB, 50 steps kept; no redo; class edits not undoable). **ADRs:** 0015 undo history (Accepted). Amends spec 003 (undo was out of scope). Spec 004 is built on main (72cccbe). The clauses marked *(spec 004)* were checked against that build (`ui/labels.ts` `replace`/`lock`, `ui/seeding.ts`, 2026-10-28) and apply once this branch includes it. Partly shelved by spec 013 (2026-10-28), lapsed: the Train and model-seed clauses.
 
 ## Scope
 In: the brush cursor; an "Undo" button in the brush panel; Ctrl+Z / Cmd+Z; multi-step undo of paint and erase strokes.
