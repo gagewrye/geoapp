@@ -22,6 +22,10 @@ export function initLabelView(map: MapLibreMap, onVisible: (visible: boolean) =>
   show.addEventListener("change", apply);
 
   return {
+    /** Check Show labels if it isn't. */
+    show(): void {
+      if (!show.checked) { show.checked = true; apply(); }
+    },
     /** A raster opened: labels show again; the opacity is kept for the page session. */
     reset(): void {
       show.checked = true;

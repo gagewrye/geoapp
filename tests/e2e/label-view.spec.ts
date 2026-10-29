@@ -1,10 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 import { CLASS_GRID, classFile, rgbClassFile } from "../unit/helpers/labelFiles";
 import { MESSAGES } from "../../src/ui/messages";
-import { clickAt, hideBasemap, hoverFeatures, jumpTo, message, openApp, openRaster, paintMode, pixelAt, rgbFixture, selectClass, stroke, tileKeysStored, toScreen, view, type Xy } from "./helpers";
+import { clickAt, hideBasemap, hoverFeatures, jumpTo, message, openApp, openRaster, paintMode, pixelAt, rgbFixture, selectClass, settled, stroke, tileKeysStored, toScreen, view, type Xy } from "./helpers";
 import { at, classList, importFile, maskFile, openFileGate, pauseLabelFile, storeTiles, upload } from "./seeding";
 
-// Spec 016: label Opacity, Show labels, painting blocked while hidden, and Pan on load.
+// Spec 016: label Opacity, Show labels, hiding selects Pan, and Pan on load.
 
 const seeded = /^Seeded \d+ pixels in \d+ classes\.$/;
 const opacity = (page: Page) => page.locator("#label-opacity");
@@ -156,44 +156,106 @@ test("an Undo while hidden restores the store, and the overlay it recreates is h
   expect(await labelLayers(page)).toEqual({ "label-256,256": [0.6, "visible"] });
 });
 
-test("hidden in Paint mode: drags change nothing and say why, no footprint, not-allowed; Space pans; showing restores the brush (criterion 5)", async ({ page }) => {
+test("hiding labels in Paint mode selects Pan: a left drag pans, no footprint, no brush or not-allowed cursor, no message (criterion 5)", async ({ page }) => {
   await setup(page);
   await paintMode(page);
   await jumpTo(page, [15, 45], 9);
   const a = await toScreen(page, [15.005, 45.005]);
   await stroke(page, [a, { x: a.x + 10, y: a.y }]);
   const tiles = await storeTiles(page);
+  const said = await message(page).textContent();
   await toggleShow(page);
-  for (const button of ["left", "right"] as const) {
-    await message(page).evaluate((e) => { e.textContent = ""; });
-    const v0 = await view(page);
-    await stroke(page, [{ x: a.x - 20, y: a.y + 5 }, { x: a.x + 20, y: a.y + 5 }, { x: a.x + 40, y: a.y + 20 }], button);
-    await expect(message(page)).toHaveText(MESSAGES.labelsHidden);
-    expect(await storeTiles(page)).toEqual(tiles);
-    expect(await view(page)).toEqual(v0);
-  }
+  await expect(show(page)).not.toBeChecked();
+  await pressed(page, "pan");
+  await expect(page.locator("#mode-paint")).toHaveAttribute("aria-pressed", "false");
+  const v0 = await view(page);
+  await stroke(page, [{ x: a.x - 20, y: a.y + 5 }, ...Array.from({ length: 10 }, (_, i) => ({ x: a.x - 20 + 6 * (i + 1), y: a.y + 5 + 3 * (i + 1) }))]);
+  expect((await view(page)).lng).not.toBe(v0.lng);
+  expect(await storeTiles(page)).toEqual(tiles);
   const q = { x: a.x + 30, y: a.y + 30 };
   await page.mouse.move(q.x, q.y);
   expect(await hoverFeatures(page)).toEqual([]);
-  expect(await cursorAt(page, q)).toBe("not-allowed");
-  // Space held pans
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-  const v0 = await view(page);
-  await page.keyboard.down("Space");
+  const c = await cursorAt(page, q);
+  expect(c.startsWith("url(")).toBe(false);
+  expect(c).not.toBe("not-allowed");
+  await expect(message(page)).toHaveText(said ?? "");
+});
+
+test("hiding labels mid-stroke by keyboard ends the stroke; later moves label nothing; one Undo removes it (criterion 5)", async ({ page }) => {
+  await setup(page);
+  await paintMode(page);
+  await jumpTo(page, [15, 45], 9);
+  const a = await toScreen(page, [15.005, 45.005]);
+  await page.mouse.move(a.x, a.y);
   await page.mouse.down();
-  for (let i = 1; i <= 10; i++) await page.mouse.move(q.x + 8 * i, q.y + 4 * i);
+  for (let i = 1; i <= 5; i++) await page.mouse.move(a.x + 4 * i, a.y);
+  await settled(page);
+  await page.waitForTimeout(100);
+  await page.locator("#label-opacity").focus(); // after the press, which focuses the map
+  await page.keyboard.press("Tab");
+  await expect(show(page)).toBeFocused();
+  await page.keyboard.press("Space");
+  await expect(show(page)).not.toBeChecked();
+  await pressed(page, "pan");
+  await settled(page);
+  const painted = await storeTiles(page);
+  expect(painted.size).toBeGreaterThan(0);
+  for (let i = 1; i <= 10; i++) await page.mouse.move(a.x + 20, a.y + 8 * i);
   await page.mouse.up();
-  await page.keyboard.up("Space");
-  expect((await view(page)).lng).not.toBe(v0.lng);
-  expect(await storeTiles(page)).toEqual(tiles);
-  // shown again with no pointer move: the brush cursor and the footprint return
+  await page.waitForTimeout(200);
+  await settled(page);
+  expect(await storeTiles(page)).toEqual(painted);
+  await page.click("#undo");
+  expect(await tileKeysStored(page)).toEqual([]);
+  await expect(page.locator("#undo")).toBeDisabled();
+});
+
+test("clicking Paint while hidden shows the labels, with the brush cursor and footprint at once (criterion 6)", async ({ page }) => {
+  await setup(page);
+  await paintMode(page);
+  await jumpTo(page, [15, 45], 9);
+  const a = await toScreen(page, [15.005, 45.005]);
+  await stroke(page, [a, { x: a.x + 10, y: a.y }]);
   await toggleShow(page);
-  const r = { x: q.x + 80, y: q.y + 40 };
-  expect((await cursorAt(page, r)).startsWith('url("data:image/svg+xml')).toBe(true);
+  await pressed(page, "pan");
+  const q = { x: a.x + 30, y: a.y + 30 };
+  await page.mouse.move(q.x, q.y);
+  expect(await hoverFeatures(page)).toEqual([]);
+  await page.locator("#mode-paint").dispatchEvent("click"); // no pointer move
+  await pressed(page, "paint");
+  await expect(show(page)).toBeChecked();
+  expect(await labelLayers(page)).toEqual({ "label-256,256": [0.6, "visible"] });
+  expect((await cursorAt(page, q)).startsWith('url("data:image/svg+xml')).toBe(true);
   await expect.poll(async () => (await hoverFeatures(page)).length).toBe(1);
 });
 
-test("opening another raster with labels hidden checks Show labels and selects Pan (criterion 6)", async ({ page }) => {
+test("checking Show labels in Pan mode keeps Pan (criterion 6)", async ({ page }) => {
+  await setup(page);
+  await toggleShow(page);
+  await pressed(page, "pan");
+  await toggleShow(page);
+  await expect(show(page)).toBeChecked();
+  await pressed(page, "pan");
+});
+
+test("hiding during an import selects Pan; after it finishes Pan is pressed and Show labels stays unchecked (criterion 6)", async ({ page }) => {
+  await setup(page);
+  await paintMode(page);
+  await pauseLabelFile(page);
+  await importFile(page, upload("classes.tif", classFile("255")));
+  await expect.poll(() => page.evaluate(() => (window as any).__fileGate.reads)).toBeGreaterThan(0);
+  await expect(page.locator("#class-add")).toBeDisabled(); // locked
+  await pressed(page, "paint");
+  await toggleShow(page);
+  await expect(show(page)).not.toBeChecked();
+  await pressed(page, "pan");
+  await openFileGate(page);
+  await expect(message(page)).toHaveText(seeded);
+  await pressed(page, "pan");
+  await expect(show(page)).not.toBeChecked();
+});
+
+test("opening another raster with labels hidden checks Show labels and selects Pan (criterion 7)", async ({ page }) => {
   await setup(page);
   await paintMode(page);
   await toggleShow(page);
@@ -205,7 +267,7 @@ test("opening another raster with labels hidden checks Show labels and selects P
   await pressed(page, "pan");
 });
 
-test("Pan on load: an open and a successful import select Pan; a cancel, a refused file and an empty import keep Paint (criterion 7)", async ({ page }) => {
+test("Pan on load: an open and a successful import select Pan; a cancel, a refused file and an empty import keep Paint (criterion 8)", async ({ page }) => {
   await setup(page);
   await pressed(page, "pan");
   await jumpTo(page, [15, 45], 9);
