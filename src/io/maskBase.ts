@@ -1,13 +1,10 @@
 import type { Window } from "../core/grid";
 import { tileWindow, type LabelStore } from "../core/labelStore";
-import type { CellBuckets } from "../core/maskPreview";
+import type { MaskPreview } from "../core/maskPreview";
 import { applyLut, gatherCells, maskNodata, sourceCells } from "../core/seed";
 import type { Grid, Tile } from "../core/types";
 import type { LabelSource } from "./labelFile";
 import type { RasterSource } from "./source";
-
-/** The mask at preview resolution: label values per preview pixel, its Mercator corners, and its pixels by tile window. */
-export type MaskPreview = { values: Uint8Array; width: number; height: number; corners: [number, number][]; buckets: CellBuckets };
 
 /** An imported label mask (spec 014, ADR 0018): the user's file, read on demand as a read-only base under the edit tiles. */
 // windows: keys of the seedWindows that hold a labelled pixel; every other window's base tile is all zeros.

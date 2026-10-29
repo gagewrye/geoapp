@@ -1,14 +1,15 @@
 import type { Map as MapLibreMap } from "maplibre-gl";
 import { MAX_CLASSES, checkName, initialClasses, nextClass, type LabelClass } from "../core/classes";
 import type { Window } from "../core/grid";
-import { emptyStore, keepMasks, tileKeys, type LabelStore } from "../core/labelStore";
+import { emptyStore, keepMasks, tileKeys, tileWindow, type LabelStore } from "../core/labelStore";
 import { BRUSH_SIZES, DEFAULT_BRUSH } from "../core/pixel";
+import { baseTile, type MaskBase } from "../io/maskBase";
 import { PaintQueue } from "../io/paintQueue";
 import type { RasterSource } from "../io/source";
 import { createBrush, type BrushMode } from "../map/brush";
-import { LabelOverlays } from "../map/labelOverlay";
 import { markSelected, renderClasses } from "./classList";
-import { MESSAGES } from "./messages";
+import { labelDisplay } from "./labelDisplay";
+import { MESSAGES, readErrorMessage } from "./messages";
 import { initUndo } from "./undo";
 
 type Deps = {
@@ -37,9 +38,10 @@ export function initLabels({ map, say, onBusy, onChange, panning }: Deps) {
   let locked = false; // while seeding or exporting labels (spec 004): no painting and no class edits, so no list or tile changes under them
   let store: LabelStore = emptyStore(0, 0);
   let queue: PaintQueue | null = null;
-  let overlays: LabelOverlays | null = null;
-  const dirty = new Set<string>();
-  let frame = 0;
+  let imagery: RasterSource | null = null;
+  let base: MaskBase | null = null; // an imported mask under the stored tiles (spec 014)
+  const display = labelDisplay(map, () => store, () => classes.map((c) => c.colour));
+  const redraw = display.redraw;
   // Paint undo (spec 010): one entry per stroke; opening a raster or replacing the store clears it
   const undo = initUndo({
     button: $<HTMLButtonElement>("undo"),
@@ -60,18 +62,6 @@ export function initLabels({ map, say, onBusy, onChange, panning }: Deps) {
     onStroke: undo.stroke,
     panning,
   });
-
-  // A redraw walks a whole tile, so tiles changed by many cells are redrawn once per frame.
-  const flush = () => {
-    frame = 0;
-    const colours = classes.map((c) => c.colour);
-    for (const key of dirty) overlays?.update(key, store.tiles.get(key), colours);
-    dirty.clear();
-  };
-  const redraw = (keys: Iterable<string>) => {
-    for (const k of keys) dirty.add(k);
-    if (!frame) frame = requestAnimationFrame(flush);
-  };
 
   const setMode = (m: BrushMode) => {
     brush.setMode(m);
@@ -101,7 +91,7 @@ export function initLabels({ map, say, onBusy, onChange, panning }: Deps) {
       recolour: (i, colour) => {
         if (locked) return;
         classes[i]!.colour = colour;
-        redraw(store.tiles.keys());
+        redraw(store.tiles.keys(), true);
         brush.refresh();
       },
     });
@@ -156,19 +146,19 @@ export function initLabels({ map, say, onBusy, onChange, panning }: Deps) {
     open(source: RasterSource): void {
       queue?.clear();
       undo.clear(); // after the queue, which hands its dropped strokes to the history
-      overlays?.clear();
-      dirty.clear();
+      base = null; // opening a raster drops the mask
+      imagery = source;
       const { width, height, epsg, gt } = source.meta;
       const grid = { width, height, epsg, gt };
       store = emptyStore(width, height);
       lock(false);
       queue = new PaintQueue(source, () => store, {
         applied: (w: Window) => { redraw(tileKeys(w)); onChange(); undo.sync(); },
-        full: () => say(MESSAGES.labelLimit),
+        full: () => say(store.base ? MESSAGES.editLimit : MESSAGES.labelLimit),
         busy: () => { onBusy(); undo.sync(); },
-        error: (e) => say((e as Error).message),
-      }, undo.history);
-      overlays = new LabelOverlays(map, grid);
+        error: (e) => say(readErrorMessage(e)),
+      }, undo.history, () => base);
+      display.open(grid);
       open = true;
       panel.hidden = false;
       brush.setImagery(grid);
@@ -176,10 +166,12 @@ export function initLabels({ map, say, onBusy, onChange, panning }: Deps) {
       onChange();
       undo.sync();
     },
-    /** Swap in seeded labels and their class list (spec 004); masks of tiles no longer stored are freed. */
-    replace(next: LabelStore, list: LabelClass[]): void {
+    /** Swap in imported labels, their class list and mask base (specs 004, 014); masks of tiles no longer stored are freed. */
+    replace(next: LabelStore, list: LabelClass[], nextBase: MaskBase | null = null): void {
       const keys = new Set([...store.tiles.keys(), ...next.tiles.keys()]);
       store = next;
+      base = nextBase;
+      display.setMask(base?.preview ?? null);
       undo.clear(); // a seed isn't undoable, and strokes recorded against the old store can't be undone over it
       classes.splice(0, classes.length, ...list);
       if (selected >= classes.length) selected = 0;
@@ -192,11 +184,21 @@ export function initLabels({ map, say, onBusy, onChange, panning }: Deps) {
     },
     lock,
     /** The labels and class list now, for seeding to build on. */
-    current: () => ({ store, classes }),
+    current: () => ({ store, classes, base }),
+    /** The mask base, if one is loaded. */
+    base: () => base,
+    /** The effective tile at key (stored, else the mask's); null when neither exists. Reads the mask file for an unstored key. */
+    async tile(key: string): Promise<Uint8Array | null> {
+      const stored = store.tiles.get(key);
+      if (stored) return stored.slice();
+      if (!base || !imagery) return null;
+      const [x0, y0] = key.split(",").map(Number) as [number, number];
+      return (await baseTile(imagery, base, tileWindow(store, x0, y0))).labels;
+    },
     /** A paint or erase stroke is in progress. */
     stroking: brush.stroking,
-    /** True when any pixel is labelled (no all-zero tile is kept). */
-    hasLabels: () => store.tiles.size > 0,
+    /** True when a tile is stored or a mask with labelled pixels is loaded. */
+    hasLabels: () => store.tiles.size > 0 || (base?.count ?? 0) > 0,
     /** Stroke cells are waiting for nodata masks. */
     busy: () => (queue?.size ?? 0) > 0,
     store: () => store,

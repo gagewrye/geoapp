@@ -31,9 +31,9 @@ const seeding = initSeeding({ labels, imagery: () => source, say, error: errorTe
 const nav = createNavigation(map, { typing: (el) => inTextField(el) || el instanceof HTMLSelectElement, stroking: labels.stroking });
 
 map.on("load", () => {
-  // Test hook for e2e (specs 001-004); exposes no user data beyond this page. labelFile: set by a test to see opened label files.
+  // Test hook for e2e (specs 001-014; labels.tile(key) is the effective tile); exposes no user data beyond this page. labelFile: set by a test to see opened label files.
   const hook = { map, imagery: () => source ?? null, labelFile: null };
-  Object.defineProperty(hook, "labels", { get: () => ({ store: labels.store(), classes: labels.classes() }) });
+  Object.defineProperty(hook, "labels", { get: () => ({ store: labels.store(), classes: labels.classes(), tile: labels.tile }) });
   (window as unknown as Record<string, unknown>).__geoapp = hook;
   $("map").dataset.ready = "true";
 });

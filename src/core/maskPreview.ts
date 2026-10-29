@@ -22,6 +22,9 @@ export function previewCells(grid: Grid, maxSide: number): { cells: Int32Array; 
 /** Preview pixels grouped by the tile window holding their cell: window wi's pixels are order[start[wi]..start[wi + 1]). */
 export type CellBuckets = { across: number; start: Int32Array; order: Int32Array };
 
+/** The mask at preview resolution: label values per preview pixel, its Mercator corners, and its pixels by tile window. */
+export type MaskPreview = { values: Uint8Array; width: number; height: number; corners: [number, number][]; buckets: CellBuckets };
+
 /** Row-major index of the tile window with origin (x0, y0) among tileWindows(). */
 export const windowIndex = (b: Pick<CellBuckets, "across">, x0: number, y0: number) => (y0 / TILE_SIZE) * b.across + x0 / TILE_SIZE;
 

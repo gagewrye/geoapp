@@ -1,6 +1,6 @@
 import { ClassTableError } from "../core/classTable";
 import { checkLabelExport, exportLabels } from "../io/labelExport";
-import { LabelFileRefused, openLabelFile, type LabelSource } from "../io/labelFile";
+import { LabelFileRefused, maskReadFailed, openLabelFile, type LabelSource } from "../io/labelFile";
 import { importLabels, importTable, type SeedMode, type SeedOutcome } from "../io/seeding";
 import { openSink } from "../io/sink";
 import type { RasterSource } from "../io/source";
@@ -58,7 +58,7 @@ export function initSeeding({ labels, imagery, say, error, opened }: Deps) {
     try {
       const r = await task(s, stale);
       if (stale()) return;
-      if (typeof r !== "string") labels.replace(r.store, r.classes);
+      if (typeof r !== "string") labels.replace(r.store, r.classes, r.base);
       say(seedMessage(r) ?? "");
     } catch (e) {
       if (!stale()) say(e instanceof LabelFileRefused ? MESSAGES.labelFile : e instanceof ClassTableError ? MESSAGES.classTable(e.field) : error(e));
@@ -97,19 +97,20 @@ export function initSeeding({ labels, imagery, say, error, opened }: Deps) {
     sync();
     const store = { ...labels.store(), tiles: new Map(labels.store().tiles) };
     const list = labels.classes().map((c) => ({ ...c }));
+    const base = labels.base(); // read only: it changes only on an import or a raster open
     try {
       checkLabelExport(s, list); // before the Save dialog, so a rejected export leaves no empty file
       const sink = await openSink("labels.tif");
       say("Exporting labels...");
       try {
-        await exportLabels(s, store, list, sink);
+        await exportLabels(s, store, list, sink, base);
       } catch (e) {
         await sink.abort?.().catch(() => {});
         throw e;
       }
       say("Labels exported.");
     } catch (e) {
-      say(error(e));
+      say(maskReadFailed(e) ? MESSAGES.maskGone : error(e));
     } finally {
       exporting = null;
       relock();
