@@ -138,5 +138,5 @@ describe("UndoHistory edges (spec 010, tester)", () => {
     // each 64-tile entry (once tiles exist) is 4 MiB, so 8 fit
     expect(t.history.entries().every((e) => editBytes(e) <= 64 * TILE_SIZE * TILE_SIZE)).toBe(true);
     expect(t.history.size).toBeLessThanOrEqual(UNDO_STEPS);
-  });
+  }, 30_000); // 2,560 cells with 64 KiB tile copies: about 4 s alone, more under full-suite load
 });
