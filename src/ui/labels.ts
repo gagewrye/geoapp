@@ -179,6 +179,7 @@ export function initLabels({ map, say, onBusy, onChange, panning }: Deps) {
       if (queue) keepMasks(store, queue.masks, null);
       redraw(keys); // colours may have changed too
       render();
+      setMode("pan"); // an import selects Pan (spec 014 as amended by spec 016)
       brush.refresh();
       onChange();
     },
