@@ -56,7 +56,8 @@ for (const zoom of [12, 14]) {
     for (const p of pts) {
       const gl = await pixelAt(page, p);
       expect(gl[3], JSON.stringify(p)).toBe(255);
-      const seen = Array.from((await shot(page, p, 1)).slice(0, 3));
+      // pixelAt reads GL row height - y, which is the top-down row y - 1, so compare the page pixel one row up
+      const seen = Array.from((await shot(page, { x: p.x, y: p.y - 1 }, 1)).slice(0, 3));
       expect(seen.every((v, k) => Math.abs(v - gl[k]!) <= 2), `${JSON.stringify(p)}: page ${seen} vs canvas ${gl}`).toBe(true);
     }
   });
