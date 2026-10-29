@@ -137,6 +137,11 @@ export function initLabels({ map, say, onBusy, onChange, panning }: Deps) {
     undo.sync();
   }
 
+  /** Paint is offered only once the imagery is drawn (spec 019); Pan stays selected until the user picks Paint. */
+  function imageryReady(ready: boolean): void {
+    $<HTMLButtonElement>("mode-paint").disabled = !ready;
+  }
+
   return {
     /** Start labelling newly opened local imagery: an empty store, no masks, labels shown, Pan mode (spec 016). */
     open(source: RasterSource): void {
@@ -160,6 +165,7 @@ export function initLabels({ map, say, onBusy, onChange, panning }: Deps) {
       panel.hidden = false;
       brush.setImagery(grid);
       setMode("pan");
+      imageryReady(false); // until main draws its preview (spec 019)
       onChange();
       undo.sync();
     },
@@ -181,6 +187,7 @@ export function initLabels({ map, say, onBusy, onChange, panning }: Deps) {
       onChange();
     },
     lock,
+    imageryReady,
     /** The mask base, if one is loaded. */
     base: () => base,
     /** The effective tile at key (stored, else the mask's); null when neither exists. Reads the mask file for an unstored key. */
