@@ -38,10 +38,11 @@ test("an import adds the mask layer in the class colours and no tile overlay; a 
 
   // Replace with a 10 x 10 km file near 15E 45N: a much smaller mask
   const small = writeFile({ width: 10, height: 10, epsg: 32633, gt: [500000, 1000, 0, 4990000, 0, -1000] }, 1, new Uint8Array(100).fill(3));
-  await page.selectOption("#seed-mode", "replace");
+  await message(page).evaluate((e) => { e.textContent = ""; }); // the first import's message matches too
   page.once("dialog", (d) => void d.accept());
   await importFile(page, upload("small.tif", small));
   await expect(message(page)).toHaveText(seeded);
+  await expect.poll(() => page.evaluate(() => (window as any).__geoapp.map.getSource("mask") !== undefined)).toBe(true); // added next frame
   const colour: string = await page.evaluate(() => (window as any).__geoapp.labels.classes[0].colour);
   await expect.poll(async () => (await opaqueOf(page, colour)).opaque).toBeLessThan(counts[0]!.opaque / 10);
   expect((await opaqueOf(page, colour)).opaque).toBeGreaterThan(0);
