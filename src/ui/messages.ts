@@ -1,3 +1,4 @@
+import { maskReadFailed } from "../io/labelFile";
 import type { SeedOutcome } from "../io/seeding";
 
 /** User-facing strings fixed by specs 001-014, and the ones they don't fix. */
@@ -25,4 +26,9 @@ export function seedMessage(r: SeedOutcome): string | null {
   if (r === "too many") return MESSAGES.tooMany;
   if (r === "empty") return MESSAGES.noSeed;
   return `Seeded ${r.pixels} pixels in ${r.classCount} classes.`;
+}
+
+/** A paint or export error as shown: a mask file that can't be read any more gets spec 014's message. */
+export function readErrorMessage(e: unknown): string {
+  return maskReadFailed(e) ? MESSAGES.maskGone : (e as Error).message;
 }
