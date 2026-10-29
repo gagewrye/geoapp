@@ -5,11 +5,11 @@ import { emptyStore, keepMasks, paintedClasses, tileKeys, type LabelStore } from
 import { BRUSH_SIZES, DEFAULT_BRUSH } from "../core/pixel";
 import { PaintQueue } from "../io/paintQueue";
 import type { RasterSource } from "../io/source";
-import { UndoHistory, type StrokeEdit } from "../io/undoHistory";
 import { createBrush, type BrushMode } from "../map/brush";
 import { LabelOverlays } from "../map/labelOverlay";
 import { markSelected, renderClasses } from "./classList";
 import { MESSAGES } from "./messages";
+import { initUndo } from "./undo";
 
 type Deps = {
   map: MapLibreMap;
@@ -32,7 +32,6 @@ export const inTextField = (el: Element | null) => el instanceof HTMLTextAreaEle
 /** Brush labels on local imagery (spec 003): panel, classes, shortcuts, store, paint queue and overlays. */
 export function initLabels({ map, say, onBusy, onChange, onPaint, panning }: Deps) {
   const panel = $("brush-panel"), list = $("classes"), add = $<HTMLButtonElement>("class-add"), sizeText = $("brush-size");
-  const undoButton = $<HTMLButtonElement>("undo");
   const classes: LabelClass[] = initialClasses();
   let selected = 0;
   let size = BRUSH_SIZES.indexOf(DEFAULT_BRUSH);
@@ -43,25 +42,26 @@ export function initLabels({ map, say, onBusy, onChange, onPaint, panning }: Dep
   let overlays: LabelOverlays | null = null;
   const dirty = new Set<string>();
   let frame = 0;
-  // Paint undo (spec 010): one entry per stroke; opening a raster clears it
-  const history = new UndoHistory(() => store);
-  let current: StrokeEdit | null = null;
+  // Paint undo (spec 010): one entry per stroke; opening a raster or replacing the store clears it
+  const undo = initUndo({
+    button: $<HTMLButtonElement>("undo"),
+    store: () => store,
+    blocked: () => locked || brush.stroking() || (queue?.size ?? 0) > 0,
+    shortcut: () => open && !inTextField(document.activeElement),
+    undone: (keys) => {
+      keepMasks(store, queue!.masks, null);
+      redraw(keys);
+      onChange(); // Seed mode, Import, Seed and Export follow the store (spec 004)
+    },
+  });
 
   const brush = createBrush(map, {
     side: () => BRUSH_SIZES[size]!,
     colour: () => classes[selected]!.colour,
-    cells: (ws, erase) => { if (!locked) for (const w of ws) queue?.push({ w, value: selected + 1, erase, stroke: current ?? undefined }); },
-    onStroke: (active) => {
-      if (active) current = history.begin();
-      else if (current) { history.end(current); current = null; }
-      syncUndo();
-    },
+    cells: (ws, erase) => { if (!locked) for (const w of ws) queue?.push({ w, value: selected + 1, erase, stroke: undo.current() ?? undefined }); },
+    onStroke: undo.stroke,
     panning,
   });
-
-  // locked: an export must write the tiles as they were at its click, and a seed builds on the store it started from
-  const canUndo = () => history.size > 0 && !locked && !brush.stroking() && (queue?.size ?? 0) === 0;
-  const syncUndo = () => { undoButton.disabled = !canUndo(); };
 
   // A redraw walks a whole tile, so tiles changed by many cells are redrawn once per frame.
   const flush = () => {
@@ -73,21 +73,6 @@ export function initLabels({ map, say, onBusy, onChange, onPaint, panning }: Dep
   const redraw = (keys: Iterable<string>) => {
     for (const k of keys) dirty.add(k);
     if (!frame) frame = requestAnimationFrame(flush);
-  };
-  const clearHistory = () => {
-    history.clear();
-    current = null;
-    syncUndo();
-  };
-  const undo = () => {
-    if (!canUndo()) return;
-    const keys = history.undo();
-    if (keys) {
-      keepMasks(store, queue!.masks, null);
-      redraw(keys);
-      onChange(); // Seed mode, Import, Seed and Export follow the store (spec 004)
-    }
-    syncUndo();
   };
 
   const setMode = (m: BrushMode) => {
@@ -127,7 +112,6 @@ export function initLabels({ map, say, onBusy, onChange, onPaint, panning }: Dep
   };
   render();
 
-  undoButton.addEventListener("click", undo);
   $("mode-paint").addEventListener("click", () => setMode("paint"));
   $("mode-pan").addEventListener("click", () => setMode("pan"));
   $("brush-smaller").addEventListener("click", () => step(-1));
@@ -144,13 +128,7 @@ export function initLabels({ map, say, onBusy, onChange, onPaint, panning }: Dep
   // Keyboard users press a control they tabbed to with Space; a mouse click leaves focus there, and then Space means Pan
   const nativeSpace = (el: Element | null) => inTextField(el) || el instanceof HTMLSelectElement
     || (keyFocused && (el instanceof HTMLButtonElement || el instanceof HTMLInputElement));
-  const mac = /Mac|iPhone|iPad/.test(navigator.platform);
   window.addEventListener("keydown", (e) => {
-    // Ctrl+Z (Cmd+Z on macOS); a text field keeps its own undo
-    if (e.key.toLowerCase() === "z" && (mac ? e.metaKey : e.ctrlKey) && !e.shiftKey && !e.altKey) {
-      if (open && !inTextField(document.activeElement)) { e.preventDefault(); undo(); }
-      return;
-    }
     if (!open || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.code === "Space") {
       if (!nativeSpace(document.activeElement)) { e.preventDefault(); brush.setSpace(true); }
@@ -173,14 +151,14 @@ export function initLabels({ map, say, onBusy, onChange, onPaint, panning }: Dep
     locked = on;
     brush.setLocked(on);
     render();
-    syncUndo();
+    undo.sync();
   }
 
   return {
     /** Start labelling newly opened local imagery: an empty store, no masks, Paint mode. */
     open(source: RasterSource): void {
       queue?.clear();
-      clearHistory(); // after the queue, which hands its dropped strokes to the history
+      undo.clear(); // after the queue, which hands its dropped strokes to the history
       overlays?.clear();
       dirty.clear();
       const { width, height, epsg, gt } = source.meta;
@@ -188,24 +166,24 @@ export function initLabels({ map, say, onBusy, onChange, onPaint, panning }: Dep
       store = emptyStore(width, height);
       lock(false);
       queue = new PaintQueue(source, () => store, {
-        applied: (w: Window) => { redraw(tileKeys(w)); onChange(); syncUndo(); },
+        applied: (w: Window) => { redraw(tileKeys(w)); onChange(); undo.sync(); },
         full: () => say(MESSAGES.labelLimit),
-        busy: () => { onBusy(); syncUndo(); },
+        busy: () => { onBusy(); undo.sync(); },
         error: (e) => say((e as Error).message),
-      }, history);
+      }, undo.history);
       overlays = new LabelOverlays(map, grid);
       open = true;
       panel.hidden = false;
       brush.setImagery(grid);
       setMode("paint");
       onChange();
-      syncUndo();
+      undo.sync();
     },
     /** Swap in seeded labels and their class list (spec 004); masks of tiles no longer stored are freed. */
     replace(next: LabelStore, list: LabelClass[]): void {
       const keys = new Set([...store.tiles.keys(), ...next.tiles.keys()]);
       store = next;
-      clearHistory(); // a seed isn't undoable, and strokes recorded against the old store can't be undone over it
+      undo.clear(); // a seed isn't undoable, and strokes recorded against the old store can't be undone over it
       classes.splice(0, classes.length, ...list);
       if (selected >= classes.length) selected = 0;
       // the queue is empty (seeding waits for it), so no footprint is pending (spec 003 Storage)
@@ -220,8 +198,6 @@ export function initLabels({ map, say, onBusy, onChange, onPaint, panning }: Dep
     current: () => ({ store, classes }),
     setMode,
     syncHandlers: brush.syncHandlers,
-    /** Empty the undo history (the store was replaced) and update the Undo button. */
-    clearHistory,
     /** A paint or erase stroke is in progress. */
     stroking: brush.stroking,
     /** True when any pixel is labelled (no all-zero tile is kept). */
