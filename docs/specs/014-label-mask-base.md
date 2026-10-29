@@ -48,7 +48,7 @@ paintPreview(values: Uint8Array, hidden: Uint8Array, colours: string[], rgba: Ui
   - If storing a tile would pass `MAX_LABEL_TILES`, the cell changes nothing and ui shows "Label limit reached (256 edited tiles of 256 x 256 px). Undo strokes, or export the labels and import the export."
   - Undo deletes a null-recorded tile, so the mask shows again and the space is freed.
 - **Display.** The base is one canvas image source with nearest resampling, layer and source id `mask`, whose `raster-opacity` is spec 016's Opacity value (default 0.6) and which is hidden while Show labels is off, in a new slot `mask` between the imagery preview and the label overlays. The id must not start with `label-`, which `beforeSlot` and existing tests treat as an overlay.
-  - Preview pixels whose cell lies in a key present in `tiles` are hidden, so that tile's full-resolution overlay (ADR 0016) alone shows there.
+  - Preview pixels whose cell lies in a key present in `tiles` are hidden, so that tile's full-resolution overlay (ADR 0019) alone shows there.
   - It repaints when a key is added to or removed from `tiles`, and on recolour.
 - **Export labels** writes, for each window, the stored tile, else the base tile, else zeros. It reads files only for base windows with no stored tile.
 - **The mask file** is read for the whole session; nothing copies it. A read can fail because the file changed (`NotReadableError`) or is gone (`NotFoundError`), per the W3C File API. Then the cell or the export changes nothing, and ui shows "The label mask can't be read any more. Import it again."
