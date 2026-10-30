@@ -41,14 +41,9 @@ export async function openLabelTiff(tiff: GeoTIFF): Promise<LabelSource> {
     meta,
     classItem: typeof item === "string" ? item : null,
     async read(w) {
-      try {
-        const [band] = (await image.readRasters({ window: [w.x0, w.y0, w.x0 + w.width, w.y0 + w.height], samples: [0] })) as unknown as Uint8Array[];
-        return band!;
-      } catch (e) {
-        // geotiff.js's FileReader source rejected with the error event (the File API's error is on its target); kept for other sources
-        const inner = (e as { target?: { error?: unknown } } | null)?.target?.error;
-        throw inner instanceof Error ? inner : e;
-      }
+      // blobSource rejects with Blob.arrayBuffer's own DOMException (NotReadableError, NotFoundError), which maskReadFailed reads
+      const [band] = (await image.readRasters({ window: [w.x0, w.y0, w.x0 + w.width, w.y0 + w.height], samples: [0] })) as unknown as Uint8Array[];
+      return band!;
     },
   };
 }
