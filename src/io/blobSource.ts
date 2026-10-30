@@ -7,11 +7,14 @@ export const MAX_FETCH = 16 * 2 ** 20;
 
 type Request = { slices: Range[]; out: ArrayBuffer[]; left: number; resolve(b: ArrayBuffer[]): void; reject(e: unknown): void; done: boolean; signal?: AbortSignal; onAbort?: () => void };
 
+export type BlobSource = ReturnType<typeof blobSource>;
+
 /** geotiff.js source over a Blob that reads each run of nearby slices requested in one task with one call (spec 025). */
 export function blobSource(blob: Blob) {
   const size = blob.size;
   let queue: Request[] = [];
   let timer: ReturnType<typeof setTimeout> | null = null;
+  let held: { offset: number; buf: ArrayBuffer }[] = [];
 
   const settle = (r: Request) => {
     r.done = true;
@@ -52,12 +55,30 @@ export function blobSource(blob: Blob) {
     r.reject(e);
   }
 
+  /** The held bytes of a slice, copied (geotiff may rewrite them), or null when not wholly held. */
+  function fromHeld({ offset, length }: Range): ArrayBuffer | null {
+    const h = held.find((x) => offset >= x.offset && offset + length <= x.offset + x.buf.byteLength);
+    return h ? h.buf.slice(offset - h.offset, offset - h.offset + length) : null;
+  }
+
   return {
     fileSize: size,
+    /** Reads the ranges now, in calls of at most MAX_FETCH, and serves fetches inside them with no file call until the release is called. */
+    // spec 028 caps a geotiff read at 512 KiB, so a band's reads would each wait on a file call of their own (spec 024's tiled import)
+    async hold(ranges: Range[]): Promise<() => void> {
+      const clipped = ranges.map(({ offset, length }) => ({ offset, length: Math.min(offset + length, size) - offset })).filter((r) => r.length > 0);
+      const got = await Promise.all(mergeRanges(clipped, MERGE_GAP, MAX_FETCH).map(async (r) => ({ offset: r.offset, buf: await blob.slice(r.offset, r.offset + r.length).arrayBuffer() })));
+      held.push(...got);
+      return () => { held = held.filter((h) => !got.includes(h)); };
+    },
     fetch(slices: Range[], signal?: AbortSignal): Promise<ArrayBuffer[]> {
       const aborted = () => new DOMException("Read aborted", "AbortError");
       if (signal?.aborted) return Promise.reject(aborted());
       if (slices.length === 0) return Promise.resolve([]);
+      if (held.length) {
+        const bufs = slices.map(fromHeld);
+        if (bufs.every((b) => b !== null)) return Promise.resolve(bufs as ArrayBuffer[]);
+      }
       return new Promise((resolve, reject) => {
         const r: Request = { slices, out: new Array<ArrayBuffer>(slices.length), left: slices.length, resolve, reject, done: false, signal };
         if (signal) { r.onAbort = () => fail(r, aborted()); signal.addEventListener("abort", r.onAbort); }
