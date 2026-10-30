@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { applyAffine, fromLonLat, toLonLat } from "../../src/core/crs";
 import { footprint, footprintRing } from "../../src/core/pixel";
 import type { Affine, Grid } from "../../src/core/types";
-import { BACKGROUND, clickAt, hideImagery, hoverFeatures, jumpTo, message, openApp, openRaster, paintMode, settled, tiff, toScreen, type LngLat } from "./helpers";
+import { BACKGROUND, clickAt, hideImagery, jumpTo, message, openApp, openRaster, paintMode, settled, tiff, toScreen, type LngLat } from "./helpers";
 
 // Spec 018 criterion 3: after a dab, the colour covers exactly the pixels the hover outline marks.
 // Positions and sizes are fixed; at least 10 per raster are where main's shared overlay grid put a painted
@@ -65,6 +65,13 @@ function samples(page: Page, ring: LngLat[]) {
   }, ring);
 }
 
+/** The brush hover still shows: a rendered hover feature, or its source still loading. */
+const hoverDrawn = (page: Page) => page.evaluate(() => {
+  const { map } = (window as any).__geoapp;
+  if (!map.getSource("brush-hover")) return false;
+  return !map.isSourceLoaded("brush-hover") || map.queryRenderedFeatures({ layers: ["brush-hover-fill", "brush-hover-line"] }).length > 0;
+});
+
 /** Two animation frames: the label display redraws on the next one. */
 const frames = (page: Page) => page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))));
 
@@ -96,8 +103,9 @@ for (const [name, grid] of RASTERS) {
         await clickAt(page, await toScreen(page, lonLat(c + 0.5, r + 0.5)));
         await settled(page);
         await page.mouse.move(panel.x + panel.width / 2, panel.y + 10); // no outline over the samples
-        // the outline stays drawn about 2 frames after the pointer leaves: wait until the hover source is empty, then one more frame (spec 029)
-        await expect.poll(async () => (await hoverFeatures(page)).length).toBe(0);
+        // the outline stays drawn a few frames after the pointer leaves, while the worker rebuilds the hover tile: wait until
+        // no hover feature is rendered and the hover source is loaded, then one more frame (spec 029)
+        await expect.poll(() => hoverDrawn(page)).toBe(false);
         await frames(page);
         const ring = footprintRing(grid, footprint(grid, c, r, side)!) as LngLat[];
         for (const p of await samples(page, ring)) {

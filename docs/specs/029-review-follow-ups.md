@@ -23,8 +23,7 @@
    - The text of spec 026 Scope 3 changes to match.
 4. **No tile update on open while panning** (`ui/imagery.ts:66-74`). `open()` calls `update()` only when `!nav.moving()`. Otherwise the settle update (spec 027) loads the tiles.
 5. **Reliable tests.**
-   - `labelQuads.lattice.tester.test.ts`, "Gage's grid: every tile of a 1000 x 700 raster…" (about 5.6 s under load): checks a fixed sample of tiles instead.
-     - Sample: every corner tile, every edge tile and 16 interior tiles chosen with a fixed seed.
+   - `labelQuads.lattice.tester.test.ts`, "Gage's grid: every tile of a 1000 x 700 raster…" (about 5.6 s under load): still checks every tile (all 12 are corner or edge tiles), but projects each corner once and makes one `expect` per quad.
      - It must run in ≤ 1.5 s alone.
    - `pipeline.preview.test.ts`, "leaves the previews of files without overviews unchanged": uses fixtures or sizes that run in ≤ 1.5 s alone. Its comparison stays byte-equal.
    - `label-alignment.spec.ts:72` (spec 018 criterion 3) reads pixels only after the hover source has no features and one further frame has rendered, since the outline stays drawn about 2 frames after the pointer leaves for the panel.
