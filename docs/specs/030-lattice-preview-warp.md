@@ -22,6 +22,9 @@
    - Spec 014 criterion 1 (brute-force cells) is unchanged.
 3. **Follow-up, spec 029 wording:** Scope 3's "drops the oldest first" becomes "drops the least recently used first".
 4. **Follow-up, file size:** `io/maskCache.ts` is at 204 lines. `readBand`'s read planning (the plan, the cap, `rowReads`, `groupReads` and the read function) moves to a new `io/bandReads.ts`, with no behaviour change.
+5. **Yield before the warp.** `buildPreview` now yields with `yieldToBrowser()` (a `MessageChannel` post) instead of `setTimeout(r, 20)`. In slow runs that timer fired 200–300 ms late and held up the open. Spec 019 never specified the 20 ms.
+
+**Known limits:** `latticeEach` checks only nodes and cell centres, so a feature smaller than a cell can slip through: a NaN hole under 16 px, or a ripple with a 16 px period. Real proj4 grids are smooth and their NaN regions are large, and no tested real grid misses.
 
 **Out of scope:**
 - Workers.
@@ -52,6 +55,7 @@ export function latticeEach(width: number, height: number, exact: (u: number, v:
 4. **Real chunks, `run.mjs`, open phase:**
    - Typical: `toPreviewDrawnMs` ≤ **450 ms** (was 680), with the longest of `longTasks` ≤ **100 ms** (was 366).
    - Chunk 11: longest task ≤ **80 ms** (was 166).
+   - These targets are judged on the median of warm runs, with the cold run discarded. About 1 run in 4–8 has a 100–300 ms whole-browser idle stall that the app can't influence (a Chrome trace shows every thread idle).
 5. **Real chunks, `run.mjs`, import phase, typical chunk:** the longest of `longTasks` ≤ **100 ms** (was about 341).
 6. **Code:**
    - `io/maskCache.ts` is ≤ 200 lines.
