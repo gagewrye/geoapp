@@ -41,7 +41,8 @@ function sink() {
   const drawn = new Map<string, Uint8ClampedArray>();
   return { drawn, use: (k: string) => drawn.has(k), draw: (k: string, _l: Level, _t: Window, rgba: Uint8ClampedArray) => { drawn.set(k, rgba.slice()); } };
 }
-const flush = () => new Promise((r) => setTimeout(r, 0));
+// a few tasks: draws past spec 028's 8 ms budget (a cold first draw) continue after a yield
+const flush = async () => { for (let i = 0; i < 4; i++) await new Promise((r) => setTimeout(r, 0)); };
 const R3: [number, number][] = [[0, 255], [0, 255], [0, 255]];
 
 describe("ImageryLoader, tester", () => {
@@ -168,7 +169,8 @@ describe("ImageryLoader, tester", () => {
     const W = 4096, H = 4096, v = (k: number, c: number, r: number) => (k * 9 + c + 2 * r) % 250;
     const { source, reads, grid } = held(W, H, 3, v, { block: [W, 1] });
     void grid;
-    source.block.bytes = 98304; // 1-row strips that decode 96 KiB: 170 rows a read
+    source.block.bytes = 98304; // 1-row strips that decode 96 KiB, read raw: 170 rows a read (MAX_READ_BYTES)
+    source.raw = [0];
     const s = sink();
     const errors: unknown[] = [];
     const loader = new ImageryLoader(source, R3, s, (e) => errors.push(e));
@@ -184,7 +186,7 @@ describe("ImageryLoader, tester", () => {
     expect(errors).toHaveLength(1);
     const before = reads.length;
     loader.show(plan);
-    for (let i = 0; i < 10; i++) { for (const r of reads) r.settle(); await flush(); }
+    for (let i = 0; i < 30; i++) { for (const r of reads) r.settle(); await flush(); }
     expect(reads.length - before).toBe(7); // read again from the start
     const rgba = s.drawn.get("4-256,0")!;
     for (const [i, j] of [[0, 0], [100, 42], [255, 255]]) expect(rgba[4 * (j! * 256 + i!)]).toBe(v(0, (256 + i!) * 4 + 2, j! * 4 + 2));

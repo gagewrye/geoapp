@@ -1,11 +1,12 @@
 import { maskSamples } from "../core/alpha";
 import type { Window } from "../core/grid";
-import { rowReads } from "../core/imagery";
+import { MAX_READ_BYTES, rowReads, TASK_READ_BYTES } from "../core/imagery";
 import { markNodata } from "../core/nodata";
 import { nodataPossible } from "../core/seed";
 import { TILE_SIZE } from "../core/types";
 import { bandOrder, compactMask, MaskStore, type ValidMask } from "../core/validMask";
 import type { RasterSource } from "./source";
+import { yieldToBrowser } from "./yieldTask";
 
 /** Priorities of need(): a queued stroke cell waits on the band, or the Paint hover is near it (spec 023 F3). */
 export const STROKE = 0, HOVER = 1;
@@ -21,13 +22,14 @@ type Deps = {
   retryMs?: number;
   /** Mask array budget (tests); MASK_BYTES by default. */
   maskBytes?: number;
+  /** The yield between background bands (tests pass a fake); yieldToBrowser by default. */
+  yieldTask?: () => Promise<void>;
 };
 /** A band's waiters, and the windows (by x0) they need: "all" for the whole band. */
 type Request = { priority: number; want: Set<number> | "all"; waiters: { resolve: () => void; reject: (e: unknown) => void }[] };
 
 type Read = Window & { bands: ArrayLike<number>[] };
 
-const macrotask = () => new Promise<void>((r) => setTimeout(r, 0));
 
 /** Valid masks of a raster's 256x256 windows, read one 256-row band at a time and kept for its life (spec 023 F1-F3, ADR 0021). */
 // One read at a time: stroke bands, then hover bands, then the background from the view's centre band outwards,
@@ -137,7 +139,7 @@ export class MaskCache {
         if (error || !this.missing(n.band, "all").length) this.read.add(n.band);
         for (const w of n.request?.waiters ?? []) if (error) w.reject(error); else w.resolve();
         // a background error is left for a stroke's own need() to report
-        if (!n.request || error) await macrotask(); // yield between background reads
+        if (!n.request || error) await (this.deps.yieldTask ?? yieldToBrowser)(); // yield between background bands (spec 028)
       }
     } finally {
       this.running = false;
@@ -152,7 +154,7 @@ export class MaskCache {
     if (!missing.length) return;
     const { meta } = this.source;
     const { width, height, bandCount, nodata, float, alpha } = meta;
-    const { block, readSamples } = this.source;
+    const { block, readSamples, raw } = this.source;
     const first = missing[0]!, last = missing[missing.length - 1]!;
     const strips = !block || block.width >= width;
     const windows = strips ? this.windows(first.y0 / TILE_SIZE).filter((w) => w.x0 >= first.x0 && w.x0 <= last.x0) : missing;
@@ -163,8 +165,10 @@ export class MaskCache {
     const m = maskSamples(bandCount, nodata, float, alpha);
     const bits = windows.map((w) => new Uint8Array(Math.ceil((w.width * w.height) / 8)));
     const plan = strips ? [{ x0: first.x0, y0: first.y0, width: last.x0 + last.width - first.x0, height: first.height }] : missing;
+    // geotiff decodes a read in one task, so its reads are smaller (spec 028); raw reads copy only the samples asked for
+    const cap = raw?.includes(0) ? MAX_READ_BYTES : TASK_READ_BYTES;
     const reads: (() => Promise<Read>)[] = block && readSamples
-      ? rowReads(plan, 1, block, width, height).map((r) => async () => ({ ...r, bands: await readSamples.call(this.source, 0, r.x0, r.y0, r.width, r.height, m.samples) }))
+      ? rowReads(plan, 1, block, width, height, cap).map((r) => async () => ({ ...r, bands: await readSamples.call(this.source, 0, r.x0, r.y0, r.width, r.height, m.samples) }))
       // readWindow decodes every band as Float32: bound its reads as if each 256 px row segment were a block
       : rowReads(plan, 1, { width: TILE_SIZE, height: 1, bytes: TILE_SIZE * bandCount * 4 }, width, height).map((r) => async () => {
         const t = await this.source.readWindow(r.x0, r.y0, r.width, r.height);

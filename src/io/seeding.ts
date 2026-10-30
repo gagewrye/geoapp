@@ -10,9 +10,7 @@ import type { LabelSource } from "./labelFile";
 import { gather, gridOf, type MaskBase } from "./maskBase";
 import { MaskCache, STROKE } from "./maskCache";
 import type { RasterSource } from "./source";
-
-/** Work between yields during an import, ms. Spec 028's TASK_BUDGET_MS (io/yieldTask.ts) has the same value; 028 will unify them. */
-const TASK_BUDGET_MS = 8;
+import { TASK_BUDGET_MS } from "./yieldTask";
 
 /** seedWindows (row-major) grouped by row. */
 function rowsOf(windows: Window[]): Window[][] {

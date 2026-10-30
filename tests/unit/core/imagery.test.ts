@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { blockWindows, decodedBytes, IMAGERY_TILES, imageryQuads, MAX_READ_BYTES, planView, rowReads, toRgba, type Block, type Overview } from "../../../src/core/imagery";
+import { blockWindows, decodedBytes, IMAGERY_TILES, imageryQuads, MAX_READ_BYTES, planView, rowReads, TASK_READ_BYTES, toRgba, type Block, type Overview } from "../../../src/core/imagery";
 import type { Window } from "../../../src/core/grid";
 import { QUAD_ERR, tileQuads } from "../../../src/core/labelQuads";
 import { tileWindow } from "../../../src/core/labelStore";
@@ -194,6 +194,19 @@ describe("rowReads (criteria 6, A1)", () => {
     const reads = rowReads([{ x0: 0, y0: 0, width: 256, height: 256 }, { x0: 256, y0: 0, width: 256, height: 256 }], 2, big, 4096, 4096);
     expect(reads).toHaveLength(4); // 4 x 2 blocks, two per read
     for (const r of reads) expect(decodedBytes(r, big, 4096, 4096)).toBe(12 * 2 ** 20);
+  });
+});
+
+describe("rowReads with a cap (spec 028 scope 2)", () => {
+  it("splits so each read decodes at most TASK_READ_BYTES when asked, at block edges", () => {
+    expect(TASK_READ_BYTES).toBe(2 ** 19);
+    const strips: Block = { width: 22300, height: 1, bytes: 22300 * 4 };
+    const tiles = [0, 256, 512].map((x0) => ({ x0, y0: 256, width: 256, height: 256 }));
+    const reads = rowReads(tiles, 2, strips, 22300, 22300, TASK_READ_BYTES);
+    const per = Math.floor(TASK_READ_BYTES / strips.bytes);
+    expect(reads.map((r) => r.height)).toEqual([...Array(Math.floor(512 / per)).fill(per), 512 % per]);
+    for (const r of reads) expect(decodedBytes(r, strips, 22300, 22300)).toBeLessThanOrEqual(TASK_READ_BYTES);
+    expect(rowReads(tiles, 2, strips, 22300, 22300)).toEqual(rowReads(tiles, 2, strips, 22300, 22300, MAX_READ_BYTES)); // the default
   });
 });
 
