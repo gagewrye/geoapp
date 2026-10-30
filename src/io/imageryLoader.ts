@@ -109,17 +109,23 @@ export class ImageryLoader {
     const step = level.overview === null ? level.s : 1;
     const { width, height } = this.image(level);
     const win = { ...read, bands };
-    for (const p of job.tiles) {
-      if (p.broken) continue;
-      const n = p.tile.width * p.tile.height;
-      p.bands ??= bands.map(() => new Float32Array(n));
-      const out: Tile = { ...p.tile, nodata: null, bands: p.bands };
-      decimateInto(out, win, step, width, height);
-      if (--p.left > 0) continue;
-      this.pending.delete(p.key);
-      const rgba = new Uint8ClampedArray(4 * n);
-      toRgba(p.bands, n, this.ranges, this.source.meta.nodata, rgba);
-      this.sink.draw(p.key, level, p.tile, rgba);
+    try {
+      for (const p of job.tiles) {
+        if (p.broken) continue;
+        const n = p.tile.width * p.tile.height;
+        p.bands ??= bands.map(() => new Float32Array(n));
+        const out: Tile = { ...p.tile, nodata: null, bands: p.bands };
+        decimateInto(out, win, step, width, height);
+        if (--p.left > 0) continue;
+        this.pending.delete(p.key);
+        const rgba = new Uint8ClampedArray(4 * n);
+        toRgba(p.bands, n, this.ranges, this.source.meta.nodata, rgba);
+        this.sink.draw(p.key, level, p.tile, rgba);
+      }
+    } catch (e) {
+      // e.g. addSource after a WebGL context loss: the job's undrawn tiles are asked for again on a later view
+      this.drop(job);
+      this.onError(e);
     }
   }
 }

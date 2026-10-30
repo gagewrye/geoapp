@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { fromArrayBuffer } from "geotiff";
 import { maskBit, nodataMask } from "../../../src/core/nodata";
+import { MAX_BLOCK_BYTES } from "../../../src/core/imagery";
 import { openGeoTiff } from "../../../src/io/geotiffSource";
 import { geotiffBuffer } from "../helpers/sources";
 import { uint8Tiff, withOverviews, type FixtureImage } from "../helpers/tiffFixtures";
@@ -46,17 +47,17 @@ describe("blocks, overviews and sample reads (spec 020)", () => {
       { width: 50, height: 40, bands: 3, value: v, layout: { rows: 40 } }, // a second page, not an overview
     ];
     const src = await openGeoTiff(await fromArrayBuffer(uint8Tiff(images, geo)));
-    expect(src.block).toEqual({ width: 128, height: 64, bytes: 128 * 64 * 3, sampleBytes: 1 });
+    expect(src.block).toEqual({ width: 128, height: 64, bytes: 128 * 64 * 3 });
     const block = { width: 128, height: 64, bytes: 128 * 64 * 3 }; // overviews' own blocks bound their reads (spec 020 A1)
     expect(src.overviews).toEqual([{ index: 1, width: 300, height: 200, block }, { index: 2, width: 150, height: 100, block }]);
   });
 
   it("reports a strip as width x RowsPerStrip", async () => {
     const src = await openGeoTiff(await fromArrayBuffer(uint8Tiff([{ width: 70, height: 50, bands: 1, value: v, layout: { rows: 8 } }], geo)));
-    expect(src.block).toEqual({ width: 70, height: 8, bytes: 560, sampleBytes: 1 });
+    expect(src.block).toEqual({ width: 70, height: 8, bytes: 560 });
     expect(src.overviews).toEqual([]);
     const single = await openGeoTiff(await fromArrayBuffer(geotiffBuffer(30, 20, 3, () => 1, geo)));
-    expect(single.block).toEqual({ width: 30, height: 20, bytes: 30 * 20 * 3 * 4, sampleBytes: 4 });
+    expect(single.block).toEqual({ width: 30, height: 20, bytes: 30 * 20 * 3 * 4 });
   });
 
   it("reads the asked bands of a window as raw typed arrays, from the full image or an overview", async () => {
@@ -75,5 +76,20 @@ describe("blocks, overviews and sample reads (spec 020)", () => {
     const ac = new AbortController();
     ac.abort();
     await expect(src.readSamples(0, 0, 0, 600, 400, [0, 1, 2], ac.signal)).rejects.toMatchObject({ name: "AbortError" });
+  });
+});
+
+describe("overview blocks (spec 020, review)", () => {
+  it("skips an overview whose block is over MAX_BLOCK_BYTES, so its level decimates or shows the preview", async () => {
+    const geo = { epsg: 32633, gt: [400000, 30, 0, 5300000, 0, -30] as [number, number, number, number, number, number] };
+    const v = (k: number, c: number, r: number) => (k + c + r) & 255;
+    const images: FixtureImage[] = [
+      { width: 512, height: 512, bands: 3, value: v, layout: { tile: [256, 256] } },
+      { width: 2500, height: 2300, bands: 3, value: v, layout: { rows: 2300 }, subfile: 1 }, // one 16.45 MiB strip
+      { width: 256, height: 256, bands: 3, value: v, layout: { rows: 16 }, subfile: 1 },
+    ];
+    const src = await openGeoTiff(await fromArrayBuffer(uint8Tiff(images, geo)));
+    expect(2500 * 2300 * 3).toBeGreaterThan(MAX_BLOCK_BYTES);
+    expect(src.overviews).toEqual([{ index: 2, width: 256, height: 256, block: { width: 256, height: 16, bytes: 256 * 16 * 3 } }]);
   });
 });

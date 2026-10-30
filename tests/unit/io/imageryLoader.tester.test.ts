@@ -19,7 +19,7 @@ function held(W: number, H: number, bandCount: number, value: (k: number, c: num
   const [bw, bh] = opts.block ?? [256, 256];
   const source: ImagerySource = {
     ...inner,
-    block: { width: bw, height: bh, bytes: bw * bh * bandCount * Arr.BYTES_PER_ELEMENT, sampleBytes: Arr.BYTES_PER_ELEMENT },
+    block: { width: bw, height: bh, bytes: bw * bh * bandCount * Arr.BYTES_PER_ELEMENT },
     overviews: [],
     readSamples(image, x0, y0, w, h, bands, signal) {
       return new Promise((resolve, reject) => {
@@ -113,7 +113,7 @@ describe("ImageryLoader, tester", () => {
     }
     expect(peak).toBeLessThanOrEqual(2);
     for (const r of reads) {
-      expect(r.win.width * r.win.height * r.bands.length * source.block.sampleBytes).toBeLessThanOrEqual(MAX_READ_BYTES);
+      expect(r.win.width * r.win.height * r.bands.length).toBeLessThanOrEqual(MAX_READ_BYTES);
     }
   });
 

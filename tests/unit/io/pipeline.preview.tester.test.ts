@@ -15,7 +15,7 @@ function refusing(W: number, H: number, bw: number, bh: number, bandCount = 3) {
   const { source: inner } = fakeSource({ width: W, height: H, bandCount }, () => 1);
   const reads: { w: number; h: number; bands: number[] }[] = [];
   const source: ImagerySource = {
-    ...inner, overviews: [], block: { width: bw, height: bh, bytes: bw * bh * bandCount, sampleBytes: 1 },
+    ...inner, overviews: [], block: { width: bw, height: bh, bytes: bw * bh * bandCount },
     readSamples: async (_i, _x, _y, w, h, bands) => { reads.push({ w, h, bands }); throw new Error("stop"); },
   };
   return { source, reads };

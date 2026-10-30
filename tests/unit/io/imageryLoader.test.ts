@@ -14,7 +14,7 @@ const value = (k: number, c: number, r: number) => (k * 7 + c + r) % 200;
 type Pending = { image: number; win: Window; signal: AbortSignal | undefined; resolve: () => void; fail: (e: unknown) => void };
 
 /** A source whose sample reads wait until released; band k of pixel (c, r) is value(k, c, r). */
-function heldSource(block = { width: 256, height: 256, bytes: 256 * 256 * 3, sampleBytes: 1 }) {
+function heldSource(block = { width: 256, height: 256, bytes: 256 * 256 * 3 }) {
   const { source: inner } = fakeSource({ width: W, height: H, gt: GRID.gt }, value);
   const pending: Pending[] = [];
   const source: ImagerySource = {
@@ -112,7 +112,7 @@ describe("ImageryLoader (criterion 8)", () => {
 
   it("fills a tile from several block-bounded reads and draws it once the last one lands (A1)", async () => {
     // 1-row strips of 98,304 B: a 1024-row read would decode 96 MiB, so it splits into reads of 170 rows
-    const { source, pending } = heldSource({ width: W, height: 1, bytes: 98304, sampleBytes: 8 });
+    const { source, pending } = heldSource({ width: W, height: 1, bytes: 98304 });
     const s = sink();
     const loader = new ImageryLoader(source, [[0, 255], [0, 255], [0, 255]], s);
     const dec: Level = { s: 4, overview: null, grid: { ...GRID, width: W / 4, height: H / 4, gt: [500000, 120, 0, 5000000, 0, -120] } };
@@ -129,7 +129,7 @@ describe("ImageryLoader (criterion 8)", () => {
   });
 
   it("draws nothing for a tile whose reads were cut short, and reads it again on a later view", async () => {
-    const { source, pending } = heldSource({ width: W, height: 1, bytes: 98304, sampleBytes: 8 });
+    const { source, pending } = heldSource({ width: W, height: 1, bytes: 98304 });
     const s = sink();
     const loader = new ImageryLoader(source, [[0, 255], [0, 255], [0, 255]], s);
     const dec: Level = { s: 4, overview: null, grid: { ...GRID, width: W / 4, height: H / 4, gt: [500000, 120, 0, 5000000, 0, -120] } };
@@ -166,5 +166,26 @@ describe("read failures (criterion 10)", () => {
     expect(errors).toHaveLength(2);
     loader.show({ level: LEVEL, tiles: row(0, [0]) });
     expect(pending.at(-1)!.win).toEqual({ x0: 0, y0: 0, width: 256, height: 256 });
+  });
+
+  it("a draw that throws (e.g. after a WebGL context loss) reports the error and leaves the job's tiles to be asked for again", async () => {
+    const { source, pending } = heldSource();
+    const errors: unknown[] = [];
+    let fail = true;
+    const drawn: string[] = [];
+    const sink = { use: (k: string) => drawn.includes(k), draw: (k: string) => { if (fail) throw new Error("addSource"); drawn.push(k); } };
+    const loader = new ImageryLoader(source, [[0, 1], [0, 1], [0, 1]], sink, (e) => errors.push(e));
+    loader.show({ level: LEVEL, tiles: row(0, [0, 256]) }); // one read, two tiles
+    expect(pending).toHaveLength(1);
+    pending[0]!.resolve();
+    await flush();
+    expect(errors).toEqual([new Error("addSource")]);
+    fail = false;
+    loader.show({ level: LEVEL, tiles: row(0, [0, 256]) });
+    expect(pending).toHaveLength(2);
+    expect(pending[1]!.win).toEqual({ x0: 0, y0: 0, width: 512, height: 256 });
+    pending[1]!.resolve();
+    await flush();
+    expect(drawn.sort()).toEqual(["1-0,0", "1-256,0"]);
   });
 });

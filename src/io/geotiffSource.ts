@@ -1,6 +1,6 @@
 import { fromBlob, type GeoTIFF, type GeoTIFFImage } from "geotiff";
 import { affineFromTags } from "../core/geotags";
-import type { Block, Overview } from "../core/imagery";
+import { MAX_BLOCK_BYTES, type Block, type Overview } from "../core/imagery";
 import type { GeoTags, ImagerySource, RasterMeta } from "./source";
 
 const stripNul = (s: unknown) => (typeof s === "string" ? s.replace(/\0+$/, "") : undefined);
@@ -40,13 +40,15 @@ export async function openGeoTiff(tiff: GeoTIFF): Promise<ImagerySource> {
     const t = Number(im.fileDirectory.getValue("NewSubfileType") ?? 0);
     // geotiff's own overview rule (geotiff.js:328-333), minus masks; other bands can't stand in for the image
     if (!(t & 1) || t & 4 || im.getSamplesPerPixel() !== bandCount) continue;
+    // a block over the limit would be decoded whole by every read at its level, so that level decimates or shows the preview
+    const block = blockOf(im);
+    if (block.bytes > MAX_BLOCK_BYTES) continue;
     images.set(i, im);
-    overviews.push({ index: i, width: im.getWidth(), height: im.getHeight(), block: blockOf(im) });
+    overviews.push({ index: i, width: im.getWidth(), height: im.getHeight(), block });
   }
-  const sampleBytes = Math.max(...Array.from({ length: bandCount }, (_, k) => image.getSampleByteSize(k)));
   return {
     meta: { width, height, bandCount, gt, epsg, nodata, geoTags },
-    block: { ...blockOf(image), sampleBytes },
+    block: blockOf(image),
     overviews,
     async readSamples(index, x0, y0, w, h, samples, signal) {
       signal?.throwIfAborted();

@@ -25,7 +25,7 @@ function source(bytes: number) {
   const reads: number[] = [];
   const { source: inner } = fakeSource({ width: 1000, height: 1000, epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01] }, () => 1);
   const s: ImagerySource = {
-    ...inner, overviews: [], block: { width: 1000, height: 1000, bytes, sampleBytes: 1 },
+    ...inner, overviews: [], block: { width: 1000, height: 1000, bytes },
     readSamples: (i) => { reads.push(i); return new Promise(() => {}); },
   };
   return { s, reads };
@@ -68,7 +68,7 @@ describe("tile read failures (criterion 10)", () => {
   /** A source whose sample reads all fail with `e`. */
   function failing(e: () => unknown) {
     const { source: inner } = fakeSource({ width: 1000, height: 1000, epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01] }, () => 1);
-    const s: ImagerySource = { ...inner, overviews: [], block: { width: 256, height: 256, bytes: 3 * 2 ** 16, sampleBytes: 1 }, readSamples: async () => { throw e(); } };
+    const s: ImagerySource = { ...inner, overviews: [], block: { width: 256, height: 256, bytes: 3 * 2 ** 16 }, readSamples: async () => { throw e(); } };
     return s;
   }
   const flush = () => new Promise((r) => setTimeout(r, 0));
