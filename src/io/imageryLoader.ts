@@ -4,7 +4,7 @@ import type { Window } from "../core/grid";
 import { MAX_READ_BYTES, rowReads, TASK_READ_BYTES, toRgba, type Block, type Level } from "../core/imagery";
 import type { Tile } from "../core/types";
 import type { ImagerySource } from "./source";
-import { yieldToBrowser } from "./yieldTask";
+import { TASK_BUDGET_MS, yieldToBrowser } from "./yieldTask";
 
 /** Where drawn tiles go: `use` says whether a tile is already drawn, marking it recently used. */
 export type TileSink = {
@@ -15,8 +15,8 @@ export type TileSink = {
 /** A tile's key: its level's step and its corner in the level grid. */
 export const tileKey = (level: Level, t: Window) => `${level.s}-${t.x0},${t.y0}`;
 
-/** Spec 028: draws in one task stop once this many ms have passed in it, and the rest wait for the next task. */
-export const DRAW_BUDGET_MS = 8;
+/** Spec 028: draws and decimation in one task stop once this many ms have passed in it, and the rest wait for the next task. */
+export const DRAW_BUDGET_MS = TASK_BUDGET_MS;
 
 /** A tile being filled: reads split at block edges (spec 020 A1), so it may need several; queued to draw when none are left. */
 type Pending = { key: string; level: Level; tile: Window; bands: Float32Array[] | null; left: number; broken: boolean };
@@ -141,12 +141,19 @@ export class ImageryLoader {
       return; // the preview stays drawn underneath
     }
     if (ac.signal.aborted) return;
-    const start = this.now();
+    let start = this.now();
     const step = level.overview === null ? level.s : 1;
     const { width, height } = this.image(level);
     const win = { ...read, bands };
     try {
       for (const p of job.tiles) {
+        // decimation shares the draw budget (spec 028): a read feeding many tiles is spread over tasks
+        if (this.now() - start >= DRAW_BUDGET_MS) {
+          await this.yieldTask();
+          if (ac.signal.aborted) return;
+          start = this.now();
+          void this.drain(start); // tiles already filled draw first, in this task's budget
+        }
         if (p.broken) continue;
         p.bands ??= bands.map(() => new Float32Array(p.tile.width * p.tile.height));
         const out: Tile = { ...p.tile, nodata: null, bands: p.bands };

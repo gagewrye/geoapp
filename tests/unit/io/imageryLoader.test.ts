@@ -142,7 +142,7 @@ describe("ImageryLoader (criterion 8)", () => {
     await flush();
     loader.show({ level: dec, tiles: row(0, [0]) }); // panned away mid-tile
     // every read settles, each resolved once (resolving builds its arrays)
-    for (let i = 0, done = 0; i < 30; i++) { const now = pending.slice(done); done = pending.length; for (const p of now) p.resolve(); await flush(); }
+    for (let i = 0, done = 0; i < 30 && loader.busy(); i++) { const now = pending.slice(done); done = pending.length; for (const p of now) p.resolve(); await flush(); }
     expect([...s.drawn.keys()]).toEqual(["4-0,0"]);
     const before = pending.length;
     loader.show({ level: dec, tiles: row(0, [768]) });

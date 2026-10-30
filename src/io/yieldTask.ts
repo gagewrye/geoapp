@@ -7,3 +7,10 @@ export function yieldToBrowser(): Promise<void> {
     port2.postMessage(null);
   });
 }
+
+/** Spec 028: main-thread work started by one task stops once this many ms have passed in it, and the rest waits for the next task. */
+export const TASK_BUDGET_MS = 8;
+
+/** The clock and the yield a budgeted loop uses; tests pass fakes. */
+export type Budget = { now: () => number; yieldTask: () => Promise<void> };
+export const browserBudget: Budget = { now: () => performance.now(), yieldTask: yieldToBrowser };

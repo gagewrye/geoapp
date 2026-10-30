@@ -82,6 +82,19 @@ describe("rawWindow, byte-equal to geotiff readRasters (criterion 1)", () => {
     await checkImage(rawTiff([{ width: W, height: H, layout: { rows: 16 }, bits: 8, value: VALUES.u8, bands: 3 }], false), 0, 7);
   });
 
+  it("copies across yields once 8 ms have passed (fake clock: 1 ms per row), still byte-equal, and stops on an abort", async () => {
+    const tiff = await fromArrayBuffer(rawTiff([{ width: W, height: H, layout: { rows: 1 }, bits: 16, value: VALUES.u16, bands: 3 }]));
+    const image = await tiff.getImage(0), offsets = await rawOffsets(image);
+    let t = 0, yields = 0;
+    const budget = { now: () => t++, yieldTask: async () => { yields++; } };
+    const got = await rawWindow(image, tiff.source, offsets, 10, 20, 300, 100, [2, 0], undefined, budget);
+    expect(yields).toBeGreaterThanOrEqual(100 / 9 - 1); // a yield about every 8 rows
+    sameArrays(got, Array.from((await image.readRasters({ window: [10, 20, 310, 120], samples: [2, 0] })) as unknown as ArrayLike<number>[]));
+    const ac = new AbortController();
+    const aborting = { now: () => t++, yieldTask: async () => { ac.abort(); } };
+    await expect(rawWindow(image, tiff.source, offsets, 0, 0, 50, 100, [0], ac.signal, aborting)).rejects.toMatchObject({ name: "AbortError" });
+  });
+
   it("openGeoTiff's readSamples reads raw, byte-equal, and rejects an aborted read", async () => {
     const buf = rawTiff([{ width: W, height: H, layout: { rows: 1 }, bits: 8, value: VALUES.u8, bands: 4 }]);
     const tiff = await fromArrayBuffer(buf);

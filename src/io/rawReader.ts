@@ -1,6 +1,7 @@
 import type { GeoTIFFImage } from "geotiff";
 import type { Range } from "../core/ranges";
 import { copySamples, rowRanges, type SampleArray } from "../core/raw";
+import { browserBudget, TASK_BUDGET_MS, type Budget } from "./yieldTask";
 
 /** Block offsets and byte counts of an image, loaded whole (spec 025). */
 export type BlockOffsets = { offsets: Float64Array; counts: Float64Array };
@@ -35,9 +36,9 @@ export async function rawOffsets(image: GeoTIFFImage): Promise<BlockOffsets> {
 
 /**
  * Samples `samples` of the window, as geotiff.js's readRasters returns them, reading only each row's bytes for the
- * window's columns in one fetch (ADR 0024); `image` must be rawEligible.
+ * window's columns in one fetch (ADR 0024); `image` must be rawEligible. The copy yields to the browser once `budget`'s 8 ms pass in a task.
  */
-export async function rawWindow(image: GeoTIFFImage, source: ByteSource, offsets: BlockOffsets, x0: number, y0: number, w: number, h: number, samples: number[], signal?: AbortSignal): Promise<SampleArray[]> {
+export async function rawWindow(image: GeoTIFFImage, source: ByteSource, offsets: BlockOffsets, x0: number, y0: number, w: number, h: number, samples: number[], signal?: AbortSignal, budget: Budget = browserBudget): Promise<SampleArray[]> {
   const spp = image.getSamplesPerPixel();
   for (const s of samples) if (s >= spp) throw new RangeError(`Invalid sample index '${s}'.`);
   const out = samples.map((s) => image.getArrayForSample(s, w * h) as SampleArray);
@@ -49,6 +50,15 @@ export async function rawWindow(image: GeoTIFFImage, source: ByteSource, offsets
   signal?.throwIfAborted();
   const fill = image.getGDALNoData() || 0; // what geotiff.js fills a block stored with no bytes with
   let j = 0;
-  for (const p of pieces) copySamples(p.length > 0 ? bufs[j++]! : new ArrayBuffer(0), p, spp, samples, out, x0, y0, w, fill);
+  let start = budget.now();
+  for (const p of pieces) {
+    // a wide read copies millions of samples: spread it over tasks (spec 028)
+    if (budget.now() - start >= TASK_BUDGET_MS) {
+      await budget.yieldTask();
+      signal?.throwIfAborted();
+      start = budget.now();
+    }
+    copySamples(p.length > 0 ? bufs[j++]! : new ArrayBuffer(0), p, spp, samples, out, x0, y0, w, fill);
+  }
   return out;
 }
