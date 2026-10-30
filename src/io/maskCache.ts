@@ -1,11 +1,10 @@
 import { maskSamples } from "../core/alpha";
 import type { Window } from "../core/grid";
-import { groupReads } from "../core/blocks";
-import { MAX_READ_BYTES, rowReads, TASK_READ_BYTES } from "../core/imagery";
 import { markNodata } from "../core/nodata";
 import { nodataPossible } from "../core/seed";
 import { TILE_SIZE } from "../core/types";
 import { bandOrder, compactMask, MaskStore, type ValidMask } from "../core/validMask";
+import { bandReads } from "./bandReads";
 import type { RasterSource } from "./source";
 import { TASK_BUDGET_MS, yieldToBrowser } from "./yieldTask";
 
@@ -30,9 +29,6 @@ type Deps = {
 };
 /** A band's waiters, and the windows (by x0) they need: "all" for the whole band. */
 type Request = { priority: number; want: Set<number> | "all"; waiters: { resolve: () => void; reject: (e: unknown) => void }[] };
-
-type Read = Window & { bands: ArrayLike<number>[] };
-
 
 /** Valid masks of a raster's 256x256 windows, read one 256-row band at a time and kept for its life (spec 023 F1-F3, ADR 0021). */
 // One read at a time: stroke bands, then hover bands, then the background from the view's centre band outwards,
@@ -155,9 +151,7 @@ export class MaskCache {
   // as one span from the first missing window to the last, which decodes each strip once and masks every window in it.
   private async readBand(missing: Window[]): Promise<void> {
     if (!missing.length) return;
-    const { meta } = this.source;
-    const { width, height, bandCount, nodata, float, alpha } = meta;
-    const { block, readSamples, raw } = this.source;
+    const { meta: { width, bandCount, nodata, float, alpha }, block } = this.source;
     const first = missing[0]!, last = missing[missing.length - 1]!;
     const strips = !block || block.width >= width;
     const windows = strips ? this.windows(first.y0 / TILE_SIZE).filter((w) => w.x0 >= first.x0 && w.x0 <= last.x0) : missing;
@@ -168,24 +162,11 @@ export class MaskCache {
     const m = maskSamples(bandCount, nodata, float, alpha);
     const bits = windows.map((w) => new Uint8Array(Math.ceil((w.width * w.height) / 8)));
     const plan = strips ? [{ x0: first.x0, y0: first.y0, width: last.x0 + last.width - first.x0, height: first.height }] : missing;
-    // geotiff decodes a read in one task, so its reads are smaller (spec 028); raw reads copy only the samples asked for
-    const cap = raw?.includes(0) ? MAX_READ_BYTES : TASK_READ_BYTES;
-    const sampled = block && readSamples ? { block, readSamples } : null;
-    const plain = rowReads(plan, 1, sampled?.block ?? { width: TILE_SIZE, height: 1, bytes: TILE_SIZE * bandCount * 4 }, width, height, sampled ? cap : MAX_READ_BYTES);
-    const read = sampled
-      ? async (r: Window): Promise<Read> => ({ ...r, bands: await sampled.readSamples.call(this.source, 0, r.x0, r.y0, r.width, r.height, m.samples) })
-      // readWindow decodes every band as Float32: its reads are bounded as if each 256 px row segment were a block
-      : async (r: Window): Promise<Read> => {
-        const t = await this.source.readWindow(r.x0, r.y0, r.width, r.height);
-        return { ...r, bands: m.samples.map((k) => t.bands[k]!) };
-      };
-    // capped reads would each wait on a file call: their file bytes are held a group (≤ MAX_READ_BYTES decoded) at a time
-    const hold = sampled && cap === TASK_READ_BYTES ? this.source.hold : undefined;
-    const groups = hold ? groupReads(plain, sampled!.block, width, height, MAX_READ_BYTES) : [plain];
+    const { count, groups, read, hold } = bandReads(this.source, plan, m.samples);
     const now = this.deps.now ?? (() => performance.now());
-    let slice = now(), left = plain.length;
+    let slice = now(), left = count;
     for (const g of groups) {
-      const release = hold ? await hold.call(this.source, 0, g, m.samples) : null;
+      const release = hold ? await hold(g) : null;
       try {
         for (const q of g) {
           if (this.stopped) return;

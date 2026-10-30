@@ -17,7 +17,7 @@
      - Corners in such cells are projected exactly, as corners beyond `MAX_LAT` are now.
 2. **Spec 026 wording, Scope 1.** Only Mercator positions are interpolated. Lon/lat is projected exactly at lattice nodes, cell centres and quad corners. The spec text changes to say so.
 3. **Bounded imagery quad cache** (`map/imagery.ts:17`).
-   - The cache holds at most `4 × IMAGERY_TILES` (2,048) entries and drops the oldest first, at under 1 KiB each (≤ 2 MiB).
+   - The cache holds at most `4 × IMAGERY_TILES` (2,048) entries and drops the least recently used first, at under 1 KiB each (≤ 2 MiB).
    - It is unbounded today: about 10k entries, 5–15 MiB, after panning all of a 22,300² file.
    - A dropped entry is recomputed (about 1 ms, spec 026).
    - The text of spec 026 Scope 3 changes to match.
