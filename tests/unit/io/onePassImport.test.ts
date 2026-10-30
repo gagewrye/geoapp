@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ClassEntry } from "../../../src/core/classTable";
 import { decodedBytes, MAX_READ_BYTES, type Block } from "../../../src/core/imagery";
 import { applyAffine } from "../../../src/core/crs";
@@ -21,21 +21,23 @@ const at = (dx: number, dy: number, w: number, h: number, size = 10): Grid => {
   const [x, y] = applyAffine(GRID.gt, dx, dy);
   return { width: w, height: h, epsg: 32633, gt: [x, size, 0, y, 0, -size] };
 };
+/** Criterion 2's imagery: 3 x 2 windows, partial on both edges, so the matrix below stays fast without losing a case. */
+const SMALL: Grid = { ...GRID, width: 520, height: 300 };
 const FILES: [string, Grid][] = [
-  ["the imagery grid", GRID],
-  ["a shifted equal grid", at(130, 75, 600, 500)],
-  ["a sub-pixel shift", at(130.4, 75, 600, 500)],
-  ["a coarser grid", at(-40, 20, 70, 50, 17)],
+  ["the imagery grid", SMALL],
+  ["a shifted equal grid", at(130, 75, 300, 200)],
+  ["a sub-pixel shift", at(130.4, 75, 300, 200)],
+  ["a coarser grid", at(-40, 20, 40, 30, 17)],
   ["EPSG:4326", { width: 300, height: 200, epsg: 4326, gt: [15.0, 0.0002, 0, 45.12, 0, -0.0002] }],
 ];
 /** Pseudo-random per pixel, so masks have no pattern a bug could hide in. */
 const hash = (c: number, r: number, k = 0) => (((c * 73856093) ^ (r * 19349663) ^ (k * 83492791)) >>> 0) % 997;
 const fileValue = (c: number, r: number) => (hash(c, r, 1) % 23 === 0 ? 9 : ((c >> 6) + (r >> 5)) % 4); // 9 is rare: some only under nodata
-const IMAGERY: [string, () => RasterSource][] = [
-  ["nodata 0 on 1-row strips", () => samplesSource({ ...GRID, bandCount: 2, nodata: 0, float: false, alpha: null }, (k, c, r) => (hash(c, r, k) % 7 === 0 ? 0 : 3), { width: 1000, height: 1, bytes: 2000 }).source],
-  ["alpha on 256 px tiles", () => samplesSource({ ...GRID, bandCount: 4, nodata: null, float: false, alpha: 3 }, (k, c, r) => (k === 3 ? (c > 700 || hash(c, r) % 5 === 0 ? 0 : 255) : 9), { width: 256, height: 256, bytes: 256 * 256 * 4 }).source],
-  ["no nodata possible, readWindow only", () => fakeSource({ ...GRID, bandCount: 2, nodata: null, float: false }, () => 4).source],
-  ["NaN floats, readWindow only", () => fakeSource({ ...GRID, bandCount: 1, nodata: null, float: true }, (_k, c, r) => (hash(c, r) % 11 === 0 ? NaN : 1)).source],
+const IMAGERY: [string, (g?: Grid) => RasterSource][] = [
+  ["nodata 0 on 1-row strips", (g = SMALL) => samplesSource({ ...g, bandCount: 2, nodata: 0, float: false, alpha: null }, (k, c, r) => (hash(c, r, k) % 7 === 0 ? 0 : 3), { width: g.width, height: 1, bytes: 2 * g.width }).source],
+  ["alpha on 256 px tiles", (g = SMALL) => samplesSource({ ...g, bandCount: 4, nodata: null, float: false, alpha: 3 }, (k, c, r) => (k === 3 ? (c > 400 || hash(c, r) % 5 === 0 ? 0 : 255) : 9), { width: 256, height: 256, bytes: 256 * 256 * 4 }).source],
+  ["no nodata possible, readWindow only", (g = SMALL) => fakeSource({ ...g, bandCount: 2, nodata: null, float: false }, () => 4).source],
+  ["NaN floats, readWindow only", (g = SMALL) => fakeSource({ ...g, bandCount: 1, nodata: null, float: true }, (_k, c, r) => (hash(c, r) % 11 === 0 ? NaN : 1)).source],
 ];
 const TABLES: [string, ClassEntry[] | null][] = [
   ["no table", null],
@@ -44,7 +46,7 @@ const TABLES: [string, ClassEntry[] | null][] = [
 
 describe("one pass equals spec 004's two passes (criterion 2)", () => {
   for (const [fname, fgrid] of FILES) for (const [iname, imagery] of IMAGERY) for (const [tname, table] of TABLES) for (const nodata of [null, 0]) {
-    it(`${fname}, ${iname}, ${tname}, file nodata ${nodata}`, { timeout: 30_000 }, async () => { // brute force: seconds each under load
+    it(`${fname}, ${iname}, ${tname}, file nodata ${nodata}`, async () => {
       const img = imagery();
       const file = fakeLabelSource(fgrid, fileValue, nodata).source;
       const want = await twoPassImport(img, file, table);
@@ -58,14 +60,21 @@ describe("one pass equals spec 004's two passes (criterion 2)", () => {
       expect([got.pixels, got.base.count, got.classCount]).toEqual([want.count, want.count, want.classCount]);
       expect([...got.base.windows].sort()).toEqual([...want.windows].sort());
       expect(Buffer.from(got.base.preview.values).equals(Buffer.from(want.preview))).toBe(true);
-      const store = emptyStore(GRID.width, GRID.height);
-      for (const w of seedWindows(GRID, gridOf(file.meta))) {
-        const a = await effectiveTile(img, store, got.base, w);
-        const b = await effectiveTile(img, store, { ...got.base, lut: want.lut, windows: want.windows }, w);
-        expect(Buffer.from(a).equals(Buffer.from(b)), `${w.x0},${w.y0}`).toBe(true);
-      }
     });
   }
+
+  // an effective tile is a function of the file, LUT, labelled windows and imagery, all compared above; one case checks it whole
+  it("effective tiles are byte-equal (a shifted equal grid, strips, no table)", async () => {
+    const img = IMAGERY[0]![1](), file = fakeLabelSource(FILES[1]![1], fileValue, 0).source;
+    const want = await twoPassImport(img, file, null), got = await importLabels(img, file, null);
+    if (typeof want === "string" || typeof got === "string") throw new Error("no labels");
+    const store = emptyStore(SMALL.width, SMALL.height);
+    for (const w of seedWindows(SMALL, gridOf(file.meta))) {
+      const a = await effectiveTile(img, store, got.base, w);
+      const b = await effectiveTile(img, store, { ...got.base, lut: want.lut, windows: want.windows }, w);
+      expect(Buffer.from(a).equals(Buffer.from(b)), `${w.x0},${w.y0}`).toBe(true);
+    }
+  });
 });
 
 describe("with no progress listener (criterion 2)", () => {
@@ -145,14 +154,26 @@ describe("review fixes", () => {
     expect([f.reads.length, needs]).toEqual([0, 0]);
   });
 
-  it("yields a macrotask at each row boundary and checks stale there: nothing of the next row is read", async () => {
-    const { source } = samplesSource({ ...GRID, bandCount: 1, nodata: 0, float: false, alpha: null }, () => 3, { width: 1000, height: 1, bytes: 1000 });
-    const f = fakeLabelSource(GRID, fileValue);
-    const row = seedWindows(GRID, GRID).filter((w) => w.y0 === 0).length;
-    let cancelled = false;
-    // a timer set at the row's last window can only run if the import gives up the thread before the next row
-    const r = await importLabels(source, f.source, null, () => cancelled, (done) => { if (done === row) setTimeout(() => { cancelled = true; }, 0); });
+  /** Runs an import on 1-row strips with performance.now advancing `step` ms a call; a timer set at window k cancels it. */
+  async function clocked(step: number, k: number) {
+    let t = 0;
+    const spy = vi.spyOn(performance, "now").mockImplementation(() => (t += step));
+    try {
+      const { source } = samplesSource({ ...GRID, bandCount: 1, nodata: 0, float: false, alpha: null }, () => 3, { width: 1000, height: 1, bytes: 1000 });
+      const f = fakeLabelSource(GRID, fileValue);
+      let cancelled = false;
+      const r = await importLabels(source, f.source, null, () => cancelled, (done) => { if (done === k) setTimeout(() => { cancelled = true; }, 0); });
+      return { r, reads: f.reads };
+    } finally { spy.mockRestore(); }
+  }
+
+  it("yields once 8 ms of work have passed, within a row, and checks stale there (fake clock)", async () => {
+    // 10 ms a call: past the budget after every window, so the timer set at window 1 runs before window 2 is read
+    const { r, reads } = await clocked(10, 1);
     expect(r).toBe("stale");
-    expect(f.reads.every((w) => w.y0 < 256)).toBe(true);
+    expect(reads.map((w) => `${w.x0},${w.y0}`)).toEqual(["0,0"]);
+    // a frozen clock never reaches the budget: no yield, so the same timer never gets a turn and the import ends
+    const still = await clocked(0, 1);
+    expect(typeof still.r).toBe("object");
   });
 });
