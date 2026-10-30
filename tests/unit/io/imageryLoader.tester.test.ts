@@ -113,7 +113,7 @@ describe("ImageryLoader, tester", () => {
     }
     expect(peak).toBeLessThanOrEqual(2);
     for (const r of reads) {
-      expect(r.win.width * r.win.height * r.bands.length).toBeLessThanOrEqual(MAX_READ_BYTES);
+      expect(decodedBytes(r.win, source.block, 8192, 8192)).toBeLessThanOrEqual(MAX_READ_BYTES); // the blocks each read decodes (A1)
     }
   });
 

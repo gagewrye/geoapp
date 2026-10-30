@@ -5,7 +5,7 @@ import { openGeoTiff } from "../../../src/io/geotiffSource";
 import { buildPreview } from "../../../src/io/pipeline";
 import type { ImagerySource } from "../../../src/io/source";
 import { fakeSource } from "../helpers/sources";
-import { uint8Tiff } from "../helpers/tiffFixtures";
+import { uint8Tiff, type FixtureImage } from "../helpers/tiffFixtures";
 
 // Spec 020 criterion 10, tester: preview reads on odd files.
 const GEO = { epsg: 32633, gt: [400000, 30, 0, 5300000, 0, -30] as [number, number, number, number, number, number] };
@@ -50,4 +50,22 @@ describe("preview reads, tester", () => {
     await expect(buildPreview(source, 1024)).rejects.toThrow("stop");
     for (const r of reads) expect(r.w * r.h * r.bands.length).toBeLessThanOrEqual(MAX_READ_BYTES);
   });
+
+  // Spec 020 Texel sources: an overview whose block is over MAX_BLOCK_BYTES isn't the preview's source either.
+  it("skips an overview whose block is over MAX_BLOCK_BYTES: the next one, or the full image's blocks, is read instead", async () => {
+    const v = (k: number, c: number, r: number) => (k * 40 + c * 3 + r * 7) % 256;
+    const base: FixtureImage = { width: 4800, height: 4800, bands: 3, value: v, layout: { tile: [256, 256] } };
+    // 2400 x 2400 x 3 B in one strip = 16.48 MiB, just over the limit
+    const big: FixtureImage = { width: 2400, height: 2400, bands: 3, value: (k, c, r) => v(k, 2 * c, 2 * r), layout: { rows: 2400 }, subfile: 1 };
+    const tiled = (f: number): FixtureImage => ({ width: 4800 / f, height: 4800 / f, bands: 3, value: (k, c, r) => v(k, f * c, f * r), layout: { tile: [256, 256] }, subfile: 1 });
+    for (const [images, want] of [[[base, big, tiled(4)], [2]], [[base, big, tiled(8)], [0]]] as const) {
+      const src = await openGeoTiff(await fromArrayBuffer(uint8Tiff([...images], GEO)));
+      expect(src.overviews.map((o) => o.index)).toEqual([2]);
+      const read = src.readSamples.bind(src);
+      const used = new Set<number>();
+      src.readSamples = (i, ...a) => { used.add(i); return read(i, ...a); };
+      await buildPreview(src, 1024);
+      expect([...used]).toEqual(want);
+    }
+  }, 120_000);
 });
