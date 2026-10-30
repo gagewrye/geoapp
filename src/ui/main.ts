@@ -37,7 +37,7 @@ const testHook = (name: string, arg: unknown) => {
 // The labels' callbacks run only after the user acts, by when seeding exists.
 const hookValue = (name: string) => (window as unknown as { __geoapp?: Record<string, unknown> }).__geoapp?.[name];
 const labels = initLabels({ map, say, onBusy: () => seeding.sync(), onChange: () => seeding.sync(), panning: () => nav.panning(),
-  imageryBusy: fullRes.busy, importing: () => seeding.seeding() || hookValue("pauseMasks") === true,
+  imageryBusy: fullRes.busy, mapMoving: fullRes.moving, importing: () => seeding.seeding() || hookValue("pauseMasks") === true,
   sweep: () => hookValue("sweep") !== false, op: (o) => testHook("paintOp", o) });
 const seeding = initSeeding({ labels, imagery: () => source, say, error: errorText,
   opened: (f) => testHook("labelFile", f) });
