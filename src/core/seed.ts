@@ -92,6 +92,10 @@ export function applyLut(vals: Int16Array, lut: Uint8Array): Uint8Array {
   return out;
 }
 
+/** Whether maskNodata can clear a label: only with a nodata value, or with floating-point samples (NaN). */
+// Alpha is ignored (spec 021's known gap), so integer imagery with no nodata value masks nothing.
+export const nodataPossible = (nodata: number | null, float: boolean): boolean => nodata !== null || float;
+
 /** labels[i] = 0 where any band equals tile.nodata or is NaN (spec 001's rule over all bands). */
 export function maskNodata(tile: Tile, labels: Uint8Array): void {
   if (labels.length !== tile.width * tile.height) throw new Error(`maskNodata: ${labels.length} labels for a ${tile.width}x${tile.height} tile`);

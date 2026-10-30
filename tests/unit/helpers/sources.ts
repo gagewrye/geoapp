@@ -5,11 +5,11 @@ import { makeTile } from "./tiles";
 
 export type Value = (band: number, col: number, row: number) => number;
 
-/** Synthetic source computing pixels on demand and logging every window read. */
+/** Synthetic source computing pixels on demand and logging every window read; float by default, as its tiles are Float32 and may hold NaN. */
 export function fakeSource(meta: Partial<RasterMeta> & { width: number; height: number }, f: Value) {
   const reads: { x0: number; y0: number; width: number; height: number }[] = [];
   const full: RasterMeta = {
-    bandCount: 3, gt: [500000, 30, 0, 5000000, 0, -30], epsg: 32633, nodata: null,
+    bandCount: 3, gt: [500000, 30, 0, 5000000, 0, -30], epsg: 32633, nodata: null, float: true,
     geoTags: { GeoKeyDirectory: [1, 1, 0, 1, 3072, 0, 1, 32633], ModelPixelScale: [30, 30, 0], ModelTiepoint: [0, 0, 0, 500000, 5000000, 0] },
     ...meta,
   };

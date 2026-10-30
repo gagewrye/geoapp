@@ -1,5 +1,5 @@
-/** The open progress bar (spec 019): indeterminate, or windows done out of total. */
-export function initOpenProgress(bar: HTMLProgressElement) {
+/** A progress bar (specs 019, 021): indeterminate, or windows done out of total. */
+export function initProgress(bar: HTMLProgressElement) {
   return {
     /** Shown with no value: work whose progress isn't counted. */
     busy(): void {

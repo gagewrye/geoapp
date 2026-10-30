@@ -1,7 +1,7 @@
 import type { Window } from "../core/grid";
 import { tileWindow, type LabelStore } from "../core/labelStore";
 import type { MaskPreview } from "../core/maskPreview";
-import { applyLut, gatherCells, maskNodata, sourceCells } from "../core/seed";
+import { applyLut, gatherCells, maskNodata, nodataPossible, sourceCells } from "../core/seed";
 import type { Grid, Tile } from "../core/types";
 import type { LabelSource } from "./labelFile";
 import type { RasterSource } from "./source";
@@ -31,14 +31,16 @@ export const anyNonZero = (a: Uint8Array) => a.some((v) => v !== 0);
 
 /**
  * Spec 004's per-window import step: lut of the gathered file values, then maskNodata with the imagery
- * window if any value is non-zero. Returns the imagery tile it read, if any; null when `stop` turns true
+ * window if any value is non-zero and the imagery can hold nodata (spec 021: a later spec honouring alpha
+ * must add "or an alpha band" to that condition). Returns the imagery tile it read, if any; null when `stop` turns true
  * after the file reads (the imagery is then not read).
  */
 export async function windowLabels(imagery: RasterSource, file: LabelSource, lut: Uint8Array, w: Window,
   stop: () => boolean = () => false): Promise<{ labels: Uint8Array; tile: Tile | null } | null> {
   const labels = applyLut(await gather(file, sourceCells(gridOf(imagery.meta), gridOf(file.meta), w), w.width * w.height), lut);
   if (stop()) return null;
-  if (!anyNonZero(labels)) return { labels, tile: null };
+  const { nodata, float } = imagery.meta;
+  if (!anyNonZero(labels) || !nodataPossible(nodata, float)) return { labels, tile: null };
   const tile = await imagery.readWindow(w.x0, w.y0, w.width, w.height);
   maskNodata(tile, labels);
   return { labels, tile };
