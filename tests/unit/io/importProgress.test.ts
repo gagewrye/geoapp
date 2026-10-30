@@ -6,7 +6,7 @@ import { exportLabels } from "../../../src/io/labelExport";
 import type { LabelSource } from "../../../src/io/labelFile";
 import { baseTile } from "../../../src/io/maskBase";
 import { importLabels } from "../../../src/io/seeding";
-import { PaintQueue } from "../../../src/io/paintQueue";
+import { cellOp, PaintQueue } from "../../../src/io/paintQueue";
 import { footprint } from "../../../src/core/pixel";
 import { idle } from "../helpers/paintQueue";
 import { fakeLabelSource } from "../helpers/labelFiles";
@@ -118,7 +118,7 @@ describe("the imagery read skipped (criterion 9)", () => {
       reads.length = 0;
       const store = r.store;
       const q = new PaintQueue(imagery, () => store, { applied: () => {}, full: () => {}, busy: () => {}, error: (e) => { throw e; } }, undefined, () => r.base);
-      q.push({ w: footprint(store, 10, 10, 1)!, value: 1, erase: true });
+      q.push(cellOp(footprint(store, 10, 10, 1)!, 1, true));
       await idle(q);
       expect(reads.length).toBe(float ? 1 : 0);
       const want = (await baseTile(imagery, r.base, ws[0]!)).labels;

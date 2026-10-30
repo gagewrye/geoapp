@@ -42,6 +42,8 @@ export function labelDisplay(map: MapLibreMap, store: () => LabelStore, colours:
       dirty.clear();
       overlays = new LabelOverlays(map, grid);
     },
+    /** Computes these tiles' quads ahead, in idle time (spec 023 F5). */
+    prefetch(keys: string[]): void { overlays?.prefetch(keys); },
     /** Removes every overlay and the mask from the map, keeping the store (spec 021's hold); a redraw and setMask draw them again. */
     hide(): void {
       if (frame) cancelAnimationFrame(frame);

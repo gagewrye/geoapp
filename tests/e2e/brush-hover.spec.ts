@@ -2,7 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 import { footprint, footprintRing, pixelAt } from "../../src/core/pixel";
 import { paintMode, RGB_GRID, hoverFeatures, jumpTo, labels, message, moveTo, openApp, openRaster, rgbFixture, stroke, toLngLat, toScreen } from "./helpers";
 
-// Spec 003 criterion 9 (hover), and criterion 8's "hovering and erasing read no window".
+// Spec 003 criterion 9 (hover), and criterion 8's "hovering and erasing read no window" as spec 023 keeps it:
+// once the background mask reads are done (F3 reads masks on hover by design before then), neither reads imagery.
 
 async function setup(page: Page, zoom = 9) {
   await openApp(page);
@@ -12,12 +13,15 @@ async function setup(page: Page, zoom = 9) {
   await jumpTo(page, [15, 45], zoom);
 }
 
-/** Count imagery window reads from now on (the hook's source is the one the brush reads). */
+/** Count imagery reads, windows and samples alike, from now on (the hook's source is the one the brush and masks read). */
 const countReads = (page: Page) => page.evaluate(() => {
   const s = (window as any).__geoapp.imagery();
-  const read = s.readWindow.bind(s);
   (window as any).__reads = 0;
-  s.readWindow = (...a: unknown[]) => { (window as any).__reads++; return read(...a); };
+  for (const m of ["readWindow", "readSamples"]) {
+    if (!s[m]) continue;
+    const read = s[m].bind(s);
+    s[m] = (...a: unknown[]) => { (window as any).__reads++; return read(...a); };
+  }
 });
 const reads = (page: Page) => page.evaluate(() => (window as any).__reads as number);
 
@@ -67,8 +71,9 @@ test.describe("hover (criterion 9)", () => {
   });
 });
 
-test("hovering and erasing read no imagery window (criterion 8)", async ({ page }) => {
+test("after the background mask reads, hovering and erasing read no imagery (criterion 8)", async ({ page }) => {
   await setup(page, 9);
+  await expect.poll(() => page.evaluate(() => (window as any).__geoapp.masksDone() as boolean), { timeout: 30_000 }).toBe(true);
   const c = await toScreen(page, [15.005, 45.005]); // a pixel centre, so both strokes stay on its row
   await stroke(page, [c, { x: c.x + 60, y: c.y }]);
   expect((await labels(page)).size).toBeGreaterThan(0);

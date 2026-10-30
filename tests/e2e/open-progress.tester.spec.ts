@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
-import { jumpTo, message, openApp, openRaster, paintMode, rgbTiled, stroke, tileKeysStored, tiff, tiledTiff, toScreen, view } from "./helpers";
-import { download, importFile, maskFile, noSavePicker } from "./seeding";
+import { jumpTo, message, openApp, openRaster, paintMode, rgbNodataFixture, rgbTiled, stroke, tileKeysStored, tiff, tiledTiff, toScreen, view } from "./helpers";
+import { download, holdMasks, importFile, maskFile, noSavePicker } from "./seeding";
 
 // Spec 019, tester: the approved decisions while the preview loads, replacement and refusal while loading, odd files.
 
@@ -170,8 +170,9 @@ test("reads failing part-way through the preview: message, bar hidden, Paint dis
 
 test("a paint read that fails with a ProgressEvent shows rasterUnreadable (readErrorMessage)", async ({ page }) => {
   await openApp(page);
+  await holdMasks(page); // the stroke, not the background, reads its masks (spec 023)
   await gate(page, 1000, {});
-  await openRaster(page, rgbTiled());
+  await openRaster(page, rgbNodataFixture()); // rgbTiled holds no nodata, so a stroke reads nothing (spec 023 F2)
   await expect(message(page)).toHaveText("Raster opened.");
   await paintMode(page);
   await failNow(page);
