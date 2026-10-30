@@ -9,6 +9,7 @@ import { createBrush, type BrushMode } from "../map/brush";
 import { initBrushSize } from "./brushSize";
 import { markSelected, renderClasses } from "./classList";
 import { labelDisplay } from "./labelDisplay";
+import { initLabelKeys, inTextField } from "./labelKeys";
 import { initLabelView } from "./labelView";
 import { MESSAGES } from "./messages";
 import { initPaint } from "./paint";
@@ -35,9 +36,6 @@ type Deps = {
 export type Held = { readonly store: LabelStore; readonly base: MaskBase | null };
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
-const NOT_TEXT = new Set(["checkbox", "radio", "button", "submit", "reset", "color", "file", "range", "image"]);
-export const inTextField = (el: Element | null) => el instanceof HTMLTextAreaElement
-  || (el instanceof HTMLInputElement && !NOT_TEXT.has(el.type)) || (el instanceof HTMLElement && el.isContentEditable);
 
 /** Brush labels on local imagery (spec 003): panel, classes, shortcuts, store, paint queue and overlays. */
 export function initLabels({ map, say, onBusy, onChange, panning, imageryBusy, importing, sweep, op }: Deps) {
@@ -120,29 +118,7 @@ export function initLabels({ map, say, onBusy, onChange, panning, imageryBusy, i
     classes.push(nextClass(classes));
     render();
   });
-  // Chromium marks the focused element :focus-visible on any keydown, so how it got focus is read when focus arrives
-  let keyFocused = false;
-  window.addEventListener("focusin", (e) => { keyFocused = e.target instanceof Element && e.target.matches(":focus-visible"); });
-  window.addEventListener("pointerdown", () => { keyFocused = false; }, true);
-  // Keyboard users press a control they tabbed to with Space; a mouse click leaves focus there, and then Space means Pan
-  const nativeSpace = (el: Element | null) => inTextField(el) || el instanceof HTMLSelectElement
-    || (keyFocused && (el instanceof HTMLButtonElement || el instanceof HTMLInputElement));
-  window.addEventListener("keydown", (e) => {
-    if (!open || e.ctrlKey || e.metaKey || e.altKey) return;
-    if (e.code === "Space") {
-      if (!nativeSpace(document.activeElement)) { e.preventDefault(); brush.setSpace(true); }
-      return;
-    }
-    if (inTextField(document.activeElement)) return;
-    if (e.key === "[") size.step(-1);
-    else if (e.key === "]") size.step(1);
-    else if (/^[1-9]$/.test(e.key) && Number(e.key) <= classes.length) select(Number(e.key) - 1);
-  });
-  window.addEventListener("keyup", (e) => {
-    if (e.code !== "Space") return;
-    if (open && !nativeSpace(document.activeElement)) e.preventDefault();
-    brush.setSpace(false);
-  });
+  initLabelKeys({ open: () => open, brush, size, select, classCount: () => classes.length });
 
   /** While seeding or exporting labels: the brush and the class list's edits are off; selecting still works. */
   function lock(on: boolean): void {
