@@ -33,7 +33,10 @@ const testHook = (name: string, arg: unknown) => {
 };
 
 // The labels' callbacks run only after the user acts, by when seeding exists.
-const labels = initLabels({ map, say, onBusy: () => seeding.sync(), onChange: () => seeding.sync(), panning: () => nav.panning() });
+const hookValue = (name: string) => (window as unknown as { __geoapp?: Record<string, unknown> }).__geoapp?.[name];
+const labels = initLabels({ map, say, onBusy: () => seeding.sync(), onChange: () => seeding.sync(), panning: () => nav.panning(),
+  imageryBusy: fullRes.busy, importing: () => seeding.seeding() || hookValue("pauseMasks") === true,
+  sweep: () => hookValue("sweep") !== false, op: (o) => testHook("paintOp", o) });
 const seeding = initSeeding({ labels, imagery: () => source, say, error: errorText,
   opened: (f) => testHook("labelFile", f) });
 // letters type in text fields and pick options in selects, so WASD leaves them alone (spec 009)
@@ -42,7 +45,9 @@ const nav = createNavigation(map, { typing: (el) => inTextField(el) || el instan
 map.on("load", () => {
   // Test hook for e2e (specs 001-014; labels.tile(key) is the effective tile); exposes no user data beyond this page. labelFile: set by a test to see opened label files;
   // rasterFile: set by a test to see (and wrap the reads of) each opened raster before its preview is built; fullRes: spec 020's block limit, which a test may lower before an open.
-  const hook = { map, imagery: () => source ?? null, labelFile: null, rasterFile: null, fullRes: fullRes.limits };
+  // Spec 023: masksDone() says every valid mask is read; a test may set sweep = false (one op per stroke cell), paintOp to see each op,
+  // and pauseMasks = true to hold the background mask reads, so strokes wait on reads it gates.
+  const hook = { map, imagery: () => source ?? null, labelFile: null, rasterFile: null, fullRes: fullRes.limits, masksDone: labels.masksDone, sweep: true, paintOp: null, pauseMasks: false };
   Object.defineProperty(hook, "labels", { get: () => ({ store: labels.store(), classes: labels.classes(), tile: labels.tile }) });
   (window as unknown as Record<string, unknown>).__geoapp = hook;
   $("map").dataset.ready = "true";
@@ -98,6 +103,7 @@ $<HTMLInputElement>("open-raster").addEventListener("change", (ev) => {
     labels.imageryReady(true);
     progress.hide();
     say(off ? `Raster opened. ${off}` : "Raster opened.");
+    labels.startMasks(); // spec 023 F3: only after the open, and behind the visible tiles
   }, stale);
 });
 
