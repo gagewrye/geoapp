@@ -13,7 +13,7 @@ Amends specs 004 (the run message) and 014/017 (when the old labels leave the ma
    - geoapp ignores alpha today, so in that case masking can't change a label, and the skip changes no result.
    - It applies to 80 of the 86 chunks: RGBA uint8, nodata None, 1-row strips. On these the imagery read is likely most of the import time.
    - The 6 uint16 chunks with nodata 256 still read.
-   - It also speeds up painting on a mask and export.
+   - It also speeds up the mask's base tiles: export, and copy-on-touch for erase cells. A Paint cell still reads imagery for its nodata mask (spec 003); that is spec 023's subject.
 4. Fact, from rasterio (2026-10-30): Gage's `labels.tif` files are uint8 with nodata 255 in 1-row strips, and the pseudo-label files are tiled 256. So the striped label files also re-decode strips on each window (out of scope here).
 
 **Known gap, not in this spec: alpha is ignored.**
@@ -37,7 +37,7 @@ Amends specs 004 (the run message) and 014/017 (when the old labels leave the ma
 ## Scope
 **Progress.** `<progress id="import-progress" hidden>` and `<button id="import-cancel" hidden>Cancel</button>` sit after `#import-labels`.
 - `ui/openProgress.ts` becomes `ui/progress.ts` `initProgress(bar)`, with the same `busy`, `step` and `hide`. Spec 019's bar uses it unchanged. A separate bar keeps an open and an import from hiding each other's.
-- **While the header is read:** indeterminate.
+- **While the header is read:** no bar and no Cancel. The bar starts at the Clear (step 4, after the header checks pass), indeterminate until the first window.
 - **During the passes:** value = windows done out of `windows x passes` (1 pass, or 2 with pass 1). `#message` reads "Importing labels…" (was "Seeding labels...").
 - **Hidden** when the run ends in any way.
 
