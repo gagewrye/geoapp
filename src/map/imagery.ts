@@ -13,7 +13,7 @@ const PREFIX = "imagery-";
 // all used or drawn last, are never the least recently used.
 export class ImageryLayer implements TileSink {
   private readonly tiles = new Map<string, string[]>();
-  // kept past eviction, for the raster's life; clear() starts a new raster
+  // kept past eviction, up to QUAD_CACHE, for the raster's life; clear() starts a new raster
   private quads: QuadCache = new Map();
 
   constructor(private readonly map: MapLibreMap) {}
