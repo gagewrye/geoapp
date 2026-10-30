@@ -5,6 +5,7 @@ import { displaySamples } from "../core/alpha";
 import { blockWindows, decodedBytes, MAX_BLOCK_BYTES, type Block } from "../core/imagery";
 import { warpPreview } from "../core/warp";
 import type { RasterSource } from "./source";
+import { yieldToBrowser } from "./yieldTask";
 
 export class RasterRefusedError extends Error {
   constructor(readonly reason: "antimeridian" | "crs", message: string) {
@@ -37,9 +38,6 @@ const checkAborted = (signal?: AbortSignal) => {
   if (signal?.aborted) throw new DOMException("Preview aborted", "AbortError");
 };
 
-/** Pause before the warp when progress is reported, a little over one 60 Hz frame. */
-const FRAME_YIELD_MS = 20;
-
 /** Spec 025: preview reads in flight when each decodes at most PARALLEL_BYTES, so their block fetches share file reads. */
 const PARALLEL_READS = 4, PARALLEL_BYTES = 4 * 2 ** 20;
 
@@ -64,8 +62,9 @@ export async function buildPreview(source: RasterSource, maxSide: number, { stre
     }
   };
   await Promise.all(Array.from({ length: Math.min(inFlight, reads.length) }, worker));
-  // For the caller's display: the warp blocks the main thread, so this usually yields past a frame (at 60 Hz) to draw the last progress first
-  if (onProgress) await new Promise((r) => setTimeout(r, FRAME_YIELD_MS));
+  // A new task, so the caller's last progress can render before the warp. Not a timer: after the typical chunk's
+  // reads the browser sometimes held timers (and frames) for ~200 ms, with the main thread idle (spec 030).
+  if (onProgress) await yieldToBrowser();
   checkAborted(signal);
   return warpPreview(dec.tile, gt, source.meta.epsg, maxSide, stretch);
 }
