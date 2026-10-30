@@ -29,7 +29,7 @@ describe("QuadCache (criterion 8)", () => {
     expect(keys).toHaveLength(25);
     cache.prefetch(keys);
     let budget = 3; // three tiles per idle callback here
-    while (idle.length) { budget = 3; idle.shift()!({ timeRemaining: () => (budget-- > 0 ? 5 : 0) }); }
+    while (idle.length) { budget = 3; idle.shift()!({ timeRemaining: () => (budget-- > 0 ? 50 : 0) }); }
     const spy = vi.mocked(quads.tileQuads);
     spy.mockClear();
     for (const k of keys) expect(cache.get(k).length).toBeGreaterThan(0);
@@ -40,10 +40,10 @@ describe("QuadCache (criterion 8)", () => {
   });
 
   it("prefetching none drops the tiles still queued", () => {
-    const idle: ((d: { timeRemaining(): number }) => void)[] = [];
+    const idle: ((d: { timeRemaining(): number; didTimeout?: boolean }) => void)[] = [];
     const cache = new QuadCache(GRID, (cb) => { idle.push(cb); });
     cache.prefetch(["0,0", "256,0", "512,0"]);
-    idle.shift()!({ timeRemaining: () => 0 }); // one tile per callback at least
+    idle.shift()!({ timeRemaining: () => 0, didTimeout: true }); // a timed-out callback still computes one tile
     cache.prefetch([]);
     while (idle.length) idle.shift()!({ timeRemaining: () => 50 });
     const spy = vi.mocked(quads.tileQuads);
@@ -60,5 +60,22 @@ describe("QuadCache (criterion 8)", () => {
     idle.shift()!();
     cache.prefetch(["0,0", "256,0"]);
     expect(idle).toHaveLength(0);
+  });
+
+  it("starts no tile on a short idle period, reschedules, and computes one tile when the callback timed out (review 2)", () => {
+    const idle: ((d: { timeRemaining(): number; didTimeout?: boolean }) => void)[] = [];
+    const cache = new QuadCache(GRID, (cb) => { idle.push(cb); });
+    const spy = vi.mocked(quads.tileQuads);
+    cache.prefetch(["0,0", "256,0", "512,0"]);
+    spy.mockClear();
+    idle.shift()!({ timeRemaining: () => 39 });
+    expect(spy).toHaveBeenCalledTimes(0);
+    expect(idle).toHaveLength(1);
+    idle.shift()!({ timeRemaining: () => 0, didTimeout: true });
+    expect(spy).toHaveBeenCalledTimes(1);
+    let t = 55;
+    idle.shift()!({ timeRemaining: () => (t -= 10) }); // 45 ms: one tile; 35 left after it: stops there
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(idle).toHaveLength(1);
   });
 });

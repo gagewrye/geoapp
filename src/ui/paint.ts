@@ -20,8 +20,10 @@ type Deps = {
   locked: () => boolean;
   /** Redraw these tiles; a move applied to them. */
   applied: (keys: string[]) => void;
-  /** Compute these tiles' quads ahead (spec 023 F5). */
+  /** Compute these tiles' quads ahead (spec 023 F5); none drops those queued. */
   prefetch: (keys: string[]) => void;
+  /** A paint or erase stroke is being drawn. */
+  stroking: () => boolean;
   say: (text: string) => void;
   /** The queue became busy or idle. */
   busy: () => void;
@@ -63,14 +65,16 @@ export function initPaint(d: Deps) {
         queue.push(op);
       }
     },
-    /** The Paint hover moved: read the bands under and next to it first (F3), and compute nearby quads (F5); no hover drops the quads queued. */
+    /** The Paint hover moved: read the bands under and next to it first (F3), and compute nearby quads between strokes (F5). */
+    // A quad set can take 100 ms on UTM: none is queued with no hover, or while a stroke is drawn or its moves
+    // wait, so idle quad work never delays a stroke's moves and frames; tiles a stroke makes compute theirs on demand.
     hovered(w: Window | null): void {
-      if (!w) { d.prefetch([]); return; } // a quad set can take 100 ms on UTM: none is started once the hover is gone
-      if (!cache) return;
-      for (let b = Math.floor(w.y0 / TILE_SIZE) - 1; b <= Math.floor((w.y0 + w.height - 1) / TILE_SIZE) + 1; b++) {
-        cache.need(b * TILE_SIZE, HOVER).catch(() => {}); // a failed band is read again, and reported, by a stroke's need
+      if (w && cache) {
+        for (let b = Math.floor(w.y0 / TILE_SIZE) - 1; b <= Math.floor((w.y0 + w.height - 1) / TILE_SIZE) + 1; b++) {
+          cache.need(b * TILE_SIZE, HOVER).catch(() => {}); // a failed band is read again, and reported, by a stroke's need
+        }
       }
-      d.prefetch(keysAround(d.store(), w));
+      d.prefetch(w && cache && !d.stroking() && !queue?.size ? keysAround(d.store(), w) : []);
     },
     /** Starts the background mask reads from the band holding centreRow ("Raster opened."). */
     start(centreRow: number): void { cache?.start(centreRow); },

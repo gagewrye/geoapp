@@ -66,7 +66,7 @@ export function initLabels({ map, say, onBusy, onChange, panning, imageryBusy, i
   const paint = initPaint({
     store: () => store, base: () => base, history: undo.history, stroke: undo.current, value: () => selected + 1, locked: () => locked,
     applied: (keys) => { redraw(keys); onChange(); undo.sync(); },
-    prefetch: display.prefetch, say,
+    prefetch: display.prefetch, stroking: () => brush.stroking(), say,
     busy: () => { onBusy(); undo.sync(); },
     imageryBusy, importing, sweep, op,
   });
