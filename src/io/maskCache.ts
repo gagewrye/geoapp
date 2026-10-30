@@ -15,6 +15,8 @@ type Deps = {
   loaderBusy?: () => boolean;
   /** An import runs: background reads wait. */
   paused?: () => boolean;
+  /** The map moves, or moved a moment ago (spec 027): background reads wait. */
+  moving?: () => boolean;
   /** How long a waiting background read sleeps before it looks again. */
   retryMs?: number;
   /** Mask array budget (tests); MASK_BYTES by default. */
@@ -29,7 +31,7 @@ const macrotask = () => new Promise<void>((r) => setTimeout(r, 0));
 
 /** Valid masks of a raster's 256x256 windows, read one 256-row band at a time and kept for its life (spec 023 F1-F3, ADR 0021). */
 // One read at a time: stroke bands, then hover bands, then the background from the view's centre band outwards,
-// the background only after start() and while the loader is idle and no import runs. stop() ends everything.
+// the background only after start() and while the loader is idle, no import runs and the map is still. stop() ends everything.
 export class MaskCache {
   readonly masks: MaskStore;
   private readonly requests = new Map<number, Request>();
@@ -115,7 +117,7 @@ export class MaskCache {
     if (!this.started) return null;
     const band = this.order.find((b) => !this.read.has(b));
     if (band === undefined) return null;
-    return this.deps.loaderBusy?.() || this.deps.paused?.() ? "wait" : { band, request: null };
+    return this.deps.loaderBusy?.() || this.deps.paused?.() || this.deps.moving?.() ? "wait" : { band, request: null };
   }
 
   private async pump(): Promise<void> {

@@ -27,6 +27,8 @@ type Deps = {
   /** Spec 020's tile reads are queued or in flight, and an import runs: background mask reads wait (spec 023 F3). */
   imageryBusy: () => boolean;
   importing: () => boolean;
+  /** The map moves or just moved (spec 027): background mask reads wait for it too. */
+  mapMoving?: () => boolean;
   /** e2e hooks (spec 023): F6 off when false, and each paint op pushed. */
   sweep?: () => boolean;
   op?: (op: PaintOp) => void;
@@ -38,7 +40,7 @@ export type Held = { readonly store: LabelStore; readonly base: MaskBase | null 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 /** Brush labels on local imagery (spec 003): panel, classes, shortcuts, store, paint queue and overlays. */
-export function initLabels({ map, say, onBusy, onChange, panning, imageryBusy, importing, sweep, op }: Deps) {
+export function initLabels({ map, say, onBusy, onChange, panning, imageryBusy, importing, mapMoving, sweep, op }: Deps) {
   const panel = $("brush-panel"), list = $("classes"), add = $<HTMLButtonElement>("class-add");
   const classes: LabelClass[] = initialClasses();
   let selected = 0;
@@ -66,7 +68,7 @@ export function initLabels({ map, say, onBusy, onChange, panning, imageryBusy, i
     applied: (keys) => { redraw(keys); onChange(); undo.sync(); },
     prefetch: display.prefetch, stroking: () => brush.stroking(), say,
     busy: () => { onBusy(); undo.sync(); },
-    imageryBusy, importing, sweep, op,
+    imageryBusy, importing, mapMoving, sweep, op,
   });
   const brush = createBrush(map, {
     side: () => size.side(),

@@ -3,6 +3,9 @@
 One entry per merge to main, newest first. Details are in the named spec.
 
 ## 2026-10-30
+- **Spec 027:** Holding W/A/S/D pans smoothly without reading the file mid-pan; full-resolution detail loads once you let go, and other bursts of map moves load once they settle.
+- **Spec 026:** Imagery and label tiles are placed on the map from a sparse grid of projected points instead of every pixel corner, so filling the view at mid zoom takes about 0.7 s on a typical chunk (was 2.8 s before specs 025–026) and 1.0 s on the largest.
+- **Spec 023:** Painting is much smoother: after a raster opens its valid-pixel masks are read once in the background and kept, each pointer move paints as one sweep, and label tiles near the brush are prepared while idle; a large brush on the largest chunk went from about 1.5 s lag to under 0.1 s.
 - **Spec 025:** Opening a raster and loading detail read neighbouring parts of the file together, so a typical chunk now shows its preview in about 0.9 s instead of 2.7 s and full-resolution tiles in about half the time.
 - **Spec 022:** Transparent pixels in an image with an alpha band now show as see-through and take no labels, and imports read the imagery a row at a time.
 - **Spec 021:** Importing labels shows a progress bar with Cancel; the old labels leave the map while it runs and come back if it's cancelled, fails or finds nothing.

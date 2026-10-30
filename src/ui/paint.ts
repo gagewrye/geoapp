@@ -30,6 +30,8 @@ type Deps = {
   /** Spec 020's loader has reads queued or in flight, and an import runs: background mask reads wait for both. */
   imageryBusy: () => boolean;
   importing: () => boolean;
+  /** The map moves or just moved (spec 027): background mask reads wait. */
+  mapMoving?: () => boolean;
   /** e2e: false turns spec 023 F6 off (one op per stroke cell); `op` sees each op pushed. */
   sweep?: () => boolean;
   op?: (op: PaintOp) => void;
@@ -45,7 +47,7 @@ export function initPaint(d: Deps) {
     open(source: RasterSource): void {
       queue?.clear();
       cache?.stop();
-      cache = new MaskCache(source, { loaderBusy: d.imageryBusy, paused: d.importing });
+      cache = new MaskCache(source, { loaderBusy: d.imageryBusy, paused: d.importing, moving: d.mapMoving });
       queue = new PaintQueue(source, d.store, {
         applied: d.applied,
         full: () => d.say(d.store().base ? MESSAGES.editLimit : MESSAGES.labelLimit),
