@@ -2,17 +2,18 @@ import { expect, test, type Page } from "@playwright/test";
 import { paletteColour } from "../../src/core/classes";
 import { MESSAGES } from "../../src/ui/messages";
 import { classFile } from "../unit/helpers/labelFiles";
-import { hoverFeatures, jumpTo, labels, message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture, settled, toScreen } from "./helpers";
-import { classList, importFile, openFileGate, openImageryGate, pauseImagery, pauseLabelFile, storeTiles, upload } from "./seeding";
+import { hoverFeatures, jumpTo, labels, message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture, rgbNodataFixture, settled, toScreen } from "./helpers";
+import { classList, holdMasks, importFile, openFileGate, openImageryGate, pauseImagery, pauseLabelFile, storeTiles, upload } from "./seeding";
 
 // Spec 004 criterion 16 (as amended) and spec 017 criterion 5: every import replaces, after a confirm when labels exist,
 // and what's disabled while seeding or painting.
 
 const classes = () => upload("classes.tif", classFile("255"));
 const seeded = /^Seeded \d+ pixels in \d+ classes\.$/;
-async function setup(page: Page) {
+async function setup(page: Page, raster = rgbFixture()) {
   await openApp(page);
-  await openRaster(page, rgbFixture());
+  await holdMasks(page);
+  await openRaster(page, raster);
   await expect(message(page)).toHaveText("Raster opened.");
   await paintMode(page);
 }
@@ -63,7 +64,7 @@ test("with painted tiles an import confirms: Cancel keeps labels, classes and th
 });
 
 test("while an import runs the brush and class edits are disabled; while mask reads are pending Import labels and Export labels are", async ({ page }) => {
-  await setup(page);
+  await setup(page, rgbNodataFixture()); // its masks need reads (spec 023 F2)
   await paintTwoClasses(page);
   const before = await labels(page);
   await pauseLabelFile(page);
@@ -90,12 +91,12 @@ test("while an import runs the brush and class edits are disabled; while mask re
   await expect.poll(async () => (await hoverFeatures(page)).length).toBe(1);
   await expect(page.locator("#classes .class-name").first()).toBeEnabled();
 
-  // a dab on tile 0,0 (no nodata mask yet) waits for its read
+  // a dab on row band 4 waits for its read: the background is held, and the strokes and their hovers (spec 023 F3) read bands near 45N
   await pauseImagery(page);
-  await jumpTo(page, [11.5, 48.5], 6);
-  const b = await toScreen(page, [11.505, 48.505]);
+  await jumpTo(page, [11.5, 38.5], 6);
+  const b = await toScreen(page, [11.505, 38.505]);
   await page.mouse.click(b.x, b.y);
-  await expect.poll(() => page.evaluate(() => (window as any).__gate.reads)).toBe(1);
+  await expect.poll(() => page.evaluate(() => (window as any).__gate.reads)).toBeGreaterThan(0); // spec 020's display reads are held too
   await expect(page.locator("#import-labels")).toBeDisabled();
   await expect(page.locator("#export-labels")).toBeDisabled(); // its file must hold no half-applied stroke
   await openImageryGate(page);

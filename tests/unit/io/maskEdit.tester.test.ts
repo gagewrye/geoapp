@@ -4,7 +4,7 @@ import type { LabelStore } from "../../../src/core/labelStore";
 import { footprint } from "../../../src/core/pixel";
 import type { Affine, Grid } from "../../../src/core/types";
 import { maskReadFailed } from "../../../src/io/labelFile";
-import { PaintQueue } from "../../../src/io/paintQueue";
+import { cellOp, PaintQueue } from "../../../src/io/paintQueue";
 import { importLabels } from "../../../src/io/seeding";
 import { UndoHistory } from "../../../src/io/undoHistory";
 import { effectiveTiles } from "../helpers/effective";
@@ -31,7 +31,7 @@ async function setup(width = 1024, height = width) {
     history, () => r.base);
   const strokeAt = async (cells: [number, number][], value: number, erase = false, side = 1) => {
     const s = history.begin();
-    for (const [c, rr] of cells) q.push({ w: footprint(store, c, rr, side)!, value, erase, stroke: s });
+    for (const [c, rr] of cells) q.push(cellOp(footprint(store, c, rr, side)!, value, erase, s));
     history.end(s);
     await idle(q);
   };
@@ -93,7 +93,7 @@ describe("the mask file failing mid-stroke (criterion 12, tester)", () => {
 });
 
 describe("copy-on-touch reads (tester)", () => {
-  it("a stroke over 16 base tiles reads each imagery window once (the base read serves the nodata mask) and each file window once", { timeout: 60_000 }, async () => {
+  it("a stroke over 16 base tiles reads each imagery band once (spec 023: the cached mask serves copy-on-touch) and each file window once", { timeout: 60_000 }, async () => {
     const t = await setup();
     const cells: [number, number][] = [];
     for (let c = 5; c < 1024; c += 37) cells.push([c, c]);
@@ -103,8 +103,9 @@ describe("copy-on-touch reads (tester)", () => {
     const im = keys(t.imagery.reads), fi = keys(t.file.reads);
     expect(new Set(im).size).toBe(im.length);
     expect(new Set(fi).size).toBe(fi.length);
-    expect(im.length).toBe(t.store.tiles.size);
-    for (const w of [...t.imagery.reads, ...t.file.reads]) {
+    expect(im.length).toBe(4); // the 4 bands of 1024 rows
+    for (const w of t.imagery.reads) expect([w.x0, w.y0 % 256, w.width, w.height]).toEqual([0, 0, 1024, 256]);
+    for (const w of t.file.reads) {
       expect(w.x0 % 256 + w.y0 % 256).toBe(0);
       expect(Math.max(w.width, w.height)).toBeLessThanOrEqual(256);
     }

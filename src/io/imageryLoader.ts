@@ -48,6 +48,9 @@ export class ImageryLoader {
     this.pump();
   }
 
+  /** A read is queued or in flight (spec 023: background mask reads wait for neither). */
+  busy(): boolean { return this.queue.length > 0 || this.running.size > 0; }
+
   /** Abort every read (the raster closed). */
   stop(): void {
     for (const j of this.running) j.ac.abort();

@@ -26,6 +26,8 @@ export function initImagery(map: MapLibreMap, say: (text: string) => void = () =
 
   return {
     limits,
+    /** The open raster's tile reads are queued or in flight. */
+    busy: () => open?.loader.busy() ?? false,
     /** Drop every tile and read (a raster opened). */
     clear(): void {
       open?.loader.stop();

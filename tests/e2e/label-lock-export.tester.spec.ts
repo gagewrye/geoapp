@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
-import { jumpTo, labels, message, openRaster, rgbFixture, toScreen } from "./helpers";
+import { jumpTo, labels, message, openRaster, rgbFixture, rgbNodataFixture, toScreen } from "./helpers";
 import { drag, expectFileHolds, expectLock, gateWrites, opfsNames, openWrite, reopen, setup, writeHeld } from "./lockCombos";
 import { classList, noSavePicker, openImageryGate, pauseImagery, storeTiles } from "./seeding";
 
@@ -57,12 +57,12 @@ test("Export is a no-op while the paint queue is non-empty, even if its button i
     const g = (window as any).__save = { opened: 0 };
     (window as any).showSaveFilePicker = () => { g.opened++; return new Promise(() => {}); };
   });
-  await setup(page);
+  await setup(page, rgbNodataFixture());
   await pauseImagery(page);
-  await jumpTo(page, [11.5, 48.5], 6);
-  const b = await toScreen(page, [11.505, 48.505]); // tile 0,0: no mask yet, so the dab waits for a read
+  await jumpTo(page, [11.5, 38.5], 6);
+  const b = await toScreen(page, [11.505, 38.505]); // row band 4: no mask yet (spec 023: the background is held, and the strokes' hovers read bands near 45N), so the dab waits for a read
   await page.mouse.click(b.x, b.y);
-  await expect.poll(() => page.evaluate(() => (window as any).__gate.reads)).toBe(1);
+  await expect.poll(() => page.evaluate(() => (window as any).__gate.reads)).toBeGreaterThan(0); // spec 020's display reads are held too
   await expect(page.locator("#export-labels")).toBeDisabled();
   await page.evaluate(() => { const e = document.getElementById("export-labels") as HTMLButtonElement; e.disabled = false; e.click(); });
   await page.waitForTimeout(300);
