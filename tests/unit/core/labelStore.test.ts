@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { tileWindows, type Window } from "../../../src/core/grid";
 import {
-  MAX_LABEL_TILES, brush, emptyStore, keepMasks, tileKeys, tileWindow, type LabelStore, type NodataMasks,
+  MAX_LABEL_TILES, brush, emptyStore, tileKeys, tileWindow, type LabelStore, type NodataMasks,
 } from "../../../src/core/labelStore";
 import { nodataMask } from "../../../src/core/nodata";
 import { makeTile } from "../helpers/tiles";
@@ -128,21 +128,11 @@ describe("brush (criterion 4)", () => {
   });
 });
 
-describe("tileKeys and keepMasks (criterion 18)", () => {
+// keepMasks went with spec 023 (ADR 0021): masks are kept for the raster's life.
+describe("tileKeys (criterion 18)", () => {
   it("tileKeys of a window across a tile corner gives 4 keys, row-major", () => {
     expect(tileKeys(win(250, 500, 10, 30))).toEqual(["0,256", "256,256", "0,512", "256,512"]);
     expect(tileKeys(win(0, 0, 256))).toEqual(["0,0"]);
     expect(tileKeys(win(256, 0, 1))).toEqual(["256,0"]);
-  });
-
-  it("keepMasks keeps exactly the masks of stored tiles and of tiles w meets", () => {
-    const s = emptyStore(1024, 1024);
-    const m = masksFor(s);
-    brush(s, m, win(10, 10, 3), 1, false);
-    brush(s, m, win(600, 600, 3), 1, false);
-    keepMasks(s, m, win(500, 250, 20));
-    expect([...m.keys()].sort()).toEqual(["0,0", "256,0", "256,256", "512,0", "512,256", "512,512"].sort());
-    keepMasks(s, m, null);
-    expect([...m.keys()].sort()).toEqual(["0,0", "512,512"]);
   });
 });

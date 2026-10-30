@@ -4,7 +4,7 @@ import { MAX_LABEL_TILES, type LabelStore } from "../../../src/core/labelStore";
 import { footprint } from "../../../src/core/pixel";
 import type { Affine, Grid } from "../../../src/core/types";
 import { maskReadFailed } from "../../../src/io/labelFile";
-import { PaintQueue } from "../../../src/io/paintQueue";
+import { cellOp, PaintQueue } from "../../../src/io/paintQueue";
 import { importLabels } from "../../../src/io/seeding";
 import { UndoHistory } from "../../../src/io/undoHistory";
 import { MESSAGES, readErrorMessage } from "../../../src/ui/messages";
@@ -36,7 +36,7 @@ async function setup(side = 1024) {
   /** One ended stroke of 1x1 (or side) cells. */
   const strokeAt = async (cells: [number, number][], value: number, erase = false, side = 1) => {
     const s = history.begin();
-    for (const [c, rr] of cells) q.push({ w: footprint(store, c, rr, side)!, value, erase, stroke: s });
+    for (const [c, rr] of cells) q.push(cellOp(footprint(store, c, rr, side)!, value, erase, s));
     history.end(s);
     await idle(q);
   };

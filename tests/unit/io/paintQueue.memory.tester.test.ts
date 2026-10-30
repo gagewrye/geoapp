@@ -1,28 +1,28 @@
 import { describe, expect, it } from "vitest";
 import { footprint, strokeCells } from "../../../src/core/pixel";
-import { MAX_LABEL_TILES, emptyStore, tileKeys, type LabelStore } from "../../../src/core/labelStore";
+import { MAX_LABEL_TILES, emptyStore, type LabelStore } from "../../../src/core/labelStore";
 import { TILE_SIZE } from "../../../src/core/types";
 import { tileWindows } from "../../../src/core/grid";
-import { PaintQueue } from "../../../src/io/paintQueue";
+import { cellOp, PaintQueue } from "../../../src/io/paintQueue";
 import type { RasterSource } from "../../../src/io/source";
 import { idle } from "../helpers/paintQueue";
 import { fakeSource } from "../helpers/sources";
 
 // Tester: memory bounds of spec 003 / ADR 0010, checked structurally (window sizes, map sizes, byte
-// lengths), never by sampling the heap. "Tile by tile" (CLAUDE.md): no read may exceed one tile.
+// lengths), never by sampling the heap. Since spec 023 (ADR 0021) a missing mask reads its 256-row band,
+// once, and masks are kept for the raster's life: arrays of at most 8 KiB, none for uniform windows.
 
-type Probe = { reads: { x0: number; y0: number; width: number; height: number }[]; inFlight: number; maxInFlight: number; maxMasks: number; maxOverStored: number };
+type Probe = { reads: { x0: number; y0: number; width: number; height: number }[]; inFlight: number; maxInFlight: number; maxMasks: number };
 
 /** A source whose every read records its window and checks the queue's masks against the store at that moment. */
 function probed(width: number, height: number, nodata: (c: number, r: number) => boolean, bandCount = 2) {
   const { source: inner } = fakeSource({ width, height, bandCount, nodata: -1 }, (b, c, r) => (b === bandCount - 1 && nodata(c, r) ? -1 : 3));
-  const p: Probe = { reads: [], inFlight: 0, maxInFlight: 0, maxMasks: 0, maxOverStored: 0 };
+  const p: Probe = { reads: [], inFlight: 0, maxInFlight: 0, maxMasks: 0 };
   let q: PaintQueue | null = null;
   let store: LabelStore = emptyStore(width, height);
   const check = () => {
     if (!q) return;
     p.maxMasks = Math.max(p.maxMasks, q.masks.size);
-    p.maxOverStored = Math.max(p.maxOverStored, q.masks.size - store.tiles.size);
   };
   const source: RasterSource = {
     meta: inner.meta,
@@ -42,61 +42,52 @@ function probed(width: number, height: number, nodata: (c: number, r: number) =>
 /** Push the stroke through the given cells, as the brush does (each cell's footprint, in order). */
 function push(q: PaintQueue, store: LabelStore, cells: [number, number][], side: number, value = 1, erase = false) {
   const all = cells.flatMap((c, i) => (i === 0 ? [c] : strokeCells(cells[i - 1]!, c).slice(1)));
-  for (const [c, r] of all) { const w = footprint(store, c, r, side); if (w) q.push({ w, value, erase }); }
+  for (const [c, r] of all) { const w = footprint(store, c, r, side); if (w) q.push(cellOp(w, value, erase)); }
 }
 
-const tileAligned = (w: { x0: number; y0: number; width: number; height: number }, W: number, H: number) =>
-  w.x0 % TILE_SIZE === 0 && w.y0 % TILE_SIZE === 0 && w.width === Math.min(TILE_SIZE, W - w.x0) && w.height === Math.min(TILE_SIZE, H - w.y0);
+const band = (w: { x0: number; y0: number; width: number; height: number }, W: number, H: number) =>
+  w.x0 === 0 && w.y0 % TILE_SIZE === 0 && w.width === W && w.height === Math.min(TILE_SIZE, H - w.y0);
 
-// Generous timeouts: thousands of queued cells and hundreds of mask reads, slow under full-suite load.
-describe("paint reads stay tile by tile (CLAUDE.md, criterion 8, tester)", { timeout: 60_000 }, () => {
-  it("a long size-127 zig-zag over a 3000x2900 raster (partial edge tiles) reads only clipped 256x256-aligned windows, one at a time, never one twice while its mask is held", async () => {
+// Generous timeouts: thousands of queued cells, slow under full-suite load.
+describe("paint reads stay band by band (spec 023 F2, tester)", { timeout: 60_000 }, () => {
+  it("a long size-127 zig-zag over a 3000x2900 raster (partial edge tiles) reads only clipped 256-row bands, one at a time, each once", async () => {
     const W = 3000, H = 2900;
     const t = probed(W, H, (c, r) => (c * 7 + r * 3) % 97 === 0);
     push(t.q, t.store, [[-60, -60], [3050, 400], [10, 1200], [2999, 2899], [1500, 0]], 127);
     await idle(t.q);
-    expect(t.p.reads.length).toBeGreaterThan(50);
-    for (const w of t.p.reads) {
-      expect(tileAligned(w, W, H), JSON.stringify(w)).toBe(true);
-      expect(w.width * w.height).toBeLessThanOrEqual(TILE_SIZE * TILE_SIZE);
-    }
+    expect(t.p.reads.length).toBe(Math.ceil(H / TILE_SIZE));
+    for (const w of t.p.reads) expect(band(w, W, H), JSON.stringify(w)).toBe(true);
+    expect(new Set(t.p.reads.map((w) => w.y0)).size).toBe(t.p.reads.length);
     expect(t.p.maxInFlight).toBe(1);
-    // a stored tile's mask is kept, so no stored tile is read twice
-    const counts = new Map<string, number>();
-    for (const w of t.p.reads) counts.set(`${w.x0},${w.y0}`, (counts.get(`${w.x0},${w.y0}`) ?? 0) + 1);
-    for (const k of t.store.tiles.keys()) expect(counts.get(k), k).toBe(1);
   });
 
-  it("masks held never exceed stored tiles + 8 (the last and next footprints), and at the end equal stored + the last footprint's", async () => {
+  it("masks are kept for every window of a band read: arrays of at most 8 KiB, uniform windows with none", async () => {
     const W = 4096, H = 4096;
-    const allNodataRow = (r: number) => r >= 2048 && r < 2304; // a tile row that is all nodata: masks there are never kept by a stored tile
+    const allNodataRow = (r: number) => r >= 2048 && r < 2304; // a tile row that is all nodata
     const t = probed(W, H, (_c, r) => allNodataRow(r));
     push(t.q, t.store, [[0, 2100], [4095, 2200], [0, 2280], [4095, 2100], [2000, 2300]], 127);
     await idle(t.q);
-    expect(t.p.maxOverStored).toBeLessThanOrEqual(8);
-    const last = footprint(t.store, 2000, 2300, 127)!;
-    const want = new Set([...t.store.tiles.keys(), ...tileKeys(last)]);
-    expect(new Set(t.q.masks.keys())).toEqual(want);
-    // every mask is ceil(w*h/8) <= 8 KiB
-    for (const m of t.q.masks.values()) expect(m.byteLength).toBeLessThanOrEqual(8192);
+    const bands = new Set(t.p.reads.map((w) => w.y0));
+    expect(t.q.masks.size).toBe(bands.size * (W / TILE_SIZE));
+    for (const k of t.q.masks.keys()) {
+      const m = t.q.masks.get(k)!;
+      if (Number(k.split(",")[1]) === 2048) expect(m).toBe("none");
+      else expect(m).toBe("all");
+    }
+    expect(t.q.masks.bytes).toBe(0);
   });
 
-  it(`at the cap (${MAX_LABEL_TILES} stored tiles) a stroke over 40 new tiles holds at most 264 masks and stores nothing new`, async () => {
+  it(`at the cap (${MAX_LABEL_TILES} stored tiles) a stroke over 40 new tiles stores nothing new`, async () => {
     const W = 256 * 20, H = 256 * 16; // 320 tiles
     const t = probed(W, H, () => false, 1);
-    // the stored tiles have masks too (as painting them would have left), built by painting one pixel each
     const cap = tileWindows(W, H).slice(0, MAX_LABEL_TILES);
-    for (const w of cap) t.q.push({ w: { x0: w.x0 + 1, y0: w.y0 + 1, width: 1, height: 1 }, value: 2, erase: false });
+    for (const w of cap) t.q.push(cellOp({ x0: w.x0 + 1, y0: w.y0 + 1, width: 1, height: 1 }, 2, false));
     await idle(t.q);
     expect(t.store.tiles.size).toBe(MAX_LABEL_TILES);
-    expect(t.q.masks.size).toBeLessThanOrEqual(MAX_LABEL_TILES + 4);
-    const reads0 = t.p.reads.length;
     push(t.q, t.store, [[0, 256 * 13 + 120], [W - 1, 256 * 15 + 30], [0, 256 * 15 + 200]], 127);
     await idle(t.q);
-    expect(t.p.reads.length).toBeGreaterThan(reads0 + 39);
     expect(t.store.tiles.size).toBe(MAX_LABEL_TILES);
-    expect(t.p.maxMasks).toBeLessThanOrEqual(264);
-    // 16 MiB of labels at most: each stored tile is its window's size
+    expect(t.p.maxMasks).toBeLessThanOrEqual(W / TILE_SIZE * (H / TILE_SIZE));
     let bytes = 0;
     for (const v of t.store.tiles.values()) bytes += v.byteLength;
     expect(bytes).toBeLessThanOrEqual(MAX_LABEL_TILES * 65536);

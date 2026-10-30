@@ -1,6 +1,6 @@
 import type { CanvasSource, Map as MapLibreMap } from "maplibre-gl";
 import type { Window } from "../core/grid";
-import { IMAGERY_TILES, imageryQuads, type Level } from "../core/imagery";
+import { IMAGERY_TILES, imageryQuads, type Level, type QuadCache } from "../core/imagery";
 import type { TileSink } from "../io/imageryLoader";
 import { beforeSlot } from "./layers";
 
@@ -13,6 +13,8 @@ const PREFIX = "imagery-";
 // all used or drawn last, are never the least recently used.
 export class ImageryLayer implements TileSink {
   private readonly tiles = new Map<string, string[]>();
+  // kept past eviction, for the raster's life; clear() starts a new raster
+  private quads: QuadCache = new Map();
 
   constructor(private readonly map: MapLibreMap) {}
 
@@ -28,7 +30,7 @@ export class ImageryLayer implements TileSink {
 
   draw(key: string, level: Level, tile: Window, rgba: Uint8ClampedArray<ArrayBuffer>): void {
     this.remove(key);
-    const quads = imageryQuads(level, tile);
+    const quads = imageryQuads(level, tile, this.quads, key);
     // evict first, so the count never passes the cap even while this tile is added; a tile goes with all its quads
     for (const old of [...this.tiles.keys()]) {
       if (this.tiles.size < IMAGERY_TILES) break;
@@ -61,6 +63,7 @@ export class ImageryLayer implements TileSink {
   /** Remove every tile (another raster opened). */
   clear(): void {
     for (const key of [...this.tiles.keys()]) this.remove(key);
+    this.quads = new Map();
   }
 
   /** Finer tiles draw above coarser: below the lowest imagery layer of a smaller step, else at the top of the slot. */

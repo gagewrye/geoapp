@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { message, openApp, openRaster, rgbFixture, tiff } from "./helpers";
+import { fileGate, fileWaiting as waiting, holdFile as hold, releaseFiles } from "./raceCombos";
 
 // Async actions tied to the raster they started on (spec 003, tester F10): an open that another open
 // overtakes.
@@ -10,37 +11,6 @@ const otherFixture = () => tiff("other.tif", 800, 600, 3, (b, c) => (b === 0 ? (
 const info = (page: Page) => page.locator("#raster-info");
 const imageryWidth = (page: Page) => page.evaluate(() => (window as any).__geoapp.imagery()?.meta.width as number | undefined);
 const previewWest = (page: Page) => page.evaluate(() => (window as any).__geoapp.map.getSource("preview")?.coordinates[0][0] as number | undefined);
-
-/**
- * Hold FileReader reads of one file name: "all" from the start, or "committed" only once that file is
- * the open raster (#raster-info names it), so its preview waits but its header doesn't.
- */
-async function fileGate(page: Page) {
-  await page.addInitScript(() => {
-    const g = (window as any).__files = { hold: new Map<string, string>(), waiting: [] as (() => void)[] };
-    const slice = Blob.prototype.slice;
-    Blob.prototype.slice = function (this: Blob, ...a: Parameters<Blob["slice"]>) {
-      const b = slice.apply(this, a);
-      (b as any).__name = (this as any).__name ?? (this as File).name;
-      return b;
-    };
-    const read = FileReader.prototype.readAsArrayBuffer;
-    FileReader.prototype.readAsArrayBuffer = function (this: FileReader, b: Blob) {
-      const name = (b as any).__name as string | undefined, mode = name && g.hold.get(name);
-      const held = mode === "all" || (mode === "committed" && document.getElementById("raster-info")!.textContent!.startsWith(`${name}:`));
-      if (held) g.waiting.push(() => read.call(this, b));
-      else read.call(this, b);
-    };
-  });
-}
-const hold = (page: Page, name: string, mode: "all" | "committed") =>
-  page.evaluate(([name, mode]) => (window as any).__files.hold.set(name, mode), [name, mode] as const);
-const waiting = (page: Page) => page.evaluate(() => (window as any).__files.waiting.length as number);
-const releaseFiles = (page: Page) => page.evaluate(() => {
-  const g = (window as any).__files;
-  g.hold.clear();
-  for (const go of g.waiting.splice(0)) go();
-});
 
 test.describe("an open that another open overtakes", () => {
   test("an older open still reading its header doesn't replace the raster opened after it", async ({ page }) => {

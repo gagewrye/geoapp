@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { footprint, pixelAt, strokeCells } from "../../src/core/pixel";
 import type { Grid } from "../../src/core/types";
 import { hoverFeatures, jumpTo, labels, message, openApp, openRaster, paintMode, settled, tiff, toLngLat, toScreen, type LngLat, type Xy } from "./helpers";
+import { holdMasks } from "./seeding";
 
 // Tester: spec 003 Imagery nodata on a 4-band raster whose GDAL_NODATA (0) appears in the last band
 // only, plus a NaN block in band 1; and the paint queue with reads paused (hover stays synchronous,
@@ -18,6 +19,7 @@ const round = (p: Xy): Xy => ({ x: Math.round(p.x), y: Math.round(p.y) });
 
 async function setup(page: Page) {
   await openApp(page);
+  await holdMasks(page);
   await openRaster(page, fixture());
   await expect(message(page)).toHaveText("Raster opened.");
   await paintMode(page);
@@ -58,10 +60,13 @@ test("with reads paused: the hover over a block still shows at once, an erase qu
   await setup(page);
   await page.evaluate(() => {
     const s = (window as any).__geoapp.imagery();
-    const read = s.readWindow.bind(s);
     const g = (window as any).__gate = { open: null as null | (() => void) };
     const wait = new Promise<void>((r) => { g.open = r; });
-    s.readWindow = async (...a: unknown[]) => { await wait; return read(...a); };
+    for (const m of ["readWindow", "readSamples"]) {
+      if (!s[m]) continue;
+      const read = s[m].bind(s);
+      s[m] = async (...a: unknown[]) => { await wait; return read(...a); };
+    }
   });
   const paint = await points(page, 185, 355, 150, 24);
   await drag(page, paint);

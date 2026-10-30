@@ -4,7 +4,7 @@ import { MAX_LABEL_TILES, emptyStore, type LabelStore } from "../../../src/core/
 import { footprint } from "../../../src/core/pixel";
 import { TILE_SIZE } from "../../../src/core/types";
 import { UNDO_BYTES, editBytes } from "../../../src/core/undo";
-import { PaintQueue } from "../../../src/io/paintQueue";
+import { cellOp, PaintQueue } from "../../../src/io/paintQueue";
 import type { RasterSource } from "../../../src/io/source";
 import { UndoHistory } from "../../../src/io/undoHistory";
 import { idle } from "../helpers/paintQueue";
@@ -35,7 +35,7 @@ function setup() {
 /** One stroke of 1x1 cells at the given pixels, ended. */
 function strokeAt(t: ReturnType<typeof setup>, cells: [number, number][], value: number, erase = false) {
   const s = t.history.begin();
-  for (const [c, r] of cells) t.q.push({ w: footprint(t.store(), c, r, 1)!, value, erase, stroke: s });
+  for (const [c, r] of cells) t.q.push(cellOp(footprint(t.store(), c, r, 1)!, value, erase, s));
   t.history.end(s);
 }
 
@@ -62,7 +62,7 @@ describe("UndoHistory with the paint queue (spec 010 What an edit is / Undo)", (
     await idle(t.q);
     expect(t.history.size).toBe(0);
     const s = t.history.begin();
-    t.q.push({ w: footprint(t.store(), 5, 5, 1)!, value: 1, erase: false, stroke: s });
+    t.q.push(cellOp(footprint(t.store(), 5, 5, 1)!, 1, false, s));
     await idle(t.q);
     expect(t.history.size).toBe(0); // still in progress
     t.history.end(s);
@@ -101,7 +101,7 @@ describe("UndoHistory with the paint queue (spec 010 What an edit is / Undo)", (
     const s = t.history.begin();
     let peak = 0;
     for (const w of all) {
-      t.q.push({ w: footprint(t.store(), w.x0 + 7, w.y0 + 7, 1)!, value: 3, erase: false, stroke: s });
+      t.q.push(cellOp(footprint(t.store(), w.x0 + 7, w.y0 + 7, 1)!, 3, false, s));
       await idle(t.q);
       peak = Math.max(peak, t.history.bytes());
     }

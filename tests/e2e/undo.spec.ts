@@ -7,6 +7,7 @@ const snapshot = async (page: Page) => [...(await labels(page))].sort();
 
 async function setup(page: Page) {
   await openApp(page);
+  await page.evaluate(() => { (window as any).__geoapp.pauseMasks = true; }); // spec 023: strokes, not the background, read the masks
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
   await paintMode(page);
@@ -93,10 +94,13 @@ test("Undo is disabled while a stroke's cells wait for masks; then one Undo remo
   const empty = await snapshot(page);
   await page.evaluate(() => {
     const s = (window as any).__geoapp.imagery();
-    const read = s.readWindow.bind(s);
     const g = (window as any).__gate = { held: true, open: null as null | (() => void), wait: null as null | Promise<void> };
     g.wait = new Promise<void>((r) => { g.open = r; });
-    s.readWindow = async (...a: unknown[]) => { if (g.held) await g.wait; return read(...a); };
+    // spec 023: masks are read through readSamples, by band; the setup paused the background reads
+    for (const m of ["readWindow", "readSamples"]) {
+      const read = s[m].bind(s);
+      s[m] = async (...a: unknown[]) => { if (g.held) await g.wait; return read(...a); };
+    }
   });
   const c = await toScreen(page, [15.005, 45.005]);
   await page.mouse.move(c.x, c.y);
