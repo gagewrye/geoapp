@@ -147,6 +147,20 @@ describe("background reads (criterion 6)", () => {
     expect(order).toEqual(["stroke 4", "hover 5"]);
   });
 
+  it("a hover's bands wait for start (\"Raster opened.\"); a stroke's do not (review 3)", async () => {
+    const { source, reads } = rgba();
+    const cache = new MaskCache(source);
+    let hovered = false;
+    void cache.need(3 * 256, HOVER).then(() => { hovered = true; });
+    await tick(20);
+    expect(reads).toEqual([]);
+    await cache.need(1 * 256, STROKE);
+    expect(bandsRead(reads)).toEqual([1]);
+    cache.start(0);
+    while (!hovered) await tick();
+    expect(bandsRead(reads).slice(0, 2)).toEqual([1, 3]);
+  });
+
   it("stop (another raster opened) ends the reads: no later band, waiting needs reject, the read in flight is dropped", async () => {
     const h = held();
     const cache = new MaskCache(h.source);
@@ -223,5 +237,25 @@ describe("copy-on-touch and label rows (criterion 7)", () => {
     expect(spy).toHaveBeenCalledTimes(5);
     await file.read(win(0, 768));
     expect(spy).toHaveBeenCalledTimes(6);
+  });
+});
+
+describe("an op's masks past MASK_BYTES (review 4)", () => {
+  it("a later band's read evicting an earlier key's mask in the same op still brushes by both masks", async () => {
+    const S = 512, grid: Grid = { ...GRID, width: S, height: S };
+    const nd = (c: number, r: number) => (c + r) % 3 === 0; // every window mixed: an 8 KiB array each
+    const { source } = samplesSource({ ...grid, bandCount: 1, alpha: null, nodata: 0, float: false }, (_k, c, r) => (nd(c, r) ? 0 : 5), { width: S, height: 1, bytes: S });
+    const cache = new MaskCache(source, { maskBytes: 2 * 8192 }); // one band
+    const store = emptyStore(S, S);
+    const errors: unknown[] = [];
+    const q = new PaintQueue(source, () => store, { applied() {}, full() {}, busy() {}, error: (e) => { errors.push(e); } }, undefined, () => null, cache);
+    q.push(cellOp({ x0: 100, y0: 200, width: 20, height: 100 }, 1, false)); // rows 200-299: keys 0,0 and 0,256
+    await idle(q);
+    expect(errors).toEqual([]);
+    expect(cache.masks.has("0,0")).toBe(false); // evicted by band 1's read
+    for (let r = 200; r < 300; r++) for (let c = 100; c < 120; c++) {
+      const t = store.tiles.get(`0,${r < 256 ? 0 : 256}`)!;
+      expect(t[(r % 256) * 256 + c], `${c},${r}`).toBe(nd(c, r) ? 0 : 1);
+    }
   });
 });

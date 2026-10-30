@@ -17,6 +17,8 @@ type Deps = {
   paused?: () => boolean;
   /** How long a waiting background read sleeps before it looks again. */
   retryMs?: number;
+  /** Mask array budget (tests); MASK_BYTES by default. */
+  maskBytes?: number;
 };
 type Request = { priority: number; waiters: { resolve: () => void; reject: (e: unknown) => void }[] };
 
@@ -28,7 +30,7 @@ const macrotask = () => new Promise<void>((r) => setTimeout(r, 0));
 // One read at a time: stroke bands, then hover bands, then the background from the view's centre band outwards,
 // the background only after start() and while the loader is idle and no import runs. stop() ends everything.
 export class MaskCache {
-  readonly masks = new MaskStore();
+  readonly masks: MaskStore;
   private readonly requests = new Map<number, Request>();
   private readonly read = new Set<number>(); // bands read once (the background skips them)
   private order: number[] = [];
@@ -37,7 +39,9 @@ export class MaskCache {
   private running = false;
   private timer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(private readonly source: RasterSource, private readonly deps: Deps = {}) {}
+  constructor(private readonly source: RasterSource, private readonly deps: Deps = {}) {
+    this.masks = new MaskStore(deps.maskBytes);
+  }
 
   /** 256-row bands of the raster. */
   get bands(): number { return Math.ceil(this.source.meta.height / TILE_SIZE); }
@@ -59,7 +63,7 @@ export class MaskCache {
     });
   }
 
-  /** Starts the background reads, from the band holding row centreRow outwards. */
+  /** Starts the hover's and the background's reads, the background from the band holding row centreRow outwards. */
   start(centreRow: number): void {
     if (this.stopped) return;
     this.started = true;
@@ -91,7 +95,10 @@ export class MaskCache {
   /** The next band to read: the most urgent request, else the background's next unread band; "wait" while the background must. */
   private next(): { band: number; request: boolean } | "wait" | null {
     let best: number | null = null;
-    for (const [band, r] of this.requests) if (best === null || r.priority < this.requests.get(best)!.priority) best = band;
+    for (const [band, r] of this.requests) {
+      if (r.priority > STROKE && !this.started) continue; // a hover's bands wait for "Raster opened.", behind the preview's reads
+      if (best === null || r.priority < this.requests.get(best)!.priority) best = band;
+    }
     if (best !== null) return { band: best, request: true };
     if (!this.started) return null;
     const band = this.order.find((b) => !this.read.has(b));

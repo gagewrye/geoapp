@@ -2,6 +2,7 @@ import type { Window } from "../core/grid";
 import { brushSpans, MAX_LABEL_TILES, tileWindow, type LabelStore } from "../core/labelStore";
 import { spanKeys, windowSpans, type Span } from "../core/spans";
 import { anyNonZero, maskedBaseTile, type MaskBase } from "./maskBase";
+import type { ValidMask } from "../core/validMask";
 import { MaskCache, STROKE } from "./maskCache";
 import type { RasterSource } from "./source";
 import type { StrokeEdit, UndoHistory } from "./undoHistory";
@@ -30,6 +31,7 @@ type Events = {
 // into the store just before brushing, after the undo record.
 export class PaintQueue {
   private pending = new Map<string, Uint8Array>(); // base tiles read for the head move, until it applies
+  private held = new Map<string, ValidMask>(); // the head move's masks: a later band's read may evict one past MASK_BYTES
   private ops: PaintOp[] = [];
   private running = false;
   private generation = 0; // bumped by clear(), so a read finishing afterwards is ignored
@@ -58,6 +60,7 @@ export class PaintQueue {
     this.running = false;
     this.ops = [];
     this.pending.clear();
+    this.held.clear();
     this.history?.dropQueued();
     this.setBusy(false);
   }
@@ -79,7 +82,7 @@ export class PaintQueue {
     }
     if (store.tiles.size + copies.length > MAX_LABEL_TILES) return "full";
     for (const [key, t] of copies) store.tiles.set(key, t);
-    const r = brushSpans(store, this.cache.masks, op.spans, op.value, op.erase);
+    const r = brushSpans(store, { get: (k) => this.held.get(k) ?? this.cache.get(k) }, op.spans, op.value, op.erase);
     if (r === "full") for (const [key] of copies) store.tiles.delete(key);
     return r;
   }
@@ -97,14 +100,17 @@ export class PaintQueue {
         const keys = spanKeys(op.spans);
         for (const key of keys) {
           const needBase = base !== null && !store.tiles.has(key) && !this.pending.has(key);
-          if ((op.erase && !needBase) || (this.cache.get(key) && !needBase)) continue;
+          if (op.erase && !needBase) continue;
           const [x0, y0] = key.split(",").map(Number) as [number, number];
-          if (!this.cache.get(key)) {
+          let mask = this.held.get(key) ?? this.cache.get(key);
+          while (!mask) {
             await this.cache.need(y0, STROKE);
             if (gen !== this.generation) return;
+            mask = this.cache.get(key);
           }
+          this.held.set(key, mask);
           if (needBase) {
-            const labels = await maskedBaseTile(this.source, base, tileWindow(store, x0, y0), this.cache.get(key)!);
+            const labels = await maskedBaseTile(this.source, base, tileWindow(store, x0, y0), mask);
             if (gen !== this.generation) return;
             this.pending.set(key, labels);
           }
@@ -112,6 +118,7 @@ export class PaintQueue {
         this.ops.shift();
         if (op.stroke) this.history?.record(op.stroke, keys);
         const full = this.apply(store, op, keys) === "full";
+        this.held.clear();
         if (op.stroke) this.history?.applied(op.stroke);
         if (full) this.on.full();
         this.on.applied(keys);
