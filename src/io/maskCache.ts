@@ -1,10 +1,9 @@
 import { maskSamples } from "../core/alpha";
-import { decimateInto, type SourceWindow } from "../core/decimate";
 import type { Window } from "../core/grid";
 import { rowReads } from "../core/imagery";
-import { nodataMask } from "../core/nodata";
+import { markNodata } from "../core/nodata";
 import { nodataPossible } from "../core/seed";
-import { TILE_SIZE, type Tile } from "../core/types";
+import { TILE_SIZE } from "../core/types";
 import { bandOrder, compactMask, MaskStore, type ValidMask } from "../core/validMask";
 import type { RasterSource } from "./source";
 
@@ -20,6 +19,8 @@ type Deps = {
   retryMs?: number;
 };
 type Request = { priority: number; waiters: { resolve: () => void; reject: (e: unknown) => void }[] };
+
+type Read = Window & { bands: ArrayLike<number>[] };
 
 const macrotask = () => new Promise<void>((r) => setTimeout(r, 0));
 
@@ -125,6 +126,8 @@ export class MaskCache {
   }
 
   /** Reads one band through spec 020's rowReads (spec 023 F2) and stores every window's mask. */
+  // Peak memory is one read at the file's sample type plus 1 bit per pixel of the band (ADR 0021's 48 MiB): each
+  // read's nodata pixels are marked straight into the windows' bits.
   private async readBand(band: number): Promise<void> {
     const { meta } = this.source;
     const { width, height, bandCount, nodata, float, alpha } = meta;
@@ -134,17 +137,21 @@ export class MaskCache {
       return;
     }
     const m = maskSamples(bandCount, nodata, float, alpha);
-    const tiles: Tile[] = windows.map((w) => ({ ...w, nodata, alpha: m.alpha, bands: m.samples.map(() => new Float32Array(w.width * w.height)) }));
+    const bits = windows.map((w) => new Uint8Array(Math.ceil((w.width * w.height) / 8)));
     const all = { x0: 0, y0: windows[0]!.y0, width, height: windows[0]!.height };
     const { block, readSamples } = this.source;
-    const reads: (() => Promise<SourceWindow>)[] = block && readSamples
+    const reads: (() => Promise<Read>)[] = block && readSamples
       ? rowReads([all], 1, block, width, height).map((r) => async () => ({ ...r, bands: await readSamples.call(this.source, 0, r.x0, r.y0, r.width, r.height, m.samples) }))
-      : [async () => { const t = await this.source.readWindow(all.x0, all.y0, all.width, all.height); return { ...all, bands: m.samples.map((k) => t.bands[k]!) }; }];
+      // readWindow decodes every band as Float32: bound its reads as if each 256 px row segment were a block
+      : rowReads([all], 1, { width: TILE_SIZE, height: 1, bytes: TILE_SIZE * bandCount * 4 }, width, height).map((r) => async () => {
+        const t = await this.source.readWindow(r.x0, r.y0, r.width, r.height);
+        return { ...r, bands: m.samples.map((k) => t.bands[k]!) };
+      });
     for (const read of reads) {
-      const win = await read();
+      const r = await read();
       if (this.stopped) return;
-      for (const t of tiles) decimateInto(t, win, 1, width, height);
+      windows.forEach((w, i) => markNodata(bits[i]!, w, r, nodata, m.alpha));
     }
-    tiles.forEach((t) => this.masks.set(`${t.x0},${t.y0}`, compactMask(nodataMask(t), t.width * t.height)));
+    windows.forEach((w, i) => this.masks.set(`${w.x0},${w.y0}`, compactMask(bits[i]!, w.width * w.height)));
   }
 }
