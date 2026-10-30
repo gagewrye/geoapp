@@ -21,7 +21,7 @@ The long task is one `readSamples` call followed by drawing the tiles it fed, al
    - `readSamples` computes each row's byte range for the window's columns from the eagerly loaded offsets (spec 025), and fetches those ranges through `blobSource`. Ranges up to 64 KiB apart merge, as spec 025 does.
    - It copies only the requested samples of the requested columns into typed arrays, one tight loop per row.
    - Strips and uncompressed tiles both qualify. Any other file uses geotiff.
-2. **Smaller decodes elsewhere.** For files that still go through geotiff, the imagery loader's and spec 023's mask-cache reads are split so each decodes at most `TASK_READ_BYTES` = 512 KiB (`rowReads` with that cap). geotiff decodes a whole read in one task, about 8 ms per 256² LZW RGBA tile. Amended under Gage's perf delegation: 4 MiB gave 130 ms tasks on the tiled chunk. Raw reads (item 1) aren't split. The import keeps `MAX_READ_BYTES`.
+2. **Smaller decodes elsewhere.** For files that still go through geotiff, the imagery loader's and spec 023's mask-cache reads are split so each decodes at most `TASK_READ_BYTES` = 512 KiB (`rowReads` with that cap). geotiff decodes a whole read in one task, about 8 ms per 256² LZW RGBA tile. Amended under Gage's perf delegation: 4 MiB gave 130 ms tasks on the tiled chunk. Raw reads (item 1) aren't split. The import's imagery reads go through the mask cache (spec 024), so they are capped too. Only label-file reads (`rowBandReader`, `io/labelFile.ts`) keep `MAX_READ_BYTES`.
 3. **Yield between draws.**
    - The imagery loader draws ready tiles from a queue, centre first, until 8 ms have passed in the task, then yields with a `MessageChannel` post before drawing more.
    - Mask-cache reads yield the same way between bands.
