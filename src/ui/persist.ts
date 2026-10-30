@@ -25,7 +25,7 @@ export type PersistLabels = {
   stroking(): boolean;
   hasLabels(): boolean;
   /** Swaps in a restored session; its replace must not count as an edit. */
-  restore(store: LabelStore, classes: LabelClass[], base: MaskBase | null, selected: number, view: { opacity: number; visible: boolean }): void;
+  restoreSession(store: LabelStore, classes: LabelClass[], base: MaskBase | null, selected: number, view: { opacity: number; visible: boolean }): void;
 };
 
 type Deps = {
@@ -76,10 +76,12 @@ export function initPersist(d: Deps) {
   let inFlight = 0, failed = false, applying = false, persisted = false, guarded = false;
 
   const dirty = (s: Session | null) => !!s && (s.tiles.size > 0 || s.record || s.clear || s.file !== null);
+  // changes to a raster with no labels, and no session saved from this page, have nothing to save (an open resets the view)
+  const unsaved = (s: Session | null) => dirty(s) && (s!.owned || labels.hasLabels());
   const guard = (e: Event) => { e.preventDefault(); (e as BeforeUnloadEvent).returnValue = ""; };
   /** The beforeunload guard is on iff something is dirty, a save is in flight, or the last save failed. */
   function sync(): void {
-    const on = dirty(current) || inFlight > 0 || failed;
+    const on = unsaved(current) || inFlight > 0 || failed;
     if (on === guarded) return;
     guarded = on;
     if (on) win.addEventListener("beforeunload", guard); else win.removeEventListener("beforeunload", guard);
@@ -93,7 +95,7 @@ export function initPersist(d: Deps) {
 
   /** Copies what changed in s now; null when nothing did or it may not save yet. */
   function take(s: Session): Snapshot | null {
-    if (!s.ready || !dirty(s)) return null;
+    if (!s.ready || !unsaved(s)) return null;
     const store = labels.store(), base = labels.base(), view = labels.view();
     const tiles = [...s.tiles].map((k): [string, ArrayBuffer | null] => [k, store.tiles.get(k)?.slice().buffer ?? null]);
     const record = {
@@ -191,7 +193,7 @@ export function initPersist(d: Deps) {
         if (s !== current) return null;
         applying = true;
         try {
-          labels.restore({ width: s.grid.width, height: s.grid.height, tiles, base: base !== null }, r.classes, base, r.selected, { opacity: r.opacity, visible: r.visible });
+          labels.restoreSession({ width: s.grid.width, height: s.grid.height, tiles, base: base !== null }, r.classes, base, r.selected, { opacity: r.opacity, visible: r.visible });
         } finally { applying = false; }
         s.owned = true;
         if (missing) s.record = true; // saved again without the mask

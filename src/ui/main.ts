@@ -8,9 +8,11 @@ import { createNavigation } from "../map/navigation";
 import { fitToPreview, showPreview } from "../map/preview";
 import { initImagery } from "./imagery";
 import { inTextField } from "./labelKeys";
+import { openSessionStore } from "../io/session";
 import { initLabels } from "./labels";
 import { errorText, MESSAGES } from "./messages";
 import { initProgress } from "./progress";
+import { initPersist } from "./persist";
 import { initSeeding } from "./seeding";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -38,9 +40,13 @@ const testHook = (name: string, arg: unknown) => {
 const hookValue = (name: string) => (window as unknown as { __geoapp?: Record<string, unknown> }).__geoapp?.[name];
 const labels = initLabels({ map, say, onBusy: () => seeding.sync(), onChange: () => seeding.sync(), panning: () => nav.panning(),
   imageryBusy: fullRes.busy, mapMoving: fullRes.moving, importing: () => seeding.seeding() || hookValue("pauseMasks") === true,
-  sweep: () => hookValue("sweep") !== false, op: (o) => testHook("paintOp", o) });
+  sweep: () => hookValue("sweep") !== false, op: (o) => testHook("paintOp", o),
+  edits: { tiles: (k) => persist.tiles(k), record: () => persist.record(), replaced: () => persist.replaced(), strokeEnded: () => persist.strokeEnded() } });
+// Spec 031: labels are kept in this browser as they change, and offered back when the raster is opened again
+const persist = initPersist({ labels, open: openSessionStore, state: $("save-state"), win: window, doc: document,
+  confirm: (t) => confirm(t), persistStorage: () => { void navigator.storage?.persist?.(); } });
 const seeding = initSeeding({ labels, imagery: () => source, say, error: errorText,
-  opened: (f) => testHook("labelFile", f) });
+  opened: (f) => testHook("labelFile", f), imported: (f) => persist.imported(f) });
 // letters type in text fields and pick options in selects, so WASD leaves them alone (spec 009)
 const nav = createNavigation(map, { typing: (el) => inTextField(el) || el instanceof HTMLSelectElement, stroking: labels.stroking });
 nav.onSettle(fullRes.settle);
@@ -89,6 +95,7 @@ $<HTMLInputElement>("open-raster").addEventListener("change", (ev) => {
     fullRes.clear();
     previewing?.abort(); // the replaced raster's preview reads stop
     const signal = (previewing = new AbortController()).signal;
+    persist.open(file.name, file.size, f.meta); // before labels.open, so the old raster's changes are copied first
     labels.open(f);
     const { width, height, bandCount, epsg } = f.meta;
     $("raster-info").textContent = `${file.name}: ${width} x ${height}, ${bandCount} band(s), EPSG:${epsg}`;
@@ -107,6 +114,8 @@ $<HTMLInputElement>("open-raster").addEventListener("change", (ev) => {
     progress.hide();
     say(off ? `Raster opened. ${off}` : "Raster opened.");
     labels.startMasks(); // spec 023 F3: only after the open, and behind the visible tiles
+    // spec 031: once the preview is drawn; a store that can't open shows on #save-state when a save fails
+    persist.offer().then((m) => { if (m && !stale()) say(m); }, () => {});
   }, stale);
 });
 

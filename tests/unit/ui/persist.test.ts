@@ -25,7 +25,7 @@ function setup(opts: { confirm?: boolean } = {}) {
   const labels: PersistLabels = {
     store: () => store, classes: () => classes, selected: () => selected, view: () => view, base: () => base,
     stroking: () => flags.stroking, hasLabels: () => store.tiles.size > 0 || (base?.count ?? 0) > 0,
-    restore(s, c, b, sel, v) { store = s; classes = c; base = b; selected = sel; view = v; restored.push({ s, c, b, sel, v }); },
+    restoreSession(s, c, b, sel, v) { store = s; classes = c; base = b; selected = sel; view = v; restored.push({ s, c, b, sel, v }); },
   };
   const win = new EventTarget(), doc = Object.assign(new EventTarget(), { visibilityState: "visible" });
   const state = { textContent: "" as string | null };
@@ -106,6 +106,8 @@ describe("debounced saves (criterion 2)", () => {
     t.p.record();
     await vi.advanceTimersByTimeAsync(SAVE_DELAY_MS); await t.p.idle();
     expect(t.fake.log).toEqual([]);
+    expect(t.state.textContent).toBe("");
+    expect(t.guarded()).toBe(false);
   });
 });
 
