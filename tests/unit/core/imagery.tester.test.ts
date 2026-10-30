@@ -130,6 +130,19 @@ describe("rowReads edge cases", () => {
     for (const r of reads) expect(decodedBytes(r, f32, 9216, 4096)).toBeLessThanOrEqual(MAX_READ_BYTES);
   });
 
+  it("splits exactly at the limit: blocks decoding exactly MAX_READ_BYTES are one read, one block row more is two", () => {
+    // 64 blocks of 256 KiB = 16 MiB: one s = 1 row of 8 tiles over 8 block rows of 32 px blocks
+    const b: Block = { width: 256, height: 32, bytes: MAX_READ_BYTES / 64 };
+    const row = Array.from({ length: 8 }, (_, i) => tile(i * 256, 0));
+    const one = rowReads(row, 1, b, 4096, 4096);
+    expect(one).toEqual([{ x0: 0, y0: 0, width: 2048, height: 256 }]);
+    expect(decodedBytes(one[0]!, b, 4096, 4096)).toBe(MAX_READ_BYTES);
+    const nine = rowReads([...row, tile(2048, 0)], 1, b, 4096, 4096);
+    expect(nine.length).toBeGreaterThan(1);
+    for (const r of nine) expect(decodedBytes(r, b, 4096, 4096)).toBeLessThanOrEqual(MAX_READ_BYTES);
+    expect(nine.reduce((n, r) => n + r.width * r.height, 0)).toBe(9 * 256 * 256);
+  });
+
   it("a partial last tile's span is clipped to the image", () => {
     expect(rowReads([tile(256, 0, 2, 256)], 4, RGB8, 1030, 1029)).toEqual([{ x0: 1024, y0: 0, width: 6, height: 1024 }]);
   });

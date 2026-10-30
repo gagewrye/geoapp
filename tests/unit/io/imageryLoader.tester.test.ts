@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Window } from "../../../src/core/grid";
-import { MAX_READ_BYTES, type Level } from "../../../src/core/imagery";
+import { decodedBytes, MAX_READ_BYTES, type Level } from "../../../src/core/imagery";
 import type { Grid } from "../../../src/core/types";
 import { ImageryLoader } from "../../../src/io/imageryLoader";
 import type { ImagerySource } from "../../../src/io/source";
@@ -146,5 +146,47 @@ describe("ImageryLoader, tester", () => {
       return bx * by * bytes;
     };
     for (const r of reads) expect(decoded(r.win)).toBeLessThanOrEqual(MAX_READ_BYTES); // 22300 x 1024 x 3 B = 68.5 MB
+  });
+
+  it("an overview level's reads are bounded by the overview's own block, not the full image's", () => {
+    // full image in 1-row strips; the overview is tiled 64 x 64 with 3 bands of Float64 (96 KiB a block)
+    const { source, reads, grid } = held(8192, 8192, 3, () => 1, { block: [8192, 1] });
+    const ob = { width: 64, height: 64, bytes: 64 * 64 * 24 };
+    source.overviews = [{ index: 1, width: 4096, height: 4096, block: ob }];
+    const level: Level = { s: 2, overview: 1, grid: { ...grid, width: 4096, height: 4096, gt: [500000, 60, 0, 5000000, 0, -60] } };
+    const row = Array.from({ length: 16 }, (_, i) => ({ x0: i * 256, y0: 0, width: 256, height: 256 }));
+    new ImageryLoader(source, R3, sink()).show({ level, tiles: row });
+    expect(reads.length).toBeGreaterThan(0);
+    for (const r of reads) {
+      expect(r.image).toBe(1);
+      expect(decodedBytes(r.win, ob, 4096, 4096)).toBeLessThanOrEqual(MAX_READ_BYTES);
+      expect(r.win.x0 % 64 === 0 && r.win.y0 % 64 === 0).toBe(true);
+    }
+  });
+
+  it("one failed read of a tile filled by several: the tile isn't drawn, the error is reported once, and a later view draws it whole", async () => {
+    const W = 4096, H = 4096, v = (k: number, c: number, r: number) => (k * 9 + c + 2 * r) % 250;
+    const { source, reads, grid } = held(W, H, 3, v, { block: [W, 1] });
+    void grid;
+    source.block.bytes = 98304; // 1-row strips that decode 96 KiB: 170 rows a read
+    const s = sink();
+    const errors: unknown[] = [];
+    const loader = new ImageryLoader(source, R3, s, (e) => errors.push(e));
+    const level: Level = { s: 4, overview: null, grid: { width: 1024, height: 1024, epsg: 32633, gt: [500000, 120, 0, 5000000, 0, -120] } };
+    const plan = { level, tiles: [{ x0: 256, y0: 0, width: 256, height: 256 }] };
+    loader.show(plan);
+    reads[0]!.settle();
+    await flush();
+    reads[1]!.settle(new Error("NotReadableError"));
+    await flush();
+    for (let i = 0; i < 8; i++) { for (const r of reads) r.settle(); await flush(); }
+    expect(s.drawn.size).toBe(0);
+    expect(errors).toHaveLength(1);
+    const before = reads.length;
+    loader.show(plan);
+    for (let i = 0; i < 10; i++) { for (const r of reads) r.settle(); await flush(); }
+    expect(reads.length - before).toBe(7); // read again from the start
+    const rgba = s.drawn.get("4-256,0")!;
+    for (const [i, j] of [[0, 0], [100, 42], [255, 255]]) expect(rgba[4 * (j! * 256 + i!)]).toBe(v(0, (256 + i!) * 4 + 2, j! * 4 + 2));
   });
 });
