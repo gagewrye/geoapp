@@ -51,6 +51,9 @@ export function importTable(file: LabelSource, classMap?: string): ClassEntry[] 
 export async function importLabels(imagery: RasterSource, file: LabelSource, table: ClassEntry[] | null,
   stale: () => boolean = () => false, onProgress?: (done: number, total: number) => void,
   cache: MaskCache = new MaskCache(imagery)): Promise<SeedOutcome> {
+  // with a table the classes are known now: "too many" before any read; from values, only after the pass
+  const early = table && mergeClasses([], table);
+  if (early === "too many") return early;
   const dst = gridOf(imagery.meta), src = gridOf(file.meta);
   const windows = seedWindows(dst, src);
   const counts = rawCounts(windows.length);
@@ -86,9 +89,12 @@ export async function importLabels(imagery: RasterSource, file: LabelSource, tab
       countRaw(v, counts, first + i);
       fillPreview(raw, cells, buckets, w, Uint16Array.from(v, (x) => x + 1));
     });
+    // a row whose file bands are cached runs on microtasks alone: give the bar and Cancel a turn between rows
+    await new Promise((r) => setTimeout(r, 0));
+    if (stale()) return "stale";
   }
   const entries = table ?? classesFromValues(counts.seen, file.meta.nodata);
-  const merged = mergeClasses([], entries);
+  const merged = early ?? mergeClasses([], entries);
   if (merged === "too many") return merged;
   const lut = seedLut(entries, merged.values);
   const r = finishImport(counts, lut, raw);

@@ -44,7 +44,7 @@ const TABLES: [string, ClassEntry[] | null][] = [
 
 describe("one pass equals spec 004's two passes (criterion 2)", () => {
   for (const [fname, fgrid] of FILES) for (const [iname, imagery] of IMAGERY) for (const [tname, table] of TABLES) for (const nodata of [null, 0]) {
-    it(`${fname}, ${iname}, ${tname}, file nodata ${nodata}`, async () => {
+    it(`${fname}, ${iname}, ${tname}, file nodata ${nodata}`, { timeout: 30_000 }, async () => { // brute force: seconds each under load
       const img = imagery();
       const file = fakeLabelSource(fgrid, fileValue, nodata).source;
       const want = await twoPassImport(img, file, table);
@@ -129,5 +129,30 @@ describe("imagery from the mask cache (criterion 4)", () => {
     for (const t of reads) for (let x = t.x0; x < t.x0 + t.width; x += 256) for (let y = t.y0; y < t.y0 + t.height; y += 256) {
       expect(covered.has(`${x - (x % 256)},${y - (y % 256)}`), `tile ${x},${y}`).toBe(true);
     }
+  });
+});
+
+describe("review fixes", () => {
+  it("a table of 256 classes gives \"too many\" before any file read or mask need", async () => {
+    const { source } = samplesSource({ ...GRID, bandCount: 1, nodata: 0, float: false, alpha: null }, () => 3, { width: 1000, height: 1, bytes: 1000 });
+    const cache = new MaskCache(source);
+    let needs = 0;
+    const need = cache.need.bind(cache);
+    cache.need = (...a) => { needs++; return need(...a); };
+    const f = fakeLabelSource(GRID, fileValue);
+    const table = Array.from({ length: 256 }, (_, v) => ({ value: v, name: `c${v}` }));
+    expect(await importLabels(source, f.source, table, undefined, undefined, cache)).toBe("too many");
+    expect([f.reads.length, needs]).toEqual([0, 0]);
+  });
+
+  it("yields a macrotask at each row boundary and checks stale there: nothing of the next row is read", async () => {
+    const { source } = samplesSource({ ...GRID, bandCount: 1, nodata: 0, float: false, alpha: null }, () => 3, { width: 1000, height: 1, bytes: 1000 });
+    const f = fakeLabelSource(GRID, fileValue);
+    const row = seedWindows(GRID, GRID).filter((w) => w.y0 === 0).length;
+    let cancelled = false;
+    // a timer set at the row's last window can only run if the import gives up the thread before the next row
+    const r = await importLabels(source, f.source, null, () => cancelled, (done) => { if (done === row) setTimeout(() => { cancelled = true; }, 0); });
+    expect(r).toBe("stale");
+    expect(f.reads.every((w) => w.y0 < 256)).toBe(true);
   });
 });
