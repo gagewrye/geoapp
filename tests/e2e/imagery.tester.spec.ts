@@ -128,6 +128,7 @@ test("A1 read failures: a failing tile read says imageryUnreadable once per rast
   await openApp(page);
   await page.evaluate(() => {
     const g = ((window as any).__fail = { on: false, failed: 0 });
+    (window as any).__geoapp.pauseMasks = true; // spec 023: only the tiles' reads, not background mask reads, run and fail
     (window as any).__geoapp.rasterFile = (src: any) => {
       const read = src.readSamples.bind(src);
       // only reads made once the preview is on the map are the tiles'
