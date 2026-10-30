@@ -6,11 +6,27 @@ import type { Grid, Tile } from "./types";
 
 /** Seeding labels from a class raster on another grid (spec 004): nearest pixel centre, then masks and LUTs. */
 
+// Pixel sizes and rotations this close are equal, and an origin this close to a whole pixel is on it: the
+// offset path then picks the pixel the projection would, since every centre is 0.5 px from a pixel edge.
+const SAME_SIZE = 1e-9, WHOLE_PIXEL = 1e-6;
+
+/** [dx, dy] when src is dst's grid shifted by whole pixels (src pixel c, r is dst pixel c + dx, r + dy); else null. */
+export function gridOffset(dst: Grid, src: Grid): [number, number] | null {
+  if (dst.epsg !== src.epsg) return null;
+  const scale = Math.max(Math.abs(dst.gt[1]), Math.abs(dst.gt[5]));
+  for (const k of [1, 2, 4, 5] as const) if (Math.abs(dst.gt[k] - src.gt[k]) > SAME_SIZE * scale) return null;
+  const [dx, dy] = invertAffine(dst.gt, src.gt[0], src.gt[3]);
+  const rx = Math.round(dx) + 0, ry = Math.round(dy) + 0; // + 0: no -0
+  return Math.abs(dx - rx) <= WHOLE_PIXEL && Math.abs(dy - ry) <= WHOLE_PIXEL ? [rx, ry] : null;
+}
+
 /** Per pixel of w, row-major: col, row of the src pixel holding its centre, or -1, -1 off src. */
 // Spec 005's transfer at k = 1: dst gt, then core/crs to lon/lat, then pixelAt(src). Equal CRSs skip
-// the lon/lat round trip, which would only add rounding.
+// the lon/lat round trip, which would only add rounding; equal grids (spec 024) skip projecting at all.
 export function sourceCells(dst: Grid, src: Grid, w: Window): Int32Array {
   const out = new Int32Array(2 * w.width * w.height);
+  const offset = gridOffset(dst, src);
+  if (offset) return offsetCells(src, w, offset, out);
   const same = dst.epsg === src.epsg;
   let i = 0;
   for (let r = w.y0; r < w.y0 + w.height; r++) {
@@ -26,6 +42,18 @@ export function sourceCells(dst: Grid, src: Grid, w: Window): Int32Array {
       const on = col >= 0 && col < src.width && row >= 0 && row < src.height; // false for NaN too
       out[i++] = on ? col : -1;
       out[i++] = on ? row : -1;
+    }
+  }
+  return out;
+}
+
+function offsetCells(src: Grid, w: Window, [dx, dy]: [number, number], out: Int32Array): Int32Array {
+  let i = 0;
+  for (let r = w.y0 - dy; r < w.y0 + w.height - dy; r++) {
+    for (let c = w.x0 - dx; c < w.x0 + w.width - dx; c++) {
+      const on = c >= 0 && c < src.width && r >= 0 && r < src.height;
+      out[i++] = on ? c : -1;
+      out[i++] = on ? r : -1;
     }
   }
   return out;
