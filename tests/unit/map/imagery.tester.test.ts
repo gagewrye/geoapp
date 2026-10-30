@@ -46,7 +46,7 @@ describe("ImageryLayer, tester", () => {
   // A Landsat-like 30 m UTM 18N file at 45N with overviews, viewed at 1920 x 1080 CSS px, 120 m per CSS px: planView picks
   // s = 2 with 144 tiles (within IMAGERY_TILES / 2), but those tiles need 558 quads, and the layer caps quads at 512. Drawing
   // the view centre first evicts its own centre tiles; every later moveend re-reads them.
-  it.fails("BUG: every tile of one planned view is still kept after the view is drawn", () => {
+  it("every tile of one planned view is still kept after the view is drawn (was B1)", () => {
     const px = 30, n = 7800, northing = 5000000;
     const grid: Grid = { epsg: 32618, gt: [500000 - (n * px) / 2, px, 0, northing + (n * px) / 2, 0, -px], width: n, height: n };
     const ovs: Overview[] = [2, 4, 8, 16].map((k, i) => ({ index: i + 1, width: Math.ceil(n / k), height: Math.ceil(n / k) }));

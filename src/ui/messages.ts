@@ -25,6 +25,7 @@ export const MESSAGES = {
   buildingPreview: "Building preview…",
   drawingPreview: "Drawing preview…",
   // spec 020
+  imageryUnreadable: "Couldn't read part of this file, so some detail may be missing.",
   largeBlocks: (bytes: number, limit: number) => `Full resolution isn't available: this file stores pixels in ${mib(bytes)} MiB blocks (limit ${mib(limit)} MiB). Re-save it tiled, e.g. gdal_translate -of COG.`,
 } as const;
 

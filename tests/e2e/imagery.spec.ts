@@ -109,19 +109,29 @@ test("a painted pixel's colour edges fall on the imagery's pixel edges (criterio
 
 test.describe("the tile cap", () => {
   test.use({ viewport: { width: 1800, height: 1400 } });
-  test(`zooming across the raster never keeps more than ${IMAGERY_TILES} imagery sources, and opening another removes them (criterion 7)`, async ({ page }) => {
+  test(`zooming across the raster never keeps more than ${IMAGERY_TILES} imagery tiles, and opening another removes them (criterion 8)`, async ({ page }) => {
     test.setTimeout(240_000);
     // 5200 px square, one band: 441 tiles at s = 1, 121 at s = 2 and 36 at s = 4
     const N = 5200, gt: Affine = [10, 0.0001, 0, 45.5, 0, -0.0001];
     const big = upload("big.tif", [{ width: N, height: N, bands: 1, value: (_k, c, r) => (c ^ r) & 255, layout: { tile: [256, 256] } }], gt);
     await openApp(page);
     await page.evaluate(() => {
+      // distinct tile keys among imagery- sources: a tile's quads are ids "imagery-<key>-<i>" (spec 020 A1 counts tiles)
       const { map } = (window as any).__geoapp;
-      const t = { now: 0, max: 0, removed: [] as string[] };
+      const quads = new Map<string, number>();
+      const t = { max: 0, removed: [] as string[] };
       (window as any).__tiles = t;
+      const keyOf = (id: string) => id.slice("imagery-".length).replace(/-\d+$/, "");
       const add = map.addSource.bind(map), remove = map.removeSource.bind(map);
-      map.addSource = (id: string, s: unknown) => { const r = add(id, s); if (id.startsWith("imagery-")) t.max = Math.max(t.max, ++t.now); return r; };
-      map.removeSource = (id: string) => { if (id.startsWith("imagery-")) { t.now--; t.removed.push(id); } return remove(id); };
+      map.addSource = (id: string, s: unknown) => {
+        const r = add(id, s);
+        if (id.startsWith("imagery-")) { quads.set(keyOf(id), (quads.get(keyOf(id)) ?? 0) + 1); t.max = Math.max(t.max, quads.size); }
+        return r;
+      };
+      map.removeSource = (id: string) => {
+        if (id.startsWith("imagery-")) { const k = keyOf(id), n = quads.get(k)! - 1; if (n) quads.set(k, n); else quads.delete(k); t.removed.push(id); }
+        return remove(id);
+      };
     });
     await openRaster(page, big);
     await expect(message(page)).toHaveText("Raster opened.", { timeout: 60_000 });

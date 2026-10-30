@@ -45,7 +45,7 @@ describe("preview reads, tester", () => {
   // CLAUDE.md: "Never load a full raster into memory." Before spec 020 a single-strip file was read in 256 px windows.
   // Now its one block is one read, so the read's output arrays alone hold the whole sampled image (here 108 MB),
   // on top of geotiff.js decoding the strip.
-  it.fails("BUG (memory): a single-strip 6000 x 6000 RGB file's preview reads stay within MAX_READ_BYTES each", async () => {
+  it("a single-strip 6000 x 6000 RGB file's preview reads stay within MAX_READ_BYTES each (was B3)", async () => {
     const { source, reads } = refusing(6000, 6000, 6000, 6000);
     await expect(buildPreview(source, 1024)).rejects.toThrow("stop");
     for (const r of reads) expect(r.w * r.h * r.bands.length).toBeLessThanOrEqual(MAX_READ_BYTES);

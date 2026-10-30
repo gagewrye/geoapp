@@ -6,10 +6,12 @@ import { MAX_LAT, TILE_SIZE, type Grid } from "./types";
 import { latOf, mercator } from "./warp";
 
 /** Spec 020: tiles kept (LRU), the coarsest step sampled from full resolution, and the block and read limits. */
-export const IMAGERY_TILES = 512, MAX_DECIMATE = 4, MAX_BLOCK_BYTES = 32 * 2 ** 20, MAX_READ_BYTES = 32 * 2 ** 20;
+export const IMAGERY_TILES = 512, MAX_DECIMATE = 4, MAX_BLOCK_BYTES = 16 * 2 ** 20, MAX_READ_BYTES = 16 * 2 ** 20;
 
-/** A reduced-resolution IFD of the file: its index in the TIFF and its size. */
-export type Overview = { index: number; width: number; height: number };
+/** A reduced-resolution IFD of the file: its index in the TIFF, its size, and its block when known (reads are bounded by it). */
+export type Overview = { index: number; width: number; height: number; block?: Block };
+/** A TIFF tile or strip; bytes are all its samples decoded. */
+export type Block = { width: number; height: number; bytes: number };
 /** One texel stands for s x s source pixels; overview null samples full resolution. */
 export type Level = { s: number; grid: Grid; overview: number | null };
 
@@ -89,19 +91,47 @@ export function planView(full: Grid, overviews: Overview[], bounds: [number, num
 /** A level tile's quads: at s = 1, the label overlay's quads for the same key (ADR 0019). */
 export const imageryQuads = (level: Level, tile: Window): Quad[] => tileQuads(level.grid, tile, QUAD_ERR);
 
+/** Decoded bytes of the blocks a window of a width x height image touches: geotiff decodes all of them for one read. */
+export function decodedBytes(w: Window, block: Block, width: number, height: number): number {
+  const x1 = Math.min(w.x0 + w.width, width), y1 = Math.min(w.y0 + w.height, height);
+  if (x1 <= w.x0 || y1 <= w.y0) return 0;
+  const nx = Math.ceil(x1 / block.width) - Math.floor(w.x0 / block.width), ny = Math.ceil(y1 / block.height) - Math.floor(w.y0 / block.height);
+  return nx * ny * block.bytes;
+}
+
 /**
- * Source windows for the tiles, with s the step from texels to the pixels read (1 when reading an overview):
- * each row's contiguous tiles as one window, split between tiles to stay within MAX_READ_BYTES.
+ * Windows of a width x height image covering the tiles, with s the step from texels to the pixels read (1 for an overview):
+ * each row's contiguous tiles as one window, clipped to the image, split in block-aligned rows and columns
+ * so that each read decodes at most MAX_READ_BYTES (spec 020 A1).
  */
-// A tile's source is at most 256 * 256 * MAX_DECIMATE^2 * 24 bytes (three Float64 bands) = 24 MiB, so whole tiles always fit.
-export function rowReads(tiles: Window[], s: number, bytesPerPixel: number): Window[] {
+export function rowReads(tiles: Window[], s: number, block: Block, width: number, height: number): Window[] {
   const sorted = [...tiles].sort((a, b) => a.y0 - b.y0 || a.x0 - b.x0);
-  const out: Window[] = [];
+  const rows: Window[] = [];
   let cur: Window | null = null;
   for (const t of sorted) {
     const w = { x0: t.x0 * s, y0: t.y0 * s, width: t.width * s, height: t.height * s };
-    if (cur && cur.y0 === w.y0 && cur.x0 + cur.width === w.x0 && (cur.width + w.width) * cur.height * bytesPerPixel <= MAX_READ_BYTES) cur.width += w.width;
-    else out.push((cur = w));
+    if (cur && cur.y0 === w.y0 && cur.x0 + cur.width === w.x0) cur.width += w.width;
+    else rows.push((cur = w));
+  }
+  return rows.flatMap((w) => {
+    // a partial last texel's span may pass the edge; it samples the last pixel (decimateInto clamps)
+    const c = { ...w, width: Math.min(w.width, width - w.x0), height: Math.min(w.height, height - w.y0) };
+    return c.width > 0 && c.height > 0 ? splitByBlocks(c, block) : [];
+  });
+}
+
+/** Split a window at block edges into reads of at most MAX_READ_BYTES of blocks: whole block rows first, else columns too. */
+function splitByBlocks(w: Window, { width: bw, height: bh, bytes }: Block): Window[] {
+  const bx0 = Math.floor(w.x0 / bw), bx1 = Math.ceil((w.x0 + w.width) / bw);
+  const by0 = Math.floor(w.y0 / bh), by1 = Math.ceil((w.y0 + w.height) / bh);
+  const nx = bx1 - bx0, ny = by1 - by0;
+  const per = Math.max(1, Math.floor(MAX_READ_BYTES / bytes)); // a block over the limit is read alone
+  const [kx, ky] = nx * ny <= per ? [nx, ny] : nx <= per ? [nx, Math.floor(per / nx)] : [per, 1];
+  const out: Window[] = [];
+  for (let by = by0; by < by1; by += ky) for (let bx = bx0; bx < bx1; bx += kx) {
+    const x0 = Math.max(w.x0, bx * bw), x1 = Math.min(w.x0 + w.width, (bx + kx) * bw);
+    const y0 = Math.max(w.y0, by * bh), y1 = Math.min(w.y0 + w.height, (by + ky) * bh);
+    out.push({ x0, y0, width: x1 - x0, height: y1 - y0 });
   }
   return out;
 }

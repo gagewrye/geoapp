@@ -1,6 +1,6 @@
 import { fromBlob, type GeoTIFF, type GeoTIFFImage } from "geotiff";
 import { affineFromTags } from "../core/geotags";
-import type { Overview } from "../core/imagery";
+import type { Block, Overview } from "../core/imagery";
 import type { GeoTags, ImagerySource, RasterMeta } from "./source";
 
 const stripNul = (s: unknown) => (typeof s === "string" ? s.replace(/\0+$/, "") : undefined);
@@ -41,15 +41,12 @@ export async function openGeoTiff(tiff: GeoTIFF): Promise<ImagerySource> {
     // geotiff's own overview rule (geotiff.js:328-333), minus masks; other bands can't stand in for the image
     if (!(t & 1) || t & 4 || im.getSamplesPerPixel() !== bandCount) continue;
     images.set(i, im);
-    overviews.push({ index: i, width: im.getWidth(), height: im.getHeight() });
+    overviews.push({ index: i, width: im.getWidth(), height: im.getHeight(), block: blockOf(im) });
   }
-  const bw = image.getTileWidth(), bh = image.getTileHeight();
   const sampleBytes = Math.max(...Array.from({ length: bandCount }, (_, k) => image.getSampleByteSize(k)));
-  // a separate-planes block holds one band
-  const bytes = bw * bh * (image.planarConfiguration === 2 ? sampleBytes : image.getBytesPerPixel());
   return {
     meta: { width, height, bandCount, gt, epsg, nodata, geoTags },
-    block: { width: bw, height: bh, bytes, sampleBytes },
+    block: { ...blockOf(image), sampleBytes },
     overviews,
     async readSamples(index, x0, y0, w, h, samples, signal) {
       signal?.throwIfAborted();
@@ -65,6 +62,12 @@ export async function openGeoTiff(tiff: GeoTIFF): Promise<ImagerySource> {
       return { x0, y0, width: w, height: h, bands, nodata };
     },
   };
+}
+
+/** An image's tile or strip, with all its samples decoded (spec 020 Block): a separate-planes file decodes one block per band. */
+function blockOf(im: GeoTIFFImage): Block {
+  const width = im.getTileWidth(), height = im.getTileHeight();
+  return { width, height, bytes: width * height * im.getBytesPerPixel() };
 }
 
 /** geotiff.js parses GDAL's "-inf"/"inf" as NaN, so read infinities from the raw tag. */

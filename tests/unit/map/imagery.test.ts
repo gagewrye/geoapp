@@ -47,19 +47,25 @@ describe("ImageryLayer", () => {
     expect([...sources].filter((id) => id.startsWith("imagery-"))).toHaveLength(IMAGERY_TILES);
   });
 
-  it("counts a tile of several quads as that many sources against the cap", () => {
+  it("counts a tile of several quads once, and evicts it with all its quads (A1)", () => {
     const { map, sources } = fakeMap();
     const layer = new ImageryLayer(map);
     // 0.01 degree pixels from 85N: a 256 px tile needs several quads (ADR 0019)
     const steep: Level = { s: 1, overview: null, grid: { width: 256, height: 2500, epsg: 4326, gt: [10, 0.01, 0, 85, 0, -0.01] } };
-    const peak = { n: 0 };
-    const add = map.addSource.bind(map);
-    map.addSource = ((id: string, s: never) => { add(id, s); peak.n = Math.max(peak.n, sources.size); }) as typeof map.addSource;
-    layer.draw("steep", steep, { x0: 0, y0: 0, width: 256, height: 256 }, new Uint8ClampedArray(256 * 256 * 4));
-    expect(sources.size).toBeGreaterThan(1);
+    layer.draw("1-steep", steep, { x0: 0, y0: 0, width: 256, height: 256 }, new Uint8ClampedArray(256 * 256 * 4));
+    const n = sources.size;
+    expect(n).toBeGreaterThan(1);
     for (let i = 0; i < IMAGERY_TILES - 1; i++) layer.draw(`1-${i * 8},0`, level(1), tile(i), rgba);
-    expect(peak.n).toBe(IMAGERY_TILES);
-    expect(layer.use("steep")).toBe(false);
+    expect(layer.size).toBe(IMAGERY_TILES);
+    expect(layer.use("1-steep")).toBe(true);
+    expect(sources.size).toBe(IMAGERY_TILES - 1 + n);
+    layer.draw("1-steep2", level(1), tile(IMAGERY_TILES), rgba); // the least recently used is now 1-0,0
+    layer.draw("1-steep3", level(1), tile(IMAGERY_TILES + 1), rgba);
+    for (let i = 1; i < IMAGERY_TILES - 1; i++) layer.use(`1-${i * 8},0`);
+    layer.draw("1-last", level(1), tile(IMAGERY_TILES + 2), rgba); // evicts 1-steep
+    expect(layer.use("1-steep")).toBe(false);
+    expect([...sources].filter((id) => id.startsWith("imagery-1-steep-"))).toEqual([]);
+    expect(layer.size).toBe(IMAGERY_TILES);
   });
 
   it("puts tiles between the preview and the mask, finer above coarser, and clear() removes them all", () => {

@@ -11,20 +11,20 @@ const W = 4096, H = 1024;
 const GRID: Grid = { width: W, height: H, epsg: 32633, gt: [500000, 30, 0, 5000000, 0, -30] };
 const value = (k: number, c: number, r: number) => (k * 7 + c + r) % 200;
 
-type Pending = { image: number; win: Window; signal: AbortSignal | undefined; resolve: () => void };
+type Pending = { image: number; win: Window; signal: AbortSignal | undefined; resolve: () => void; fail: (e: unknown) => void };
 
 /** A source whose sample reads wait until released; band k of pixel (c, r) is value(k, c, r). */
-function heldSource() {
+function heldSource(block = { width: 256, height: 256, bytes: 256 * 256 * 3, sampleBytes: 1 }) {
   const { source: inner } = fakeSource({ width: W, height: H, gt: GRID.gt }, value);
   const pending: Pending[] = [];
   const source: ImagerySource = {
     ...inner,
-    block: { width: 256, height: 256, bytes: 256 * 256 * 3, sampleBytes: 1 },
+    block,
     overviews: [],
     readSamples(image, x0, y0, w, h, bands, signal) {
       return new Promise((resolve, reject) => {
         const win = { x0, y0, width: w, height: h };
-        pending.push({ image, win, signal, resolve: () => {
+        pending.push({ image, win, signal, fail: reject, resolve: () => {
           if (signal?.aborted) { reject(new DOMException("aborted", "AbortError")); return; }
           resolve(bands.map((k) => Uint8Array.from({ length: w * h }, (_, p) => value(k, x0 + (p % w), y0 + Math.floor(p / w)))));
         } });
@@ -108,5 +108,63 @@ describe("ImageryLoader (criterion 8)", () => {
     expect(pending[0]!.signal!.aborted).toBe(true);
     loader.show(null);
     expect(pending).toHaveLength(1);
+  });
+
+  it("fills a tile from several block-bounded reads and draws it once the last one lands (A1)", async () => {
+    // 1-row strips of 98,304 B: a 1024-row read would decode 96 MiB, so it splits into reads of 170 rows
+    const { source, pending } = heldSource({ width: W, height: 1, bytes: 98304, sampleBytes: 8 });
+    const s = sink();
+    const loader = new ImageryLoader(source, [[0, 255], [0, 255], [0, 255]], s);
+    const dec: Level = { s: 4, overview: null, grid: { ...GRID, width: W / 4, height: H / 4, gt: [500000, 120, 0, 5000000, 0, -120] } };
+    loader.show({ level: dec, tiles: row(0, [768]) });
+    for (let k = 0; k < 7; k++) {
+      expect(s.drawn.size).toBe(0);
+      pending[k]!.resolve();
+      await flush();
+    }
+    expect(pending.map((p) => p.win.height)).toEqual([170, 170, 170, 170, 170, 170, 4]);
+    expect(pending.every((p) => p.win.x0 === 3072 && p.win.width === 1024)).toBe(true);
+    const rgba = s.drawn.get("4-768,0")!;
+    for (const [i, j] of [[7, 5], [100, 42], [255, 255]]) expect(rgba[4 * (j! * 256 + i!) + 2]).toBe(value(2, (768 + i!) * 4 + 2, j! * 4 + 2));
+  });
+
+  it("draws nothing for a tile whose reads were cut short, and reads it again on a later view", async () => {
+    const { source, pending } = heldSource({ width: W, height: 1, bytes: 98304, sampleBytes: 8 });
+    const s = sink();
+    const loader = new ImageryLoader(source, [[0, 255], [0, 255], [0, 255]], s);
+    const dec: Level = { s: 4, overview: null, grid: { ...GRID, width: W / 4, height: H / 4, gt: [500000, 120, 0, 5000000, 0, -120] } };
+    loader.show({ level: dec, tiles: row(0, [768]) });
+    pending[0]!.resolve();
+    await flush();
+    loader.show({ level: dec, tiles: row(0, [0]) }); // panned away mid-tile
+    for (let i = 0; i < 10; i++) { for (const p of [...pending]) p.resolve(); await flush(); } // every read settles
+    expect([...s.drawn.keys()]).toEqual(["4-0,0"]);
+    const before = pending.length;
+    loader.show({ level: dec, tiles: row(0, [768]) });
+    expect(pending.length).toBeGreaterThan(before);
+    expect(pending[before]!.win).toEqual({ x0: 3072, y0: 0, width: 1024, height: 170 });
+  });
+});
+
+describe("read failures (criterion 10)", () => {
+  it("reports an Error or a ProgressEvent, not an abort, and asks for the tile again later", async () => {
+    const { source, pending } = heldSource();
+    const errors: unknown[] = [];
+    const s = sink();
+    const loader = new ImageryLoader(source, [[0, 1], [0, 1], [0, 1]], s, (e) => errors.push(e));
+    const PE = typeof ProgressEvent === "undefined" ? Event : ProgressEvent;
+    loader.show({ level: LEVEL, tiles: [...row(0, [0]), ...row(256, [0])] });
+    pending[0]!.fail(new Error("NotReadableError"));
+    pending[1]!.fail(new PE("error"));
+    await flush();
+    expect(errors).toHaveLength(2);
+    loader.show({ level: LEVEL, tiles: row(512, [0]) }); // aborts nothing running; nothing reported
+    loader.show({ level: LEVEL, tiles: row(768, [0]) });
+    expect(pending[2]!.signal!.aborted).toBe(true);
+    pending[2]!.resolve();
+    await flush();
+    expect(errors).toHaveLength(2);
+    loader.show({ level: LEVEL, tiles: row(0, [0]) });
+    expect(pending.at(-1)!.win).toEqual({ x0: 0, y0: 0, width: 256, height: 256 });
   });
 });

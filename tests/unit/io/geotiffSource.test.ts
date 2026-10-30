@@ -47,7 +47,8 @@ describe("blocks, overviews and sample reads (spec 020)", () => {
     ];
     const src = await openGeoTiff(await fromArrayBuffer(uint8Tiff(images, geo)));
     expect(src.block).toEqual({ width: 128, height: 64, bytes: 128 * 64 * 3, sampleBytes: 1 });
-    expect(src.overviews).toEqual([{ index: 1, width: 300, height: 200 }, { index: 2, width: 150, height: 100 }]);
+    const block = { width: 128, height: 64, bytes: 128 * 64 * 3 }; // overviews' own blocks bound their reads (spec 020 A1)
+    expect(src.overviews).toEqual([{ index: 1, width: 300, height: 200, block }, { index: 2, width: 150, height: 100, block }]);
   });
 
   it("reports a strip as width x RowsPerStrip", async () => {

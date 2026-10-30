@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { blockWindows, IMAGERY_TILES, imageryQuads, MAX_READ_BYTES, planView, rowReads, toRgba, type Overview } from "../../../src/core/imagery";
+import { blockWindows, decodedBytes, IMAGERY_TILES, imageryQuads, MAX_READ_BYTES, planView, rowReads, toRgba, type Block, type Overview } from "../../../src/core/imagery";
 import type { Window } from "../../../src/core/grid";
 import { QUAD_ERR, tileQuads } from "../../../src/core/labelQuads";
 import { tileWindow } from "../../../src/core/labelStore";
@@ -145,31 +145,65 @@ describe("toRgba (criterion 5)", () => {
   });
 });
 
-describe("rowReads (criterion 6)", () => {
-  it("keeps each read within MAX_READ_BYTES and covers every tile's source pixels", () => {
-    const cases: [number, number][] = [[1, 3], [4, 3], [4, 24], [2, 12], [1, 24]];
-    for (const [d, bpp] of cases) {
+describe("rowReads (criteria 6, A1)", () => {
+  const W = GRID.width, H = GRID.height;
+  const blocks: Block[] = [
+    { width: 256, height: 256, bytes: 256 * 256 * 3 }, // tiled 8-bit RGB
+    { width: W, height: 1, bytes: W * 3 }, // 1-row strips
+    { width: W, height: 16, bytes: W * 16 * 24 }, // 16-row strips of 3 Float64 bands
+    { width: 512, height: 512, bytes: 512 * 512 * 24 },
+  ];
+
+  it("keeps the blocks each read decodes within MAX_READ_BYTES, and covers every tile's source pixels", () => {
+    for (const d of [1, 2, 4]) for (const block of blocks) {
       const p = planView(GRID, [], view(d, 10000, 8000, 4000, 1000), 4000, 1000)!;
       const { s } = p.level;
-      const reads = rowReads(p.tiles, s, bpp);
-      for (const r of reads) expect(r.width * r.height * bpp).toBeLessThanOrEqual(MAX_READ_BYTES);
+      const reads = rowReads(p.tiles, s, block, W, H);
+      for (const r of reads) {
+        expect(decodedBytes(r, block, W, H)).toBeLessThanOrEqual(MAX_READ_BYTES);
+        expect(r.x0 + r.width <= W && r.y0 + r.height <= H).toBe(true);
+      }
       for (const t of p.tiles) {
         for (const [x, y] of [[t.x0, t.y0], [t.x0 + t.width - 1, t.y0 + t.height - 1], [t.x0 + (t.width >> 1), t.y0 + 3]]) {
-          for (const [dx, dy] of [[0, 0], [s - 1, s - 1]]) expect(reads.some((r) => contains(r, x! * s + dx!, y! * s + dy!))).toBe(true);
+          for (const [dx, dy] of [[0, 0], [s - 1, s - 1]]) {
+            expect(reads.filter((r) => contains(r, x! * s + dx!, y! * s + dy!)), `d ${d} block ${block.width}x${block.height}`).toHaveLength(1);
+          }
         }
       }
-      // one window per row of tiles unless it must split
-      const rows = new Set(p.tiles.map((t) => t.y0)).size;
-      if (p.tiles.length / rows * 256 * 256 * s * s * bpp <= MAX_READ_BYTES) expect(reads).toHaveLength(rows);
-      else expect(reads.length).toBeGreaterThan(rows);
     }
   });
 
-  it("reads only the tiles given, a row's gaps split it", () => {
+  it("keeps one window per row of contiguous tiles when it fits, and splits at block edges when not", () => {
     const tiles: Window[] = [{ x0: 0, y0: 0, width: 256, height: 256 }, { x0: 512, y0: 0, width: 256, height: 256 }, { x0: 256, y0: 256, width: 100, height: 256 }];
-    expect(rowReads(tiles, 2, 1)).toEqual([
+    const tiled: Block = { width: 256, height: 256, bytes: 256 * 256 * 3 };
+    expect(rowReads(tiles, 2, tiled, W, H)).toEqual([
       { x0: 0, y0: 0, width: 512, height: 512 }, { x0: 1024, y0: 0, width: 512, height: 512 }, { x0: 512, y0: 512, width: 200, height: 512 },
     ]);
+    // s = 4 on a 22,300 px wide, 3-band file of 1-row strips: 1024 rows would decode 68.5 MB (tester case, cc81250)
+    const strips: Block = { width: 22300, height: 1, bytes: 22300 * 3 };
+    const reads = rowReads([{ x0: 2560, y0: 2560, width: 256, height: 256 }], 4, strips, 22300, 22300);
+    const per = Math.floor(MAX_READ_BYTES / strips.bytes);
+    expect(reads.map((r) => r.height)).toEqual([...Array(Math.floor(1024 / per)).fill(per), 1024 % per]);
+    expect(reads.every((r) => r.x0 === 10240 && r.width === 1024 && decodedBytes(r, strips, 22300, 22300) <= MAX_READ_BYTES)).toBe(true);
+  });
+
+  it("clips the last tile's span to the image, and splits columns when one block row is over the limit", () => {
+    expect(rowReads([{ x0: 256, y0: 0, width: 2, height: 256 }], 4, { width: 256, height: 256, bytes: 1 }, 1030, 1029))
+      .toEqual([{ x0: 1024, y0: 0, width: 6, height: 1024 }]);
+    const big: Block = { width: 256, height: 256, bytes: 6 * 2 ** 20 }; // two blocks per read
+    const reads = rowReads([{ x0: 0, y0: 0, width: 256, height: 256 }, { x0: 256, y0: 0, width: 256, height: 256 }], 2, big, 4096, 4096);
+    expect(reads).toHaveLength(4); // 4 x 2 blocks, two per read
+    for (const r of reads) expect(decodedBytes(r, big, 4096, 4096)).toBe(12 * 2 ** 20);
+  });
+});
+
+describe("decodedBytes", () => {
+  it("counts every block a window touches, clipped to the image", () => {
+    const b: Block = { width: 100, height: 10, bytes: 7 };
+    expect(decodedBytes({ x0: 99, y0: 9, width: 2, height: 2 }, b, 1000, 1000)).toBe(4 * 7);
+    expect(decodedBytes({ x0: 0, y0: 0, width: 100, height: 10 }, b, 1000, 1000)).toBe(7);
+    expect(decodedBytes({ x0: 950, y0: 995, width: 500, height: 500 }, b, 1000, 1000)).toBe(7);
+    expect(decodedBytes({ x0: 1000, y0: 0, width: 5, height: 5 }, b, 1000, 1000)).toBe(0);
   });
 });
 

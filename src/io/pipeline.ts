@@ -1,7 +1,7 @@
 import { crossesAntimeridian, projString } from "../core/crs";
 import { decimatedAffine, decimatedTile, decimateInto, decimationFactor, type SourceWindow } from "../core/decimate";
 import { tileWindows, type Window } from "../core/grid";
-import { blockWindows } from "../core/imagery";
+import { blockWindows, MAX_BLOCK_BYTES } from "../core/imagery";
 import { warpPreview } from "../core/warp";
 import type { RasterSource } from "./source";
 
@@ -76,9 +76,10 @@ function previewReads(source: RasterSource, maxSide: number, signal?: AbortSigna
     };
   }
   const f = decimationFactor(width, height, maxSide);
-  // spec 020: only the blocks holding a sampled pixel, each decoded once, cropped to its sampled span
-  const reads = block && readSamples
-    ? blockWindows(width, height, block.width, block.height, f).map((w) => samples(0, w))
-    : tileWindows(width, height).map((w) => () => source.readWindow(w.x0, w.y0, w.width, w.height));
+  // spec 020: only the blocks holding a sampled pixel, each decoded once, cropped to its sampled span. A block over
+  // MAX_BLOCK_BYTES (a single strip) is read in 256 px windows instead (A1): each decodes the block again, but output stays small.
+  const reads = !readSamples ? tileWindows(width, height).map((w) => () => source.readWindow(w.x0, w.y0, w.width, w.height))
+    : block && block.bytes <= MAX_BLOCK_BYTES ? blockWindows(width, height, block.width, block.height, f).map((w) => samples(0, w))
+    : tileWindows(width, height).map((w) => samples(0, w));
   return { dec: { tile: decimatedTile(width, height, f, nb, nodata), size: [width, height] }, f, gt: decimatedAffine(gt, f), reads };
 }

@@ -17,7 +17,7 @@ const message = $("message");
 const say = (text: string) => { message.textContent = text; };
 
 const map = createMap($("map"));
-const fullRes = initImagery(map);
+const fullRes = initImagery(map, say);
 let source: RasterSource | undefined;
 // Opens are numbered so that an older open finishing late can't replace the raster a newer one opened
 let opens = 0;

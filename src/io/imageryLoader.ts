@@ -1,6 +1,7 @@
 import { decimateInto } from "../core/decimate";
 import type { Window } from "../core/grid";
-import { rowReads, toRgba, type Level } from "../core/imagery";
+import { rowReads, toRgba, type Block, type Level } from "../core/imagery";
+import type { Tile } from "../core/types";
 import type { ImagerySource } from "./source";
 
 /** Where drawn tiles go: `use` says whether a tile is already drawn, marking it recently used. */
@@ -12,25 +13,37 @@ export type TileSink = {
 /** A tile's key: its level's step and its corner in the level grid. */
 export const tileKey = (level: Level, t: Window) => `${level.s}-${t.x0},${t.y0}`;
 
-type Job = { level: Level; read: Window; tiles: Window[]; keys: string[]; ac: AbortController; first: number };
+/** A tile being filled: reads split at block edges (spec 020 A1), so it may need several; drawn when none are left. */
+type Pending = { key: string; level: Level; tile: Window; bands: Float32Array[] | null; left: number; broken: boolean };
+type Job = { level: Level; read: Window; tiles: Pending[]; ac: AbortController };
 
-// Spec 020's memory estimate allows two reads of at most MAX_READ_BYTES in flight; an aborted read counts until it settles.
+// Spec 020 allows two reads in flight; an aborted read counts until it settles.
 const IN_FLIGHT = 2;
+
+const isAbort = (e: unknown) => (e as { name?: unknown } | null)?.name === "AbortError";
 
 /** Reads the imagery tiles of each view, centre first, and hands them to a sink as RGBA (spec 020 Loading). */
 export class ImageryLoader {
   private queue: Job[] = [];
   private readonly running = new Set<Job>();
+  private readonly pending = new Map<string, Pending>();
 
-  constructor(private readonly source: ImagerySource, private readonly ranges: [number, number][], private readonly sink: TileSink) {}
+  /** onError: a read failed with something other than an abort (spec 020 A1 Read failures). */
+  constructor(private readonly source: ImagerySource, private readonly ranges: [number, number][], private readonly sink: TileSink,
+    private readonly onError: (e: unknown) => void = () => {}) {}
 
-  /** The view's plan (tiles centre first), or null for none: reads no longer needed stop, and queued ones are replaced. */
+  /** The view's plan (tiles centre first), or null for none: reads no tile of it needs stop, and the queue follows the plan. */
   show(plan: { level: Level; tiles: Window[] } | null): void {
     const missing = plan ? plan.tiles.filter((t) => !this.sink.use(tileKey(plan.level, t))) : [];
-    const want = new Set(plan ? missing.map((t) => tileKey(plan.level, t)) : []);
-    for (const j of this.running) if (!j.keys.some((k) => want.has(k))) j.ac.abort();
-    const reading = new Set([...this.running].filter((j) => !j.ac.signal.aborted).flatMap((j) => j.keys));
-    this.queue = plan ? this.jobs(plan.level, missing.filter((t) => !reading.has(tileKey(plan.level, t)))) : [];
+    const order = new Map(plan ? missing.map((t, i) => [tileKey(plan.level, t), i]) : []);
+    const wanted = (j: Job) => j.tiles.some((p) => order.has(p.key) && !p.broken);
+    for (const j of this.running) if (!j.ac.signal.aborted && !wanted(j)) { j.ac.abort(); this.drop(j); }
+    const kept = this.queue.filter(wanted);
+    for (const j of this.queue) if (!wanted(j)) this.drop(j);
+    // tiles already in progress keep their reads; the rest get new ones
+    const fresh = plan ? missing.filter((t) => !this.pending.get(tileKey(plan.level, t))) : [];
+    const first = (j: Job) => Math.min(...j.tiles.map((p) => order.get(p.key) ?? Infinity));
+    this.queue = [...kept, ...(plan ? this.jobs(plan.level, fresh) : [])].sort((a, b) => first(a) - first(b));
     this.pump();
   }
 
@@ -38,29 +51,40 @@ export class ImageryLoader {
   stop(): void {
     for (const j of this.running) j.ac.abort();
     this.queue = [];
+    this.pending.clear();
   }
 
-  /** One job per read window, in the order of their first tile (centre first). */
+  /** The reads for these tiles, each listing the tiles it fills. */
   private jobs(level: Level, tiles: Window[]): Job[] {
     const step = level.overview === null ? level.s : 1;
-    const { width, height } = this.image(level);
-    const nb = this.bands().length;
-    const order = new Map(tiles.map((t, i) => [t, i]));
-    return rowReads(tiles, step, nb * this.source.block.sampleBytes).map((w) => {
-      const inside = tiles.filter((t) => t.y0 * step === w.y0 && t.x0 * step >= w.x0 && (t.x0 + t.width) * step <= w.x0 + w.width);
-      // the last texel's span may pass the image edge; it samples the last pixel (decimateInto clamps)
-      const read = { ...w, width: Math.min(w.width, width - w.x0), height: Math.min(w.height, height - w.y0) };
-      return { level, read, tiles: inside, keys: inside.map((t) => tileKey(level, t)), ac: new AbortController(), first: Math.min(...inside.map((t) => order.get(t)!)) };
-    }).sort((a, b) => a.first - b.first);
+    const { width, height, block } = this.image(level);
+    const reads = rowReads(tiles, step, block, width, height);
+    const entries = tiles.map((tile): Pending => ({ key: tileKey(level, tile), level, tile, bands: null, left: 0, broken: false }));
+    for (const p of entries) this.pending.set(p.key, p);
+    return reads.map((read) => {
+      const touched = entries.filter(({ tile: t }) => overlaps(read, { x0: t.x0 * step, y0: t.y0 * step, width: t.width * step, height: t.height * step }));
+      for (const p of touched) p.left++;
+      return { level, read, tiles: touched, ac: new AbortController() };
+    });
   }
 
-  /** The size of the image a level reads: its overview's, or the full image's. */
-  private image(level: Level) {
-    return level.overview === null ? this.source.meta : level.grid;
+  /** The image a level reads, with its block: its overview's, or the full image's. */
+  private image(level: Level): { width: number; height: number; block: Block } {
+    if (level.overview === null) return { ...this.source.meta, block: this.source.block };
+    const o = this.source.overviews.find((v) => v.index === level.overview);
+    return { width: level.grid.width, height: level.grid.height, block: o?.block ?? this.source.block };
   }
 
   private bands(): number[] {
     return this.source.meta.bandCount >= 3 ? [0, 1, 2] : [0];
+  }
+
+  /** A job that won't complete: its tiles can't be drawn, so a later view asks for them again. */
+  private drop(job: Job): void {
+    for (const p of job.tiles) {
+      p.broken = true;
+      if (this.pending.get(p.key) === p) this.pending.delete(p.key);
+    }
   }
 
   private pump(): void {
@@ -76,20 +100,28 @@ export class ImageryLoader {
     let bands: ArrayLike<number>[];
     try {
       bands = await this.source.readSamples(level.overview ?? 0, read.x0, read.y0, read.width, read.height, this.bands(), ac.signal);
-    } catch {
-      return; // aborted, or unreadable: the preview stays drawn underneath (spec 020 Decided 2)
+    } catch (e) {
+      this.drop(job);
+      if (!ac.signal.aborted && !isAbort(e)) this.onError(e);
+      return; // the preview stays drawn underneath
     }
     if (ac.signal.aborted) return;
     const step = level.overview === null ? level.s : 1;
     const { width, height } = this.image(level);
     const win = { ...read, bands };
-    for (const t of job.tiles) {
-      const n = t.width * t.height;
-      const tile = { ...t, nodata: null, bands: bands.map(() => new Float32Array(n)) };
-      decimateInto(tile, win, step, width, height);
+    for (const p of job.tiles) {
+      if (p.broken) continue;
+      const n = p.tile.width * p.tile.height;
+      p.bands ??= bands.map(() => new Float32Array(n));
+      const out: Tile = { ...p.tile, nodata: null, bands: p.bands };
+      decimateInto(out, win, step, width, height);
+      if (--p.left > 0) continue;
+      this.pending.delete(p.key);
       const rgba = new Uint8ClampedArray(4 * n);
-      toRgba(tile.bands, n, this.ranges, this.source.meta.nodata, rgba);
-      this.sink.draw(tileKey(level, t), level, t, rgba);
+      toRgba(p.bands, n, this.ranges, this.source.meta.nodata, rgba);
+      this.sink.draw(p.key, level, p.tile, rgba);
     }
   }
 }
+
+const overlaps = (a: Window, b: Window) => a.x0 < b.x0 + b.width && b.x0 < a.x0 + a.width && a.y0 < b.y0 + b.height && b.y0 < a.y0 + a.height;

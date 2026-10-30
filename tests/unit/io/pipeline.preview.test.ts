@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { fromArrayBuffer } from "geotiff";
+import { tileWindows } from "../../../src/core/grid";
+import { MAX_BLOCK_BYTES } from "../../../src/core/imagery";
 import { openGeoTiff } from "../../../src/io/geotiffSource";
 import { buildPreview } from "../../../src/io/pipeline";
 import type { ImagerySource, RasterSource } from "../../../src/io/source";
@@ -50,6 +52,16 @@ describe("preview reads (criterion 10)", () => {
       }
       if ("rows" in layout && layout.rows === 1) expect(reads.length).toBe(Math.ceil(1300 / 3)); // f = 3: one strip in three
     }
+  });
+
+  it("reads a block over MAX_BLOCK_BYTES in 256 px windows of samples, with the same preview (A1)", async () => {
+    const buf = geotiffBuffer(700, 600, 3, (b, c, r) => (b * 50 + c + 2 * r) % 300, GEO);
+    const { source, reads } = await logged(buf);
+    source.block = { ...source.block, bytes: MAX_BLOCK_BYTES + 1 }; // stands in for a 6000 px single strip
+    const p = await buildPreview(source, 1024);
+    expect(reads.map((r) => `${r.x0},${r.y0} ${r.w}x${r.h}`)).toEqual(tileWindows(700, 600).map((w) => `${w.x0},${w.y0} ${w.width}x${w.height}`));
+    const before = await buildPreview(windowsOnly(await openGeoTiff(await fromArrayBuffer(buf))), 1024);
+    expect(Buffer.from(p.rgba).equals(Buffer.from(before.rgba))).toBe(true);
   });
 
   it("leaves the previews of files without overviews unchanged", async () => {

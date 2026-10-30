@@ -38,7 +38,7 @@ describe("full-resolution imagery on open (criterion 9)", () => {
     const { map, calls, moveend } = fakeMap();
     const imagery = initImagery(map);
     const { s, reads } = source(MAX_BLOCK_BYTES + 1);
-    expect(imagery.open(s, RANGES)).toBe("Full resolution isn't available: this file stores pixels in 33 MiB blocks (limit 32 MiB). Re-save it tiled, e.g. gdal_translate -of COG.");
+    expect(imagery.open(s, RANGES)).toBe("Full resolution isn't available: this file stores pixels in 17 MiB blocks (limit 16 MiB). Re-save it tiled, e.g. gdal_translate -of COG.");
     moveend();
     expect(reads).toEqual([]);
     expect(calls).toEqual([]);
@@ -61,5 +61,43 @@ describe("full-resolution imagery on open (criterion 9)", () => {
     const { source: plain } = fakeSource({ width: 100, height: 100 }, () => 1);
     expect(initImagery(map).open(plain, RANGES)).toBeNull();
     expect(calls).toEqual([]);
+  });
+});
+
+describe("tile read failures (criterion 10)", () => {
+  /** A source whose sample reads all fail with `e`. */
+  function failing(e: () => unknown) {
+    const { source: inner } = fakeSource({ width: 1000, height: 1000, epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01] }, () => 1);
+    const s: ImagerySource = { ...inner, overviews: [], block: { width: 256, height: 256, bytes: 3 * 2 ** 16, sampleBytes: 1 }, readSamples: async () => { throw e(); } };
+    return s;
+  }
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+  const PE = typeof ProgressEvent === "undefined" ? Event : ProgressEvent;
+
+  it("say imageryUnreadable once per opened raster, for an Error or a ProgressEvent", async () => {
+    const { map, moveend } = fakeMap();
+    const said: string[] = [];
+    const imagery = initImagery(map, (t) => said.push(t));
+    imagery.open(failing(() => new Error("NotReadableError")), RANGES);
+    await flush();
+    moveend();
+    await flush();
+    expect(said).toEqual(["Couldn't read part of this file, so some detail may be missing."]);
+    imagery.open(failing(() => new PE("error")), RANGES);
+    await flush();
+    moveend();
+    await flush();
+    expect(said).toHaveLength(2);
+    expect(said[1]).toBe(said[0]);
+  });
+
+  it("says nothing for an abort", async () => {
+    const { map, moveend } = fakeMap();
+    const said: string[] = [];
+    const imagery = initImagery(map, (t) => said.push(t));
+    imagery.open(failing(() => new DOMException("aborted", "AbortError")), RANGES);
+    moveend();
+    await flush();
+    expect(said).toEqual([]);
   });
 });

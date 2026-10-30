@@ -8,11 +8,12 @@ import { MESSAGES } from "./messages";
 const canRead = (s: RasterSource): s is ImagerySource => Boolean(s.block && s.overviews && s.readSamples);
 
 /** Full-resolution imagery over the preview (spec 020): tiles for each view once the map stops moving. */
-export function initImagery(map: MapLibreMap) {
+export function initImagery(map: MapLibreMap, say: (text: string) => void = () => {}) {
   const layer = new ImageryLayer(map);
   /** The block limit; e2e tests lower it through the page hook. */
   const limits = { maxBlockBytes: MAX_BLOCK_BYTES };
   let open: { source: ImagerySource; loader: ImageryLoader } | null = null;
+  let reported = false; // a tile read failed for this raster, and the user was told (spec 020 A1)
 
   const update = () => {
     if (!open) return;
@@ -36,7 +37,9 @@ export function initImagery(map: MapLibreMap) {
       this.clear();
       if (!canRead(source)) return null;
       if (source.block.bytes > limits.maxBlockBytes) return MESSAGES.largeBlocks(source.block.bytes, limits.maxBlockBytes);
-      open = { source, loader: new ImageryLoader(source, ranges, layer) };
+      reported = false;
+      const failed = () => { if (!reported) { reported = true; say(MESSAGES.imageryUnreadable); } };
+      open = { source, loader: new ImageryLoader(source, ranges, layer, failed) };
       update();
       return null;
     },

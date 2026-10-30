@@ -134,7 +134,7 @@ describe("ImageryLoader, tester", () => {
 
   // ADR 0020 / spec 020 memory: "at most 2 x 32 MiB of reads in flight". geotiff.js decodes every block a window touches,
   // all at once (Promise.all in GeoTIFFImage._readRaster), so for a striped file a read decodes full-width strips.
-  it.fails("BUG (memory): on a 22,300 px wide file of 1-row strips, the blocks one s = 4 read decodes stay within MAX_READ_BYTES", () => {
+  it("on a 22,300 px wide file of 1-row strips, the blocks one s = 4 read decodes stay within MAX_READ_BYTES (was B2)", () => {
     const W = 22300, H = 22300;
     const { source, reads, grid } = held(W, H, 3, () => 1, { block: [W, 1] });
     const loader = new ImageryLoader(source, R3, sink());

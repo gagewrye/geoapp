@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { applyAffine, fromLonLat, invertAffine, toLonLat } from "../../../src/core/crs";
-import { blockWindows, IMAGERY_TILES, imageryQuads, MAX_READ_BYTES, planView, rowReads, toRgba } from "../../../src/core/imagery";
+import { blockWindows, decodedBytes, IMAGERY_TILES, imageryQuads, MAX_READ_BYTES, planView, rowReads, toRgba, type Block } from "../../../src/core/imagery";
 import type { Window } from "../../../src/core/grid";
 import { QUAD_ERR, tileQuads } from "../../../src/core/labelQuads";
 import { tileWindow } from "../../../src/core/labelStore";
@@ -113,23 +113,25 @@ describe("toRgba edge cases", () => {
 
 describe("rowReads edge cases", () => {
   const tile = (x0: number, y0: number, width = 256, height = 256): Window => ({ x0, y0, width, height });
+  // spec 020 A1: reads are bounded by the blocks they decode, and rowReads clips to the image
+  const RGB8: Block = { width: 256, height: 256, bytes: 256 * 256 * 3 };
 
   it("no tiles give no reads; input order doesn't matter; different rows never merge", () => {
-    expect(rowReads([], 1, 3)).toEqual([]);
-    const a = rowReads([tile(256, 0), tile(0, 256), tile(0, 0)], 1, 3);
+    expect(rowReads([], 1, RGB8, 4096, 4096)).toEqual([]);
+    const a = rowReads([tile(256, 0), tile(0, 256), tile(0, 0)], 1, RGB8, 4096, 4096);
     expect(a).toEqual([{ x0: 0, y0: 0, width: 512, height: 256 }, { x0: 0, y0: 256, width: 256, height: 256 }]);
   });
 
-  it("splits exactly at the limit: two s = 4 Float32 one-band tiles fit, a third doesn't", () => {
-    // one tile at s = 4: 1024 x 1024 x 4 B = 4 MiB; 8 fit in 32 MiB
+  it("splits at the limit in block rows: nine s = 4 tiles of one Float32 band decode 36 MiB, so four reads of one block row", () => {
+    const f32: Block = { width: 256, height: 256, bytes: 256 * 256 * 4 };
     const row = Array.from({ length: 9 }, (_, i) => tile(i * 256, 0));
-    const reads = rowReads(row, 4, 4);
-    expect(reads.map((r) => r.width / 1024)).toEqual([8, 1]);
-    for (const r of reads) expect(r.width * r.height * 4).toBeLessThanOrEqual(MAX_READ_BYTES);
+    const reads = rowReads(row, 4, f32, 9216, 4096);
+    expect(reads.map((r) => [r.y0, r.height, r.width])).toEqual([0, 256, 512, 768].map((y) => [y, 256, 9216]));
+    for (const r of reads) expect(decodedBytes(r, f32, 9216, 4096)).toBeLessThanOrEqual(MAX_READ_BYTES);
   });
 
-  it("a partial last tile reads its texels' full spans, which the loader then clips to the image", () => {
-    expect(rowReads([tile(256, 0, 2, 256)], 4, 1)).toEqual([{ x0: 1024, y0: 0, width: 8, height: 1024 }]);
+  it("a partial last tile's span is clipped to the image", () => {
+    expect(rowReads([tile(256, 0, 2, 256)], 4, RGB8, 1030, 1029)).toEqual([{ x0: 1024, y0: 0, width: 6, height: 1024 }]);
   });
 });
 
