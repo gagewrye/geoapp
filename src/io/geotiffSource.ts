@@ -3,6 +3,7 @@ import { alphaOf } from "../core/alpha";
 import { affineFromTags } from "../core/geotags";
 import { MAX_BLOCK_BYTES, type Block, type Overview } from "../core/imagery";
 import { blobSource } from "./blobSource";
+import { rawEligible, rawOffsets, rawWindow, type BlockOffsets } from "./rawReader";
 import type { GeoTags, ImagerySource, RasterMeta } from "./source";
 
 const stripNul = (s: unknown) => (typeof s === "string" ? s.replace(/\0+$/, "") : undefined);
@@ -52,14 +53,20 @@ export async function openGeoTiff(tiff: GeoTIFF): Promise<ImagerySource> {
     overviews.push({ index: i, width: im.getWidth(), height: im.getHeight(), block });
   }
   await Promise.all([...images.values()].map(loadBlockOffsets));
+  // uncompressed chunky images read only the window's columns (ADR 0024); the rest go through geotiff
+  const raw = new Map<number, BlockOffsets>();
+  for (const [i, im] of images) if (rawEligible(im)) raw.set(i, await rawOffsets(im));
   return {
     meta: { width, height, bandCount, gt, epsg, nodata, float, alpha, geoTags },
     block: blockOf(image),
     overviews,
+    raw: [...raw.keys()],
     async readSamples(index, x0, y0, w, h, samples, signal) {
       signal?.throwIfAborted();
       const im = images.get(index);
       if (!im) throw new Error(`No overview ${index}`);
+      const offsets = raw.get(index);
+      if (offsets) return rawWindow(im, tiff.source, offsets, x0, y0, w, h, samples, signal);
       const rasters = await im.readRasters({ window: [x0, y0, x0 + w, y0 + h], samples, signal });
       signal?.throwIfAborted();
       return Array.from(rasters as unknown as ArrayLike<number>[]);
