@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { initialClasses } from "../../../src/core/classes";
-import type { ClassEntry } from "../../../src/core/classTable";
 import { tileWindows, type Window } from "../../../src/core/grid";
 import { emptyStore, MAX_LABEL_TILES } from "../../../src/core/labelStore";
-import { applyLut, seedLut, seedWindows, sourceCells } from "../../../src/core/seed";
+import { seedWindows, sourceCells } from "../../../src/core/seed";
 import type { Affine, Grid } from "../../../src/core/types";
 import type { LabelSource } from "../../../src/io/labelFile";
 import { importLabels } from "../../../src/io/seeding";
@@ -48,45 +47,29 @@ function fileWindowsOf(w: Window): Window[] {
   });
 }
 
-/** Gathered labels of imagery window w by brute force: lut of the file value at each cell. */
-function gathered(w: Window, lut: Uint8Array): Uint8Array {
-  const cells = sourceCells(IMAGERY, FILE, w);
-  const vals = new Int16Array(w.width * w.height).fill(-1);
-  for (let i = 0; i < vals.length; i++) if (cells[2 * i]! >= 0) vals[i] = fileValue(cells[2 * i]!, cells[2 * i + 1]!);
-  return applyLut(vals, lut);
-}
-
-describe("reads (criterion 14)", () => {
-  it("the values pass reads no imagery and only aligned file windows holding a cell of the current imagery window, once each", { timeout: 60_000 }, async () => {
+describe("reads (criterion 14, as spec 024 amends it)", () => {
+  it("one pass, row by row: each window's aligned file windows, then one imagery span per row over the windows the file covers", { timeout: 60_000 }, async () => {
     const { imagery, file, log, maxInFlight } = instrumented();
-    const want = seedWindows(IMAGERY, FILE).flatMap((w) => fileWindowsOf(w).map((fw) => `f ${key(fw)}`));
-    // stale once the values pass has read its windows, so the run stops before the labelling pass
-    expect(await importLabels(imagery, file, null, () => log.length >= want.length)).toBe("stale");
-    expect(log).toEqual(want);
-    expect(log.filter((e) => e.startsWith("i"))).toEqual([]);
-    expect(maxInFlight()).toBe(1);
-  });
-
-  it("the labelling pass reads exactly the imagery windows whose gathered labels are non-zero, once each, after their file windows", { timeout: 60_000 }, async () => {
-    const { imagery, file, log, maxInFlight } = instrumented();
-    const table: ClassEntry[] = [{ value: 1, name: "one" }];
-    const r = await importLabels(imagery, file, table);
+    const r = await importLabels(imagery, file, [{ value: 1, name: "one" }]);
     expect(typeof r).toBe("object");
-    const lut = seedLut(table, [1]);
     const want: string[] = [];
-    let skipped = 0, multi = 0;
-    for (const w of seedWindows(IMAGERY, FILE)) {
-      const fws = fileWindowsOf(w);
-      if (fws.length > 1) multi++;
-      want.push(...fws.map((fw) => `f ${key(fw)}`));
-      if (gathered(w, lut).some((v) => v)) want.push(`i ${key(w)}`); else skipped++;
+    let multi = 0;
+    const windows = seedWindows(IMAGERY, FILE);
+    for (const y0 of [...new Set(windows.map((w) => w.y0))]) {
+      const row = windows.filter((w) => w.y0 === y0);
+      for (const w of row) {
+        const fws = fileWindowsOf(w);
+        if (fws.length > 1) multi++;
+        want.push(...fws.map((fw) => `f ${key(fw)}`));
+      }
+      const covered = row.filter((w) => sourceCells(IMAGERY, FILE, w).some((v) => v >= 0));
+      if (!covered.length) continue;
+      const first = covered[0]!, last = covered.at(-1)!;
+      want.push(`i ${key({ x0: first.x0, y0, width: last.x0 + last.width - first.x0, height: first.height })}`);
     }
     expect(log).toEqual(want);
-    // the case split is real: some windows read no imagery, some need several file windows
-    expect(skipped).toBeGreaterThan(0);
+    // the case split is real: some windows need several file windows
     expect(multi).toBeGreaterThan(0);
-    expect(log.filter((e) => e.startsWith("i")).length).toBeGreaterThan(0);
-    expect(log.filter((e) => e.startsWith("f")).every((e) => { const [x0, y0, w, h] = e.slice(2).split(",").map(Number); return x0! % 256 === 0 && y0! % 256 === 0 && w! <= 256 && h! <= 256; })).toBe(true);
     expect(maxInFlight()).toBe(1);
   });
 });

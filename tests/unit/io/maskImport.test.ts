@@ -55,9 +55,11 @@ describe("a large mask (criterion 4)", () => {
     expect(io.fileReads).toHaveLength(1024);
     expect(new Set(io.fileReads).size).toBe(1024);
     expect(io.fileReads.every(aligned)).toBe(true);
+    // spec 024: imagery validity comes a row band at a time, each pixel read once, each read within one band
+    const rows = io.imageryReads.map((k) => k.split(",").map(Number) as [number, number, number, number]);
+    expect(rows.every(([, y0, , h]) => y0 % 256 === 0 && h <= 256)).toBe(true);
+    expect(rows.reduce((a, [, , w, h]) => a + w * h, 0)).toBe(SIDE * SIDE);
     expect(new Set(io.imageryReads).size).toBe(io.imageryReads.length);
-    expect(io.imageryReads.length).toBeLessThanOrEqual(1024);
-    expect(io.imageryReads.every(aligned)).toBe(true);
     expect([io.flight.maxF, io.flight.maxI]).toEqual([1, 1]);
   });
 });

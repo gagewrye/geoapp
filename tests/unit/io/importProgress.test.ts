@@ -36,13 +36,13 @@ describe("nodataPossible (criterion 9, core)", () => {
 
 describe("onProgress (criterion 1)", () => {
   for (const table of [TABLE, null]) {
-    it(`is called once per window per pass, done 1..total in order (${table ? "table" : "no table"})`, async () => {
+    it(`is called once per window, done 1..total in order (one pass, spec 024) (${table ? "table" : "no table"})`, async () => {
       const { imagery } = imageryOf(null, true);
       const file = fakeLabelSource(GRID, maskValue).source;
       const calls: [number, number][] = [];
       const r = await importLabels(imagery, file, table, undefined, (done, total) => calls.push([done, total]));
       expect(typeof r).toBe("object");
-      const total = seedWindows(GRID, GRID).length * (table ? 1 : 2);
+      const total = seedWindows(GRID, GRID).length; // one pass (spec 024)
       expect(calls).toEqual(Array.from({ length: total }, (_, i) => [i + 1, total]));
     });
   }

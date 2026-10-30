@@ -103,10 +103,12 @@ describe("memory, structurally", () => {
     const io = instrument(img, fakeLabelSource(f, () => 6).source);
     ok(await importLabels(io.imagery, io.file, null));
     expect(io.max()).toBe(1);
-    expect(io.log.every((e) => aligned(e.w))).toBe(true);
+    expect(io.log.filter((e) => e.kind === "f").every((e) => aligned(e.w))).toBe(true);
+    // spec 024: imagery validity a row band at a time, over the windows the file covers (about 5 x 5 windows)
     const imageryReads = io.log.filter((e) => e.kind === "i");
+    expect(imageryReads.every((e) => e.w.y0 % 256 === 0 && e.w.height <= 256 && e.w.x0 % 256 === 0)).toBe(true);
     expect(new Set(imageryReads.map((e) => `${e.w.x0},${e.w.y0}`)).size).toBe(imageryReads.length);
-    expect(imageryReads.length).toBeLessThan(60); // the file covers about 11 x 10 km, i.e. about 5 x 5 windows
+    expect(imageryReads.reduce((a, e) => a + e.w.width * e.w.height, 0)).toBeLessThan(60 * 65536);
     expect(io.log.filter((e) => e.kind === "f").length).toBeLessThan(400);
   });
 
@@ -116,12 +118,13 @@ describe("memory, structurally", () => {
     const io = instrument(fakeSource({ ...img, bandCount: 1 }, () => 1).source, fakeLabelSource(f, () => 2).source);
     ok(await importLabels(io.imagery, io.file, [{ value: 2, name: "two" }]));
     expect(io.max()).toBe(1);
-    expect(io.log.every((e) => aligned(e.w))).toBe(true);
+    expect(io.log.filter((e) => e.kind === "f").every((e) => aligned(e.w))).toBe(true);
     // the imagery covers 18 x 15 km = 3600 x 3000 file px: at most 16 x 13 file windows, each read once per imagery window
     const fileReads = io.log.filter((e) => e.kind === "f");
     expect(new Set(fileReads.map((e) => `${e.w.x0},${e.w.y0}`)).size).toBeLessThanOrEqual(16 * 13);
     expect(fileReads.length).toBeLessThanOrEqual(16 * 13 + 6 * 16 + 6 * 13); // window seams read twice at most
-    expect(io.log.filter((e) => e.kind === "i")).toHaveLength(tileWindows(600, 500).length);
+    // spec 024: one imagery read per row band, together covering the imagery once
+    expect(io.log.filter((e) => e.kind === "i").map((e) => [e.w.x0, e.w.y0, e.w.width, e.w.height])).toEqual([[0, 0, 600, 256], [0, 256, 600, 244]]);
   });
 
   it("a stale run reads nothing more once stale", { timeout: 30_000 }, async () => {
@@ -131,9 +134,9 @@ describe("memory, structurally", () => {
     expect(await importLabels(io.imagery, io.file, null, () => io.log.length >= 5)).toBe("stale");
     expect(io.log).toHaveLength(5);
     const later = instrument(fakeSource({ ...g, bandCount: 1 }, () => 1).source, fakeLabelSource(g, () => 4).source);
-    // in the labelling pass: file read 64 + 3 is the third window's, so its imagery read never starts
-    expect(await importLabels(later.imagery, later.file, null, () => later.log.length >= 64 + 5)).toBe("stale");
-    expect(later.log.slice(64).map((e) => e.kind)).toEqual(["f", "i", "f", "i", "f"]);
+    // one pass (spec 024): a row's 8 file reads, its imagery span, then the next row's; stale at that row's third file read
+    expect(await importLabels(later.imagery, later.file, null, () => later.log.length >= 8 + 1 + 3)).toBe("stale");
+    expect(later.log.map((e) => e.kind)).toEqual([...Array(8).fill("f"), "i", "f", "f", "f"]);
   });
 });
 

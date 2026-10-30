@@ -42,8 +42,8 @@ export function cellBuckets(cells: Int32Array, dims: Pick<Grid, "width" | "heigh
   return { across, start, order };
 }
 
-/** values[p] = the label under preview pixel p, for every p whose cell lies in window w (labels row-major for w). */
-export function fillPreview(values: Uint8Array, cells: Int32Array, b: CellBuckets, w: Window, labels: Uint8Array): void {
+/** values[p] = the label (or raw value) under preview pixel p, for every p whose cell lies in window w (labels row-major for w). */
+export function fillPreview(values: Uint8Array | Uint16Array, cells: Int32Array, b: CellBuckets, w: Window, labels: ArrayLike<number>): void {
   const wi = windowIndex(b, w.x0, w.y0);
   for (let k = b.start[wi]!; k < b.start[wi + 1]!; k++) {
     const p = b.order[k]!;
