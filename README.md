@@ -2,6 +2,23 @@
 
 Label a local GeoTIFF in your browser. Paint class labels on it with a brush, seed them from an existing class raster, then export them as a label GeoTIFF. Your files and labels never leave your device: the app fetches only its own static files.
 
+## Set up
+1. **Install Node.js 22.12 or later** (it includes npm). Get the LTS installer from https://nodejs.org, or:
+   - Windows: `winget install OpenJS.NodeJS.LTS`
+   - macOS: `brew install node`
+   - Linux: use your distribution's packages, or https://nodejs.org/en/download
+
+   Open a new terminal, then check: `node --version`.
+2. **Get the code and its packages:**
+   ```
+   git clone https://github.com/gagewrye/geoapp.git
+   cd geoapp
+   npm install
+   ```
+3. **Run it:** `npm run dev`, then open http://localhost:5173 in a Chromium-based browser (Chrome or Edge). Other browsers work, but download exports instead of offering a Save dialog. Press Ctrl+C in the terminal to stop.
+
+If the page shows "Failed to fetch dynamically imported module", stop the server, run `npm run dev -- --force`, and reload the page.
+
 ## Use it
 The globe shows a bundled, low-resolution Natural Earth shaded relief to help you find your way (public domain; `src/map/basemap.NOTICE.md`). It is one static file, the same for every view. The wheel zooms about the centre of the map, a middle-button drag pans, and holding W/A/S/D pans smoothly (not while typing in a field).
 1. **Open GeoTIFF**: pick a GeoTIFF or COG in EPSG:4326, EPSG:3857 or WGS84 UTM (326xx/327xx). A bar shows progress while the preview of bands 1-3 (or band 1 as greyscale) is built; it then appears on the globe, which flattens to Mercator from zoom 12. Large files take a while; a file with overviews opens much faster. When you stop zooming or panning, the view fills in at full resolution, in the preview's colours. Coarser zooms use the file's overviews (add them with `gdaladdo` or `gdal_translate -of COG`); without overviews, zooms coarser than 4 source pixels per screen pixel show the preview. Files stored in blocks over 16 MiB (such as large single-strip files) show the preview only. If part of the file can't be read, the app says so and the preview stays. Opening another raster discards your labels, after asking, stops the previous preview, and starts in **Pan** mode. **Paint** is available once the preview shows.
@@ -12,10 +29,8 @@ The globe shows a bundled, low-resolution Natural Earth shaded relief to help yo
 v1 limits: labels live in memory until you export them. At most 256 tiles of 256 x 256 px hold painted or edited labels; a stroke needing more says so, and each pointer move of it is applied whole or not at all. An imported mask doesn't count towards this. Labels beyond ±85.05° latitude are kept and exported but aren't drawn. EPSG:4326/3857 rasters crossing 180° are refused. Output is capped at 4 GiB (classic TIFF).
 
 ## Develop
-Requires Node.js 22.12 or later.
+After **Set up**:
 ```
-npm install
-npm run dev          # http://localhost:5173
 npm run check        # lint + typecheck + unit tests (Vitest)
 npx playwright install chromium
 npm run e2e          # builds, serves on :4173, runs Playwright
