@@ -5,6 +5,10 @@ import { IMAGERY_TILES, imageryQuads, planView, type Level, type Overview } from
 import type { Grid } from "../../../src/core/types";
 import { tileKey } from "../../../src/io/imageryLoader";
 import { ImageryLayer } from "../../../src/map/imagery";
+import type { ImagerySource } from "../../../src/io/source";
+import { initImagery } from "../../../src/ui/imagery";
+import { MESSAGES } from "../../../src/ui/messages";
+import { fakeSource } from "../helpers/sources";
 
 // Spec 020, tester: the tile cap against one view's own tiles, and re-drawing a kept tile.
 function fakeMap() {
@@ -61,4 +65,44 @@ describe("ImageryLayer, tester", () => {
     const lost = plan.tiles.filter((t) => !layer.use(tileKey(plan.level, t)));
     expect(lost, `s = ${plan.level.s}, ${plan.tiles.length} tiles, ${quads} quads`).toEqual([]);
   }, 120_000);
+
+  // Review fix 874dd6d: a draw that throws partway (addSource or addLayer, e.g. after a WebGL context loss) leaves nothing.
+  it.each(["addSource", "addLayer"] as const)("through initImagery: %s throwing on a later quad leaves no imagery- source or layer, the retry draws the tile, and the next open removes it", async (which) => {
+    const { map, sources, layers } = fakeMap();
+    const handlers: (() => void)[] = [];
+    let calls = 0, failOn = 2;
+    const orig = map[which].bind(map) as (...a: unknown[]) => void;
+    Object.assign(map, {
+      on: (_e: string, f: () => void) => { handlers.push(f); },
+      getBounds: () => ({ getWest: () => 9.9, getSouth: () => 82.3, getEast: () => 12.7, getNorth: () => 85.1 }),
+      getContainer: () => ({ clientWidth: 800, clientHeight: 600 }),
+      [which]: (...a: unknown[]) => { if (++calls === failOn) throw new Error("context lost"); orig(...a); },
+    });
+    // 0.01 degree pixels from 85N: the one 256 px tile needs several quads (ADR 0019)
+    const src = (): ImagerySource => ({
+      ...fakeSource({ width: 256, height: 256, epsg: 4326, gt: [10, 0.01, 0, 85, 0, -0.01] }, () => 1).source,
+      overviews: [], block: { width: 256, height: 256, bytes: 256 * 256 * 3 },
+      readSamples: async (_i, _x, _y, w, h, bands) => bands.map(() => new Uint8Array(w * h).fill(5)),
+    });
+    const imageryIds = () => [...sources].filter((id) => id.startsWith("imagery-"));
+    const imageryLayers = () => layers.filter((id) => id.startsWith("imagery-"));
+    const flush = async () => { for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0)); };
+    const said: string[] = [];
+    const imagery = initImagery(map, (t) => said.push(t));
+    expect(imagery.open(src(), [[0, 10], [0, 10], [0, 10]])).toBeNull();
+    await flush();
+    expect(said).toEqual([MESSAGES.imageryUnreadable]);
+    expect(imageryIds()).toEqual([]);
+    expect(imageryLayers()).toEqual([]);
+    failOn = -1;
+    handlers.forEach((h) => h()); // moveend: the tile is asked for again
+    await flush();
+    const ids = imageryIds();
+    expect(ids.length).toBeGreaterThan(1);
+    expect(imageryLayers().sort()).toEqual([...ids].sort());
+    imagery.open(src(), [[0, 10], [0, 10], [0, 10]]); // the next open clears, then draws its own tile
+    expect(imageryIds()).toEqual([]);
+    await flush();
+    expect(imageryIds().sort()).toEqual([...ids].sort());
+  });
 });
