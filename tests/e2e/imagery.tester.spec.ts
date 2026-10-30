@@ -131,8 +131,10 @@ test("A1 read failures: a failing tile read says imageryUnreadable once per rast
     (window as any).__geoapp.pauseMasks = true; // spec 023: only the tiles' reads, not background mask reads, run and fail
     (window as any).__geoapp.rasterFile = (src: any) => {
       const read = src.readSamples.bind(src);
-      // only reads made once the preview is on the map are the tiles'
-      src.readSamples = (...a: unknown[]) => ((window as any).__geoapp.map.getSource("preview") && g.on ? (g.failed++, Promise.reject(new ProgressEvent("error"))) : read(...a));
+      // only reads made once this raster's preview is on the map are the tiles' (showPreview adds a new source)
+      const { map } = (window as any).__geoapp, old = map.getSource("preview");
+      const tiles = () => { const p = map.getSource("preview"); return p !== undefined && p !== old; };
+      src.readSamples = (...a: unknown[]) => (g.on && tiles() ? (g.failed++, Promise.reject(new ProgressEvent("error"))) : read(...a));
     };
   });
   const unreadable = "Couldn't read part of this file, so some detail may be missing.";
@@ -151,10 +153,13 @@ test("A1 read failures: a failing tile read says imageryUnreadable once per rast
   await zoomTo(page, 350.5, 350.5, 10); // the same tiles are asked for again and drawn
   await expect.poll(() => imagerySources(page), { timeout: 20_000 }).toBeGreaterThan(0);
   await paintMode(page);
-  // another open: a failure is reported again
-  await openRaster(page, { ...rotatedFixture(), name: "again.tif" });
-  await expect(message(page)).toHaveText("Raster opened.");
+  // another open: a failure is reported again. Failing from the start, as for the first open: the fitted view
+  // may need every tile, so once they have loaded no zoom reads anything new
+  const before = await page.evaluate(() => (window as any).__fail.failed as number);
   await fail(true);
+  await openRaster(page, { ...rotatedFixture(), name: "again.tif" });
+  await expect(page.locator("#mode-paint")).toBeEnabled();
   await zoomTo(page, 300.5, 300.5, 10);
+  await expect.poll(() => page.evaluate(() => (window as any).__fail.failed as number)).toBeGreaterThan(before);
   await expect(message(page)).toHaveText(unreadable);
 });
