@@ -86,6 +86,16 @@ describe("preview lattice (spec 030)", () => {
     expect([seen, bad]).toEqual([W * H, 0]);
   });
 
+  it("criterion 1: a UTM grid where proj4 gives NaN over part of it matches the exact loop", () => {
+    // proj4's forward UTM doesn't fail inside a bbox mercBounds can bound, so the failure is spliced in as in spec 029's test
+    const real = crs.fromLonLat;
+    const g = at(32633, 18, 63, 30, 4000);
+    const [lon0, lat0] = crs.toLonLat(g.epsg, g.gt[0] + 1800 * 30, g.gt[3] - 1500 * 30);
+    vi.spyOn(crs, "fromLonLat").mockImplementation((e, lon, lat) =>
+      (lon > lon0 && lat < lat0) || (lon - lon0) ** 2 + (lat - lat0 - 0.2) ** 2 < 0.05 ** 2 ? [NaN, Infinity] : real(e, lon, lat));
+    expect(floorMismatches(g, 512)).toBe(0);
+  });
+
   it("visits every pixel once, row-major", () => {
     const order: number[] = [];
     latticeEach(37, 21, (u, v) => [u * 1.5, v * 2.5], (o) => order.push(o));

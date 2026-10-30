@@ -1,5 +1,6 @@
 import { fromLonLat, invertAffine, applyAffine, toLonLat } from "./crs";
 import type { Window } from "./grid";
+import { latticeEach } from "./lattice";
 import { MAX_LAT, type Affine, type Tile } from "./types";
 
 const R = 6378137;
@@ -31,7 +32,7 @@ export function mercBounds(src: Window, gt: Affine, epsg: number): [number, numb
   return [x0, y0, x1, y1];
 }
 
-/** Axis-aligned Mercator grid over a window (longer side maxSide; corners TL, TR, BR, BL); `each` visits pixel centres. */
+/** Axis-aligned Mercator grid over a window (longer side maxSide; corners TL, TR, BR, BL); `each` visits pixel centres (spec 030 lattice). */
 export function mercatorGrid(win: Window, gt: Affine, epsg: number, maxSide: number) {
   const [mx0, my0, mx1, my1] = mercBounds(win, gt, epsg);
   const aspect = (mx1 - mx0) / (my1 - my0);
@@ -41,16 +42,8 @@ export function mercatorGrid(win: Window, gt: Affine, epsg: number, maxSide: num
   const sy = (my1 - my0) / height;
   const W = lonOf(mx0), E = lonOf(mx1), N = latOf(my1), S = latOf(my0);
   const corners: [number, number][] = [[W, N], [E, N], [E, S], [W, S]];
-  const each = (f: (o: number, col: number, row: number) => void) => {
-    for (let v = 0; v < height; v++) {
-      const lat = latOf(my1 - (v + 0.5) * sy);
-      for (let u = 0; u < width; u++) {
-        const [x, y] = fromLonLat(epsg, lonOf(mx0 + (u + 0.5) * sx), lat);
-        const [c, r] = invertAffine(gt, x, y);
-        f(v * width + u, c, r);
-      }
-    }
-  };
+  const exact = (u: number, v: number) => invertAffine(gt, ...fromLonLat(epsg, lonOf(mx0 + (u + 0.5) * sx), latOf(my1 - (v + 0.5) * sy)));
+  const each = (f: (o: number, col: number, row: number) => void) => latticeEach(width, height, exact, f);
   return { width, height, corners, each };
 }
 
