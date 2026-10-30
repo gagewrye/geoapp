@@ -21,7 +21,7 @@
    - The band search and its 0.05 px check are unchanged and run on the interpolated positions.
    - So the total error is ≤ 0.05 + 0.005 px between checked points. Corners beyond `MAX_LAT` are handled as today.
    - The self-check skips a centre whose projection isn't finite, and a cell whose 4 nodes aren't all finite (spec 029).
-3. **Quad cache.** Imagery quads are cached by level and tile key for the raster's life (corners only, under 1 KiB per tile), so evicted tiles don't recompute them. Label quads are already built once per tile (`map/labelOverlay.ts`).
+3. **Quad cache.** Imagery quads are cached by level and tile key for the raster's life (corners only, under 1 KiB per tile), so evicted tiles don't recompute them. The cache holds at most `4 × IMAGERY_TILES` (2,048) entries, at most about 2 MiB, and drops the least recently used first; a dropped tile recomputes its quads (spec 029). Label quads are already built once per tile (`map/labelOverlay.ts`).
 
 **Out of scope:** workers; the `warpPreview` projections, which run once per open.
 
