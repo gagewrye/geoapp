@@ -38,7 +38,8 @@
 4. **Unit:** a grid curved enough to fail the self-check (EPSG:4326 near 85°, coarse pixels) halves the lattice and still meets criterion 1.
 5. **Unit:** an imagery tile evicted and redrawn calls `tileQuads` once in total.
 6. **Real chunks, `run.mjs`:**
-   - `tileQuads` self plus proj4 time per mid-zoom fill ≤ 80 ms on Chunk 11 (was about 0.75 s).
-   - The longest task during a mid-zoom fill ≤ 100 ms (was about 200 ms).
+   - `tileQuads` self plus proj4 time per mid-zoom fill ≤ 80 ms on Chunk 11 (was about 0.75 s). Like the baseline measure, this excludes the `fits` band check.
+   - The longest task during a mid-zoom fill on Chunk 11 ≤ 100 ms (was about 200 ms).
+   - On the typical and tiled chunks, this target moves to spec 028 (amended under Gage's perf delegation). Their remaining long task is a strip decode plus tile draws, not quads.
    - With specs 025 and 026 both in: mid-zoom last tile ≤ **1.3 s** typical and ≤ **1.6 s** on Chunk 11 (baseline 2.80 / 3.37 s; 025 alone 1.65 / 2.00 s). These targets moved here from spec 025.
 7. Spec 018's alignment criteria, spec 020 criteria 3 and 4, and spec 022 criterion 6 pass. `npm run check` passes.
