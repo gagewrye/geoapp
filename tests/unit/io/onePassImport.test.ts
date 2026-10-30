@@ -10,6 +10,7 @@ import { effectiveTile, gridOf } from "../../../src/io/maskBase";
 import { MaskCache } from "../../../src/io/maskCache";
 import { importLabels } from "../../../src/io/seeding";
 import type { RasterSource } from "../../../src/io/source";
+import { yieldToBrowser } from "../../../src/io/yieldTask";
 import { fakeLabelSource } from "../helpers/labelFiles";
 import { fakeSource, samplesSource } from "../helpers/sources";
 import { twoPassImport } from "../helpers/twoPassImport";
@@ -154,7 +155,7 @@ describe("review fixes", () => {
     expect([f.reads.length, needs]).toEqual([0, 0]);
   });
 
-  /** Runs an import on 1-row strips with performance.now advancing `step` ms a call; a timer set at window k cancels it. */
+  /** Runs an import on 1-row strips with performance.now advancing `step` ms a call; a task posted at window k cancels it. */
   async function clocked(step: number, k: number) {
     let t = 0;
     const spy = vi.spyOn(performance, "now").mockImplementation(() => (t += step));
@@ -162,17 +163,17 @@ describe("review fixes", () => {
       const { source } = samplesSource({ ...GRID, bandCount: 1, nodata: 0, float: false, alpha: null }, () => 3, { width: 1000, height: 1, bytes: 1000 });
       const f = fakeLabelSource(GRID, fileValue);
       let cancelled = false;
-      const r = await importLabels(source, f.source, null, () => cancelled, (done) => { if (done === k) setTimeout(() => { cancelled = true; }, 0); });
+      const r = await importLabels(source, f.source, null, () => cancelled, (done) => { if (done === k) void yieldToBrowser().then(() => { cancelled = true; }); });
       return { r, reads: f.reads };
     } finally { spy.mockRestore(); }
   }
 
   it("yields once 8 ms of work have passed, within a row, and checks stale there (fake clock)", async () => {
-    // 10 ms a call: past the budget after every window, so the timer set at window 1 runs before window 2 is read
+    // 10 ms a call: past the budget after every window, so the task posted at window 1 runs before window 2 is read
     const { r, reads } = await clocked(10, 1);
     expect(r).toBe("stale");
     expect(reads.map((w) => `${w.x0},${w.y0}`)).toEqual(["0,0"]);
-    // a frozen clock never reaches the budget: no yield, so the same timer never gets a turn and the import ends
+    // a frozen clock never reaches the budget: no yield, so the same task never gets a turn and the import ends
     const still = await clocked(0, 1);
     expect(typeof still.r).toBe("object");
   });

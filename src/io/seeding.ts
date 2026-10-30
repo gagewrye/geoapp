@@ -10,7 +10,7 @@ import type { LabelSource } from "./labelFile";
 import { gather, gridOf, type MaskBase } from "./maskBase";
 import { MaskCache, STROKE } from "./maskCache";
 import type { RasterSource } from "./source";
-import { TASK_BUDGET_MS } from "./yieldTask";
+import { TASK_BUDGET_MS, yieldToBrowser } from "./yieldTask";
 
 /** seedWindows (row-major) grouped by row. */
 function rowsOf(windows: Window[]): Window[][] {
@@ -66,7 +66,7 @@ export async function importLabels(imagery: RasterSource, file: LabelSource, tab
   /** After TASK_BUDGET_MS of work, gives the bar and Cancel a turn (a row whose bands are cached runs on microtasks alone); true when stale. */
   const breathe = async (): Promise<boolean> => {
     if (performance.now() - slice < TASK_BUDGET_MS) return false;
-    await new Promise((r) => setTimeout(r, 0));
+    await yieldToBrowser(); // not setTimeout, which nested timers clamp to 4 ms: thousands of yields per import
     slice = performance.now();
     return stale();
   };
