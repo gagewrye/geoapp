@@ -68,7 +68,7 @@ export function initImagery(map: MapLibreMap, say: (text: string) => void = () =
       reported = false;
       const failed = () => { if (!reported) { reported = true; say(MESSAGES.imageryUnreadable); } };
       open = { source, loader: new ImageryLoader(source, ranges, layer, failed) };
-      update();
+      if (!nav.moving()) update(); // mid-pan, the settle loads the view (spec 029)
       return null;
     },
   };
