@@ -136,7 +136,8 @@ describe("background mask reads wired to imagery.moving() (criterion 2)", () => 
   it("wait during a hold and until 150 ms after the last move; stroke and hover reads still start", async () => {
     const { imagery, emit } = setup();
     const { source, reads } = masks();
-    const cache = new MaskCache(source, { moving: imagery.moving, retryMs: 10 });
+    // spec 028 yields between background bands with a MessageChannel post, which fake timers don't run: yield on a (faked) timer
+    const cache = new MaskCache(source, { moving: imagery.moving, retryMs: 10, yieldTask: () => new Promise<void>((r) => setTimeout(r, 0)) });
     down("KeyD");
     cache.start(0);
     await vi.advanceTimersByTimeAsync(500);
