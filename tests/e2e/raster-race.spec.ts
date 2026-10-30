@@ -12,7 +12,7 @@ const imageryWidth = (page: Page) => page.evaluate(() => (window as any).__geoap
 const previewWest = (page: Page) => page.evaluate(() => (window as any).__geoapp.map.getSource("preview")?.coordinates[0][0] as number | undefined);
 
 /**
- * Hold FileReader reads of one file name: "all" from the start, or "committed" only once that file is
+ * Hold FileReader and Blob.arrayBuffer reads of one file name: "all" from the start, or "committed" only once that file is
  * the open raster (#raster-info names it), so its preview waits but its header doesn't.
  */
 async function fileGate(page: Page) {
@@ -30,6 +30,14 @@ async function fileGate(page: Page) {
       const held = mode === "all" || (mode === "committed" && document.getElementById("raster-info")!.textContent!.startsWith(`${name}:`));
       if (held) g.waiting.push(() => read.call(this, b));
       else read.call(this, b);
+    };
+    // spec 025's blob source reads with Blob.arrayBuffer, the same gate applies
+    const arrayBuffer = Blob.prototype.arrayBuffer;
+    Blob.prototype.arrayBuffer = function (this: Blob) {
+      const name = (this as any).__name as string | undefined, mode = name && g.hold.get(name);
+      const held = mode === "all" || (mode === "committed" && document.getElementById("raster-info")!.textContent!.startsWith(`${name}:`));
+      if (!held) return arrayBuffer.call(this);
+      return new Promise<ArrayBuffer>((resolve, reject) => g.waiting.push(() => arrayBuffer.call(this).then(resolve, reject)));
     };
   });
 }
