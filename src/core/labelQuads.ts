@@ -11,6 +11,8 @@ export const QUAD_ERR = 0.05;
 
 // Corners past this are pulled in so MapLibre gets finite Mercator; corners beyond MAX_LAT never show.
 const POLE_LAT = 89.9;
+// MAX_LAT as a Mercator y, so interpolated corners are tested without interpolating their latitude
+const MAX_MY = mercator(0, MAX_LAT)[1];
 
 /** Lattice step in pixels: corners between its nodes are interpolated, not projected (ADR 0023). */
 export const LATTICE = 16;
@@ -30,7 +32,8 @@ export function tileQuads(grid: Grid, w: Window, maxErr: number): Quad[] {
 export function latticeQuads(grid: Grid, w: Window, maxErr: number, lattice: number): { quads: Quad[]; lattice: number } {
   // corners one beyond the window too, so each corner's pixel width comes from the pixel it is the top left of
   const W = w.width + 2, H = w.height + 2;
-  const lon = new Float64Array(W * H), lat = new Float64Array(W * H), mx = new Float64Array(W * H), my = new Float64Array(W * H);
+  // Mercator only: lon/lat between nodes is never needed, as quad corners are projected exactly
+  const mx = new Float64Array(W * H), my = new Float64Array(W * H);
   // exact projections, kept across lattice steps: a cell centre at one step is a node at the next
   const exLon = new Float64Array(W * H), exLat = new Float64Array(W * H), known = new Uint8Array(W * H);
   const exact = (i: number) => {
@@ -48,24 +51,27 @@ export function latticeQuads(grid: Grid, w: Window, maxErr: number, lattice: num
     step = Math.max(1, Math.floor(step / 2));
   }
 
-  /** Nodes projected exactly, every other corner bilinear in its lattice cell, for lon/lat and Mercator alike. */
+  /** Nodes projected exactly, every other corner's Mercator position bilinear in its lattice cell. */
   function project(cols: Cells, rows: Cells) {
     for (const r of rows.nodes) for (const c of cols.nodes) {
       const i = exact(r * W + c);
-      lon[i] = exLon[i]!; lat[i] = exLat[i]!;
-      [mx[i], my[i]] = mercator(lon[i]!, lat[i]!);
+      [mx[i], my[i]] = mercator(exLon[i]!, exLat[i]!);
+    }
+    // bilinear as two linear passes: along node rows between nodes, then down each column between node rows
+    for (const r of rows.nodes) for (let c = 0; c < W; c++) {
+      const u = cols.t[c]!;
+      if (u === 0) continue; // a node
+      const i = r * W + c, k0 = r * W + cols.a[c]!, k1 = r * W + cols.b[c]!;
+      mx[i] = (1 - u) * mx[k0]! + u * mx[k1]!;
+      my[i] = (1 - u) * my[k0]! + u * my[k1]!;
     }
     for (let r = 0; r < H; r++) {
-      const ra = rows.a[r]!, rb = rows.b[r]!, v = rows.t[r]!;
+      const v = rows.t[r]!;
+      if (v === 0) continue; // a node row
+      const i0 = r * W, a0 = rows.a[r]! * W, b0 = rows.b[r]! * W;
       for (let c = 0; c < W; c++) {
-        const ca = cols.a[c]!, cb = cols.b[c]!, u = cols.t[c]!;
-        if (u === 0 && v === 0) continue; // a node
-        const k0 = ra * W + ca, k1 = ra * W + cb, k2 = rb * W + cb, k3 = rb * W + ca, i = r * W + c;
-        const a = (1 - u) * (1 - v), b = u * (1 - v), d = u * v, e = (1 - u) * v;
-        lon[i] = a * lon[k0]! + b * lon[k1]! + d * lon[k2]! + e * lon[k3]!;
-        lat[i] = a * lat[k0]! + b * lat[k1]! + d * lat[k2]! + e * lat[k3]!;
-        mx[i] = a * mx[k0]! + b * mx[k1]! + d * mx[k2]! + e * mx[k3]!;
-        my[i] = a * my[k0]! + b * my[k1]! + d * my[k2]! + e * my[k3]!;
+        mx[i0 + c] = (1 - v) * mx[a0 + c]! + v * mx[b0 + c]!;
+        my[i0 + c] = (1 - v) * my[a0 + c]! + v * my[b0 + c]!;
       }
     }
   }
@@ -86,13 +92,13 @@ export function latticeQuads(grid: Grid, w: Window, maxErr: number, lattice: num
     return true;
   }
 
-  // per corner: maxErr x the narrowest width (area over longer edge) of its pixel; NaN beyond MAX_LAT, never checked
-  const tol = new Float64Array(W * H);
+  // per corner, squared: maxErr x the narrowest width (area over longer edge) of its pixel; NaN beyond MAX_LAT, never checked
+  const tol2 = new Float64Array(W * H);
   for (let r = 0; r < H - 1; r++) for (let c = 0; c < W - 1; c++) {
     const i = r * W + c;
     const ax = mx[i + 1]! - mx[i]!, ay = my[i + 1]! - my[i]!, bx = mx[i + W]! - mx[i]!, by = my[i + W]! - my[i]!;
-    const cross = Math.abs(ax * by - ay * bx);
-    tol[i] = Math.abs(lat[i]!) <= MAX_LAT ? (maxErr * cross) / Math.max(Math.hypot(ax, ay), Math.hypot(bx, by)) : NaN;
+    const cross = maxErr * (ax * by - ay * bx);
+    tol2[i] = Math.abs(my[i]!) <= MAX_MY ? (cross * cross) / Math.max(ax * ax + ay * ay, bx * bx + by * by) : NaN;
   }
   const edges = (n: number, k: number) => Array.from({ length: k + 1 }, (_, i) => Math.floor((i * n) / k));
   const fits = (xs: number[], ys: number[]) => {
@@ -102,13 +108,13 @@ export function latticeQuads(grid: Grid, w: Window, maxErr: number, lattice: num
       for (let r = ry0; r <= ry1; r++) {
         const v = (r - ry0) / (ry1 - ry0);
         for (let c = cx0; c <= cx1; c++) {
-          const t = tol[r * W + c]!;
+          const t = tol2[r * W + c]!;
           if (!(t >= 0)) continue;
           const u = (c - cx0) / (cx1 - cx0);
           const a = (1 - u) * (1 - v), b = u * (1 - v), d = u * v, e = (1 - u) * v;
           const ex = a * mx[k[0]]! + b * mx[k[1]]! + d * mx[k[2]]! + e * mx[k[3]]! - mx[r * W + c]!;
           const ey = a * my[k[0]]! + b * my[k[1]]! + d * my[k[2]]! + e * my[k[3]]! - my[r * W + c]!;
-          if (Math.hypot(ex, ey) > t) return false;
+          if (ex * ex + ey * ey > t) return false;
         }
       }
     }
