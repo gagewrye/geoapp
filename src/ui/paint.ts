@@ -80,6 +80,8 @@ export function initPaint(d: Deps) {
     start(centreRow: number): void { cache?.start(centreRow); },
     /** Every band's mask has been read once. */
     finished: () => cache?.finished ?? false,
+    /** The open raster's mask cache, which an import fills and leaves for painting (spec 024). */
+    masks: () => cache,
     /** Moves waiting for masks. */
     size: () => queue?.size ?? 0,
   };

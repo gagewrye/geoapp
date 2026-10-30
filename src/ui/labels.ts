@@ -191,6 +191,8 @@ export function initLabels({ map, say, onBusy, onChange, panning, imageryBusy, i
     },
     /** Every valid mask has been read once (e2e). */
     masksDone: paint.finished,
+    /** The open raster's valid masks: an import reads through them (spec 024). */
+    masks: paint.masks,
     /** The mask base, if one is loaded. */
     base: () => base,
     /** The effective tile at key (stored, else the mask's); null when neither exists. Reads the mask file for an unstored key. */

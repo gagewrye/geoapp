@@ -69,7 +69,7 @@ export function initSeeding({ labels, imagery, say, error, opened }: Deps) {
       const table = importTable(file, text);
       held = labels.hold();
       showRun(true);
-      const r = await importLabels(s, file, table, stale, (done, total) => { if (!stale()) progress.step(done, total); });
+      const r = await importLabels(s, file, table, stale, (done, total) => { if (!stale()) progress.step(done, total); }, labels.masks() ?? undefined);
       if (imagery() !== s) return;
       if (cancelled) { labels.restore(held); say(MESSAGES.importCancelled); return; }
       if (typeof r === "string") labels.restore(held);
