@@ -1,5 +1,6 @@
 import { writeArrayBuffer } from "geotiff";
-import type { GeoTags, RasterMeta, RasterSource } from "../../../src/io/source";
+import type { Block } from "../../../src/core/imagery";
+import type { GeoTags, ImagerySource, RasterMeta, RasterSource } from "../../../src/io/source";
 import type { Affine, Tile } from "../../../src/core/types";
 import { makeTile } from "./tiles";
 
@@ -9,7 +10,7 @@ export type Value = (band: number, col: number, row: number) => number;
 export function fakeSource(meta: Partial<RasterMeta> & { width: number; height: number }, f: Value) {
   const reads: { x0: number; y0: number; width: number; height: number }[] = [];
   const full: RasterMeta = {
-    bandCount: 3, gt: [500000, 30, 0, 5000000, 0, -30], epsg: 32633, nodata: null, float: true,
+    bandCount: 3, gt: [500000, 30, 0, 5000000, 0, -30], epsg: 32633, nodata: null, float: true, alpha: null,
     geoTags: { GeoKeyDirectory: [1, 1, 0, 1, 3072, 0, 1, 32633], ModelPixelScale: [30, 30, 0], ModelTiepoint: [0, 0, 0, 500000, 5000000, 0] },
     ...meta,
   };
@@ -17,13 +18,30 @@ export function fakeSource(meta: Partial<RasterMeta> & { width: number; height: 
     meta: full,
     async readWindow(x0, y0, width, height): Promise<Tile> {
       reads.push({ x0, y0, width, height });
-      return makeTile(x0, y0, width, height, full.bandCount, f, full.nodata);
+      return { ...makeTile(x0, y0, width, height, full.bandCount, f, full.nodata), alpha: full.alpha };
     },
   };
   return { source, reads };
 }
 
-/** In-memory GeoTIFF (Float32, pixel-interleaved) written with geotiff.js for read-back tests. */
+export type SampleRead = { image: number; x0: number; y0: number; width: number; height: number; bands: number[] };
+
+/** fakeSource plus spec 020's block, no overviews, and readSamples logging each read (readWindow throws unless allowed). */
+export function samplesSource(meta: Partial<RasterMeta> & { width: number; height: number }, f: Value, block: Block, allowWindows = false) {
+  const { source: inner, reads: windowReads } = fakeSource(meta, f);
+  const reads: SampleRead[] = [];
+  const source: ImagerySource = {
+    meta: inner.meta, block, overviews: [],
+    readWindow: (x0, y0, w, h) => { if (!allowWindows) throw new Error("readWindow"); return inner.readWindow(x0, y0, w, h); },
+    async readSamples(image, x0, y0, width, height, bands) {
+      reads.push({ image, x0, y0, width, height, bands: [...bands] });
+      return bands.map((k) => Float32Array.from({ length: width * height }, (_, p) => f(k, x0 + (p % width), y0 + Math.floor(p / width))));
+    },
+  };
+  return { source, reads, windowReads };
+}
+
+/** In-memory GeoTIFF (Float32, pixel-interleaved) written with geotiff.js for read-back tests; its ExtraSamples is geotiff.js's default 0 (no alpha). */
 export function geotiffBuffer(width: number, height: number, nb: number, f: Value, geo: { epsg: number; gt: Affine; nodata?: string }): ArrayBuffer {
   const vals = new Float32Array(width * height * nb);
   for (let r = 0; r < height; r++) for (let c = 0; c < width; c++) for (let b = 0; b < nb; b++) vals[(r * width + c) * nb + b] = f(b, c, r);

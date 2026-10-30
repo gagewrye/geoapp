@@ -12,6 +12,8 @@ export type Tile = {
   height: number;
   bands: Float32Array[];
   nodata: number | null;
+  /** Index into bands of the alpha sample (spec 022): a pixel whose alpha is 0 is nodata. */
+  alpha?: number | null;
 };
 
 /** GDAL order: x = a + b*col + c*row, y = d + e*col + f*row. */
