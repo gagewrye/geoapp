@@ -14,7 +14,6 @@ import { twoPassImport } from "../helpers/twoPassImport";
 // through the real label-file reader (geotiff strips) and its blob bytes; criterion 4 with an all-nodata gap window.
 
 const GRID: Grid = { width: 900, height: 600, epsg: 32633, gt: [500000, 10, 0, 5000000, 0, -10] };
-const GEO = { epsg: GRID.epsg, gt: GRID.gt };
 const at = (dx: number, dy: number, w: number, h: number): Grid => {
   const [x, y] = applyAffine(GRID.gt, dx, dy);
   return { width: w, height: h, epsg: 32633, gt: [x, 10, 0, y, 0, -10] };
