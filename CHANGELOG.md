@@ -3,6 +3,7 @@
 One entry per merge to main, newest first. Details are in the named spec.
 
 ## 2026-10-30
+- **Spec 022:** Transparent pixels in an image with an alpha band now show as see-through and take no labels, and imports read the imagery a row at a time.
 - **Spec 021:** Importing labels shows a progress bar with Cancel; the old labels leave the map while it runs and come back if it's cancelled, fails or finds nothing.
 
 ## 2026-10-29
