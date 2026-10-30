@@ -1,7 +1,7 @@
-import { fromBlob, type GeoTIFF } from "geotiff";
+import { GeoTIFF } from "geotiff";
 import { CLASS_ITEM } from "../core/classTable";
 import type { Window } from "../core/grid";
-import { readGeoMeta } from "./geotiffSource";
+import { loadBlockOffsets, readGeoMeta, sourceOf } from "./geotiffSource";
 import { openRaster } from "./pipeline";
 import type { RasterMeta } from "./source";
 
@@ -35,19 +35,15 @@ export async function openLabelTiff(tiff: GeoTIFF): Promise<LabelSource> {
   const nodata = nd !== null && Number.isInteger(nd) && nd >= 0 && nd <= 255 ? nd : null;
   const meta: RasterMeta = { ...geo, bandCount: 1, nodata, float: false, alpha: null };
   await openRaster({ meta });
+  await loadBlockOffsets(image);
   const item = (await image.getGDALMetadata())?.[CLASS_ITEM];
   return {
     meta,
     classItem: typeof item === "string" ? item : null,
     async read(w) {
-      try {
-        const [band] = (await image.readRasters({ window: [w.x0, w.y0, w.x0 + w.width, w.y0 + w.height], samples: [0] })) as unknown as Uint8Array[];
-        return band!;
-      } catch (e) {
-        // geotiff.js's blob source rejects with the FileReader's error event; the File API's error is on its target
-        const inner = (e as { target?: { error?: unknown } } | null)?.target?.error;
-        throw inner instanceof Error ? inner : e;
-      }
+      // blobSource rejects with Blob.arrayBuffer's own DOMException (NotReadableError, NotFoundError), which maskReadFailed reads
+      const [band] = (await image.readRasters({ window: [w.x0, w.y0, w.x0 + w.width, w.y0 + w.height], samples: [0] })) as unknown as Uint8Array[];
+      return band!;
     },
   };
 }
@@ -56,5 +52,5 @@ export async function openLabelTiff(tiff: GeoTIFF): Promise<LabelSource> {
 export const maskReadFailed = (e: unknown): boolean => e instanceof Error && (e.name === "NotReadableError" || e.name === "NotFoundError");
 
 export async function openLabelFile(file: Blob): Promise<LabelSource> {
-  return openLabelTiff(await fromBlob(file));
+  return openLabelTiff(await GeoTIFF.fromSource(sourceOf(file)));
 }

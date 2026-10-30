@@ -82,7 +82,8 @@ describe("preview reads (criterion 10)", () => {
   });
 });
 
-describe("progress and abort on the sample reads (spec 019 criteria 1 and 3, after spec 020)", () => {
+// Spec 025 keeps up to 4 of these reads in flight, so a read may start before the previous one finishes.
+describe("progress and abort on the sample reads (spec 019 criteria 1 and 3, after spec 020 and 025)", () => {
   const files: [string, ArrayBuffer][] = [
     ["blocks", uint8Tiff([{ width: 2500, height: 1300, bands: 3, value: v, layout: { tile: [256, 256] } }], GEO)],
     ["an overview", uint8Tiff(withOverviews(4100, 3000, 3, v, [2, 4], [256, 256]), GEO)],
@@ -97,16 +98,20 @@ describe("progress and abort on the sample reads (spec 019 criteria 1 and 3, aft
     const calls: [number, number, number][] = [];
     await buildPreview(source, 1024, { signal: ac.signal, onProgress: (d, t) => calls.push([d, t, reads.length]) });
     expect(reads.length).toBeGreaterThan(1);
-    expect(calls).toEqual(reads.map((_, i) => [i + 1, reads.length, i + 1]));
+    expect(calls.map(([d, t]) => [d, t])).toEqual(reads.map((_, i) => [i + 1, reads.length]));
+    expect(calls.every(([d, , started]) => started >= d && started <= d + 3)).toBe(true);
     expect(signals.every((s) => s === ac.signal)).toBe(true);
   });
 
-  it.each(files)("an abort during sample read 3 of %s stops the reads after it and rejects with AbortError", async (_n, buf) => {
+  it.each(files)("an abort during sample read 3 of %s starts no read after it and rejects with AbortError", async (_n, buf) => {
     const { source, reads } = await logged(buf);
     const ac = new AbortController();
     const inner = source.readSamples;
-    source.readSamples = async (...a) => { const r = await inner(...a); if (reads.length === 3) ac.abort(); return r; };
+    let finished = 0, startedAtAbort = 0;
+    source.readSamples = async (...a) => { const r = await inner(...a); if (++finished === 3) { ac.abort(); startedAtAbort = reads.length; } return r; };
     await expect(buildPreview(source, 1024, { signal: ac.signal })).rejects.toSatisfy((e) => (e as Error).name === "AbortError");
-    expect(reads).toHaveLength(3);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(reads).toHaveLength(startedAtAbort);
+    expect(startedAtAbort).toBeLessThanOrEqual(6);
   });
 });

@@ -16,7 +16,7 @@ export async function paintPair(page: Page, first: number, second: number) {
   await stroke(page, [b, { x: b.x + 30, y: b.y - 20 }, { x: b.x + 60, y: b.y }]);
 }
 
-/** Hold FileReader reads of one file name ("all", or "committed": once #raster-info names it), as raster-race.spec.ts. */
+/** Hold FileReader and Blob.arrayBuffer reads of one file name ("all", or "committed": once #raster-info names it), for race-opens.tester.spec.ts and raster-race.spec.ts. */
 export async function fileGate(page: Page) {
   await page.addInitScript(() => {
     const g = (window as any).__files = { hold: new Map<string, string>(), waiting: [] as (() => void)[] };
@@ -32,6 +32,14 @@ export async function fileGate(page: Page) {
       const held = mode === "all" || (mode === "committed" && document.getElementById("raster-info")!.textContent!.startsWith(`${name}:`));
       if (held) g.waiting.push(() => read.call(this, b));
       else read.call(this, b);
+    };
+    // spec 025's blob source reads with Blob.arrayBuffer, the same gate applies
+    const arrayBuffer = Blob.prototype.arrayBuffer;
+    Blob.prototype.arrayBuffer = function (this: Blob) {
+      const name = (this as any).__name as string | undefined, mode = name && g.hold.get(name);
+      const held = mode === "all" || (mode === "committed" && document.getElementById("raster-info")!.textContent!.startsWith(`${name}:`));
+      if (!held) return arrayBuffer.call(this);
+      return new Promise<ArrayBuffer>((resolve, reject) => g.waiting.push(() => arrayBuffer.call(this).then(resolve, reject)));
     };
   });
 }

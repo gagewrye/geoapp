@@ -1,7 +1,8 @@
-import { fromBlob, type GeoTIFF, type GeoTIFFImage } from "geotiff";
+import { GeoTIFF, type GeoTIFFImage } from "geotiff";
 import { alphaOf } from "../core/alpha";
 import { affineFromTags } from "../core/geotags";
 import { MAX_BLOCK_BYTES, type Block, type Overview } from "../core/imagery";
+import { blobSource } from "./blobSource";
 import type { GeoTags, ImagerySource, RasterMeta } from "./source";
 
 const stripNul = (s: unknown) => (typeof s === "string" ? s.replace(/\0+$/, "") : undefined);
@@ -50,6 +51,7 @@ export async function openGeoTiff(tiff: GeoTIFF): Promise<ImagerySource> {
     images.set(i, im);
     overviews.push({ index: i, width: im.getWidth(), height: im.getHeight(), block });
   }
+  await Promise.all([...images.values()].map(loadBlockOffsets));
   return {
     meta: { width, height, bandCount, gt, epsg, nodata, float, alpha, geoTags },
     block: blockOf(image),
@@ -70,6 +72,12 @@ export async function openGeoTiff(tiff: GeoTIFF): Promise<ImagerySource> {
   };
 }
 
+/** Loads an image's block offsets and sizes whole now, so reads don't fetch them one index at a time (spec 025). */
+export async function loadBlockOffsets(im: GeoTIFFImage): Promise<void> {
+  const fd = im.fileDirectory;
+  await Promise.all((im.isTiled ? (["TileOffsets", "TileByteCounts"] as const) : (["StripOffsets", "StripByteCounts"] as const)).map((t) => fd.loadValue(t)));
+}
+
 /** An image's tile or strip, with all its samples decoded (spec 020 Block): a separate-planes file decodes one block per band. */
 function blockOf(im: GeoTIFFImage): Block {
   const width = im.getTileWidth(), height = im.getTileHeight();
@@ -83,6 +91,10 @@ function gdalNoData(parsed: number | null, raw: string | undefined): number | nu
   return /^-inf/i.test(t) ? -Infinity : /^\+?inf/i.test(t) ? Infinity : parsed;
 }
 
+/** Opens a GeoTIFF through blobSource, so nearby block reads made together are one file read (spec 025). */
 export async function openFile(file: Blob): Promise<ImagerySource> {
-  return openGeoTiff(await fromBlob(file));
+  return openGeoTiff(await GeoTIFF.fromSource(sourceOf(file)));
 }
+
+/** blobSource typed as geotiff's source: geotiff only calls fetch, reads fileSize and calls close if it has one. */
+export const sourceOf = (file: Blob) => blobSource(file) as unknown as Parameters<typeof GeoTIFF.fromSource>[0];
