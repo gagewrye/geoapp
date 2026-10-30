@@ -31,7 +31,8 @@ export function blobSource(blob: Blob) {
       blob.slice(run.offset, run.offset + run.length).arrayBuffer().then((buf) => {
         for (const m of run.members) {
           const { offset, length } = ranges[m]!, at = offset - run.offset;
-          give(owners[m]![0], owners[m]![1], at === 0 && length === buf.byteLength ? buf : buf.slice(at, at + length));
+          // each caller gets its own buffer: geotiff's raw decoder returns it and the predictor then rewrites it in place
+          give(owners[m]![0], owners[m]![1], run.members.length === 1 ? buf : buf.slice(at, at + length));
         }
       }, (e: unknown) => {
         for (const m of run.members) fail(owners[m]![0], e);

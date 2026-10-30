@@ -61,6 +61,15 @@ describe("blobSource (criterion 2)", () => {
     expect(slices).toEqual([[0, 20 + MERGE_GAP], [30 + 2 * MERGE_GAP + 1, 40 + 2 * MERGE_GAP + 1], [300_000, 300_000 + MAX_FETCH], [300_000 + MAX_FETCH, 300_010 + MAX_FETCH]]);
   });
 
+  it("gives identical slices in one batch distinct buffers, as geotiff may decode each in place", async () => {
+    const data = bytes(5000);
+    const src = blobSource(new Blob([data]));
+    const [[a], [b], [c, d]] = await Promise.all([src.fetch([{ offset: 100, length: 400 }]), src.fetch([{ offset: 100, length: 400 }]), src.fetch([{ offset: 100, length: 400 }, { offset: 100, length: 400 }])]);
+    const bufs = [a!, b!, c!, d!];
+    expect(new Set(bufs).size).toBe(4);
+    for (const x of bufs) expect(eq(x, data.slice(100, 500).buffer)).toBe(true);
+  });
+
   it("clamps the end of the file, as the 1,024-byte header fetch needs", async () => {
     const data = bytes(600);
     const src = blobSource(new Blob([data]));
