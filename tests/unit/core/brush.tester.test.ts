@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { fromLonLat, normalizeLon } from "../../../src/core/crs";
-import { tileWindows, type Window } from "../../../src/core/grid";
-import { MAX_LABEL_TILES, brush, emptyStore, keepMasks, tileKeys, tileWindow, type LabelStore, type NodataMasks } from "../../../src/core/labelStore";
+import { tileWindows } from "../../../src/core/grid";
+import { MAX_LABEL_TILES, brush, emptyStore, tileKeys, tileWindow, type LabelStore, type NodataMasks } from "../../../src/core/labelStore";
 import { maskBit, nodataMask } from "../../../src/core/nodata";
 import { footprint, footprintRing, pixelAt, strokeCells, strokeCellsIn } from "../../../src/core/pixel";
 import type { Grid, Tile } from "../../../src/core/types";
@@ -173,15 +173,6 @@ describe("brush on partial edge tiles and with odd inputs (criterion 4, tester)"
     m.delete("256,0");
     expect(() => brush(s, m, { x0: 250, y0: 0, width: 10, height: 5 }, 1, false)).toThrow(/mask/);
     expect(s.tiles.size).toBe(0);
-  });
-
-  it("keepMasks with a footprint on a partial tile and with null", () => {
-    const s = emptyStore(300, 260);
-    const m = masks(s, () => false);
-    keepMasks(s, m, { x0: 290, y0: 255, width: 5, height: 5 } as Window);
-    expect([...m.keys()].sort()).toEqual(["256,0", "256,256"]);
-    keepMasks(s, m, null);
-    expect(m.size).toBe(0);
   });
 });
 

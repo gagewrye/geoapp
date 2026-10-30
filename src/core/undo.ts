@@ -8,9 +8,9 @@ export const UNDO_STEPS = 50;
 /** LabelStore key -> a copy of the tile before the stroke; null = no tile then. */
 export type Edit = Map<string, Uint8Array | null>;
 
-/** Adds a copy (or null) for each key of tileKeys(w) not yet in edit. */
-export function recordTiles(store: LabelStore, edit: Edit, w: Window): void {
-  for (const key of tileKeys(w)) if (!edit.has(key)) edit.set(key, store.tiles.get(key)?.slice() ?? null);
+/** Adds a copy (or null) for each key of tileKeys(w), or of the keys given, not yet in edit. */
+export function recordTiles(store: LabelStore, edit: Edit, w: Window | string[]): void {
+  for (const key of Array.isArray(w) ? w : tileKeys(w)) if (!edit.has(key)) edit.set(key, store.tiles.get(key)?.slice() ?? null);
 }
 
 function same(a: Uint8Array | null, b: Uint8Array | undefined): boolean {
