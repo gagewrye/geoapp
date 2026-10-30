@@ -20,7 +20,8 @@ type Deps = {
   /** Mask array budget (tests); MASK_BYTES by default. */
   maskBytes?: number;
 };
-type Request = { priority: number; waiters: { resolve: () => void; reject: (e: unknown) => void }[] };
+/** A band's waiters, and the windows (by x0) they need: "all" for the whole band. */
+type Request = { priority: number; want: Set<number> | "all"; waiters: { resolve: () => void; reject: (e: unknown) => void }[] };
 
 type Read = Window & { bands: ArrayLike<number>[] };
 
@@ -50,15 +51,21 @@ export class MaskCache {
 
   get(key: string): ValidMask | undefined { return this.masks.get(key); }
 
-  /** Resolves once every window of the band holding row y0 has a mask; rejects if its read fails or the cache stops. */
-  need(y0: number, priority: number): Promise<void> {
+  /** Resolves once the band holding row y0 has a mask in every window, or in those at x0s; rejects if its read fails or the cache stops. */
+  // An import asks for the windows its file covers (spec 024), so a tiled file reads only their tiles.
+  need(y0: number, priority: number, x0s?: number[]): Promise<void> {
     const band = Math.floor(y0 / TILE_SIZE);
     if (this.stopped) return Promise.reject(new DOMException("Mask reads stopped", "AbortError"));
-    if (band < 0 || band >= this.bands || this.complete(band)) return Promise.resolve();
+    if (band < 0 || band >= this.bands || !this.missing(band, x0s ?? "all").length) return Promise.resolve();
     return new Promise((resolve, reject) => {
       const r = this.requests.get(band);
-      if (r) { r.priority = Math.min(r.priority, priority); r.waiters.push({ resolve, reject }); }
-      else this.requests.set(band, { priority, waiters: [{ resolve, reject }] });
+      if (!r) { this.requests.set(band, { priority, want: x0s ? new Set(x0s) : "all", waiters: [{ resolve, reject }] }); }
+      else {
+        r.priority = Math.min(r.priority, priority);
+        r.waiters.push({ resolve, reject });
+        if (!x0s) r.want = "all";
+        else if (r.want !== "all") for (const x of x0s) r.want.add(x);
+      }
       void this.pump();
     });
   }
@@ -80,9 +87,10 @@ export class MaskCache {
     this.requests.clear();
   }
 
-  private complete(band: number): boolean {
-    for (const w of this.windows(band)) if (!this.masks.has(`${w.x0},${w.y0}`)) return false;
-    return true;
+  /** The band's windows with no mask, among those wanted. */
+  private missing(band: number, want: Iterable<number> | "all"): Window[] {
+    const set = want === "all" ? null : new Set(want);
+    return this.windows(band).filter((w) => (!set || set.has(w.x0)) && !this.masks.has(`${w.x0},${w.y0}`));
   }
 
   private windows(band: number): Window[] {
@@ -93,17 +101,21 @@ export class MaskCache {
   }
 
   /** The next band to read: the most urgent request, else the background's next unread band; "wait" while the background must. */
-  private next(): { band: number; request: boolean } | "wait" | null {
+  private next(): { band: number; request: Request | null } | "wait" | null {
     let best: number | null = null;
     for (const [band, r] of this.requests) {
       if (r.priority > STROKE && !this.started) continue; // a hover's bands wait for "Raster opened.", behind the preview's reads
       if (best === null || r.priority < this.requests.get(best)!.priority) best = band;
     }
-    if (best !== null) return { band: best, request: true };
+    if (best !== null) {
+      const request = this.requests.get(best)!;
+      this.requests.delete(best); // needs made while it is read wait for another read, of what is still missing then
+      return { band: best, request };
+    }
     if (!this.started) return null;
     const band = this.order.find((b) => !this.read.has(b));
     if (band === undefined) return null;
-    return this.deps.loaderBusy?.() || this.deps.paused?.() ? "wait" : { band, request: false };
+    return this.deps.loaderBusy?.() || this.deps.paused?.() ? "wait" : { band, request: null };
   }
 
   private async pump(): Promise<void> {
@@ -118,12 +130,10 @@ export class MaskCache {
           return;
         }
         let error: unknown = null;
-        try { await this.readBand(n.band); } catch (e) { error = e; }
-        if (this.stopped) return;
-        this.read.add(n.band);
-        const r = this.requests.get(n.band);
-        this.requests.delete(n.band);
-        for (const w of r?.waiters ?? []) if (error) w.reject(error); else w.resolve();
+        try { await this.readBand(this.missing(n.band, n.request?.want ?? "all")); } catch (e) { error = e; }
+        if (this.stopped) { for (const w of n.request?.waiters ?? []) w.reject(new DOMException("Mask reads stopped", "AbortError")); return; }
+        if (error || !this.missing(n.band, "all").length) this.read.add(n.band);
+        for (const w of n.request?.waiters ?? []) if (error) w.reject(error); else w.resolve();
         // a background error is left for a stroke's own need() to report
         if (!n.request || error) await macrotask(); // yield between background reads
       }
@@ -132,25 +142,29 @@ export class MaskCache {
     }
   }
 
-  /** Reads one band through spec 020's rowReads (spec 023 F2) and stores every window's mask. */
+  /** Reads the missing windows of one band through spec 020's rowReads (spec 023 F2) and stores their masks. */
   // Peak memory is one read at the file's sample type plus 1 bit per pixel of the band (ADR 0021's 48 MiB): each
-  // read's nodata pixels are marked straight into the windows' bits.
-  private async readBand(band: number): Promise<void> {
+  // read's nodata pixels are marked straight into the windows' bits. Blocks as wide as the file (strips) are read
+  // as one span from the first missing window to the last, which decodes each strip once and masks every window in it.
+  private async readBand(missing: Window[]): Promise<void> {
+    if (!missing.length) return;
     const { meta } = this.source;
     const { width, height, bandCount, nodata, float, alpha } = meta;
-    const windows = this.windows(band);
+    const { block, readSamples } = this.source;
+    const first = missing[0]!, last = missing[missing.length - 1]!;
+    const strips = !block || block.width >= width;
+    const windows = strips ? this.windows(first.y0 / TILE_SIZE).filter((w) => w.x0 >= first.x0 && w.x0 <= last.x0) : missing;
     if (!nodataPossible(nodata, float, alpha !== null)) {
       for (const w of windows) this.masks.set(`${w.x0},${w.y0}`, "all");
       return;
     }
     const m = maskSamples(bandCount, nodata, float, alpha);
     const bits = windows.map((w) => new Uint8Array(Math.ceil((w.width * w.height) / 8)));
-    const all = { x0: 0, y0: windows[0]!.y0, width, height: windows[0]!.height };
-    const { block, readSamples } = this.source;
+    const plan = strips ? [{ x0: first.x0, y0: first.y0, width: last.x0 + last.width - first.x0, height: first.height }] : missing;
     const reads: (() => Promise<Read>)[] = block && readSamples
-      ? rowReads([all], 1, block, width, height).map((r) => async () => ({ ...r, bands: await readSamples.call(this.source, 0, r.x0, r.y0, r.width, r.height, m.samples) }))
+      ? rowReads(plan, 1, block, width, height).map((r) => async () => ({ ...r, bands: await readSamples.call(this.source, 0, r.x0, r.y0, r.width, r.height, m.samples) }))
       // readWindow decodes every band as Float32: bound its reads as if each 256 px row segment were a block
-      : rowReads([all], 1, { width: TILE_SIZE, height: 1, bytes: TILE_SIZE * bandCount * 4 }, width, height).map((r) => async () => {
+      : rowReads(plan, 1, { width: TILE_SIZE, height: 1, bytes: TILE_SIZE * bandCount * 4 }, width, height).map((r) => async () => {
         const t = await this.source.readWindow(r.x0, r.y0, r.width, r.height);
         return { ...r, bands: m.samples.map((k) => t.bands[k]!) };
       });
