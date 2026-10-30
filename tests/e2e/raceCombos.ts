@@ -16,7 +16,7 @@ export async function paintPair(page: Page, first: number, second: number) {
   await stroke(page, [b, { x: b.x + 30, y: b.y - 20 }, { x: b.x + 60, y: b.y }]);
 }
 
-/** Hold FileReader and Blob.arrayBuffer reads of one file name ("all", or "committed": once #raster-info names it), as raster-race.spec.ts. */
+/** Hold FileReader and Blob.arrayBuffer reads of one file name ("all", or "committed": once #raster-info names it), for race-opens.tester.spec.ts and raster-race.spec.ts. */
 export async function fileGate(page: Page) {
   await page.addInitScript(() => {
     const g = (window as any).__files = { hold: new Map<string, string>(), waiting: [] as (() => void)[] };
