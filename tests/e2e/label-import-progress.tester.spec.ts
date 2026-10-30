@@ -4,11 +4,11 @@ import { writeFile } from "../unit/helpers/labelFiles";
 import { collectErrors, jumpTo, message, openApp, openRaster, paintMode, path, RGB_GRID, rgbFixture, stroke, tileKeysStored, toScreen } from "./helpers";
 import { at, classList, effectiveTiles, importFile, maskFile, upload } from "./seeding";
 
-// Spec 021, tester: Cancel in pass 2, a second import after a Cancel, and restored labels under view settings changed mid-run.
+// Spec 021, tester: Cancel late in the import, a second import after a Cancel, and restored labels under view settings changed mid-run.
 
 const seeded = /^Seeded \d+ pixels in \d+ classes\.$/;
 const GEOG = { GTModelTypeGeoKey: 2, GTRasterTypeGeoKey: 1, GeographicTypeGeoKey: 4326 };
-/** On rgbFixture's grid, no class table: 16 windows per pass, two passes, one file read per window per pass. */
+/** On rgbFixture's grid, no class table: 16 windows, one pass (spec 024), one file read per window. */
 function other() {
   const v = new Uint8Array(1000 * 1000);
   for (let r = 0; r < 1000; r++) for (let c = 0; c < 1000; c++) v[r * 1000 + c] = 1 + (((c >> 6) + (r >> 6)) % 2);
@@ -68,20 +68,20 @@ async function startImport(page: Page) {
   await expect(bar(page)).toBeVisible();
 }
 
-test("Cancel in pass 2 restores everything and reads no window past k + 1; the next import starts indeterminate, isn't pre-cancelled, and succeeds (criteria 2, 5)", async ({ page }) => {
+test("Cancel at window 12 of 16 restores everything and reads no window past k + 1; the next import starts indeterminate, isn't pre-cancelled, and succeeds (criteria 2, 5)", async ({ page }) => {
   test.setTimeout(120_000);
   const errors = collectErrors(page);
   await withLabels(page);
   const before = await snapshot(page);
   await startImport(page);
-  await allow(page, 20); // pass 1 is reads 1-16, so this is window 4 of pass 2
-  await expect.poll(() => barValue(page)).toBe("20");
+  await allow(page, 12); // one pass (spec 024): window 12 of 16, in the last row of windows
+  await expect.poll(() => barValue(page)).toBe("12");
   await page.click("#import-cancel");
   await allow(page, 1000);
   await expect(message(page)).toHaveText(MESSAGES.importCancelled);
   await expect(bar(page)).toBeHidden();
   await expect(page.locator("#import-cancel")).toBeHidden();
-  expect(await reads(page)).toBeLessThanOrEqual(21);
+  expect(await reads(page)).toBeLessThanOrEqual(13);
   await expectRestored(page, before);
   // a second import: indeterminate until a window is done, and runs to the end
   await startImport(page);

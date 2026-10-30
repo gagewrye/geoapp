@@ -9,7 +9,7 @@ import { at, classList, effectiveTiles, importFile, maskFile, upload } from "./s
 
 const seeded = /^Seeded \d+ pixels in \d+ classes\.$/;
 const GEOG = { GTModelTypeGeoKey: 2, GTRasterTypeGeoKey: 1, GeographicTypeGeoKey: 4326 };
-/** A label file on rgbFixture's grid, f per pixel, GDAL_NODATA 0, no class table: 16 windows, two passes, one file read per window per pass. */
+/** A label file on rgbFixture's grid, f per pixel, GDAL_NODATA 0, no class table: 16 windows, one pass (spec 024), one file read per window. */
 function sameGrid(name: string, f: (c: number, r: number) => number) {
   const v = new Uint8Array(1000 * 1000);
   for (let r = 0; r < 1000; r++) for (let c = 0; c < 1000; c++) v[r * 1000 + c] = f(c, r);
@@ -90,7 +90,7 @@ test("the bar counts windows, Cancel shows, the old labels leave the map; Cancel
   expect(await labelLayers(page)).toEqual([]);
   await allow(page, 3);
   await expect.poll(() => barValue(page)).toBe("3");
-  expect(await bar(page).evaluate((b: HTMLProgressElement) => b.max)).toBe(32);
+  expect(await bar(page).evaluate((b: HTMLProgressElement) => b.max)).toBe(16); // one pass (spec 024)
   await expect(cancel(page)).toBeVisible();
   await expect(message(page)).toHaveText("Importing labels…");
   await page.click("#import-cancel");
