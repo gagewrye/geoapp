@@ -92,14 +92,27 @@ export function planView(full: Grid, overviews: Overview[], bounds: [number, num
 
 /** One raster's imagery quads by `${level.s}:${key}` (spec 026): corners only, so an evicted tile doesn't project them again. */
 export type QuadCache = Map<string, Quad[]>;
+/** Most quad cache entries kept (spec 029): under 1 KiB each, so at most about 2 MiB; a dropped tile recomputes in about 1 ms. */
+export const QUAD_CACHE = 4 * IMAGERY_TILES;
 
 /** A level tile's quads: at s = 1, the label overlay's quads for the same key (ADR 0019); from `cache` when given and known. */
+// Map order is recency: a hit moves its entry to the end, so dropping takes the least recently used first.
 export function imageryQuads(level: Level, tile: Window, cache?: QuadCache, key?: string): Quad[] {
   const k = cache && key !== undefined ? `${level.s}:${key}` : null;
   const known = k === null ? undefined : cache!.get(k);
-  if (known) return known;
+  if (known) {
+    cache!.delete(k!);
+    cache!.set(k!, known);
+    return known;
+  }
   const quads = tileQuads(level.grid, tile, QUAD_ERR);
-  if (k !== null) cache!.set(k, quads);
+  if (k !== null) {
+    cache!.set(k, quads);
+    for (const old of cache!.keys()) {
+      if (cache!.size <= QUAD_CACHE) break;
+      cache!.delete(old);
+    }
+  }
   return quads;
 }
 

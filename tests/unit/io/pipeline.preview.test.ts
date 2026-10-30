@@ -64,17 +64,18 @@ describe("preview reads (criterion 10)", () => {
     expect(Buffer.from(p.rgba).equals(Buffer.from(before.rgba))).toBe(true);
   });
 
+  // a 512 px preview, so every file but the last decimates and the test stays fast (spec 029): tiles, strips, a single strip, nodata
   it("leaves the previews of files without overviews unchanged", async () => {
     const files = [
-      uint8Tiff([{ width: 2500, height: 1300, bands: 3, value: v, layout: { tile: [256, 256] } }], GEO),
+      uint8Tiff([{ width: 1300, height: 700, bands: 3, value: v, layout: { tile: [256, 256] } }], GEO),
       uint8Tiff([{ width: 700, height: 900, bands: 1, value: v, layout: { rows: 7 } }], GEO),
-      geotiffBuffer(1000, 1000, 3, (b, c, r) => (b === 0 ? (c < 500 ? 200 : 120) : b === 1 ? 100 + (r % 100) : 150), { epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01] }),
+      geotiffBuffer(600, 600, 3, (b, c, r) => (b === 0 ? (c < 300 ? 200 : 120) : b === 1 ? 100 + (r % 100) : 150), { epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01] }),
       geotiffBuffer(300, 200, 2, (b, c, r) => (c === 5 ? -9 : b * 1000 + r * 0.5 + c), { ...GEO, nodata: "-9" }),
     ];
     for (const buf of files) {
       const { source } = await logged(buf);
-      const now = await buildPreview(source, 1024);
-      const before = await buildPreview(windowsOnly(await openGeoTiff(await fromArrayBuffer(buf))), 1024);
+      const now = await buildPreview(source, 512);
+      const before = await buildPreview(windowsOnly(await openGeoTiff(await fromArrayBuffer(buf))), 512);
       expect(now.corners).toEqual(before.corners);
       expect(now.ranges).toEqual(before.ranges);
       expect(Buffer.from(now.rgba).equals(Buffer.from(before.rgba))).toBe(true);

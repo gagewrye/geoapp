@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Map as MapLibreMap } from "maplibre-gl";
-import { IMAGERY_TILES, type Level } from "../../../src/core/imagery";
+import { IMAGERY_TILES, imageryQuads, QUAD_CACHE, type Level, type QuadCache } from "../../../src/core/imagery";
 import * as labelQuads from "../../../src/core/labelQuads";
 import type { Grid } from "../../../src/core/types";
 import { ImageryLayer } from "../../../src/map/imagery";
@@ -52,5 +52,41 @@ describe("imagery quad cache (spec 026 criterion 5)", () => {
     layer.clear();
     layer.draw(key(0), level, tile(0), rgba);
     expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it("spec 029: after 3,000 distinct tiles the cache holds the 2,048 most recent, and a dropped tile is computed once more", () => {
+    expect(QUAD_CACHE).toBe(4 * IMAGERY_TILES);
+    const cache: QuadCache = new Map();
+    for (let i = 0; i < 3000; i++) imageryQuads(level, tile(i), cache, key(i));
+    expect(cache.size).toBe(2048);
+    expect([...cache.keys()]).toEqual(Array.from({ length: 2048 }, (_, i) => `1:${key(i + 952)}`));
+    const spy = vi.spyOn(labelQuads, "tileQuads");
+    imageryQuads(level, tile(0), cache, key(0)); // dropped
+    imageryQuads(level, tile(0), cache, key(0));
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(cache.size).toBe(2048);
+  });
+});
+
+describe("imagery quad cache bound (tester, spec 029 criterion 3)", () => {
+  it("a hit refreshes an entry, so a tile in use outlives older unused ones", () => {
+    const cache: QuadCache = new Map();
+    for (let i = 0; i < QUAD_CACHE; i++) imageryQuads(level, tile(i), cache, key(i));
+    imageryQuads(level, tile(0), cache, key(0)); // hit: now the most recent
+    imageryQuads(level, tile(QUAD_CACHE), cache, key(QUAD_CACHE)); // drops the oldest unused, tile 1
+    expect(cache.size).toBe(QUAD_CACHE);
+    expect(cache.has(`1:${key(0)}`)).toBe(true);
+    expect(cache.has(`1:${key(1)}`)).toBe(false);
+  });
+
+  it("through ImageryLayer: after 3,000 tiles the first is recomputed once, the most recent not at all", () => {
+    const layer = new ImageryLayer(fakeMap());
+    for (let i = 0; i < 3000; i++) layer.draw(key(i), level, tile(i), rgba);
+    const spy = vi.spyOn(labelQuads, "tileQuads");
+    layer.draw(key(2999 - IMAGERY_TILES), level, tile(2999 - IMAGERY_TILES), rgba); // evicted from the map, still cached
+    expect(spy).not.toHaveBeenCalled();
+    layer.draw(key(0), level, tile(0), rgba);
+    layer.draw(key(0), level, tile(0), rgba);
+    expect(spy).toHaveBeenCalledTimes(1);
   });
 });
