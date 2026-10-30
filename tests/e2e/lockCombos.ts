@@ -4,7 +4,7 @@ import { fromArrayBuffer } from "geotiff";
 import { CLASS_ITEM, decodeClasses } from "../../src/core/classTable";
 import { tileWindows } from "../../src/core/grid";
 import { hoverFeatures, jumpTo, message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture, toScreen } from "./helpers";
-import { arrayBuffer } from "./seeding";
+import { arrayBuffer, holdMasks } from "./seeding";
 
 // Helpers for the label-lock-*.tester specs.
 // Tester probe of spec 004's shared lock (Settled in build: Locks): while a seed or an Export labels
@@ -76,9 +76,10 @@ export const opfsNames = (page: Page) => page.evaluate(async () => {
   return out;
 });
 
-export async function setup(page: Page) {
+export async function setup(page: Page, raster = rgbFixture()) {
   await openApp(page);
-  await openRaster(page, rgbFixture());
+  await holdMasks(page);
+  await openRaster(page, raster);
   await expect(message(page)).toHaveText("Raster opened.");
   await paintMode(page);
   await paintTwoClasses(page);

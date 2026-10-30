@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
 import { hoverFeatures, jumpTo, labels, message, openApp, openRaster, paintMode, renameClass, rgbFixture, stroke, tiff, toScreen } from "./helpers";
 
+import { holdMasks } from "./seeding";
 // Tester: spec 003 Local imagery (refused files keep the labels), the paint queue when another raster
 // opens, and shortcuts in text fields.
 
@@ -36,15 +37,19 @@ test.describe("refused files leave the labels (tester)", () => {
 
 test("another raster opened while mask reads are paused drops the queue: Import labels is enabled, the new store stays empty after the old read resumes, and painting reads the new raster", async ({ page }) => {
   await openApp(page);
+  await holdMasks(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
   await paintMode(page);
   await page.evaluate(() => {
     const s = (window as any).__geoapp.imagery();
-    const read = s.readWindow.bind(s);
     const g = (window as any).__gate = { open: null as null | (() => void), reads: 0 };
     const wait = new Promise<void>((r) => { g.open = r; });
-    s.readWindow = async (...a: unknown[]) => { g.reads++; await wait; return read(...a); };
+    for (const m of ["readWindow", "readSamples"]) {
+      if (!s[m]) continue;
+      const read = s[m].bind(s);
+      s[m] = async (...a: unknown[]) => { g.reads++; await wait; return read(...a); };
+    }
   });
   await jumpTo(page, [15, 45], 7);
   const c = await toScreen(page, [15.005, 45.005]);

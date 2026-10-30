@@ -29,7 +29,7 @@ async function setSize(page: Page, px: number) {
   while ((await page.locator("#brush-size").textContent()) !== `Brush: ${px} px`) await page.click("#brush-larger");
 }
 
-test("a fast size-127 drag at zoom 4 over a 65792 px wide strip labels every pixel between its ends, reading aligned windows one at a time", async ({ page }) => {
+test("a fast size-127 drag at zoom 4 over a 65792 px wide strip labels every pixel between its ends, reading no imagery", async ({ page }) => {
   test.setTimeout(120_000);
   const parts: Uint8Array[] = [];
   const geo = { GeoKeyDirectory: [1, 1, 0, 3, 1024, 0, 1, 2, 1025, 0, 1, 1, 2048, 0, 1, 4326], ModelPixelScale: [0.005, 0.005, 0], ModelTiepoint: [0, 0, 0, -175, 10, 0] };
@@ -64,9 +64,7 @@ test("a fast size-127 drag at zoom 4 over a 65792 px wide strip labels every pix
   const cols = [...got].map((k) => Number(k.split(",")[0]));
   expect(Math.max(...cols) - Math.min(...cols) + 1).toBe(got.size / 2); // both rows, no gap
   const log = await page.evaluate(() => (window as any).__log);
-  expect(log.max).toBe(1);
-  for (const [x0, y0, w, h] of log.reads) expect([x0 % 256, y0, w, h]).toEqual([0, 0, 256, 2]);
-  expect(new Set(log.reads.map((r: number[]) => r[0])).size).toBe(log.reads.length); // each tile read once
+  expect(log.reads).toEqual([]); // spec 023 F2: a uint8 file with no nodata or alpha has no nodata pixel, so no mask is read
 });
 
 test("a stroke that leaves the globe and comes back is lifted: nothing is interpolated across the gap", async ({ page }) => {
