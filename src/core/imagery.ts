@@ -88,8 +88,18 @@ export function planView(full: Grid, overviews: Overview[], bounds: [number, num
   }
 }
 
-/** A level tile's quads: at s = 1, the label overlay's quads for the same key (ADR 0019). */
-export const imageryQuads = (level: Level, tile: Window): Quad[] => tileQuads(level.grid, tile, QUAD_ERR);
+/** One raster's imagery quads by `${level.s}:${key}` (spec 026): corners only, so an evicted tile doesn't project them again. */
+export type QuadCache = Map<string, Quad[]>;
+
+/** A level tile's quads: at s = 1, the label overlay's quads for the same key (ADR 0019); from `cache` when given and known. */
+export function imageryQuads(level: Level, tile: Window, cache?: QuadCache, key?: string): Quad[] {
+  const k = cache && key !== undefined ? `${level.s}:${key}` : null;
+  const known = k === null ? undefined : cache!.get(k);
+  if (known) return known;
+  const quads = tileQuads(level.grid, tile, QUAD_ERR);
+  if (k !== null) cache!.set(k, quads);
+  return quads;
+}
 
 /** Decoded bytes of the blocks a window of a width x height image touches: geotiff decodes all of them for one read. */
 export function decodedBytes(w: Window, block: Block, width: number, height: number): number {
