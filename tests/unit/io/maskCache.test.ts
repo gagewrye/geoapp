@@ -121,6 +121,22 @@ describe("background reads (criterion 6)", () => {
     expect(cache.masks.size).toBe(6 * 8);
   });
 
+  it("wait while the map moves (spec 027), while stroke reads still start", async () => {
+    const { source, reads } = rgba();
+    let moving = true;
+    const cache = new MaskCache(source, { moving: () => moving, retryMs: 2 });
+    cache.start(0);
+    await tick(20);
+    expect(reads).toEqual([]);
+    await cache.need(3 * 256, STROKE);
+    expect(bandsRead(reads)).toEqual([3]);
+    await tick(20);
+    expect(bandsRead(reads)).toEqual([3]);
+    moving = false;
+    while (!cache.finished) await tick();
+    expect(bandsRead(reads)).toHaveLength(6);
+  });
+
   it("pause during an import, and resume after", async () => {
     const { source, reads } = rgba();
     let importing = true;

@@ -10,6 +10,8 @@ type Deps = {
 
 const WASD = new Set<string>(["KeyW", "KeyA", "KeyS", "KeyD"]);
 const MODIFIERS = new Set(["Control", "Meta", "Alt", "Shift"]);
+/** A keyboard pan has settled this long after its last key is released; tiles load then (spec 027). */
+export const SETTLE_MS = 150;
 
 /** Middle-button drag pan and held-WASD panning, in every mode (spec 009). */
 // MapLibre leaves button 1 unused, so the middle pan is ours: its presses are stopped at the map
@@ -50,7 +52,16 @@ export function createNavigation(map: MapLibreMap, deps: Deps) {
 
   const held = new Set<WasdKey>();
   let frame = 0, last = 0;
-  const stop = () => { held.clear(); cancelAnimationFrame(frame); frame = 0; };
+  const settles = new Set<() => void>();
+  let settleTimer: ReturnType<typeof setTimeout> | null = null;
+  const unsettle = () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; } };
+  // once the keys that panned are all up, settle after SETTLE_MS unless another press comes first
+  const released = (wasMoving: boolean) => {
+    if (!wasMoving || held.size) return;
+    unsettle();
+    settleTimer = setTimeout(() => { settleTimer = null; for (const cb of settles) cb(); }, SETTLE_MS);
+  };
+  const stop = () => { const was = held.size > 0; held.clear(); cancelAnimationFrame(frame); frame = 0; released(was); };
   const step = (t: number) => {
     const [dx, dy] = wasdStep(held, Math.max(0, t - last));
     last = t;
@@ -61,10 +72,11 @@ export function createNavigation(map: MapLibreMap, deps: Deps) {
     if (MODIFIERS.has(e.key)) { stop(); return; }
     if (!WASD.has(e.code) || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey || deps.typing(document.activeElement)) return;
     e.preventDefault();
+    unsettle();
     held.add(e.code as WasdKey);
     if (!frame) { last = performance.now(); frame = requestAnimationFrame(step); }
   });
-  window.addEventListener("keyup", (e) => { held.delete(e.code as WasdKey); });
+  window.addEventListener("keyup", (e) => { if (held.delete(e.code as WasdKey)) released(true); });
   window.addEventListener("focusin", (e) => { if (deps.typing(e.target as Element)) stop(); });
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") stop(); });
   window.addEventListener("blur", () => { stop(); endPan(); });
@@ -72,5 +84,12 @@ export function createNavigation(map: MapLibreMap, deps: Deps) {
   return {
     /** A middle-button pan is in progress (the brush paints nothing meanwhile). */
     panning: () => pan !== null,
+    /** A pan key is held: the map moves every frame, so tiles wait (spec 027). */
+    moving: () => held.size > 0,
+    /** Calls cb once, SETTLE_MS after the last held pan key is released; returns its removal. */
+    onSettle(cb: () => void): () => void {
+      settles.add(cb);
+      return () => { settles.delete(cb); };
+    },
   };
 }
