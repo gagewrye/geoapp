@@ -21,7 +21,12 @@
    - Both the imagery and the label file use it.
 2. **Eager block offsets.** At open, `loadValue` is called for `StripOffsets` and `StripByteCounts` (or `TileOffsets` and `TileByteCounts`) on image 0 and on every overview used. `loadAll` marks every index loaded, so later `loadValueIndexed` calls read nothing.
    - Cost: 16 bytes per block (257 KB for Chunk 11).
-3. **Preview reads in parallel.** The preview keeps up to 4 reads in flight when each read's `decodedBytes` is ≤ 4 MiB, and 1 otherwise. Progress still counts finished reads, and a stale open still stops at the next read.
+   - The label file's offsets load eagerly too.
+3. **Preview reads in parallel.**
+   - The preview keeps up to 4 reads in flight when each read's `decodedBytes` is ≤ 4 MiB.
+   - Otherwise it keeps 1, as it does for a source with no `block`.
+   - Progress still counts finished reads.
+   - A stale or aborted open starts no further read: at any time, the reads started are between done and done + 3.
 
 **Out of scope:** reading only a window's columns from uncompressed strips (re-measure after this spec), and workers.
 
@@ -48,7 +53,9 @@ export function mergeRanges(r: { offset: number; length: number }[], gap: number
 4. **Unit:** existing fixtures decode byte-equal through `blobSource` and through `fromBlob`, for both imagery and label files.
 5. **Real chunks, `run.mjs`:**
    - Typical open ≤ **1.3 s** to preview (was 2.74 s), with FileReader or `slice` calls ≤ sampled strips + 20 (was 2,788).
-   - Mid-zoom last tile ≤ **1.3 s** typical (was 2.80 s) and ≤ **1.6 s** Chunk 11 (was 3.37 s).
+   - Mid-zoom last tile ≤ **1.8 s** typical (was 2.80 s) and ≤ **2.2 s** Chunk 11 (was 3.37 s).
+     - Amended under Gage's perf delegation: measured 1.65 and 2.00 s. File reads are no longer the limit; `tileQuads` (about 0.75 s) and geotiff's strip copy are.
+     - The original 1.3 / 1.6 s targets move to spec 026, measured with both specs in.
    - Calls per mid-zoom fill ≤ 200 (was about 7,000).
    - The tiled chunk's open and fills are no slower than baseline +10%.
 6. Spec 019 criteria 1–5 and spec 020 criteria 6, 10 and 12 pass. `npm run check` passes.
