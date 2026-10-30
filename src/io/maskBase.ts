@@ -4,6 +4,7 @@ import type { MaskPreview } from "../core/maskPreview";
 import { maskSamples } from "../core/alpha";
 import { decimateInto } from "../core/decimate";
 import { rowReads } from "../core/imagery";
+import { maskLabels, type ValidMask } from "../core/validMask";
 import { applyLut, gatherCells, maskNodata, nodataPossible, sourceCells } from "../core/seed";
 import type { Grid, Tile } from "../core/types";
 import type { LabelSource } from "./labelFile";
@@ -91,6 +92,14 @@ export async function maskRow(imagery: ImagerySource, row: { w: Window; labels: 
 export async function baseTile(imagery: RasterSource, base: MaskBase, w: Window): Promise<{ labels: Uint8Array; tile: Tile | null }> {
   if (!base.windows.has(`${w.x0},${w.y0}`)) return { labels: new Uint8Array(w.width * w.height), tile: null };
   return (await windowLabels(imagery, base.file, base.lut, w))!;
+}
+
+/** baseTile masked by a cached valid mask instead of an imagery read (spec 023 F4): reads only the label file. */
+export async function maskedBaseTile(imagery: RasterSource, base: MaskBase, w: Window, mask: ValidMask): Promise<Uint8Array> {
+  if (!base.windows.has(`${w.x0},${w.y0}`)) return new Uint8Array(w.width * w.height);
+  const labels = await fileLabels(imagery, base.file, base.lut, w);
+  maskLabels(mask, labels);
+  return labels;
 }
 
 /** The labels window w shows: its stored tile, else the mask's tile, else zeros. */
