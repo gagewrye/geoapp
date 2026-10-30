@@ -78,6 +78,7 @@ export function initSeeding({ labels, imagery, say, error, opened }: Deps) {
     } catch (e) {
       if (imagery() !== s) return;
       if (held) labels.restore(held);
+      if (cancelled) { say(MESSAGES.importCancelled); return; } // a read in flight at Cancel may still reject
       say(e instanceof LabelFileRefused ? MESSAGES.labelFile : e instanceof ClassTableError ? MESSAGES.classTable(e.field) : error(e));
     } finally {
       if (running === s) {

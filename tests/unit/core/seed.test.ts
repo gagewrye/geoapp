@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { tileWindows } from "../../../src/core/grid";
-import { applyLut, gatherCells, markValues, maskNodata, seedLut, seedWindows, sourceCells } from "../../../src/core/seed";
+import { applyLut, gatherCells, markValues, maskNodata, nodataPossible, seedLut, seedWindows, sourceCells } from "../../../src/core/seed";
 import type { Affine, Grid, Tile } from "../../../src/core/types";
 
 // Spec 004 criteria 1 (sourceCells), 2 (seedWindows), 4 (seedLut, applyLut) and 7 (maskNodata).
@@ -124,5 +124,11 @@ describe("maskNodata (criterion 7)", () => {
     const b = Uint8Array.from([1, 2, 3, 4, 5, 6, 7, 0]);
     maskNodata(tile(null), b);
     expect([...b]).toEqual([1, 2, 3, 4, 5, 0, 7, 0]);
+  });
+});
+
+describe("nodataPossible (spec 021 criterion 9)", () => {
+  it.each([[null, false, false], [0, false, true], [null, true, true], [NaN, false, true]] as const)("nodata %s, float %s -> %s", (nodata, float, want) => {
+    expect(nodataPossible(nodata, float)).toBe(want);
   });
 });

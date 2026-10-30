@@ -103,6 +103,21 @@ test("the bar counts windows, Cancel shows, the old labels leave the map; Cancel
   expect(errors).toEqual([]);
 });
 
+test("Cancel while a read is in flight, then that read failing, restores and says the import was cancelled (criterion 5)", async ({ page }) => {
+  test.setTimeout(120_000);
+  await withLabels(page);
+  const before = await snapshot(page);
+  await startImport(page, other(), 4);
+  await allow(page, 3);
+  await expect.poll(() => barValue(page)).toBe("3");
+  await page.click("#import-cancel");
+  await allow(page, 1000); // read 4, in flight at the click, now rejects
+  await expect(message(page)).toHaveText(MESSAGES.importCancelled);
+  await expect(bar(page)).toBeHidden();
+  expect(await readsLogged(page)).toHaveLength(4);
+  await expectRestored(page, before);
+});
+
 test("on success only the new mask layer exists, and the bar and Cancel hide after the message (criteria 2, 3)", async ({ page }) => {
   test.setTimeout(120_000);
   await withLabels(page);
