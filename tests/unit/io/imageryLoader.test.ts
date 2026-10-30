@@ -41,7 +41,8 @@ function sink() {
 
 const LEVEL: Level = { s: 1, grid: GRID, overview: null };
 const row = (y0: number, xs: number[]): Window[] => xs.map((x0) => ({ x0, y0, width: 256, height: 256 }));
-const flush = () => new Promise((r) => setTimeout(r, 0));
+// a few tasks: draws past spec 028's 8 ms budget (a cold first draw) continue after a yield
+const flush = async () => { for (let i = 0; i < 4; i++) await new Promise((r) => setTimeout(r, 0)); };
 
 describe("ImageryLoader (criterion 8)", () => {
   it("reads each row of visible tiles as one window, two at a time, and draws them through the preview stretch", async () => {
@@ -111,18 +112,18 @@ describe("ImageryLoader (criterion 8)", () => {
   });
 
   it("fills a tile from several block-bounded reads and draws it once the last one lands (A1)", async () => {
-    // 1-row strips of 98,304 B: a 1024-row read would decode 96 MiB, so it splits into reads of 170 rows
+    // 1-row strips of 98,304 B: a 1024-row read would decode 96 MiB, so it splits into reads of 42 rows (TASK_READ_BYTES, spec 028)
     const { source, pending } = heldSource({ width: W, height: 1, bytes: 98304 });
     const s = sink();
     const loader = new ImageryLoader(source, [[0, 255], [0, 255], [0, 255]], s);
     const dec: Level = { s: 4, overview: null, grid: { ...GRID, width: W / 4, height: H / 4, gt: [500000, 120, 0, 5000000, 0, -120] } };
     loader.show({ level: dec, tiles: row(0, [768]) });
-    for (let k = 0; k < 7; k++) {
+    for (let k = 0; k < 25; k++) {
       expect(s.drawn.size).toBe(0);
       pending[k]!.resolve();
       await flush();
     }
-    expect(pending.map((p) => p.win.height)).toEqual([170, 170, 170, 170, 170, 170, 4]);
+    expect(pending.map((p) => p.win.height)).toEqual([...Array(24).fill(42), 16]);
     expect(pending.every((p) => p.win.x0 === 3072 && p.win.width === 1024)).toBe(true);
     const rgba = s.drawn.get("4-768,0")!;
     for (const [i, j] of [[7, 5], [100, 42], [255, 255]]) expect(rgba[4 * (j! * 256 + i!) + 2]).toBe(value(2, (768 + i!) * 4 + 2, j! * 4 + 2));
@@ -137,12 +138,13 @@ describe("ImageryLoader (criterion 8)", () => {
     pending[0]!.resolve();
     await flush();
     loader.show({ level: dec, tiles: row(0, [0]) }); // panned away mid-tile
-    for (let i = 0; i < 10; i++) { for (const p of [...pending]) p.resolve(); await flush(); } // every read settles
+    // every read settles, each resolved once (resolving builds its arrays)
+    for (let i = 0, done = 0; i < 30; i++) { const now = pending.slice(done); done = pending.length; for (const p of now) p.resolve(); await flush(); }
     expect([...s.drawn.keys()]).toEqual(["4-0,0"]);
     const before = pending.length;
     loader.show({ level: dec, tiles: row(0, [768]) });
     expect(pending.length).toBeGreaterThan(before);
-    expect(pending[before]!.win).toEqual({ x0: 3072, y0: 0, width: 1024, height: 170 });
+    expect(pending[before]!.win).toEqual({ x0: 3072, y0: 0, width: 1024, height: 42 });
   });
 });
 
