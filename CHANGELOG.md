@@ -3,6 +3,7 @@
 One entry per merge to main, newest first. Details are in the named spec.
 
 ## 2026-10-30
+- **Spec 028:** Loading imagery no longer freezes the page: uncompressed files read only the columns each tile needs (Chunk 11 reads 3 MB instead of 113 MB at full zoom), compressed files decode in small pieces, and drawing yields to the browser every 8 ms; a typical chunk now fills mid zoom in about 0.4 s with no pause over 50 ms.
 - **Spec 029:** Tidy-ups from reviews: tiles that partly fail to project no longer fall back to slow placement, the tile-position cache is capped, opening a raster mid-pan waits for the pan to stop, and three intermittently failing tests are fixed.
 - **Spec 027:** Holding W/A/S/D pans smoothly without reading the file mid-pan; full-resolution detail loads once you let go, and other bursts of map moves load once they settle.
 - **Spec 026:** Imagery and label tiles are placed on the map from a sparse grid of projected points instead of every pixel corner, so filling the view at mid zoom takes about 0.7 s on a typical chunk (was 2.8 s before specs 025–026) and 1.0 s on the largest.
