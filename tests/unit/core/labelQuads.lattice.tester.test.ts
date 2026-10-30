@@ -9,7 +9,6 @@ import { MAX_LAT, type Grid } from "../../../src/core/types";
 // across halvings, rasters beyond MAX_LAT and projections that give NaN.
 const R = 6378137, D2R = Math.PI / 180;
 const merc = (lon: number, lat: number): [number, number] => [R * lon * D2R, R * Math.log(Math.tan(Math.PI / 4 + (lat * D2R) / 2))];
-const M = (g: Grid, c: number, r: number) => merc(...toLonLat(g.epsg, ...applyAffine(g.gt, c, r)));
 const geo = (lat: number, px: number, size = 256): Grid => ({ epsg: 4326, gt: [10, px, 0, lat, 0, -px], width: size, height: size });
 const GAGE: Grid = (() => {
   const [x, y] = fromLonLat(32618, -77.16, 17.83);
@@ -19,6 +18,15 @@ const GAGE: Grid = (() => {
 /** Every pixel corner within 0.055 px, exact cover, and quad corners projected exactly (spec 018: footprintRing's). */
 function expectAccurate(g: Grid, w: Window, qs: Quad[]) {
   const cover = new Uint8Array(w.width * w.height);
+  // every corner of the window and the ring beyond it projected once, not once per use
+  const W = w.width + 2, ll = new Float64Array(2 * W * (w.height + 2)), mm = new Float64Array(ll.length);
+  for (let r = 0; r < w.height + 2; r++) for (let c = 0; c < W; c++) {
+    const [lon, la] = toLonLat(g.epsg, ...applyAffine(g.gt, w.x0 + c, w.y0 + r)), i = 2 * (r * W + c);
+    [ll[i], ll[i + 1]] = [lon, la];
+    [mm[i], mm[i + 1]] = merc(lon, la);
+  }
+  const lat = (c: number, r: number) => ll[2 * ((r - w.y0) * W + c - w.x0) + 1]!;
+  const proj = (c: number, r: number): [number, number] => { const i = 2 * ((r - w.y0) * W + c - w.x0); return [mm[i]!, mm[i + 1]!]; };
   for (const q of qs) {
     const { x0, y0, width, height } = q.window;
     expect(width >= 1 && height >= 1).toBe(true);
@@ -30,15 +38,19 @@ function expectAccurate(g: Grid, w: Window, qs: Quad[]) {
       if (Math.abs(elat) < 89.9) expect(Math.abs(lat! - elat)).toBeLessThan(1e-9);
     });
     const [tl, tr, br, bl] = q.corners.map((p) => merc(p[0]!, p[1]!)) as [number, number][];
+    let worst = 0, at = "";
     for (let r = y0; r <= y0 + height; r++) for (let c = x0; c <= x0 + width; c++) {
-      if (Math.abs(toLonLat(g.epsg, ...applyAffine(g.gt, c, r))[1]) > MAX_LAT) continue;
+      if (Math.abs(lat(c, r)) > MAX_LAT) continue;
       const u = (c - x0) / width, v = (r - y0) / height;
       const bi = (k: 0 | 1) => (1 - u) * (1 - v) * tl![k] + u * (1 - v) * tr![k] + u * v * br![k] + (1 - u) * v * bl![k];
-      const m = M(g, c, r), p = M(g, c + 1, r), s = M(g, c, r + 1);
+      const m = proj(c, r), p = proj(c + 1, r), s = proj(c, r + 1);
       const ax = p[0] - m[0], ay = p[1] - m[1], bx = s[0] - m[0], by = s[1] - m[1];
       const narrow = Math.abs(ax * by - ay * bx) / Math.max(Math.hypot(ax, ay), Math.hypot(bx, by));
-      expect(Math.hypot(bi(0) - m[0], bi(1) - m[1]) / narrow).toBeLessThanOrEqual(0.055);
+      const e = Math.hypot(bi(0) - m[0], bi(1) - m[1]) / narrow;
+      if (!(e <= worst)) { worst = e; at = `${c},${r}`; }
     }
+    // one expect per quad: an expect per pixel corner made this test take seconds (spec 029)
+    expect(worst, `worst at ${at}`).toBeLessThanOrEqual(0.055);
   }
   expect(cover.every((n) => n === 1)).toBe(true);
 }

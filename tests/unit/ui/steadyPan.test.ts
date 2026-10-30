@@ -29,19 +29,19 @@ function fakeMap() {
   return { map: map as unknown as MapLibreMap, emit, updates: () => bounds };
 }
 
-const source = (): ImagerySource => {
+const source = (reads = { n: 0 }): ImagerySource => {
   const { source: inner } = fakeSource({ width: 1000, height: 1000, epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01] }, () => 1);
-  return { ...inner, overviews: [], block: { width: 256, height: 256, bytes: 256 * 256 * 12 }, readSamples: () => new Promise(() => {}) };
+  return { ...inner, overviews: [], block: { width: 256, height: 256, bytes: 256 * 256 * 12 }, readSamples: () => { reads.n++; return new Promise(() => {}); } };
 };
 
 /** The app's wiring (ui/main.ts): imagery reads the navigation's moving() and updates on its settle. */
-function setup() {
+function setup(open = true) {
   const { map, emit, updates } = fakeMap();
   let nav: ReturnType<typeof createNavigation> | null = null;
   const imagery = initImagery(map, () => {}, { moving: () => nav?.moving() ?? false });
   nav = createNavigation(map, { typing: () => false, stroking: () => false });
   nav.onSettle(imagery.settle);
-  imagery.open(source(), [[0, 1], [0, 1], [0, 1]]);
+  if (open) imagery.open(source(), [[0, 1], [0, 1], [0, 1]]);
   return { nav, imagery, emit, updates };
 }
 
@@ -120,5 +120,24 @@ describe("steady keyboard pan (spec 027)", () => {
     expect(imagery.moving()).toBe(true);
     vi.advanceTimersByTime(1);
     expect(imagery.moving()).toBe(false);
+  });
+
+  it("spec 029 criterion 4: an open while a pan key is held reads nothing until the settle, then updates once", () => {
+    const { imagery, updates } = setup(false);
+    fire("keydown", { code: "KeyD", key: "d" });
+    vi.advanceTimersByTime(200);
+    const reads = { n: 0 }, before = updates();
+    expect(imagery.open(source(reads), [[0, 1], [0, 1], [0, 1]])).toBeNull();
+    vi.advanceTimersByTime(500);
+    expect(reads.n).toBe(0);
+    expect(updates()).toBe(before);
+    fire("keyup", { code: "KeyD", key: "d" });
+    vi.advanceTimersByTime(SETTLE_MS - 1);
+    expect(reads.n).toBe(0);
+    vi.advanceTimersByTime(1);
+    expect(updates()).toBe(before + 1);
+    expect(reads.n).toBeGreaterThan(0);
+    vi.advanceTimersByTime(1000);
+    expect(updates()).toBe(before + 1);
   });
 });

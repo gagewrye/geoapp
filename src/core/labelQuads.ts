@@ -43,6 +43,7 @@ export function latticeQuads(grid: Grid, w: Window, maxErr: number, lattice: num
     }
     return i;
   };
+  const finite = (i: number) => Number.isFinite(mx[i]) && Number.isFinite(my[i]);
   let step = Math.max(1, Math.floor(lattice));
   for (;;) {
     const cols = cells(w.width, step), rows = cells(w.height, step);
@@ -74,16 +75,30 @@ export function latticeQuads(grid: Grid, w: Window, maxErr: number, lattice: num
         my[i0 + c] = (1 - v) * my[a0 + c]! + v * my[b0 + c]!;
       }
     }
+    // spec 029: a node that doesn't project would spread NaN through its cell, so a cell with only some nodes finite
+    // (at the edge of where the projection works) projects every corner; a cell with none stays NaN, never checked
+    for (let j = 0; j + 1 < rows.nodes.length; j++) for (let k = 0; k + 1 < cols.nodes.length; k++) {
+      const r0 = rows.nodes[j]!, r1 = rows.nodes[j + 1]!, c0 = cols.nodes[k]!, c1 = cols.nodes[k + 1]!;
+      const ok = [r0 * W + c0, r0 * W + c1, r1 * W + c1, r1 * W + c0].filter(finite).length;
+      if (ok === 0 || ok === 4) continue;
+      for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) {
+        const i = exact(r * W + c);
+        [mx[i], my[i]] = mercator(exLon[i]!, exLat[i]!);
+      }
+    }
   }
 
   /** Each cell's centre corner, projected exactly, is within LATTICE_TOL of its pixel's narrowest width of its interpolation. */
   function centresFit(cols: Cells, rows: Cells): boolean {
     // the window's cells only: the last span on each side is the one-pixel ring beyond it
     for (let j = 0; j + 2 < rows.nodes.length; j++) for (let k = 0; k + 2 < cols.nodes.length; k++) {
-      const r = (rows.nodes[j]! + rows.nodes[j + 1]!) >> 1, c = (cols.nodes[k]! + cols.nodes[k + 1]!) >> 1;
-      if (r === rows.nodes[j] && c === cols.nodes[k]) continue; // a one-pixel cell: its centre is a node
+      const r0 = rows.nodes[j]!, r1 = rows.nodes[j + 1]!, c0 = cols.nodes[k]!, c1 = cols.nodes[k + 1]!;
+      const r = (r0 + r1) >> 1, c = (c0 + c1) >> 1;
+      if (r === r0 && c === c0) continue; // a one-pixel cell: its centre is a node
+      // a cell with a node that doesn't project is projected exactly, or never shows (spec 029)
+      if (![r0 * W + c0, r0 * W + c1, r1 * W + c1, r1 * W + c0].every(finite)) continue;
       const i = exact(r * W + c);
-      if (Math.abs(exLat[i]!) > MAX_LAT) continue; // never shows
+      if (!(Math.abs(exLat[i]!) <= MAX_LAT) || !Number.isFinite(exLon[i])) continue; // never shows, or doesn't project
       const [ex, ey] = mercator(exLon[i]!, exLat[i]!);
       const ax = mx[i + 1]! - mx[i]!, ay = my[i + 1]! - my[i]!, bx = mx[i + W]! - mx[i]!, by = my[i + W]! - my[i]!;
       const narrow = Math.abs(ax * by - ay * bx) / Math.max(Math.hypot(ax, ay), Math.hypot(bx, by));
