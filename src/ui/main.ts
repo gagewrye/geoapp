@@ -9,7 +9,7 @@ import { fitToPreview, showPreview } from "../map/preview";
 import { initImagery } from "./imagery";
 import { initLabels, inTextField } from "./labels";
 import { errorText, MESSAGES } from "./messages";
-import { initOpenProgress } from "./openProgress";
+import { initProgress } from "./progress";
 import { initSeeding } from "./seeding";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -23,7 +23,7 @@ let source: RasterSource | undefined;
 let opens = 0;
 let opened = 0;
 
-const progress = initOpenProgress($<HTMLProgressElement>("open-progress"));
+const progress = initProgress($<HTMLProgressElement>("open-progress"));
 let previewing: AbortController | null = null; // the opened raster's preview reads
 
 /** Calls the e2e hook `name` with `arg`, if a test set one. */

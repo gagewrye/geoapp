@@ -7,6 +7,8 @@ export type FixtureImage = {
   /** Tiles of w x h, or strips of `rows` rows. */
   layout: { tile: [number, number] } | { rows: number };
   subfile?: number;
+  /** TIFF ExtraSamples (338), e.g. [2] for unassociated alpha (spec 022); none written when absent. */
+  extraSamples?: number[];
 };
 
 const SHORT = 3, LONG = 4, DOUBLE = 12;
@@ -72,7 +74,7 @@ function entries(im: FixtureImage, offsets: number[], counts: number[], geo: { e
   if (im.subfile) e.push({ tag: 254, type: LONG, values: [im.subfile] });
   e.push({ tag: 256, type: LONG, values: [im.width] }, { tag: 257, type: LONG, values: [im.height] },
     { tag: 258, type: SHORT, values: Array(nb).fill(8) }, { tag: 259, type: SHORT, values: [1] },
-    { tag: 262, type: SHORT, values: [nb === 3 ? 2 : 1] });
+    { tag: 262, type: SHORT, values: [nb - (im.extraSamples?.length ?? 0) === 3 ? 2 : 1] });
   if ("tile" in im.layout) {
     e.push({ tag: 277, type: SHORT, values: [nb] }, { tag: 284, type: SHORT, values: [1] },
       { tag: 322, type: SHORT, values: [im.layout.tile[0]] }, { tag: 323, type: SHORT, values: [im.layout.tile[1]] },
@@ -81,6 +83,7 @@ function entries(im: FixtureImage, offsets: number[], counts: number[], geo: { e
     e.push({ tag: 273, type: LONG, values: offsets }, { tag: 277, type: SHORT, values: [nb] },
       { tag: 278, type: LONG, values: [im.layout.rows] }, { tag: 279, type: LONG, values: counts }, { tag: 284, type: SHORT, values: [1] });
   }
+  if (im.extraSamples) e.push({ tag: 338, type: SHORT, values: im.extraSamples });
   e.push({ tag: 339, type: SHORT, values: Array(nb).fill(1) });
   if (geo) {
     const [a, sx, , d, , sy] = geo.gt;

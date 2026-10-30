@@ -68,7 +68,7 @@ export function aefShapedFile(): ArrayBuffer {
 export function fakeLabelSource(g: Grid, f: (c: number, r: number) => number, nodata: number | null = null) {
   const reads: { x0: number; y0: number; width: number; height: number }[] = [];
   const source: LabelSource = {
-    meta: { ...g, bandCount: 1, nodata, geoTags: { GeoKeyDirectory: [] } },
+    meta: { ...g, bandCount: 1, nodata, float: false, alpha: null, geoTags: { GeoKeyDirectory: [] } },
     classItem: null,
     async read(w) {
       reads.push({ ...w });

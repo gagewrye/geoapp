@@ -18,6 +18,10 @@ export type RasterMeta = {
   gt: Affine;
   epsg: number;
   nodata: number | null;
+  /** Floating-point samples (SampleFormat 3), which can hold NaN. */
+  float: boolean;
+  /** Index of the alpha sample (TIFF ExtraSamples 1 or 2, spec 022), or null. */
+  alpha: number | null;
   geoTags: GeoTags;
 };
 

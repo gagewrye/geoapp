@@ -24,6 +24,9 @@ type Deps = {
   panning: () => boolean;
 };
 
+/** The labels an import took off the map (spec 021), to restore if it doesn't replace them. */
+export type Held = { readonly store: LabelStore; readonly base: MaskBase | null };
+
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const NOT_TEXT = new Set(["checkbox", "radio", "button", "submit", "reset", "color", "file", "range", "image"]);
 export const inTextField = (el: Element | null) => el instanceof HTMLTextAreaElement
@@ -185,6 +188,17 @@ export function initLabels({ map, say, onBusy, onChange, panning }: Deps) {
       setMode("pan"); // an import selects Pan (spec 014 as amended by spec 016)
       brush.refresh();
       onChange();
+    },
+    /** Takes the labels off the map for an import (spec 021); the store, classes, base and history stay as they are. */
+    hold(): Held {
+      display.hide();
+      return { store, base };
+    },
+    /** Draws held labels again, history kept; does nothing once a raster open or a replace changed them. */
+    restore(held: Held): void {
+      if (held.store !== store || held.base !== base) return;
+      display.setMask(base?.preview ?? null);
+      redraw(store.tiles.keys());
     },
     lock,
     imageryReady,

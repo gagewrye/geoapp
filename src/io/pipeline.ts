@@ -1,6 +1,7 @@
 import { crossesAntimeridian, projString } from "../core/crs";
 import { decimatedAffine, decimatedTile, decimateInto, decimationFactor, type SourceWindow } from "../core/decimate";
 import { tileWindows, type Window } from "../core/grid";
+import { displaySamples } from "../core/alpha";
 import { blockWindows, MAX_BLOCK_BYTES } from "../core/imagery";
 import { warpPreview } from "../core/warp";
 import type { RasterSource } from "./source";
@@ -58,9 +59,9 @@ export async function buildPreview(source: RasterSource, maxSide: number, { stre
  * (of size dec.size), and one read per window.
  */
 function previewReads(source: RasterSource, maxSide: number, signal?: AbortSignal) {
-  const { width, height, bandCount, gt, nodata } = source.meta;
-  const nb = bandCount >= 3 ? 3 : 1;
-  const bands = nb === 3 ? [0, 1, 2] : [0];
+  const { width, height, bandCount, gt, nodata, alpha } = source.meta;
+  const bands = displaySamples(bandCount, alpha);
+  const nb = bands.length, a = alpha === null ? null : nb - 1; // alpha's index in the decimated tile
   const { block, readSamples, overviews = [] } = source;
   const samples = (image: number, w: Window) => async (): Promise<SourceWindow> =>
     ({ ...w, bands: await readSamples!.call(source, image, w.x0, w.y0, w.width, w.height, bands, signal) });
@@ -70,7 +71,7 @@ function previewReads(source: RasterSource, maxSide: number, signal?: AbortSigna
     const f = decimationFactor(ov.width, ov.height, maxSide);
     const fx = width / ov.width, fy = height / ov.height;
     return {
-      dec: { tile: decimatedTile(ov.width, ov.height, f, nb, nodata), size: [ov.width, ov.height] }, f,
+      dec: { tile: decimatedTile(ov.width, ov.height, f, nb, nodata, a), size: [ov.width, ov.height] }, f,
       gt: decimatedAffine([gt[0], gt[1] * fx, gt[2] * fy, gt[3], gt[4] * fx, gt[5] * fy], f),
       reads: tileWindows(ov.width, ov.height).map((w) => samples(ov.index, w)),
     };
@@ -78,8 +79,12 @@ function previewReads(source: RasterSource, maxSide: number, signal?: AbortSigna
   const f = decimationFactor(width, height, maxSide);
   // spec 020: only the blocks holding a sampled pixel, each decoded once, cropped to its sampled span. A block over
   // MAX_BLOCK_BYTES (a single strip) is read in 256 px windows instead (A1): each decodes the block again, but output stays small.
-  const reads = !readSamples ? tileWindows(width, height).map((w) => () => source.readWindow(w.x0, w.y0, w.width, w.height))
+  const fromWindow = (w: Window) => async (): Promise<SourceWindow> => {
+    const t = await source.readWindow(w.x0, w.y0, w.width, w.height);
+    return { ...w, bands: bands.map((k) => t.bands[k]!) };
+  };
+  const reads = !readSamples ? tileWindows(width, height).map(fromWindow)
     : block && block.bytes <= MAX_BLOCK_BYTES ? blockWindows(width, height, block.width, block.height, f).map((w) => samples(0, w))
     : tileWindows(width, height).map((w) => samples(0, w));
-  return { dec: { tile: decimatedTile(width, height, f, nb, nodata), size: [width, height] }, f, gt: decimatedAffine(gt, f), reads };
+  return { dec: { tile: decimatedTile(width, height, f, nb, nodata, a), size: [width, height] }, f, gt: decimatedAffine(gt, f), reads };
 }

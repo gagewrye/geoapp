@@ -1,9 +1,11 @@
 import { fromBlob, type GeoTIFF, type GeoTIFFImage } from "geotiff";
+import { alphaOf } from "../core/alpha";
 import { affineFromTags } from "../core/geotags";
 import { MAX_BLOCK_BYTES, type Block, type Overview } from "../core/imagery";
 import type { GeoTags, ImagerySource, RasterMeta } from "./source";
 
 const stripNul = (s: unknown) => (typeof s === "string" ? s.replace(/\0+$/, "") : undefined);
+const list = (v: unknown): number[] => (v === undefined ? [] : typeof v === "number" ? [v] : Array.from(v as ArrayLike<number>));
 const nums = (v: unknown) => (v ? Array.from(v as ArrayLike<number>) : undefined);
 
 /** Size, CRS, geotransform and copyable georeferencing tags of a GeoTIFF image; reads only the header. */
@@ -33,6 +35,8 @@ export async function openGeoTiff(tiff: GeoTIFF): Promise<ImagerySource> {
   // Bands are read as Float32Array, so compare against nodata rounded the same way.
   const nd = gdalNoData(image.getGDALNoData(), stripNul(fd.getValue("GDAL_NODATA")));
   const nodata = nd === null ? null : Math.fround(nd);
+  const float = list(fd.getValue("SampleFormat")).includes(3);
+  const alpha = alphaOf(list(fd.getValue("ExtraSamples")), bandCount); // overviews share it
   const images = new Map<number, GeoTIFFImage>([[0, image]]);
   const overviews: Overview[] = [];
   for (let i = 1, n = await tiff.getImageCount(); i < n; i++) {
@@ -47,7 +51,7 @@ export async function openGeoTiff(tiff: GeoTIFF): Promise<ImagerySource> {
     overviews.push({ index: i, width: im.getWidth(), height: im.getHeight(), block });
   }
   return {
-    meta: { width, height, bandCount, gt, epsg, nodata, geoTags },
+    meta: { width, height, bandCount, gt, epsg, nodata, float, alpha, geoTags },
     block: blockOf(image),
     overviews,
     async readSamples(index, x0, y0, w, h, samples, signal) {
@@ -61,7 +65,7 @@ export async function openGeoTiff(tiff: GeoTIFF): Promise<ImagerySource> {
     async readWindow(x0, y0, w, h) {
       const rasters = (await image.readRasters({ window: [x0, y0, x0 + w, y0 + h] })) as unknown as ArrayLike<number>[];
       const bands = Array.from(rasters, (r) => (r instanceof Float32Array ? r : Float32Array.from(r)));
-      return { x0, y0, width: w, height: h, bands, nodata };
+      return { x0, y0, width: w, height: h, bands, nodata, alpha };
     },
   };
 }

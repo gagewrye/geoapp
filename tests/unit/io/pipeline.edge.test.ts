@@ -11,7 +11,7 @@ type Read = { x0: number; y0: number; width: number; height: number };
 function fastSource(meta: Partial<RasterMeta> & { width: number; height: number }, fill = (w: Read, k: number) => (w.x0 < meta.width / 2 ? 10 : 50) + k) {
   const reads: Read[] = [];
   const full: RasterMeta = {
-    bandCount: 3, gt: [500000, 30, 0, 5000000, 0, -30], epsg: 32633, nodata: null,
+    bandCount: 3, gt: [500000, 30, 0, 5000000, 0, -30], epsg: 32633, nodata: null, float: true, alpha: null,
     geoTags: { GeoKeyDirectory: [1, 1, 0, 1, 3072, 0, 1, 32633], ModelPixelScale: [30, 30, 0], ModelTiepoint: [0, 0, 0, 500000, 5000000, 0] },
     ...meta,
   };

@@ -5,11 +5,11 @@ export function decimationFactor(width: number, height: number, maxSide: number)
   return Math.max(1, Math.ceil(Math.max(width, height) / maxSide));
 }
 
-/** Empty decimated tile for a width x height raster; NaN means not yet filled. */
-export function decimatedTile(width: number, height: number, f: number, nb: number, nodata: number | null): Tile {
+/** Empty decimated tile for a width x height raster; NaN means not yet filled; alpha indexes its bands (spec 022). */
+export function decimatedTile(width: number, height: number, f: number, nb: number, nodata: number | null, alpha: number | null = null): Tile {
   const w = Math.ceil(width / f);
   const h = Math.ceil(height / f);
-  return { x0: 0, y0: 0, width: w, height: h, nodata, bands: Array.from({ length: nb }, () => new Float32Array(w * h).fill(NaN)) };
+  return { x0: 0, y0: 0, width: w, height: h, nodata, alpha, bands: Array.from({ length: nb }, () => new Float32Array(w * h).fill(NaN)) };
 }
 
 // Output pixel i samples source pixel i*f + floor(f/2), clamped to the raster.
