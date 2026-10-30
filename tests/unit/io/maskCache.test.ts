@@ -5,7 +5,7 @@ import { emptyStore } from "../../../src/core/labelStore";
 import { nodataMask } from "../../../src/core/nodata";
 import { footprint } from "../../../src/core/pixel";
 import type { Grid } from "../../../src/core/types";
-import { bandOrder, type ValidMask } from "../../../src/core/validMask";
+import { bandOrder, MaskStore, type ValidMask } from "../../../src/core/validMask";
 import { openLabelTiff } from "../../../src/io/labelFile";
 import { MaskCache, STROKE, HOVER } from "../../../src/io/maskCache";
 import { cellOp, PaintQueue } from "../../../src/io/paintQueue";
@@ -258,4 +258,20 @@ describe("an op's masks past MASK_BYTES (review 4)", () => {
       expect(t[(r % 256) * 256 + c], `${c},${r}`).toBe(nd(c, r) ? 0 : 1);
     }
   });
+
+  it("a mask evicted again after every read gives up after 2 reads with an error, not a loop", async () => {
+    const S = 256;
+    const { source } = samplesSource({ ...GRID, width: S, height: S, bandCount: 1, alpha: null, nodata: 0, float: false }, () => 5, { width: S, height: 1, bytes: S });
+    let needs = 0;
+    const cache = { masks: new MaskStore(), get: () => undefined, need: async () => { needs++; } } as unknown as MaskCache;
+    const store = emptyStore(S, S);
+    const errors: unknown[] = [];
+    const q = new PaintQueue(source, () => store, { applied() {}, full() {}, busy() {}, error: (e) => { errors.push(e); } }, undefined, () => null, cache);
+    q.push(cellOp({ x0: 10, y0: 10, width: 5, height: 5 }, 1, false));
+    await idle(q);
+    expect(needs).toBe(2);
+    expect(errors).toHaveLength(1);
+    expect(store.tiles.size).toBe(0);
+  });
 });
+

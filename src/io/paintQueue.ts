@@ -103,7 +103,9 @@ export class PaintQueue {
           if (op.erase && !needBase) continue;
           const [x0, y0] = key.split(",").map(Number) as [number, number];
           let mask = this.held.get(key) ?? this.cache.get(key);
-          while (!mask) {
+          // other moves' band reads could evict it again each time, past MASK_BYTES: fail rather than loop
+          for (let tries = 0; !mask; tries++) {
+            if (tries === 2) throw new Error(`The valid mask of tile ${key} was evicted before it could be used`);
             await this.cache.need(y0, STROKE);
             if (gen !== this.generation) return;
             mask = this.cache.get(key);
