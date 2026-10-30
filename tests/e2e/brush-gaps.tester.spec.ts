@@ -43,12 +43,15 @@ test("a fast size-127 drag at zoom 4 over a 65792 px wide strip labels every pix
   await jumpTo(page, [-20, 9.995], 4);
   await page.evaluate(() => {
     const s = (window as any).__geoapp.imagery();
-    const read = s.readWindow.bind(s);
-    const log = (window as any).__log = { reads: [] as number[][], inFlight: 0, max: 0 };
-    s.readWindow = async (...a: number[]) => {
-      log.reads.push(a); log.inFlight++; log.max = Math.max(log.max, log.inFlight);
-      try { return await read(...a); } finally { log.inFlight--; }
-    };
+    const log = (window as any).__log = { reads: [] as unknown[][], inFlight: 0, max: 0 };
+    for (const m of ["readWindow", "readSamples"]) { // spec 023 reads masks with readSamples: gate both
+      if (!s[m]) continue;
+      const read = s[m].bind(s);
+      s[m] = async (...a: unknown[]) => {
+        log.reads.push([m, ...a]); log.inFlight++; log.max = Math.max(log.max, log.inFlight);
+        try { return await read(...a); } finally { log.inFlight--; }
+      };
+    }
   });
   const a = round(await toScreen(page, [-35, 9.995])), b = round(await toScreen(page, [-5, 9.995]));
   const pts: Xy[] = [a, round({ x: (a.x + b.x) / 2, y: a.y }), b]; // two moves of ~300 screen px, ~3000 raster px each
