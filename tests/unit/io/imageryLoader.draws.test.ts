@@ -16,8 +16,8 @@ const value = (k: number, c: number, r: number) => (k + c + r) % 200;
 const row = (y0: number, xs: number[]): Window[] => xs.map((x0) => ({ x0, y0, width: 256, height: 256 }));
 const flush = async () => { for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0)); };
 
-/** A loader over a fake source and clock: each draw takes `drawMs`, and yields wait until released. */
-function rig(block: Block = { width: 256, height: 256, bytes: 256 * 256 * 3 }, raw?: number[], drawMs = 3) {
+/** A loader over a fake source and clock: each draw takes `drawMs`, and yields wait until released; read raw by default, so a row of tiles is one read. */
+function rig(block: Block = { width: 256, height: 256, bytes: 256 * 256 * 3 }, raw: number[] = [0], drawMs = 3) {
   const { source: inner, reads } = samplesSource({ ...GRID, bandCount: 3, float: false }, value, block);
   const source: ImagerySource = { ...inner, raw };
   let t = 0;
@@ -81,7 +81,7 @@ describe("read size (criterion 3)", () => {
   const tiles = row(1024, [0, 256, 512, 768, 1024, 1280, 1536, 1792]);
 
   it("reads through geotiff decode at most TASK_READ_BYTES each", async () => {
-    const { loader, reads } = rig(strips, undefined, 0);
+    const { loader, reads } = rig(strips, [], 0);
     loader.show({ level: { s: 2, grid: { ...GRID, width: W / 2, height: H / 2 }, overview: null }, tiles });
     for (let i = 0; i < 20; i++) await flush();
     expect(reads.length).toBeGreaterThan(1);

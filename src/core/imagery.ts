@@ -7,8 +7,8 @@ import { latOf, mercator } from "./warp";
 
 /** Spec 020: tiles kept (LRU), the coarsest step sampled from full resolution, and the block and read limits. */
 export const IMAGERY_TILES = 512, MAX_DECIMATE = 4, MAX_BLOCK_BYTES = 16 * 2 ** 20, MAX_READ_BYTES = 16 * 2 ** 20;
-/** Spec 028: geotiff decodes a read in one task, so tile and mask reads through it decode at most this much each. */
-export const TASK_READ_BYTES = 4 * 2 ** 20;
+/** Spec 028: geotiff decodes a read in one task, so tile and mask reads through it decode at most this much each (about 2 LZW 256² RGBA tiles). */
+export const TASK_READ_BYTES = 2 ** 19;
 
 /** A reduced-resolution IFD of the file: its index in the TIFF, its size, and its block when known (reads are bounded by it). */
 export type Overview = { index: number; width: number; height: number; block?: Block };

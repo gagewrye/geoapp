@@ -169,7 +169,8 @@ describe("ImageryLoader, tester", () => {
     const W = 4096, H = 4096, v = (k: number, c: number, r: number) => (k * 9 + c + 2 * r) % 250;
     const { source, reads, grid } = held(W, H, 3, v, { block: [W, 1] });
     void grid;
-    source.block.bytes = 98304; // 1-row strips that decode 96 KiB: 42 rows a read under TASK_READ_BYTES (spec 028)
+    source.block.bytes = 98304; // 1-row strips that decode 96 KiB, read raw: 170 rows a read (MAX_READ_BYTES)
+    source.raw = [0];
     const s = sink();
     const errors: unknown[] = [];
     const loader = new ImageryLoader(source, R3, s, (e) => errors.push(e));
@@ -186,7 +187,7 @@ describe("ImageryLoader, tester", () => {
     const before = reads.length;
     loader.show(plan);
     for (let i = 0; i < 30; i++) { for (const r of reads) r.settle(); await flush(); }
-    expect(reads.length - before).toBe(25); // read again from the start
+    expect(reads.length - before).toBe(7); // read again from the start
     const rgba = s.drawn.get("4-256,0")!;
     for (const [i, j] of [[0, 0], [100, 42], [255, 255]]) expect(rgba[4 * (j! * 256 + i!)]).toBe(v(0, (256 + i!) * 4 + 2, j! * 4 + 2));
   });

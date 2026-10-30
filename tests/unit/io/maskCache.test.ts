@@ -105,7 +105,8 @@ function held() {
   return { source, reads, release, waiting };
 }
 const tick = (ms = 5) => new Promise((r) => setTimeout(r, ms));
-const bandsRead = (reads: SampleRead[]) => reads.map((r) => r.y0 / 256);
+// a band may take several reads (spec 028 TASK_READ_BYTES): the bands in the order first read
+const bandsRead = (reads: SampleRead[]) => [...new Set(reads.map((r) => Math.floor(r.y0 / 256)))];
 
 describe("background reads (criterion 6)", () => {
   it("wait while the loader is busy, then run one at a time in bandOrder from the centre band", async () => {
@@ -142,7 +143,7 @@ describe("background reads (criterion 6)", () => {
     const order: string[] = [];
     void cache.need(5 * 256, HOVER).then(() => order.push("hover 5"));
     void cache.need(4 * 256, STROKE).then(() => order.push("stroke 4"));
-    for (let i = 0; i < 6; i++) await h.release();
+    while (!cache.finished) await h.release(); // a band takes several reads (spec 028)
     expect(bandsRead(h.reads)).toEqual([0, 4, 5, 1, 2, 3]);
     expect(order).toEqual(["stroke 4", "hover 5"]);
   });

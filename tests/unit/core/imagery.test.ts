@@ -199,7 +199,7 @@ describe("rowReads (criteria 6, A1)", () => {
 
 describe("rowReads with a cap (spec 028 scope 2)", () => {
   it("splits so each read decodes at most TASK_READ_BYTES when asked, at block edges", () => {
-    expect(TASK_READ_BYTES).toBe(4 * 2 ** 20);
+    expect(TASK_READ_BYTES).toBe(2 ** 19);
     const strips: Block = { width: 22300, height: 1, bytes: 22300 * 4 };
     const tiles = [0, 256, 512].map((x0) => ({ x0, y0: 256, width: 256, height: 256 }));
     const reads = rowReads(tiles, 2, strips, 22300, 22300, TASK_READ_BYTES);
