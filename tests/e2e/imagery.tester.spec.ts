@@ -153,7 +153,11 @@ test("A1 read failures: a failing tile read says imageryUnreadable once per rast
   // another open: a failure is reported again
   await openRaster(page, { ...rotatedFixture(), name: "again.tif" });
   await expect(message(page)).toHaveText("Raster opened.");
+  // the open's fit can still be moving; its moveend would re-plan and abort the failing reads, which then report nothing
+  await page.evaluate(() => new Promise<void>((r) => { const { map } = (window as any).__geoapp; if (!map.isMoving()) r(); else map.once("moveend", () => r()); }));
+  const before = await page.evaluate(() => (window as any).__fail.failed as number);
   await fail(true);
   await zoomTo(page, 300.5, 300.5, 10);
+  await expect.poll(() => page.evaluate(() => (window as any).__fail.failed as number)).toBeGreaterThan(before);
   await expect(message(page)).toHaveText(unreadable);
 });
