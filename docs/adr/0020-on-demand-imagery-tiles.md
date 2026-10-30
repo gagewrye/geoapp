@@ -1,6 +1,6 @@
 # 0020: Full-resolution imagery as on-demand raster-aligned tiles
 
-**Status:** Accepted (Gage, 2026-10-29), with spec 020; cache raised to 512 tiles (Gage, 2026-10-29). Amendment A1 (read and block limits 16 MiB, cache counts tiles) awaits Gage's approval. Amends ADR 0015 (memory).
+**Status:** Accepted (Gage, 2026-10-29), with spec 020; cache raised to 512 tiles (Gage, 2026-10-29). Amendment A1 (read and block limits 16 MiB, cache counts tiles) accepted (Gage, 2026-10-29). Amends ADR 0015 (memory).
 
 **Context:** Imagery is one preview of at most 1024 px. Gage needs every source pixel when zoomed in. The options were:
 - (a) On-demand tiles drawn as ADR 0019 quads.

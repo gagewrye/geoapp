@@ -1,6 +1,6 @@
 # 020: Full-resolution imagery when zoomed in
 
-**Status:** Approved (Gage, 2026-10-29: "approve all"). The cache was raised to 512 tiles ("yes increase cache"). **Amendment A1 (the tester's B1–B3, F1) awaits Gage's approval.** Builds on spec 019. ADR 0020.
+**Status:** Approved (Gage, 2026-10-29: "approve all"). The cache was raised to 512 tiles ("yes increase cache"). Amendment A1 (the tester's B1–B3, F1), with the 16 MiB `MAX_BLOCK_BYTES`, was approved (Gage, 2026-10-29: "approve all"). Builds on spec 019. ADR 0020.
 
 **Request** (Gage, 2026-10-29): "If you are labelling, you want that full resolution when you zoom in to see the details."
 
@@ -11,7 +11,7 @@
 
 **Pending, not blocking:** `gdalinfo` for the 1.49 GB file.
 
-**Question (A1):** lowering `MAX_BLOCK_BYTES` from 32 to 16 MiB turns full resolution off for files with 16–32 MiB blocks, which today are single-strip RGB images of about 2,400² to 3,300² px. Accept? [Yes. The preview still shows, and the message says how to re-save.]
+**Decided (A1, Gage, 2026-10-29):** `MAX_BLOCK_BYTES` drops from 32 to 16 MiB, which turns full resolution off for files with 16–32 MiB blocks, such as single-strip RGB images of about 2,400² to 3,300² px. The preview still shows, and the message says how to re-save.
 
 ## Scope
 **Tiles.** A tile is 256x256 texels at scale `s` = 1, 2, 4, …, drawn over the preview and below the mask and labels.
