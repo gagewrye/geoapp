@@ -50,14 +50,16 @@ describe("preview reads in parallel (spec 025)", () => {
     expect(startedAtAbort).toBeLessThanOrEqual(6);
   });
 
-  it("stops starting reads after one fails, and rejects with its error", async () => {
+  it("stops starting reads after one fails, rejects with its error, and reports no progress after", async () => {
     const { source, log } = slowSource(SMALL);
     const read = source.readSamples!;
     source.readSamples = (...args) => (log.started === 3 ? Promise.reject(new Error("disk")) : read(...args));
-    await expect(buildPreview(source, 256)).rejects.toThrow("disk");
-    const after = log.started;
+    let progress = 0;
+    await expect(buildPreview(source, 256, { onProgress: () => progress++ })).rejects.toThrow("disk");
+    const after = log.started, reported = progress;
     await new Promise((r) => setTimeout(r, 30));
     expect(log.started).toBe(after);
     expect(after).toBeLessThanOrEqual(4);
+    expect(progress).toBe(reported);
   });
 });

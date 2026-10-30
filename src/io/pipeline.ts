@@ -49,16 +49,18 @@ export async function buildPreview(source: RasterSource, maxSide: number, { stre
   let next = 0, done = 0, failed = false;
   // windows don't overlap, so reads may finish and decimate in any order
   const worker = async () => {
-    while (next < reads.length && !failed) {
-      checkAborted(signal);
-      const read = reads[next++]!;
-      try {
-        decimateInto(dec.tile, await read(), f, dec.size[0]!, dec.size[1]!);
-      } catch (e) {
-        failed = true;
-        throw e;
+    try {
+      while (next < reads.length && !failed) {
+        checkAborted(signal);
+        const tile = await reads[next++]!();
+        // once the call has rejected, reads still in flight report nothing: the caller has moved on
+        if (failed) return;
+        decimateInto(dec.tile, tile, f, dec.size[0]!, dec.size[1]!);
+        onProgress?.(++done, reads.length);
       }
-      onProgress?.(++done, reads.length);
+    } catch (e) {
+      failed = true;
+      throw e;
     }
   };
   await Promise.all(Array.from({ length: Math.min(inFlight, reads.length) }, worker));
