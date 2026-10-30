@@ -68,6 +68,25 @@ describe("ImageryLayer", () => {
     expect(layer.size).toBe(IMAGERY_TILES);
   });
 
+  it("a draw that throws partway leaves no orphan quads, and drawing the tile again works", () => {
+    const { map, layers, sources } = fakeMap();
+    const layer = new ImageryLayer(map);
+    const steep: Level = { s: 1, overview: null, grid: { width: 256, height: 2500, epsg: 4326, gt: [10, 0.01, 0, 85, 0, -0.01] } };
+    const t = { x0: 0, y0: 0, width: 256, height: 256 }, px = new Uint8ClampedArray(256 * 256 * 4);
+    const addLayer = map.addLayer.bind(map);
+    let calls = 0;
+    map.addLayer = ((l: never, before?: string) => { if (++calls === 2) throw new Error("context lost"); addLayer(l, before); }) as typeof map.addLayer;
+    expect(() => layer.draw("1-0,0", steep, t, px)).toThrow("context lost");
+    expect([...sources]).toEqual([]);
+    expect(layers.filter((id) => id.startsWith("imagery-"))).toEqual([]);
+    expect(layer.use("1-0,0")).toBe(false);
+    layer.draw("1-0,0", steep, t, px);
+    expect(sources.size).toBeGreaterThan(1);
+    expect(layers.filter((id) => id.startsWith("imagery-"))).toHaveLength(sources.size);
+    layer.clear();
+    expect([...sources]).toEqual([]);
+  });
+
   it("puts tiles between the preview and the mask, finer above coarser, and clear() removes them all", () => {
     const { map, layers, sources } = fakeMap();
     const layer = new ImageryLayer(map);

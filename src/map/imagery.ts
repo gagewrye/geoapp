@@ -36,18 +36,25 @@ export class ImageryLayer implements TileSink {
     }
     const img = new ImageData(rgba, tile.width, tile.height);
     const before = this.before(level.s);
-    const ids = quads.map((q, i) => {
-      const id = quads.length === 1 ? `${PREFIX}${key}` : `${PREFIX}${key}-${i}`;
-      const canvas = document.createElement("canvas");
-      canvas.width = q.window.width;
-      canvas.height = q.window.height;
-      const dx = q.window.x0 - tile.x0, dy = q.window.y0 - tile.y0;
-      canvas.getContext("2d")!.putImageData(img, -dx, -dy, dx, dy, q.window.width, q.window.height);
-      this.map.addSource(id, { type: "canvas", canvas, coordinates: q.corners as Corners, animate: false });
-      this.map.getSource<CanvasSource>(id)!.setWarp("flat"); // bilinear between the corners, as for label tiles (ADR 0019)
-      this.map.addLayer({ id, type: "raster", source: id, paint: { "raster-fade-duration": 0, "raster-resampling": "nearest" } }, before);
-      return id;
-    });
+    const ids: string[] = [];
+    try {
+      for (const [i, q] of quads.entries()) {
+        const id = quads.length === 1 ? `${PREFIX}${key}` : `${PREFIX}${key}-${i}`;
+        ids.push(id); // before adding, so a throw below removes whatever part of it was added
+        const canvas = document.createElement("canvas");
+        canvas.width = q.window.width;
+        canvas.height = q.window.height;
+        const dx = q.window.x0 - tile.x0, dy = q.window.y0 - tile.y0;
+        canvas.getContext("2d")!.putImageData(img, -dx, -dy, dx, dy, q.window.width, q.window.height);
+        this.map.addSource(id, { type: "canvas", canvas, coordinates: q.corners as Corners, animate: false });
+        this.map.getSource<CanvasSource>(id)!.setWarp("flat"); // bilinear between the corners, as for label tiles (ADR 0019)
+        this.map.addLayer({ id, type: "raster", source: id, paint: { "raster-fade-duration": 0, "raster-resampling": "nearest" } }, before);
+      }
+    } catch (e) {
+      // untracked quads would survive clear() and block a retry with "source already exists"
+      this.removeIds(ids);
+      throw e;
+    }
     this.tiles.set(key, ids);
   }
 
@@ -66,6 +73,10 @@ export class ImageryLayer implements TileSink {
     const ids = this.tiles.get(key);
     if (!ids) return;
     this.tiles.delete(key);
+    this.removeIds(ids);
+  }
+
+  private removeIds(ids: string[]): void {
     for (const id of ids) {
       if (this.map.getLayer(id)) this.map.removeLayer(id);
       if (this.map.getSource(id)) this.map.removeSource(id);
