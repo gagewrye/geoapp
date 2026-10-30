@@ -3,6 +3,7 @@
 One entry per merge to main, newest first. Details are in the named spec.
 
 ## 2026-10-30
+- **Spec 030:** Opening a raster projects a sparse, self-checked grid of preview points instead of every pixel, with byte-identical results, so a typical chunk draws its preview in about 0.36 s (was 0.68 s) with no pause over 75 ms, and importing labels no longer has its 340 ms pause.
 - **Spec 024:** Importing a label mask reads the label file once in a single pass and the imagery only where needed, without freezing the page: a typical chunk imports in about 3 s (was 69 s), Chunk 11 in 28 s (was about 21 min), the tiled 20000² chunk in 55 s (was about 10 min), and painting right after an import stays smooth.
 - **Spec 028:** Loading imagery no longer freezes the page: uncompressed files read only the columns each tile needs (Chunk 11 reads 3 MB instead of 113 MB at full zoom), compressed files decode in small pieces, and drawing yields to the browser every 8 ms; a typical chunk now fills mid zoom in about 0.4 s with no pause over 50 ms.
 - **Spec 029:** Tidy-ups from reviews: tiles that partly fail to project no longer fall back to slow placement, the tile-position cache is capped, opening a raster mid-pan waits for the pan to stop, and three intermittently failing tests are fixed.
