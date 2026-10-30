@@ -2,6 +2,9 @@ import { maskReadFailed } from "../io/labelFile";
 import { RasterRefusedError } from "../io/pipeline";
 import type { SeedOutcome } from "../io/seeding";
 
+/** Bytes as MiB rounded up: whole numbers from 10 MiB, else two decimals (a test hook lowers the limit). */
+const mib = (bytes: number) => { const v = bytes / 2 ** 20; return v >= 10 ? Math.ceil(v) : Math.ceil(v * 100) / 100; };
+
 /** User-facing strings fixed by specs 001-014, and the ones they don't fix. */
 export const MESSAGES = {
   rasterAntimeridian: "Rasters crossing the 180° meridian aren't supported yet.",
@@ -21,6 +24,9 @@ export const MESSAGES = {
   rasterUnreadable: "Couldn't read this file.",
   buildingPreview: "Building preview…",
   drawingPreview: "Drawing preview…",
+  // spec 020
+  imageryUnreadable: "Couldn't read part of this file, so some detail may be missing.",
+  largeBlocks: (bytes: number, limit: number) => `Full resolution isn't available: this file stores pixels in ${mib(bytes)} MiB blocks (limit ${mib(limit)} MiB). Re-save it tiled, e.g. gdal_translate -of COG.`,
 } as const;
 
 /** What a seeding run says (spec 004); null for a run dropped because another raster opened. */

@@ -1,3 +1,4 @@
+import type { Block, Overview } from "../core/imagery";
 import type { Affine, Tile } from "../core/types";
 
 /** Georeferencing tags copied unchanged from input to output (ADR 0001). */
@@ -24,7 +25,17 @@ export type RasterMeta = {
 export interface RasterSource {
   meta: RasterMeta;
   readWindow(x0: number, y0: number, width: number, height: number): Promise<Tile>;
+  // Spec 020. Optional, so a source without them (a test double) has the preview only.
+  /** The full image's storage block: a tile, or a strip of width x RowsPerStrip, with all samples decoded. */
+  block?: Block;
+  /** Reduced-resolution IFDs with the full image's bands, by TIFF index. */
+  overviews?: Overview[];
+  /** Raw band arrays of a window of image 0 (full resolution) or an overview's index; rejects with AbortError on `signal`. */
+  readSamples?(image: number, x0: number, y0: number, w: number, h: number, bands: number[], signal?: AbortSignal): Promise<ArrayLike<number>[]>;
 }
+
+/** A source that can draw full-resolution imagery: a GeoTIFF file. */
+export type ImagerySource = RasterSource & Required<Pick<RasterSource, "block" | "overviews" | "readSamples">>;
 
 /** Byte sink; a FileSystemWritableFileStream satisfies it. */
 export interface Sink {

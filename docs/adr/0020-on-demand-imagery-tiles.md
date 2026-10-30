@@ -1,21 +1,22 @@
 # 0020: Full-resolution imagery as on-demand raster-aligned tiles
 
-**Status:** Accepted (Gage, 2026-10-29), with spec 020. The cache was raised from 192 to 512 tiles (Gage, 2026-10-29). Amends ADR 0015 (memory).
+**Status:** Accepted (Gage, 2026-10-29), with spec 020; cache raised to 512 tiles (Gage, 2026-10-29). Amendment A1 (read and block limits 16 MiB, cache counts tiles) accepted (Gage, 2026-10-29). Amends ADR 0015 (memory).
 
-**Context:** Imagery is one preview of at most 1024 px. Gage needs every source pixel when zoomed in. The options:
+**Context:** Imagery is one preview of at most 1024 px. Gage needs every source pixel when zoomed in. The options were:
 - (a) On-demand tiles drawn as ADR 0019 quads.
-- (b) A MapLibre raster source fed Mercator tiles through `addProtocol`. This resamples, which is ADR 0016's misalignment, and was not verified on 6.16.0.
+- (b) Mercator tiles through `addProtocol`. These resample, which is ADR 0016's misalignment, and this wasn't verified on maplibre-gl 6.16.0.
 - (c) A larger single preview: still not full resolution, and 64 MiB of GPU at 4096².
-- (d) A pyramid built in OPFS on open: a full pass and disk writes.
+- (d) A pyramid written to OPFS on open: a full pass and disk writes.
 
-**Decision:** (a). Tiles use overviews or decimation for s ≤ 4, with a fixed 512-tile LRU, not scaled from `navigator.deviceMemory` (Chromium-only). The library facts below were checked in geotiff 3.0.5:
-- Its decoded-block cache is unbounded, an array never evicted (`geotiffimage.js:202,421-440`), so it isn't used.
-- Its overview rule (`NewSubfileType & 1`, `geotiff.js:328-333`) is reused.
-- `Pool` is not used: `worker/create.js` imports `web-worker` and inlines the decoder bundle, and this is unverified with Vite.
+**Decision:** (a). Tiles come from overviews, or decimation for s ≤ 4. A fixed 512-tile LRU counts tiles, not quads; it isn't scaled from `navigator.deviceMemory`, which is Chromium-only. These geotiff 3.0.5 facts shaped it:
+- Its block cache is never evicted (`geotiffimage.js:202,421-440`), so it isn't used.
+- It decodes all of a window's blocks at once (`_readRaster`, `Promise.all`), so each read is capped at 16 MiB of decoded blocks, and blocks over 16 MiB turn tiles off.
+- `Pool` inlines its decoder through `web-worker` and is unverified with Vite, so it isn't used.
 
 **Consequences:**
 - No dependency.
 - Imagery and label pixels share edges at s = 1.
-- Up to 256 MiB more memory, about 500 MiB at worst with reads in flight.
+- Up to 256 MiB of tiles plus about 96 MiB of reads in flight: about 530 MiB at worst.
+- A single-strip file's preview still decodes the whole strip once per 256 px window.
 - Without overviews, coarse zooms show the preview.
-- More canvas sources: re-check `setWarp` and frame rate on maplibre-gl upgrades.
+- Re-check `setWarp` and frame rate on maplibre-gl upgrades.

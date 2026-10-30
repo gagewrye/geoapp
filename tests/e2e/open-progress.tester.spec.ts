@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
-import { jumpTo, message, openApp, openRaster, paintMode, rgbFixture, stroke, tileKeysStored, tiff, toScreen, view } from "./helpers";
+import { jumpTo, message, openApp, openRaster, paintMode, rgbTiled, stroke, tileKeysStored, tiff, tiledTiff, toScreen, view } from "./helpers";
 import { download, importFile, maskFile, noSavePicker } from "./seeding";
 
 // Spec 019, tester: the approved decisions while the preview loads, replacement and refusal while loading, odd files.
@@ -8,7 +8,7 @@ import { download, importFile, maskFile, noSavePicker } from "./seeding";
 const bar = (page: Page) => page.locator("#open-progress");
 const paint = (page: Page) => page.locator("#mode-paint");
 const pan = (page: Page) => page.locator("#mode-pan");
-const otherFixture = () => tiff("other.tif", 800, 600, 3, () => 150, { epsg: 4326, gt: [30, 0.01, 0, 46, 0, -0.01] });
+const otherFixture = () => tiledTiff("other.tif", 800, 600, 3, () => 150, { epsg: 4326, gt: [30, 0.01, 0, 46, 0, -0.01] });
 const previewWest = (page: Page) => page.evaluate(() => (window as any).__geoapp.map.getSource("preview")?.coordinates[0][0] as number | undefined);
 
 /** Wrap reads of rasters `width` wide: held until release(), or failing (ProgressEvent) from read number `failFrom` on. */
@@ -17,13 +17,17 @@ async function gate(page: Page, width: number, opts: { hold?: boolean; failFrom?
     const g = ((window as any).__g = { count: 0, held: [] as (() => void)[], hold, failFrom });
     (window as any).__geoapp.rasterFile = (src: any) => {
       if (src.meta.width !== width) return;
-      const read = src.readWindow.bind(src);
-      src.readWindow = async (...a: unknown[]) => {
-        g.count++;
-        if (g.failFrom !== null && g.count >= g.failFrom) throw new ProgressEvent("error");
-        if (g.hold) await new Promise<void>((r) => g.held.push(r));
-        return read(...a);
-      };
+      // spec 020's preview reads blocks with readSamples; readWindow serves sources without it
+      for (const m of ["readWindow", "readSamples"]) {
+        const read = src[m]?.bind(src);
+        if (!read) continue;
+        src[m] = async (...a: unknown[]) => {
+          g.count++;
+          if (g.failFrom !== null && g.count >= g.failFrom) throw new ProgressEvent("error");
+          if (g.hold) await new Promise<void>((r) => g.held.push(r));
+          return read(...a);
+        };
+      }
     };
   }, [width, opts.hold ?? false, opts.failFrom ?? null] as const);
 }
@@ -34,7 +38,7 @@ const failNow = (page: Page) => page.evaluate(() => { (window as any).__g.failFr
 /** Open rgbFixture with its preview reads held. */
 async function openHeld(page: Page): Promise<void> {
   await gate(page, 1000, { hold: true });
-  await openRaster(page, rgbFixture());
+  await openRaster(page, rgbTiled());
   await expect.poll(() => held(page)).toBeGreaterThan(0);
   await expect(paint(page)).toBeDisabled();
 }
@@ -105,7 +109,7 @@ test("Import labels while the preview loads: it runs, selects Pan, and Paint ena
 
 test("replacing an open raster in Paint mode: the new one starts with Paint disabled, Pan pressed and a counted bar", async ({ page }) => {
   await openApp(page);
-  await openRaster(page, rgbFixture());
+  await openRaster(page, rgbTiled());
   await expect(message(page)).toHaveText("Raster opened.");
   await paintMode(page);
   await gate(page, 800, { hold: true });
@@ -154,7 +158,7 @@ test("a single-window raster opens with the bar hidden and Paint enabled", async
 test("reads failing part-way through the preview: message, bar hidden, Paint disabled; the next file opens normally", async ({ page }) => {
   await openApp(page);
   await gate(page, 1000, { failFrom: 6 });
-  await openRaster(page, rgbFixture());
+  await openRaster(page, rgbTiled());
   await expect(message(page)).toHaveText(MESSAGES.rasterUnreadable);
   await expect(bar(page)).toBeHidden();
   await expect(paint(page)).toBeDisabled();
@@ -167,7 +171,7 @@ test("reads failing part-way through the preview: message, bar hidden, Paint dis
 test("a paint read that fails with a ProgressEvent shows rasterUnreadable (readErrorMessage)", async ({ page }) => {
   await openApp(page);
   await gate(page, 1000, {});
-  await openRaster(page, rgbFixture());
+  await openRaster(page, rgbTiled());
   await expect(message(page)).toHaveText("Raster opened.");
   await paintMode(page);
   await failNow(page);

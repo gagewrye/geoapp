@@ -22,6 +22,17 @@ describe("decimation", () => {
     expect(parts.bands).toEqual(one.bands);
     expect(Array.from(one.bands[0]!.subarray(0, 4))).toEqual([1, 4, 7, 9]);
   });
+  it("fills an output tile placed at x0, y0 from raw typed arrays (spec 020)", () => {
+    const f = 3;
+    const whole = decimatedTile(10, 7, f, 2, null);
+    decimateInto(whole, makeTile(0, 0, 10, 7, 2, colRow), f, 10, 7);
+    const part = { x0: 2, y0: 1, width: 2, height: 2, nodata: null, bands: [new Float32Array(4), new Float32Array(4)] };
+    const raw = makeTile(0, 0, 10, 7, 2, colRow);
+    decimateInto(part, { ...raw, bands: raw.bands.map((b) => Uint16Array.from(b)) }, f, 10, 7);
+    const want = (k: number) => [whole.bands[k]![1 * 4 + 2], whole.bands[k]![1 * 4 + 3], whole.bands[k]![2 * 4 + 2], whole.bands[k]![2 * 4 + 3]];
+    expect(Array.from(part.bands[0]!)).toEqual(want(0));
+    expect(Array.from(part.bands[1]!)).toEqual(want(1));
+  });
   it("keeps sampled pixel centres within half a pixel of decimated centres", () => {
     const gt = [100, 2, 0, 50, 0, -2] as [number, number, number, number, number, number];
     const d = decimatedAffine(gt, 4);

@@ -65,7 +65,7 @@ function ranges(src: Tile, nb: number): [number, number][] {
 
 /**
  * Warp a (decimated) tile onto an axis-aligned Mercator grid; corners are TL, TR, BR, BL lon/lat.
- * Each band is stretched over its own valid range unless `stretch` fixes one range for all.
+ * Each band is stretched over its own valid range unless `stretch` fixes one range for all; `ranges` are those used.
  */
 export function warpPreview(src: Tile, gt: Affine, epsg: number, maxSide: number, stretch?: [number, number]) {
   const nb = src.bands.length >= 3 ? 3 : 1;
@@ -87,5 +87,5 @@ export function warpPreview(src: Tile, gt: Affine, epsg: number, maxSide: number
     if (nb === 1) rgba[o + 1] = rgba[o + 2] = rgba[o]!;
     rgba[o + 3] = 255;
   });
-  return { rgba, width, height, corners };
+  return { rgba, width, height, corners, ranges: rg };
 }

@@ -1,7 +1,7 @@
 import type { Map as MapLibreMap } from "maplibre-gl";
 
-// Bottom to top (spec 012 Rendering, spec 003 Display, spec 014 Display).
-const SLOTS = ["basemap", "preview", "mask", "label-", "brush-hover"] as const;
+// Bottom to top (spec 012 Rendering, spec 003 Display, spec 014 Display, spec 020 imagery tiles).
+const SLOTS = ["basemap", "preview", "imagery-", "mask", "label-", "brush-hover"] as const;
 
 export type Slot = (typeof SLOTS)[number];
 

@@ -1,6 +1,7 @@
 import { crossesAntimeridian, projString } from "../core/crs";
-import { decimatedAffine, decimatedTile, decimateInto, decimationFactor } from "../core/decimate";
-import { tileWindows } from "../core/grid";
+import { decimatedAffine, decimatedTile, decimateInto, decimationFactor, type SourceWindow } from "../core/decimate";
+import { tileWindows, type Window } from "../core/grid";
+import { blockWindows, MAX_BLOCK_BYTES } from "../core/imagery";
 import { warpPreview } from "../core/warp";
 import type { RasterSource } from "./source";
 
@@ -24,9 +25,9 @@ export async function openRaster(source: Pick<RasterSource, "meta">): Promise<vo
 export type PreviewOptions = {
   /** Fixed value range for every band; see warpPreview. */
   stretch?: [number, number];
-  /** After each window read: `done` of `total` reads. */
+  /** After each read: `done` of `total` reads. */
   onProgress?: (done: number, total: number) => void;
-  /** Aborting stops the reads before the next window. */
+  /** Aborting stops the reads before the next one. */
   signal?: AbortSignal;
 };
 
@@ -38,19 +39,47 @@ const checkAborted = (signal?: AbortSignal) => {
 /** Pause before the warp when progress is reported, a little over one 60 Hz frame. */
 const FRAME_YIELD_MS = 20;
 
-/** Decimate window by window, then warp to a Mercator-aligned RGBA preview. */
+/** Decimate read by read, then warp to a Mercator-aligned RGBA preview. */
 export async function buildPreview(source: RasterSource, maxSide: number, { stretch, onProgress, signal }: PreviewOptions = {}) {
-  const { width, height, bandCount, gt, epsg, nodata } = source.meta;
-  const f = decimationFactor(width, height, maxSide);
-  const dec = decimatedTile(width, height, f, bandCount >= 3 ? 3 : 1, nodata);
-  const windows = tileWindows(width, height);
-  for (const [i, w] of windows.entries()) {
+  const { dec, gt, f, reads } = previewReads(source, maxSide, signal);
+  for (const [i, read] of reads.entries()) {
     checkAborted(signal);
-    decimateInto(dec, await source.readWindow(w.x0, w.y0, w.width, w.height), f, width, height);
-    onProgress?.(i + 1, windows.length);
+    decimateInto(dec.tile, await read(), f, dec.size[0]!, dec.size[1]!);
+    onProgress?.(i + 1, reads.length);
   }
   // For the caller's display: the warp blocks the main thread, so this usually yields past a frame (at 60 Hz) to draw the last progress first
   if (onProgress) await new Promise((r) => setTimeout(r, FRAME_YIELD_MS));
   checkAborted(signal);
-  return warpPreview(dec, decimatedAffine(gt, f), epsg, maxSide, stretch);
+  return warpPreview(dec.tile, gt, source.meta.epsg, maxSide, stretch);
+}
+
+/**
+ * What the preview reads, without reading: the decimated tile to fill, its geotransform, the step f over the image read
+ * (of size dec.size), and one read per window.
+ */
+function previewReads(source: RasterSource, maxSide: number, signal?: AbortSignal) {
+  const { width, height, bandCount, gt, nodata } = source.meta;
+  const nb = bandCount >= 3 ? 3 : 1;
+  const bands = nb === 3 ? [0, 1, 2] : [0];
+  const { block, readSamples, overviews = [] } = source;
+  const samples = (image: number, w: Window) => async (): Promise<SourceWindow> =>
+    ({ ...w, bands: await readSamples!.call(source, image, w.x0, w.y0, w.width, w.height, bands, signal) });
+  // spec 020: the smallest overview with a longest side of at least maxSide stands in for the image
+  const ov = overviews.filter((o) => Math.max(o.width, o.height) >= maxSide).sort((a, b) => a.width * a.height - b.width * b.height)[0];
+  if (ov && readSamples) {
+    const f = decimationFactor(ov.width, ov.height, maxSide);
+    const fx = width / ov.width, fy = height / ov.height;
+    return {
+      dec: { tile: decimatedTile(ov.width, ov.height, f, nb, nodata), size: [ov.width, ov.height] }, f,
+      gt: decimatedAffine([gt[0], gt[1] * fx, gt[2] * fy, gt[3], gt[4] * fx, gt[5] * fy], f),
+      reads: tileWindows(ov.width, ov.height).map((w) => samples(ov.index, w)),
+    };
+  }
+  const f = decimationFactor(width, height, maxSide);
+  // spec 020: only the blocks holding a sampled pixel, each decoded once, cropped to its sampled span. A block over
+  // MAX_BLOCK_BYTES (a single strip) is read in 256 px windows instead (A1): each decodes the block again, but output stays small.
+  const reads = !readSamples ? tileWindows(width, height).map((w) => () => source.readWindow(w.x0, w.y0, w.width, w.height))
+    : block && block.bytes <= MAX_BLOCK_BYTES ? blockWindows(width, height, block.width, block.height, f).map((w) => samples(0, w))
+    : tileWindows(width, height).map((w) => samples(0, w));
+  return { dec: { tile: decimatedTile(width, height, f, nb, nodata), size: [width, height] }, f, gt: decimatedAffine(gt, f), reads };
 }

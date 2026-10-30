@@ -6,6 +6,7 @@ import type { RasterSource } from "../io/source";
 import { createMap } from "../map/map";
 import { createNavigation } from "../map/navigation";
 import { fitToPreview, showPreview } from "../map/preview";
+import { initImagery } from "./imagery";
 import { initLabels, inTextField } from "./labels";
 import { errorText, MESSAGES } from "./messages";
 import { initOpenProgress } from "./openProgress";
@@ -16,6 +17,7 @@ const message = $("message");
 const say = (text: string) => { message.textContent = text; };
 
 const map = createMap($("map"));
+const fullRes = initImagery(map, say);
 let source: RasterSource | undefined;
 // Opens are numbered so that an older open finishing late can't replace the raster a newer one opened
 let opens = 0;
@@ -39,8 +41,8 @@ const nav = createNavigation(map, { typing: (el) => inTextField(el) || el instan
 
 map.on("load", () => {
   // Test hook for e2e (specs 001-014; labels.tile(key) is the effective tile); exposes no user data beyond this page. labelFile: set by a test to see opened label files;
-  // rasterFile: set by a test to see (and wrap the reads of) each opened raster before its preview is built.
-  const hook = { map, imagery: () => source ?? null, labelFile: null, rasterFile: null };
+  // rasterFile: set by a test to see (and wrap the reads of) each opened raster before its preview is built; fullRes: spec 020's block limit, which a test may lower before an open.
+  const hook = { map, imagery: () => source ?? null, labelFile: null, rasterFile: null, fullRes: fullRes.limits };
   Object.defineProperty(hook, "labels", { get: () => ({ store: labels.store(), classes: labels.classes(), tile: labels.tile }) });
   (window as unknown as Record<string, unknown>).__geoapp = hook;
   $("map").dataset.ready = "true";
@@ -76,6 +78,7 @@ $<HTMLInputElement>("open-raster").addEventListener("change", (ev) => {
     if (labels.hasLabels() && !confirm(MESSAGES.discard)) { input.value = ""; progress.hide(); return; }
     opened = req;
     source = s = f;
+    fullRes.clear();
     previewing?.abort(); // the replaced raster's preview reads stop
     const signal = (previewing = new AbortController()).signal;
     labels.open(f);
@@ -91,9 +94,10 @@ $<HTMLInputElement>("open-raster").addEventListener("change", (ev) => {
     if (stale()) return;
     showPreview(map, preview);
     fitToPreview(map, preview.corners);
+    const off = fullRes.open(f, preview.ranges);
     labels.imageryReady(true);
     progress.hide();
-    say("Raster opened.");
+    say(off ? `Raster opened. ${off}` : "Raster opened.");
   }, stale);
 });
 

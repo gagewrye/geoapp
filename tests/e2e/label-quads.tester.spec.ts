@@ -5,7 +5,7 @@ import { footprint, footprintRing } from "../../src/core/pixel";
 import type { Grid } from "../../src/core/types";
 import { writeFile } from "../unit/helpers/labelFiles";
 import {
-  BACKGROUND, clickAt, collectErrors, jumpTo, message, openApp, openRaster, paintMode, pixelAt, RGB_GRID, rgbFixture, selectClass, settled, tiff, toScreen, type LngLat,
+  hideImagery, BACKGROUND, clickAt, collectErrors, jumpTo, message, openApp, openRaster, paintMode, pixelAt, RGB_GRID, rgbFixture, selectClass, settled, tiff, toScreen, type LngLat,
 } from "./helpers";
 import { importFile, upload } from "./seeding";
 
@@ -22,7 +22,10 @@ const near = (p: number[], t: number[]) => p.every((v, k) => Math.abs(v - t[k]!)
 const layerIds = (page: Page) => page.evaluate(() => (window as any).__geoapp.map.getStyle().layers.map((l: { id: string }) => l.id) as string[]);
 const labelLayers = async (page: Page) => (await layerIds(page)).filter((id) => id.startsWith("label-")).sort();
 const labelSources = (page: Page) => page.evaluate(() => Object.keys((window as any).__geoapp.map.getStyle().sources).filter((id) => id.startsWith("label-")).sort());
-const hideAll = (page: Page) => page.evaluate(() => { const { map } = (window as any).__geoapp; for (const id of ["basemap", "preview"]) map.setLayoutProperty(id, "visibility", "none"); });
+const hideAll = async (page: Page) => {
+  await page.evaluate(() => (window as any).__geoapp.map.setLayoutProperty("basemap", "visibility", "none"));
+  await hideImagery(page); // the preview and spec 020's imagery tiles
+};
 const setLabelsVisible = (page: Page, on: boolean) => page.evaluate((on) => {
   const { map } = (window as any).__geoapp;
   for (const l of map.getStyle().layers) if (l.id.startsWith("label-")) map.setLayoutProperty(l.id, "visibility", on ? "visible" : "none");

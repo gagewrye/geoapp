@@ -6,6 +6,9 @@ import { mercator } from "./warp";
 /** A band of a label tile and the lon/lat of its pixel-grid corners TL, TR, BR, BL (spec 018). */
 export type Quad = { window: Window; corners: [number, number][] };
 
+/** Largest bilinear placement error of a quad's pixels, in pixels (spec 018). */
+export const QUAD_ERR = 0.05;
+
 // Corners past this are pulled in so MapLibre gets finite Mercator; corners beyond MAX_LAT never show.
 const POLE_LAT = 89.9;
 
