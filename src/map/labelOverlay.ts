@@ -1,8 +1,9 @@
 import type { CanvasSource, Map as MapLibreMap } from "maplibre-gl";
-import { paintLabels, QUAD_ERR, tileQuads } from "../core/labelQuads";
+import { paintLabels } from "../core/labelQuads";
 import { tileWindow } from "../core/labelStore";
 import type { Grid } from "../core/types";
 import { beforeSlot, labelViewProps } from "./layers";
+import { QuadCache } from "./quadCache";
 
 type Corners = [[number, number], [number, number], [number, number], [number, number]];
 type Part = { id: string; canvas: HTMLCanvasElement; dx: number; dy: number; corners: Corners };
@@ -13,8 +14,14 @@ type Overlay = { width: number; height: number; parts: Part[] };
 // once; callers batch redraws per frame, since a repaint walks the whole tile.
 export class LabelOverlays {
   private readonly overlays = new Map<string, Overlay>();
+  private readonly quads: QuadCache; // every quad set computed, for the raster's life (spec 023 F5)
 
-  constructor(private readonly map: MapLibreMap, private readonly grid: Grid) {}
+  constructor(private readonly map: MapLibreMap, private readonly grid: Grid) {
+    this.quads = new QuadCache(grid);
+  }
+
+  /** Computes these tiles' quads in idle time, so drawing them later projects nothing. */
+  prefetch(keys: string[]): void { this.quads.prefetch(keys); }
 
   /** Redraw one tile: create its overlay, repaint it, or remove it when the tile is gone. */
   update(key: string, labels: Uint8Array | undefined, colours: string[]): void {
@@ -42,7 +49,7 @@ export class LabelOverlays {
   private create(key: string): Overlay {
     const [x0, y0] = key.split(",").map(Number) as [number, number];
     const w = tileWindow(this.grid, x0, y0);
-    const quads = tileQuads(this.grid, w, QUAD_ERR);
+    const quads = this.quads.get(key);
     const parts = quads.map((q, i): Part => {
       const canvas = document.createElement("canvas");
       canvas.width = q.window.width;

@@ -38,8 +38,8 @@ export class UndoHistory {
   /** A cell of s entered the paint queue. */
   queued(s: StrokeEdit): void { s.queued++; }
 
-  /** Called before a cell of s is brushed; older entries make room so the stroke's own copies are kept. */
-  record(s: StrokeEdit, w: Window): void {
+  /** Called before a move of s is brushed, with its window or tile keys; older entries make room so the stroke's own copies are kept. */
+  record(s: StrokeEdit, w: Window | string[]): void {
     const n = s.edit.size;
     recordTiles(this.store(), s.edit, w);
     if (s.edit.size > n) trimHistory(this.history, UNDO_BYTES - this.openBytes(), UNDO_STEPS);

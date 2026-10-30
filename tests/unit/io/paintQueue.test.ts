@@ -1,12 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { footprint } from "../../../src/core/pixel";
 import { emptyStore, type LabelStore } from "../../../src/core/labelStore";
-import { PaintQueue } from "../../../src/io/paintQueue";
+import { cellOp, PaintQueue } from "../../../src/io/paintQueue";
 import type { RasterSource } from "../../../src/io/source";
 import { idle } from "../helpers/paintQueue";
 import { fakeSource } from "../helpers/sources";
 
-type Read = { x0: number; y0: number; width: number; height: number };
 
 /** Instrumented 2048x2048 source: logs reads, tracks reads in flight, and can be held. */
 function instrumented(nodata: (c: number, r: number) => boolean = () => false) {
@@ -44,66 +43,62 @@ function queue(src: ReturnType<typeof instrumented>, store: LabelStore = emptySt
 }
 
 const dab = (store: LabelStore, c: number, r: number, side = 7) => footprint(store, c, r, side)!;
-const key = (w: Read) => `${w.x0},${w.y0}`;
-const aligned = (reads: Read[]) => reads.every((w) => w.x0 % 256 === 0 && w.y0 % 256 === 0 && w.width === 256 && w.height === 256);
 
 describe("paint reads (criterion 8)", () => {
   it("erasing reads no window", async () => {
     const src = instrumented();
     const { q, store } = queue(src);
     store.tiles.set("0,0", new Uint8Array(65536).fill(1));
-    for (let c = 0; c < 600; c += 3) q.push({ w: dab(store, c, 100), value: 1, erase: true });
+    for (let c = 0; c < 600; c += 3) q.push(cellOp(dab(store, c, 100), 1, true));
     await idle(q);
     expect(src.reads).toEqual([]);
     expect(store.tiles.get("0,0")![100 * 256 + 10]).toBe(0);
   });
 
-  it("a stroke back and forth over two stored tiles reads each once, one at a time, aligned", async () => {
+  // Spec 023 (ADR 0021) amends this criterion: a missing mask reads its whole 256-row band, once, and masks are kept.
+  it("a stroke back and forth over two tiles reads their band once, one read at a time", async () => {
     const src = instrumented();
     const { q, store } = queue(src);
-    for (let pass = 0; pass < 3; pass++) for (let c = 240; c <= 270; c++) q.push({ w: dab(store, pass % 2 ? 510 - c : c, 100), value: 1, erase: false });
+    for (let pass = 0; pass < 3; pass++) for (let c = 240; c <= 270; c++) q.push(cellOp(dab(store, pass % 2 ? 510 - c : c, 100), 1, false));
     await idle(q);
-    expect(src.reads.map(key)).toEqual(["0,0", "256,0"]);
-    expect(aligned(src.reads)).toBe(true);
+    expect(src.reads).toEqual([{ x0: 0, y0: 0, width: 2048, height: 256 }]);
     expect(src.maxInFlight).toBe(1);
     expect([...store.tiles.keys()].sort()).toEqual(["0,0", "256,0"]);
   });
 
-  it("reads only tiles a footprint meets that have no mask", async () => {
+  it("reads only the bands of tiles a footprint meets that have no mask", async () => {
     const src = instrumented();
     const { q, store } = queue(src);
-    q.push({ w: dab(store, 253, 253), value: 2, erase: false }); // a tile corner: 4 tiles
-    q.push({ w: dab(store, 1000, 1000), value: 2, erase: false });
+    q.push(cellOp(dab(store, 253, 253), 2, false)); // a tile corner: 4 tiles in 2 bands
+    q.push(cellOp(dab(store, 1000, 1000), 2, false));
+    q.push(cellOp(dab(store, 1500, 300), 2, false)); // band 256 is read already
     await idle(q);
-    expect(src.reads.map(key)).toEqual(["0,0", "256,0", "0,256", "256,256", "768,768"]);
+    expect(src.reads.map((w) => w.y0)).toEqual([0, 256, 768]);
     expect(src.maxInFlight).toBe(1);
   });
 
-  it("a stroke that leaves a tile it labelled nothing in and comes back reads it again", async () => {
+  it("a stroke that leaves a tile it labelled nothing in and comes back reads nothing again", async () => {
     // tile 256,0 is all nodata, so the stroke labels nothing there and stores no tile
     const src = instrumented((c) => c >= 256 && c < 512);
     const { q, store } = queue(src);
-    const stroke = (cols: number[]) => cols.forEach((c) => q.push({ w: dab(store, c, 100), value: 1, erase: false }));
-    stroke([200, 300, 400, 300]); // stays on tile 256,0: its mask is kept
+    const stroke = (cols: number[]) => cols.forEach((c) => q.push(cellOp(dab(store, c, 100), 1, false)));
+    stroke([200, 300, 400, 300]);
     await idle(q);
-    expect(src.reads.map(key)).toEqual(["0,0", "256,0"]);
-    stroke([200, 300]); // leaves it (mask freed), then comes back
+    stroke([200, 300, 100]);
     await idle(q);
-    expect(src.reads.map(key)).toEqual(["0,0", "256,0", "256,0"]);
+    expect(src.reads).toHaveLength(1);
     expect([...store.tiles.keys()]).toEqual(["0,0"]);
-    expect([...q.masks.keys()].sort()).toEqual(["0,0", "256,0"]);
-    stroke([100]);
-    await idle(q);
-    expect([...q.masks.keys()]).toEqual(["0,0"]);
+    expect(q.masks.get("256,0")).toBe("none");
+    expect(q.masks.size).toBe(8);
   });
 
   it("queues cells during a held read, applies them in order once reads resume, and is busy until then", async () => {
     const src = instrumented();
     const { q, store, events } = queue(src);
     src.hold();
-    q.push({ w: dab(store, 10, 10), value: 1, erase: false });
-    q.push({ w: dab(store, 12, 10), value: 2, erase: false });
-    q.push({ w: dab(store, 12, 10, 1), value: 2, erase: true }); // erase waits its turn too
+    q.push(cellOp(dab(store, 10, 10), 1, false));
+    q.push(cellOp(dab(store, 12, 10), 2, false));
+    q.push(cellOp(dab(store, 12, 10, 1), 2, true)); // erase waits its turn too
     await new Promise((r) => setTimeout(r, 20));
     expect(store.tiles.size).toBe(0);
     expect(q.size).toBe(3);
@@ -117,21 +112,20 @@ describe("paint reads (criterion 8)", () => {
     expect(src.reads).toHaveLength(1);
   });
 
-  it("clear drops the queue and every mask, and a read finishing afterwards changes nothing", async () => {
+  it("clear drops the queue, keeps the masks, and a read finishing afterwards changes no tile", async () => {
     const src = instrumented();
     const { q, store } = queue(src);
-    q.push({ w: dab(store, 10, 10), value: 1, erase: false });
+    q.push(cellOp(dab(store, 10, 10), 1, false));
     await idle(q);
     src.hold();
-    q.push({ w: dab(store, 600, 10), value: 1, erase: false });
+    q.push(cellOp(dab(store, 600, 600), 1, false));
     await new Promise((r) => setTimeout(r, 10));
     q.clear();
     expect(q.size).toBe(0);
-    expect(q.masks.size).toBe(0);
     src.release();
     await new Promise((r) => setTimeout(r, 10));
     expect([...store.tiles.keys()]).toEqual(["0,0"]);
-    expect(q.masks.size).toBe(0);
+    expect(q.masks.size).toBe(16); // bands 0 and 512
   });
 
   it("reports full, changes nothing for that cell and applies the next", async () => {
@@ -140,8 +134,8 @@ describe("paint reads (criterion 8)", () => {
     for (let i = 0; i < 256; i++) store.tiles.set(`${(i % 16) * 256},${Math.floor(i / 16) * 256}`, new Uint8Array(65536).fill(1));
     let full = 0;
     const q = new PaintQueue(source, () => store, { applied() {}, full: () => { full++; }, busy() {}, error: (e) => { throw e; } });
-    q.push({ w: dab(store, 100, 16 * 256 + 100), value: 2, erase: false });
-    q.push({ w: dab(store, 100, 100), value: 2, erase: false });
+    q.push(cellOp(dab(store, 100, 16 * 256 + 100), 2, false));
+    q.push(cellOp(dab(store, 100, 100), 2, false));
     await idle(q);
     expect(full).toBe(1);
     expect(store.tiles.size).toBe(256);
@@ -157,12 +151,12 @@ describe("errors", () => {
       const store = emptyStore(2048, 2048);
       const busy: boolean[] = [], errors: unknown[] = [];
       const q = new PaintQueue(src.source, () => store, { applied() {}, full() {}, busy: (b) => { busy.push(b); }, error: (e) => { errors.push(e); } });
-      q.push({ w: dab(store, 10, 10), value: 0, erase });
+      q.push(cellOp(dab(store, 10, 10), 0, erase));
       await new Promise((r) => setTimeout(r, 20));
       expect(errors).toHaveLength(1);
       expect(q.size).toBe(0);
       expect(busy).toEqual([true, false]);
-      q.push({ w: dab(store, 10, 10), value: 1, erase: false }); // the queue still works
+      q.push(cellOp(dab(store, 10, 10), 1, false)); // the queue still works
       await new Promise((r) => setTimeout(r, 20));
       expect(busy).toEqual([true, false, true, false]);
       expect(store.tiles.size).toBe(1);

@@ -16,6 +16,7 @@ const lonLat = (c: number, r: number): LngLat => [GRID.gt[0] + c * GRID.gt[1], G
 
 async function setup(page: Page, centre: [number, number] = [215, 115]) {
   await openApp(page);
+  await page.evaluate(() => { (window as any).__geoapp.pauseMasks = true; }); // spec 023: strokes, not the background, read the masks
   await openRaster(page, fixture());
   await expect(message(page)).toHaveText("Raster opened.");
   await paintMode(page);
@@ -80,10 +81,13 @@ test.describe("imagery nodata (criterion 19)", () => {
     await setup(page);
     await page.evaluate(() => {
       const s = (window as any).__geoapp.imagery();
-      const read = s.readWindow.bind(s);
       const g = (window as any).__gate = { held: true, open: null as null | (() => void), wait: null as null | Promise<void> };
       g.wait = new Promise<void>((r) => { g.open = r; });
-      s.readWindow = async (...a: unknown[]) => { if (g.held) await g.wait; return read(...a); };
+      // spec 023: masks are read through readSamples, by band; the setup paused the background reads
+      for (const m of ["readWindow", "readSamples"]) {
+        const read = s[m].bind(s);
+        s[m] = async (...a: unknown[]) => { if (g.held) await g.wait; return read(...a); };
+      }
     });
     const pts = await across(page, 85, 345, 115, 30);
     await drag(page, pts);

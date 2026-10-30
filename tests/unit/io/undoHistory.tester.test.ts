@@ -4,7 +4,7 @@ import { emptyStore, type LabelStore } from "../../../src/core/labelStore";
 import { footprint } from "../../../src/core/pixel";
 import { TILE_SIZE } from "../../../src/core/types";
 import { UNDO_BYTES, UNDO_STEPS, editBytes } from "../../../src/core/undo";
-import { PaintQueue } from "../../../src/io/paintQueue";
+import { cellOp, PaintQueue } from "../../../src/io/paintQueue";
 import type { RasterSource } from "../../../src/io/source";
 import { UndoHistory } from "../../../src/io/undoHistory";
 import { idle } from "../helpers/paintQueue";
@@ -33,14 +33,14 @@ function setup(opts: { fail?: (x0: number, y0: number) => boolean; w?: number; h
 }
 type T = ReturnType<typeof setup>;
 const cells = (t: T, s: ReturnType<UndoHistory["begin"]>, pts: [number, number][], value: number, side = 1, erase = false) => {
-  for (const [c, r] of pts) t.q.push({ w: footprint(t.store, c, r, side)!, value, erase, stroke: s });
+  for (const [c, r] of pts) t.q.push(cellOp(footprint(t.store, c, r, side)!, value, erase, s));
 };
 
 describe("UndoHistory edges (spec 010, tester)", () => {
   it("a failed read mid-stroke keeps what applied undoable, as one entry", async () => {
-    const t = setup({ fail: (x0) => x0 === 512 });
+    const t = setup({ fail: (_x0, y0) => y0 === 256 }); // spec 023: masks are read by 256-row band
     const s = t.history.begin();
-    cells(t, s, [[10, 10], [300, 10], [600, 10], [700, 10]], 1);
+    cells(t, s, [[10, 10], [300, 10], [600, 300], [700, 300]], 1);
     await idle(t.q);
     t.history.end(s);
     expect(t.errors).toHaveLength(1);
@@ -90,7 +90,7 @@ describe("UndoHistory edges (spec 010, tester)", () => {
 
   it("cells pushed without a stroke (the e2e hook) bypass the history", async () => {
     const t = setup();
-    t.q.push({ w: footprint(t.store, 5, 5, 1)!, value: 1, erase: false });
+    t.q.push(cellOp(footprint(t.store, 5, 5, 1)!, 1, false));
     await idle(t.q);
     expect(t.history.size).toBe(0);
     expect(t.store.tiles.size).toBe(1);
@@ -127,7 +127,7 @@ describe("UndoHistory edges (spec 010, tester)", () => {
     for (let k = 0; k < 40; k++) {
       const s = t.history.begin();
       for (const w of all.slice((k % 4) * 64, (k % 4) * 64 + 64)) {
-        t.q.push({ w: footprint(t.store, w.x0 + (k % 200), w.y0 + 3, 1)!, value: 1 + (k % 3), erase: false, stroke: s });
+        t.q.push(cellOp(footprint(t.store, w.x0 + (k % 200), w.y0 + 3, 1)!, 1 + (k % 3), false, s));
         await idle(t.q);
         peak = Math.max(peak, t.history.bytes());
       }

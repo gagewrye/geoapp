@@ -1,5 +1,7 @@
 import type { Window } from "./grid";
 import { maskBit } from "./nodata";
+import type { Span } from "./spans";
+import { validAt, type ValidMask } from "./validMask";
 import { TILE_SIZE } from "./types";
 
 /** At most 256 label tiles (16 MiB) in memory (ADR 0010). */
@@ -18,6 +20,15 @@ export const emptyStore = (width: number, height: number): LabelStore => ({ widt
 /** The tileWindows() window whose origin is (x0, y0), clipped to the raster. */
 export function tileWindow(dims: { width: number; height: number }, x0: number, y0: number): Window {
   return { x0, y0, width: Math.min(TILE_SIZE, dims.width - x0), height: Math.min(TILE_SIZE, dims.height - y0) };
+}
+
+/** Keys of the (2r+1) x (2r+1) tiles around the tile holding w's centre, clipped to the raster, row-major. */
+export function keysAround(dims: { width: number; height: number }, w: Window, r = 2): string[] {
+  const cx = Math.floor((w.x0 + (w.width >> 1)) / TILE_SIZE), cy = Math.floor((w.y0 + (w.height >> 1)) / TILE_SIZE);
+  const keys: string[] = [];
+  for (let y = Math.max(0, cy - r); y <= cy + r && y * TILE_SIZE < dims.height; y++)
+    for (let x = Math.max(0, cx - r); x <= cx + r && x * TILE_SIZE < dims.width; x++) keys.push(`${x * TILE_SIZE},${y * TILE_SIZE}`);
+  return keys;
 }
 
 const origin = (key: string): [number, number] => key.split(",").map(Number) as [number, number];
@@ -79,10 +90,60 @@ export function brush(store: LabelStore, masks: NodataMasks, w: Window, value: n
   return "ok";
 }
 
-/** Deletes the masks of tiles that are neither stored nor met by w (null: met by nothing). */
-export function keepMasks(store: LabelStore, masks: NodataMasks, w: Window | null): void {
-  const met = new Set(w ? tileKeys(w) : []);
-  for (const key of [...masks.keys()]) if (!store.tiles.has(key) && !met.has(key)) masks.delete(key);
+/** Masks by key: a Map or spec 023's MaskStore. */
+export type MaskLookup = { get(key: string): ValidMask | undefined };
+
+/** Spans split at tile edges, grouped by key: [row index within the tile, first col, end col] in tile coordinates. */
+function spansByTile(store: LabelStore, spans: Span[]): Map<string, { t: Window; runs: [number, number, number][] }> {
+  const out = new Map<string, { t: Window; runs: [number, number, number][] }>();
+  for (const s of spans) {
+    const y0 = Math.floor(s.row / TILE_SIZE) * TILE_SIZE;
+    for (let x0 = Math.floor(s.x0 / TILE_SIZE) * TILE_SIZE; x0 < s.x1; x0 += TILE_SIZE) {
+      const key = `${x0},${y0}`;
+      let e = out.get(key);
+      if (!e) out.set(key, (e = { t: tileWindow(store, x0, y0), runs: [] }));
+      e.runs.push([s.row - y0, Math.max(s.x0, x0) - x0, Math.min(s.x1, x0 + TILE_SIZE) - x0]);
+    }
+  }
+  return out;
+}
+
+/** brush over spans (spec 023 F6): the result of brushing each cell in turn, but at the cap the whole move is "full" and changes nothing. */
+export function brushSpans(store: LabelStore, masks: MaskLookup, spans: Span[], value: number, erase: boolean): "ok" | "full" {
+  if (!Number.isInteger(value) || value < 1 || value > 255) throw new Error(`brushSpans: label value ${value} is not 1..255`);
+  const byTile = spansByTile(store, spans);
+  if (erase) {
+    for (const [key, { t, runs }] of byTile) {
+      const tile = store.tiles.get(key);
+      if (!tile) continue;
+      let cleared = false;
+      for (const [r, a, b] of runs) for (let i = r * t.width + a, e = r * t.width + b; i < e; i++) if (tile[i] === value) { tile[i] = 0; cleared = true; }
+      if (cleared && !store.base && isEmpty(tile)) store.tiles.delete(key);
+    }
+    return "ok";
+  }
+  // plan first, so a missing mask or the cap changes nothing
+  const plan = [...byTile].map(([key, { t, runs }]) => {
+    const mask = masks.get(key);
+    if (mask === undefined) throw new Error(`brushSpans: no nodata mask for tile ${key}`);
+    let create = false;
+    if (!store.tiles.has(key) && mask !== "none") {
+      create = mask === "all" || runs.some(([r, a, b]) => { for (let i = r * t.width + a; i < r * t.width + b; i++) if (validAt(mask, i)) return true; return false; });
+    }
+    return { key, t, runs, mask, create };
+  });
+  if (store.tiles.size + plan.filter((p) => p.create).length > MAX_LABEL_TILES) return "full";
+  for (const { key, t, runs, mask, create } of plan) {
+    const tile = store.tiles.get(key) ?? (create ? new Uint8Array(t.width * t.height) : undefined);
+    if (!tile || mask === "none") continue;
+    for (const [r, a, b] of runs) {
+      const s = r * t.width + a, e = r * t.width + b;
+      if (mask === "all") tile.fill(value, s, e);
+      else for (let i = s; i < e; i++) if (!maskBit(mask, i)) tile[i] = value;
+    }
+    if (create) store.tiles.set(key, tile);
+  }
+  return "ok";
 }
 
 /** Replaces w's tile with window-sized labels; all zeros deletes it unless store.base; "full" (a new key at the cap) changes nothing. */

@@ -82,14 +82,19 @@ export const pauseLabelFile = (page: Page) => page.evaluate(() => {
 });
 export const openFileGate = (page: Page) => page.evaluate(() => (window as any).__fileGate.open());
 
-/** Holds every imagery read until `openImageryGate`. */
+/** Holds every imagery read (whole windows and spec 020's sample reads) until `openImageryGate`. */
 export const pauseImagery = (page: Page) => page.evaluate(() => {
   const s = (window as any).__geoapp.imagery();
-  const read = s.readWindow.bind(s);
   const g = (window as any).__gate = { reads: 0, open: null as null | (() => void) };
   const wait = new Promise<void>((r) => { g.open = r; });
-  s.readWindow = async (...a: unknown[]) => { g.reads++; await wait; return read(...a); };
+  for (const m of ["readWindow", "readSamples"]) {
+    if (!s[m]) continue;
+    const read = s[m].bind(s);
+    s[m] = async (...a: unknown[]) => { g.reads++; await wait; return read(...a); };
+  }
 });
+/** Holds spec 023's background mask reads (call before opening the raster), so a stroke reads its own masks. */
+export const holdMasks = (page: Page) => page.evaluate(() => { (window as any).__geoapp.pauseMasks = true; });
 export const openImageryGate = (page: Page) => page.evaluate(() => (window as any).__gate.open());
 
 /** Spec 001's EPSG:4326 fixture grid, with band 2 nodata (-9999) on a block the class rasters cover. */

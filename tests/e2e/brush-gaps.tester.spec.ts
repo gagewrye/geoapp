@@ -29,7 +29,7 @@ async function setSize(page: Page, px: number) {
   while ((await page.locator("#brush-size").textContent()) !== `Brush: ${px} px`) await page.click("#brush-larger");
 }
 
-test("a fast size-127 drag at zoom 4 over a 65792 px wide strip labels every pixel between its ends, reading aligned windows one at a time", async ({ page }) => {
+test("a fast size-127 drag at zoom 4 over a 65792 px wide strip labels every pixel between its ends, reading no imagery", async ({ page }) => {
   test.setTimeout(120_000);
   const parts: Uint8Array[] = [];
   const geo = { GeoKeyDirectory: [1, 1, 0, 3, 1024, 0, 1, 2, 1025, 0, 1, 1, 2048, 0, 1, 4326], ModelPixelScale: [0.005, 0.005, 0], ModelTiepoint: [0, 0, 0, -175, 10, 0] };
@@ -43,12 +43,15 @@ test("a fast size-127 drag at zoom 4 over a 65792 px wide strip labels every pix
   await jumpTo(page, [-20, 9.995], 4);
   await page.evaluate(() => {
     const s = (window as any).__geoapp.imagery();
-    const read = s.readWindow.bind(s);
-    const log = (window as any).__log = { reads: [] as number[][], inFlight: 0, max: 0 };
-    s.readWindow = async (...a: number[]) => {
-      log.reads.push(a); log.inFlight++; log.max = Math.max(log.max, log.inFlight);
-      try { return await read(...a); } finally { log.inFlight--; }
-    };
+    const log = (window as any).__log = { reads: [] as unknown[][], inFlight: 0, max: 0 };
+    for (const m of ["readWindow", "readSamples"]) { // spec 023 reads masks with readSamples: gate both
+      if (!s[m]) continue;
+      const read = s[m].bind(s);
+      s[m] = async (...a: unknown[]) => {
+        log.reads.push([m, ...a]); log.inFlight++; log.max = Math.max(log.max, log.inFlight);
+        try { return await read(...a); } finally { log.inFlight--; }
+      };
+    }
   });
   const a = round(await toScreen(page, [-35, 9.995])), b = round(await toScreen(page, [-5, 9.995]));
   const pts: Xy[] = [a, round({ x: (a.x + b.x) / 2, y: a.y }), b]; // two moves of ~300 screen px, ~3000 raster px each
@@ -64,9 +67,7 @@ test("a fast size-127 drag at zoom 4 over a 65792 px wide strip labels every pix
   const cols = [...got].map((k) => Number(k.split(",")[0]));
   expect(Math.max(...cols) - Math.min(...cols) + 1).toBe(got.size / 2); // both rows, no gap
   const log = await page.evaluate(() => (window as any).__log);
-  expect(log.max).toBe(1);
-  for (const [x0, y0, w, h] of log.reads) expect([x0 % 256, y0, w, h]).toEqual([0, 0, 256, 2]);
-  expect(new Set(log.reads.map((r: number[]) => r[0])).size).toBe(log.reads.length); // each tile read once
+  expect(log.reads).toEqual([]); // spec 023 F2: a uint8 file with no nodata or alpha has no nodata pixel, so no mask is read
 });
 
 test("a stroke that leaves the globe and comes back is lifted: nothing is interpolated across the gap", async ({ page }) => {

@@ -1,6 +1,8 @@
 import { GeoTIFF } from "geotiff";
 import { CLASS_ITEM } from "../core/classTable";
 import type { Window } from "../core/grid";
+import { MAX_READ_BYTES } from "../core/imagery";
+import { TILE_SIZE } from "../core/types";
 import { loadBlockOffsets, readGeoMeta, sourceOf } from "./geotiffSource";
 import { openRaster } from "./pipeline";
 import type { RasterMeta } from "./source";
@@ -13,6 +15,9 @@ export type LabelSource = {
   classItem: string | null;
   read(w: Window): Promise<Uint8Array>;
 };
+
+/** Row chunks of a label file kept (spec 023 F4), and their width: 256 rows of 1-byte samples within MAX_READ_BYTES. */
+const LABEL_ROWS = 4, CHUNK_WIDTH = Math.floor(MAX_READ_BYTES / TILE_SIZE / TILE_SIZE) * TILE_SIZE;
 
 /** The file isn't a single-band 8-bit unsigned GeoTIFF. */
 export class LabelFileRefused extends Error {
@@ -37,13 +42,33 @@ export async function openLabelTiff(tiff: GeoTIFF): Promise<LabelSource> {
   await openRaster({ meta });
   await loadBlockOffsets(image);
   const item = (await image.getGDALMetadata())?.[CLASS_ITEM];
+  const rows = new Map<string, Window & { data: Uint8Array }>(); // the last LABEL_ROWS row chunks read, least recent first
+  // blobSource rejects with Blob.arrayBuffer's own DOMException (NotReadableError, NotFoundError), which maskReadFailed reads
+  const readRaw = async (w: Window): Promise<Uint8Array> => {
+    const [band] = (await image.readRasters({ window: [w.x0, w.y0, w.x0 + w.width, w.y0 + w.height], samples: [0] })) as unknown as Uint8Array[];
+    return band!;
+  };
   return {
     meta,
     classItem: typeof item === "string" ? item : null,
+    // Spec 023 F4: a window is cut from its 256-row chunk (at most MAX_READ_BYTES of samples), and the last
+    // LABEL_ROWS chunks are kept, so the windows of a striped file's row band decode its strips once.
     async read(w) {
-      // blobSource rejects with Blob.arrayBuffer's own DOMException (NotReadableError, NotFoundError), which maskReadFailed reads
-      const [band] = (await image.readRasters({ window: [w.x0, w.y0, w.x0 + w.width, w.y0 + w.height], samples: [0] })) as unknown as Uint8Array[];
-      return band!;
+      const y0 = Math.floor(w.y0 / TILE_SIZE) * TILE_SIZE, x0 = Math.floor(w.x0 / CHUNK_WIDTH) * CHUNK_WIDTH;
+      const chunk = { x0, y0, width: Math.min(CHUNK_WIDTH, meta.width - x0), height: Math.min(TILE_SIZE, meta.height - y0) };
+      if (w.x0 + w.width > chunk.x0 + chunk.width || w.y0 + w.height > chunk.y0 + chunk.height) return readRaw(w); // not inside one chunk
+      const key = `${x0},${y0}`;
+      let c = rows.get(key);
+      if (c) rows.delete(key);
+      else c = { ...chunk, data: await readRaw(chunk) };
+      rows.set(key, c);
+      for (const k of rows.keys()) { if (rows.size <= LABEL_ROWS) break; rows.delete(k); }
+      const out = new Uint8Array(w.width * w.height);
+      for (let r = 0; r < w.height; r++) {
+        const s = (w.y0 - c.y0 + r) * c.width + (w.x0 - c.x0);
+        out.set(c.data.subarray(s, s + w.width), r * w.width);
+      }
+      return out;
     },
   };
 }

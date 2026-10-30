@@ -9,8 +9,10 @@ export type BrushMode = "paint" | "pan";
 type Deps = {
   side: () => number;
   colour: () => string;
-  /** Footprints of the stroke cells one pointer position reaches, in order. */
-  cells: (ws: Window[], erase: boolean) => void;
+  /** The stroke cells one pointer move reaches, in order, all on or overlapping the raster, with the brush side (spec 023 F6). */
+  cells: (cells: [number, number][], side: number, erase: boolean) => void;
+  /** The Paint hover's footprint, or null when none shows (spec 023 F3, F5). */
+  hovered?: (w: Window | null) => void;
   /** A stroke began (before its first cells) or ended. */
   onStroke: (active: boolean) => void;
   /** A middle-button pan is in progress (spec 009): presses paint nothing. */
@@ -74,6 +76,7 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
     const cell = pointer && painting() && !locked ? cellAt(pointer.x, pointer.y, pointer.target) : null;
     const w = cell && footprint(grid!, cell[0], cell[1], deps.side());
     showHover(map, w ? footprintRing(grid!, w) : null, deps.colour());
+    deps.hovered?.(w);
   };
 
   const apply = (s: Stroke, e: PointerEvent) => {
@@ -86,9 +89,8 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
     // only cells whose footprint can meet the raster; the previous cell was applied already
     const box = { x0: -h, y0: -h, x1: grid!.width - 1 + h, y1: grid!.height - 1 + h };
     const cells = prev ? strokeCellsIn(prev, cell, box).filter(([c, r]) => c !== prev[0] || r !== prev[1]) : [cell];
-    const ws: Window[] = [];
-    for (const [c, r] of cells) { const w = footprint(grid!, c, r, side); if (w) ws.push(w); }
-    if (ws.length) deps.cells(ws, s.erase);
+    const on = cells.filter(([c, r]) => footprint(grid!, c, r, side) !== null);
+    if (on.length) deps.cells(on, side, s.erase);
   };
 
   const end = () => {
