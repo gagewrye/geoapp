@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { fromArrayBuffer, writeArrayBuffer } from "geotiff";
 import type { Window } from "../../../src/core/grid";
-import { decodedBytes, MAX_READ_BYTES, type Block, type Level } from "../../../src/core/imagery";
+import { decodedBytes, MAX_READ_BYTES, TASK_READ_BYTES, type Block, type Level } from "../../../src/core/imagery";
 import { maskBit, nodataMask } from "../../../src/core/nodata";
 import { seedWindows } from "../../../src/core/seed";
 import type { Affine, Grid } from "../../../src/core/types";
@@ -136,11 +136,12 @@ describe("spec 021's skip with alpha (criterion 8)", () => {
 });
 
 describe("rule R: an import's imagery reads, one row of seed windows at a time (criterion 9)", () => {
+  // spec 024 reads them through the mask cache, whose geotiff reads spec 028 caps at TASK_READ_BYTES: two per row here
   const strips = (bytes: number): Block => ({ width: G.width, height: 1, bytes });
   for (const [name, meta, block, rowsRead] of [
-    ["alpha only, 1-row strips", { alpha: 3, nodata: null, float: false }, strips(G.width * 4), 3],
-    ["alpha only, strips split by MAX_READ_BYTES", { alpha: 3, nodata: null, float: false }, strips(200_000), null],
-    ["alpha and nodata, 256 tiles", { alpha: 3, nodata: 7, float: false }, { width: 256, height: 256, bytes: 256 * 256 * 4 }, 3],
+    ["alpha only, 1-row strips", { alpha: 3, nodata: null, float: false }, strips(G.width * 4), 6],
+    ["alpha only, strips split by the read cap", { alpha: 3, nodata: null, float: false }, strips(200_000), null],
+    ["alpha and nodata, 256 tiles", { alpha: 3, nodata: 7, float: false }, { width: 256, height: 256, bytes: 256 * 256 * 4 }, 6],
   ] as const) {
     it(`reads rows of seed windows within the limit, each block once per row, with tiles equal to unbatched reads (${name})`, { timeout: 60_000 }, async () => {
       const m = { ...G, bandCount: 4, ...meta };
@@ -156,7 +157,7 @@ describe("rule R: an import's imagery reads, one row of seed windows at a time (
       for (const x of imported) {
         const row = Math.floor(x.y0 / 256);
         expect(Math.floor((x.y0 + x.height - 1) / 256)).toBe(row); // one row of seed windows, or part of one
-        expect(decodedBytes(x, block, G.width, G.height)).toBeLessThanOrEqual(MAX_READ_BYTES);
+        expect(decodedBytes(x, block, G.width, G.height)).toBeLessThanOrEqual(TASK_READ_BYTES);
         for (let by = Math.floor(x.y0 / block.height); by < Math.ceil((x.y0 + x.height) / block.height); by++)
           for (let bx = Math.floor(x.x0 / block.width); bx < Math.ceil((x.x0 + x.width) / block.width); bx++) {
             const k = `${row}:${bx},${by}`;
