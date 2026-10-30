@@ -20,6 +20,7 @@
   - an overview of size W/s x H/s (within 1%);
   - else, for s ≤ 4, full resolution sampled at `i*s + floor(s/2)`;
   - else none, and the preview shows.
+  - An overview whose block is over `MAX_BLOCK_BYTES` isn't used, neither for tiles nor as the preview's source. Its level decimates (s ≤ 4) or shows the preview.
 - At s ≥ 2 the last texel may reach up to s−1 px past the raster edge, as the preview's decimation does.
 - **Placement:** tiles are ADR 0019 quads of the level grid, equal to the label quads at s = 1.
 
