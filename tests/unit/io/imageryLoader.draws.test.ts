@@ -64,6 +64,19 @@ describe("drawing (criterion 3)", () => {
     expect(reads.at(-1)).toMatchObject({ x0: 1280, y0: 0, width: 256, height: 256 });
   });
 
+  it("a read kept for one tile still in view fills and draws only that tile; the others are read again when asked for", async () => {
+    const { loader, drawn, reads } = rig();
+    const tiles = row(0, [0, 256, 512]); // one read
+    loader.show({ level: LEVEL, tiles });
+    loader.show({ level: LEVEL, tiles: [tiles[1]!] }); // panned while the read was in flight: it is kept for the middle tile
+    await flush();
+    expect(reads).toHaveLength(1);
+    expect(drawn).toEqual([tileKey(LEVEL, tiles[1]!)]);
+    expect(loader.busy()).toBe(false);
+    loader.show({ level: LEVEL, tiles: [tiles[0]!] });
+    expect(reads.at(-1)).toMatchObject({ x0: 0, y0: 0, width: 256, height: 256 });
+  });
+
   it("stop() drops the tiles waiting to be drawn", async () => {
     const { loader, drawn, release } = rig();
     loader.show({ level: LEVEL, tiles: row(0, [0, 256, 512, 768, 1024]) });
