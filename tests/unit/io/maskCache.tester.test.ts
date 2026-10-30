@@ -64,7 +64,8 @@ describe("mask edge cases", () => {
     const f: Value = (k, c, r) => (k === 3 ? (c >= 2000 || r >= 900 || (c >> 5) % 3 === 0 ? 0 : 255) : 50);
     const { reads, cache } = await allMasks({ width: W, height: H, bandCount: 4, alpha: 3, nodata: null, float: false }, f, block);
     for (const r of reads) expect(decodedBytes(r, block, W, H)).toBeLessThanOrEqual(MAX_READ_BYTES);
-    expect(rowsOnce(reads, H).size).toBe(H);
+    // reads of 512 KiB split each band into columns (spec 028 TASK_READ_BYTES): every pixel once, rather than every row once
+    expect(reads.reduce((n, r) => n + r.width * r.height, 0)).toBe(W * H);
     expect(cache.get("2048,768")).toBe("none"); // the bottom-right partial window: wholly transparent
   });
 

@@ -36,6 +36,8 @@ export interface RasterSource {
   overviews?: Overview[];
   /** Raw band arrays of a window of image 0 (full resolution) or an overview's index; rejects with AbortError on `signal`. */
   readSamples?(image: number, x0: number, y0: number, w: number, h: number, bands: number[], signal?: AbortSignal): Promise<ArrayLike<number>[]>;
+  /** Images readSamples reads without decoding whole blocks (spec 028, ADR 0024); every other image's reads decode their blocks. */
+  raw?: number[];
 }
 
 /** A source that can draw full-resolution imagery: a GeoTIFF file. */
