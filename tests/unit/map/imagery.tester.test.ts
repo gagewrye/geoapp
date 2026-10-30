@@ -5,6 +5,7 @@ import { IMAGERY_TILES, imageryQuads, planView, type Level, type Overview } from
 import type { Grid } from "../../../src/core/types";
 import { tileKey } from "../../../src/io/imageryLoader";
 import { ImageryLayer } from "../../../src/map/imagery";
+import { SETTLE_MS } from "../../../src/map/navigation";
 import type { ImagerySource } from "../../../src/io/source";
 import { initImagery } from "../../../src/ui/imagery";
 import { MESSAGES } from "../../../src/ui/messages";
@@ -95,7 +96,8 @@ describe("ImageryLayer, tester", () => {
     expect(imageryIds()).toEqual([]);
     expect(imageryLayers()).toEqual([]);
     failOn = -1;
-    handlers.forEach((h) => h()); // moveend: the tile is asked for again
+    handlers.forEach((h) => h()); // moveend: the tile is asked for again, SETTLE_MS later (spec 027)
+    await new Promise((r) => setTimeout(r, SETTLE_MS));
     await flush();
     const ids = imageryIds();
     expect(ids.length).toBeGreaterThan(1);

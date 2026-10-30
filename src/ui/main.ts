@@ -18,7 +18,8 @@ const message = $("message");
 const say = (text: string) => { message.textContent = text; };
 
 const map = createMap($("map"));
-const fullRes = initImagery(map, say);
+// nav exists before any map event; a held pan key holds tile updates until it settles (spec 027)
+const fullRes = initImagery(map, say, { moving: () => nav.moving() });
 let source: RasterSource | undefined;
 // Opens are numbered so that an older open finishing late can't replace the raster a newer one opened
 let opens = 0;
@@ -42,6 +43,7 @@ const seeding = initSeeding({ labels, imagery: () => source, say, error: errorTe
   opened: (f) => testHook("labelFile", f) });
 // letters type in text fields and pick options in selects, so WASD leaves them alone (spec 009)
 const nav = createNavigation(map, { typing: (el) => inTextField(el) || el instanceof HTMLSelectElement, stroking: labels.stroking });
+nav.onSettle(fullRes.settle);
 
 map.on("load", () => {
   // Test hook for e2e (specs 001-014; labels.tile(key) is the effective tile); exposes no user data beyond this page. labelFile: set by a test to see opened label files;
