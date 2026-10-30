@@ -1,12 +1,13 @@
 import { maskSamples } from "../core/alpha";
 import type { Window } from "../core/grid";
+import { groupReads } from "../core/blocks";
 import { MAX_READ_BYTES, rowReads, TASK_READ_BYTES } from "../core/imagery";
 import { markNodata } from "../core/nodata";
 import { nodataPossible } from "../core/seed";
 import { TILE_SIZE } from "../core/types";
 import { bandOrder, compactMask, MaskStore, type ValidMask } from "../core/validMask";
 import type { RasterSource } from "./source";
-import { yieldToBrowser } from "./yieldTask";
+import { TASK_BUDGET_MS, yieldToBrowser } from "./yieldTask";
 
 /** Priorities of need(): a queued stroke cell waits on the band, or the Paint hover is near it (spec 023 F3). */
 export const STROKE = 0, HOVER = 1;
@@ -22,8 +23,10 @@ type Deps = {
   retryMs?: number;
   /** Mask array budget (tests); MASK_BYTES by default. */
   maskBytes?: number;
-  /** The yield between background bands (tests pass a fake); yieldToBrowser by default. */
+  /** The yield between background bands and after TASK_BUDGET_MS of reads in a band (tests pass a fake); yieldToBrowser by default. */
   yieldTask?: () => Promise<void>;
+  /** The clock of that budget (tests); performance.now by default. */
+  now?: () => number;
 };
 /** A band's waiters, and the windows (by x0) they need: "all" for the whole band. */
 type Request = { priority: number; want: Set<number> | "all"; waiters: { resolve: () => void; reject: (e: unknown) => void }[] };
@@ -167,17 +170,34 @@ export class MaskCache {
     const plan = strips ? [{ x0: first.x0, y0: first.y0, width: last.x0 + last.width - first.x0, height: first.height }] : missing;
     // geotiff decodes a read in one task, so its reads are smaller (spec 028); raw reads copy only the samples asked for
     const cap = raw?.includes(0) ? MAX_READ_BYTES : TASK_READ_BYTES;
-    const reads: (() => Promise<Read>)[] = block && readSamples
-      ? rowReads(plan, 1, block, width, height, cap).map((r) => async () => ({ ...r, bands: await readSamples.call(this.source, 0, r.x0, r.y0, r.width, r.height, m.samples) }))
-      // readWindow decodes every band as Float32: bound its reads as if each 256 px row segment were a block
-      : rowReads(plan, 1, { width: TILE_SIZE, height: 1, bytes: TILE_SIZE * bandCount * 4 }, width, height).map((r) => async () => {
+    const sampled = block && readSamples ? { block, readSamples } : null;
+    const plain = rowReads(plan, 1, sampled?.block ?? { width: TILE_SIZE, height: 1, bytes: TILE_SIZE * bandCount * 4 }, width, height, sampled ? cap : MAX_READ_BYTES);
+    const read = sampled
+      ? async (r: Window): Promise<Read> => ({ ...r, bands: await sampled.readSamples.call(this.source, 0, r.x0, r.y0, r.width, r.height, m.samples) })
+      // readWindow decodes every band as Float32: its reads are bounded as if each 256 px row segment were a block
+      : async (r: Window): Promise<Read> => {
         const t = await this.source.readWindow(r.x0, r.y0, r.width, r.height);
         return { ...r, bands: m.samples.map((k) => t.bands[k]!) };
-      });
-    for (const read of reads) {
-      const r = await read();
-      if (this.stopped) return;
-      windows.forEach((w, i) => markNodata(bits[i]!, w, r, nodata, m.alpha));
+      };
+    // capped reads would each wait on a file call: their file bytes are held a group (≤ MAX_READ_BYTES decoded) at a time
+    const hold = sampled && cap === TASK_READ_BYTES ? this.source.hold : undefined;
+    const groups = hold ? groupReads(plain, sampled!.block, width, height, MAX_READ_BYTES) : [plain];
+    const now = this.deps.now ?? (() => performance.now());
+    let slice = now(), left = plain.length;
+    for (const g of groups) {
+      const release = hold ? await hold.call(this.source, 0, g, m.samples) : null;
+      try {
+        for (const q of g) {
+          if (this.stopped) return;
+          const r = await read(q);
+          if (this.stopped) return;
+          windows.forEach((w, i) => markNodata(bits[i]!, w, r, nodata, m.alpha));
+          // held reads resolve in microtasks, so the band would otherwise be one task (spec 028)
+          if (--left && now() - slice >= TASK_BUDGET_MS) { await (this.deps.yieldTask ?? yieldToBrowser)(); slice = now(); }
+        }
+      } finally {
+        release?.();
+      }
     }
     windows.forEach((w, i) => this.masks.set(`${w.x0},${w.y0}`, compactMask(bits[i]!, w.width * w.height)));
   }
