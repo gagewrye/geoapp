@@ -11,6 +11,9 @@ import { gather, gridOf, type MaskBase } from "./maskBase";
 import { MaskCache, STROKE } from "./maskCache";
 import type { RasterSource } from "./source";
 
+/** Work between yields during an import, ms. Spec 028's TASK_BUDGET_MS (io/yieldTask.ts) has the same value; 028 will unify them. */
+const TASK_BUDGET_MS = 8;
+
 /** seedWindows (row-major) grouped by row. */
 function rowsOf(windows: Window[]): Window[][] {
   const rows: Window[][] = [];
@@ -61,19 +64,31 @@ export async function importLabels(imagery: RasterSource, file: LabelSource, tab
   const buckets = cellBuckets(cells, dst);
   const raw = new Uint16Array(width * height); // raw value + 1; 0 for none
   const { nodata } = file.meta;
-  let done = 0;
+  let done = 0, slice = performance.now();
+  /** After TASK_BUDGET_MS of work, gives the bar and Cancel a turn (a row whose bands are cached runs on microtasks alone); true when stale. */
+  const breathe = async (): Promise<boolean> => {
+    if (performance.now() - slice < TASK_BUDGET_MS) return false;
+    await new Promise((r) => setTimeout(r, 0));
+    slice = performance.now();
+    return stale();
+  };
   for (const row of rowsOf(windows)) {
-    const first = done, vals: Int16Array[] = [];
+    const first = done, vals: Int16Array[] = [], covered: Window[] = [];
     for (const w of row) {
       const v = await gather(file, sourceCells(dst, src, w), w.width * w.height);
       if (stale()) return "stale";
       markValues(v, counts.seen);
-      if (nodata !== null) for (let i = 0; i < v.length; i++) if (v[i] === nodata) v[i] = -1; // never a class: no imagery read for it
+      let on = false;
+      for (let i = 0; i < v.length; i++) {
+        if (v[i] === nodata) v[i] = -1; // never a class: no imagery read for it
+        else if (v[i]! >= 0) on = true;
+      }
       vals.push(v);
+      if (on) covered.push(w);
       done++; // outside onProgress?.(), which skips its arguments with no listener
       onProgress?.(done, windows.length);
+      if (await breathe()) return "stale";
     }
-    const covered = row.filter((_, i) => vals[i]!.some((v) => v >= 0));
     let masks: ValidMask[];
     try {
       masks = await rowMasks(cache, covered);
@@ -82,16 +97,14 @@ export async function importLabels(imagery: RasterSource, file: LabelSource, tab
       throw e;
     }
     if (stale()) return "stale";
-    row.forEach((w, i) => {
-      const v = vals[i]!, k = covered.indexOf(w);
-      if (k < 0) return;
+    for (let i = 0; i < row.length; i++) {
+      const w = row[i]!, v = vals[i]!, k = covered.indexOf(w);
+      if (k < 0) continue;
       maskVals(masks[k]!, v);
       countRaw(v, counts, first + i);
       fillPreview(raw, cells, buckets, w, Uint16Array.from(v, (x) => x + 1));
-    });
-    // a row whose file bands are cached runs on microtasks alone: give the bar and Cancel a turn between rows
-    await new Promise((r) => setTimeout(r, 0));
-    if (stale()) return "stale";
+      if (await breathe()) return "stale";
+    }
   }
   const entries = table ?? classesFromValues(counts.seen, file.meta.nodata);
   const merged = early ?? mergeClasses([], entries);
