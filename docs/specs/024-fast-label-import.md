@@ -18,12 +18,21 @@
 1. **Row bands.** `gather` takes file cells from spec 023's label-file band cache: decoded 256-row bands of the file, each ≤ `MAX_READ_BYTES`, the last 4 kept.
    - Seed windows are visited row by row. So on an equal grid each file band is read once per import.
    - If a window needs more bands than the cache holds, it still works, just with re-reads.
-2. **One pass.** The labelling pass counts raw file values after imagery masking: a 256-entry histogram, plus 256 bits per window recording which values occur. The preview keeps raw values.
-   - After the pass, classes come from the histogram (the class map, else the table, else `classesFromValues`) and give the LUT.
-   - From the LUT: `count` = Σ hist[v] over v with lut[v] > 0; a window is labelled if any value present in it maps to a class; the preview values are remapped through the LUT.
-   - Results are byte-equal to spec 004's two passes. Spec 021's progress total becomes one pass.
-3. **Imagery validity from spec 023's mask cache.** The import asks the `MaskCache` for each window's mask, filling missing bands at stroke priority. It no longer reads imagery itself, so spec 022's rule R goes.
-   - For tiled imagery, a band read covers only the tiles of the windows it is asked for (`rowReads` gets those windows), which fixes the gap decode.
+2. **One pass.** The single pass records:
+   - the values seen before imagery masking, which give the classes, as spec 004's pass 1 did;
+   - a 256-entry histogram of the values that remain after masking;
+   - 256 bits per window recording which masked values occur in it;
+   - the preview as raw values: `previewRaw` is a `Uint16Array` holding value + 1, with 0 for none.
+
+   After the pass:
+   - classes come from the class map, else the table, else `classesFromValues` of the values seen, and they give the LUT;
+   - `count` = Σ hist[v] over v with lut[v] > 0;
+   - a window is labelled if any value present in it maps to a class;
+   - the preview is remapped through the LUT.
+
+   Results are byte-equal to spec 004's two passes. Progress counts each window as its file values are read, so spec 021's total is the window count. "Too many" comes after the pass when classes come from values, and before it otherwise. Spec 021's text is amended to match.
+3. **Imagery validity from spec 023's mask cache.** The import asks the `MaskCache` for each window's mask, through `need(y0, priority, x0s)` at stroke priority. It no longer reads imagery itself, so spec 022's rule R (`maskRow`) is removed.
+   - For tiled imagery, a band read covers only the tiles of the windows listed in `x0s` (`rowReads` gets those windows), which fixes the gap decode.
    - The masks it fills stay cached, so painting right after an import doesn't wait.
 4. **Equal-grid fast path.** When both grids share the EPSG, pixel size and rotation, and the file's origin is a whole number of imagery pixels away, `sourceCells` returns cells by offset with no projection.
 
@@ -33,8 +42,9 @@
 ```ts
 export function gridOffset(dst: Grid, src: Grid): [number, number] | null;   // integer pixel offset src - dst, or null
 export type RawCounts = { hist: Float64Array; present: Uint8Array };        // present: 32 bytes per seed window
-export function finishImport(counts: RawCounts, lut: Uint8Array, previewRaw: Uint8Array): { count: number; labelled: number[]; preview: Uint8Array };
+export function finishImport(counts: RawCounts, lut: Uint8Array, previewRaw: Uint16Array): { count: number; labelled: number[]; preview: Uint8Array };   // previewRaw: value + 1, 0 = none
 ```
+`io/maskCache.ts`: `need(y0: number, priority, x0s?: number[])`, where `x0s` limits a tiled band read to those windows.
 
 ## Acceptance criteria
 1. **Unit, `gridOffset`:**

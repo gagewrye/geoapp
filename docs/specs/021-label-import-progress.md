@@ -25,7 +25,7 @@ Amends specs 004 (the run message) and 014/017 (when the old labels leave the ma
 ## Where the time goes (`io/seeding.ts` `importLabels`, main 99d363a)
 - **Picking the file and the confirm "Replace labels?":** the user's time; nothing is read.
 - **Header and class table** (`openLabelFile`, `importTable`): a few small reads.
-- **Pass 1, classes from values:** reads every file window once. It runs only when there is no class map and no `GEOAPP_CLASSES`, so Gage's files skip it.
+- **Pass 1, classes from values:** reads every file window once. It runs only when there is no class map and no `GEOAPP_CLASSES`, so Gage's files skip it. (Spec 024 removed this pass: an import is now always one pass.)
 - **Pass 2, labelling:** for each `seedWindows` window (256², on the imagery grid; 1,849 for 11,000² on an equal grid):
   - gather the file windows it touches;
   - map them through the LUT;
@@ -38,7 +38,7 @@ Amends specs 004 (the run message) and 014/017 (when the old labels leave the ma
 **Progress.** `<progress id="import-progress" hidden>` and `<button id="import-cancel" hidden>Cancel</button>` sit after `#import-labels`.
 - `ui/openProgress.ts` becomes `ui/progress.ts` `initProgress(bar)`, with the same `busy`, `step` and `hide`. Spec 019's bar uses it unchanged. A separate bar keeps an open and an import from hiding each other's.
 - **While the header is read:** no bar and no Cancel. The bar starts at the Clear (step 4, after the header checks pass), indeterminate until the first window.
-- **During the passes:** value = windows done out of `windows x passes` (1 pass, or 2 with pass 1). `#message` reads "Importing labels…" (was "Seeding labels...").
+- **During the passes:** value = windows whose file values have been read, out of the seed windows (one pass, spec 024). "Too many" classes is reported after the pass when classes come from values, and before it with a class map or table. `#message` reads "Importing labels…" (was "Seeding labels...").
 - **Hidden** when the run ends in any way.
 
 **Old labels cleared at the start.** Order of an import:
@@ -75,7 +75,7 @@ This fits spec 017: the import still replaces and still can't be undone. Only wh
 - `MESSAGES.importing`, `MESSAGES.importCancelled`.
 
 ## Acceptance criteria
-1. **Unit, fake sources:** `onProgress` is called once per window per pass, with `done` 1..total in order. `total` is `seedWindows(...).length`, doubled when there is no table.
+1. **Unit, fake sources:** `onProgress` is called once per window as its file values are read, with `done` 1..total in order. `total` is `seedWindows(...).length` (one pass, as amended by spec 024).
 2. **E2E:** during an import slowed by a test hook, `#import-progress` shows a numeric value, `#import-cancel` is visible, and the message reads "Importing labels…". Both are hidden after the result message.
 3. **E2E:**
    - after OK on "Replace labels?", once the bar shows, there is no `label-` or `mask` layer;
