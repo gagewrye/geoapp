@@ -54,11 +54,14 @@ export function mercatorGrid(win: Window, gt: Affine, epsg: number, maxSide: num
   return { width, height, corners, each };
 }
 
-/** Per-band [min, max] over valid pixels, for a linear 0..255 stretch. */
-function ranges(src: Tile, nb: number): [number, number][] {
+/** Per-band [min, max] over valid pixels (alpha 0 isn't valid, spec 022), for a linear 0..255 stretch. */
+function ranges(src: Tile, nb: number, alpha: ArrayLike<number> | undefined): [number, number][] {
   return src.bands.slice(0, nb).map((a) => {
     let lo = Infinity, hi = -Infinity;
-    for (const v of a) if (!Number.isNaN(v) && v !== src.nodata) { if (v < lo) lo = v; if (v > hi) hi = v; }
+    for (let p = 0; p < a.length; p++) {
+      const v = a[p]!;
+      if (!Number.isNaN(v) && v !== src.nodata && alpha?.[p] !== 0) { if (v < lo) lo = v; if (v > hi) hi = v; }
+    }
     return [lo, hi];
   });
 }
@@ -66,10 +69,12 @@ function ranges(src: Tile, nb: number): [number, number][] {
 /**
  * Warp a (decimated) tile onto an axis-aligned Mercator grid; corners are TL, TR, BR, BL lon/lat.
  * Each band is stretched over its own valid range unless `stretch` fixes one range for all; `ranges` are those used.
+ * src.alpha, if set, is the alpha band: alpha 0 draws transparent and is left out of the ranges (spec 022).
  */
 export function warpPreview(src: Tile, gt: Affine, epsg: number, maxSide: number, stretch?: [number, number]) {
-  const nb = src.bands.length >= 3 ? 3 : 1;
-  const rg = stretch ? Array.from({ length: nb }, () => stretch) : ranges(src, nb);
+  const nb = (src.alpha ?? src.bands.length) >= 3 ? 3 : 1;
+  const alpha = src.alpha == null ? undefined : src.bands[src.alpha];
+  const rg = stretch ? Array.from({ length: nb }, () => stretch) : ranges(src, nb, alpha);
   const { width, height, corners, each } = mercatorGrid(src, gt, epsg, maxSide);
   const rgba = new Uint8ClampedArray(width * height * 4);
   each((g, c, r) => {
@@ -78,6 +83,7 @@ export function warpPreview(src: Tile, gt: Affine, epsg: number, maxSide: number
     if (!(i >= 0 && i < src.width && j >= 0 && j < src.height)) return;
     const p = j * src.width + i;
     const o = 4 * g;
+    if (alpha?.[p] === 0) return;
     for (let k = 0; k < nb; k++) {
       const val = src.bands[k]![p]!;
       if (Number.isNaN(val) || val === src.nodata) return;

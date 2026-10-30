@@ -156,15 +156,16 @@ export function blockWindows(width: number, height: number, blockW: number, bloc
 }
 
 /**
- * n pixels of 1 or 3 bands to RGBA with warpPreview's per-band linear stretch; NaN or nodata gives alpha 0.
+ * n pixels of 1 or 3 bands to RGBA with warpPreview's per-band linear stretch; NaN, nodata or alpha 0 (bands[alpha]) gives alpha 0.
  * Values are rounded to float32 first, as readWindow's bands and nodata are.
  */
-export function toRgba(bands: ArrayLike<number>[], n: number, ranges: [number, number][], nodata: number | null, out: Uint8ClampedArray): void {
-  const nb = bands.length >= 3 ? 3 : 1;
+export function toRgba(bands: ArrayLike<number>[], n: number, ranges: [number, number][], nodata: number | null, out: Uint8ClampedArray, alpha: number | null = null): void {
+  const nb = (alpha ?? bands.length) >= 3 ? 3 : 1;
+  const a = alpha === null ? undefined : bands[alpha];
   for (let p = 0; p < n; p++) {
     const o = 4 * p;
-    let ok = true;
-    for (let k = 0; k < nb; k++) {
+    let ok = a?.[p] !== 0; // spec 022 rule A: any other alpha is opaque
+    for (let k = 0; ok && k < nb; k++) {
       const v = Math.fround(bands[k]![p]!);
       if (Number.isNaN(v) || v === nodata) { ok = false; break; }
       const [lo, hi] = ranges[k]!;

@@ -1,3 +1,4 @@
+import { displaySamples } from "../core/alpha";
 import { decimateInto } from "../core/decimate";
 import type { Window } from "../core/grid";
 import { rowReads, toRgba, type Block, type Level } from "../core/imagery";
@@ -76,7 +77,7 @@ export class ImageryLoader {
   }
 
   private bands(): number[] {
-    return this.source.meta.bandCount >= 3 ? [0, 1, 2] : [0];
+    return displaySamples(this.source.meta.bandCount, this.source.meta.alpha);
   }
 
   /** A job that won't complete: its tiles can't be drawn, so a later view asks for them again. */
@@ -119,7 +120,7 @@ export class ImageryLoader {
         if (--p.left > 0) continue;
         this.pending.delete(p.key);
         const rgba = new Uint8ClampedArray(4 * n);
-        toRgba(p.bands, n, this.ranges, this.source.meta.nodata, rgba);
+        toRgba(p.bands, n, this.ranges, this.source.meta.nodata, rgba, this.source.meta.alpha === null ? null : p.bands.length - 1);
         this.sink.draw(p.key, level, p.tile, rgba);
       }
     } catch (e) {
