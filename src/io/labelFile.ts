@@ -33,7 +33,7 @@ export async function openLabelTiff(tiff: GeoTIFF): Promise<LabelSource> {
   const geo = await readGeoMeta(image);
   const nd = image.getGDALNoData();
   const nodata = nd !== null && Number.isInteger(nd) && nd >= 0 && nd <= 255 ? nd : null;
-  const meta: RasterMeta = { ...geo, bandCount: 1, nodata };
+  const meta: RasterMeta = { ...geo, bandCount: 1, nodata, float: false };
   await openRaster({ meta });
   const item = (await image.getGDALMetadata())?.[CLASS_ITEM];
   return {

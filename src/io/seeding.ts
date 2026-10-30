@@ -31,17 +31,21 @@ export function importTable(file: LabelSource, classMap?: string): ClassEntry[] 
 // known before any value is mapped. The labelling pass visits every seedWindows window once, reading
 // imagery only where a label would land, and keeps only counts and preview values: the file stays the
 // base, read again on demand (ADR 0018). Every import replaces (spec 017): no stored tile, new classes.
-// `stale` turns true when another raster opened: the run stops and nothing changes.
+// `stale` turns true when another raster opened or the user cancelled: the run stops and nothing changes.
+// onProgress counts windows done over both passes (spec 021).
 export async function importLabels(imagery: RasterSource, file: LabelSource, table: ClassEntry[] | null,
-  stale: () => boolean = () => false): Promise<SeedOutcome> {
+  stale: () => boolean = () => false, onProgress?: (done: number, total: number) => void): Promise<SeedOutcome> {
   const dst = gridOf(imagery.meta), src = gridOf(file.meta);
   const windows = seedWindows(dst, src);
+  const total = windows.length * (table ? 1 : 2);
+  let done = 0;
   let entries = table;
   if (!entries) {
     const seen = new Uint8Array(256);
     for (const w of windows) {
       markValues(await gather(file, sourceCells(dst, src, w), w.width * w.height), seen);
       if (stale()) return "stale";
+      onProgress?.(++done, total);
     }
     entries = classesFromValues(seen, file.meta.nodata);
   }
@@ -59,9 +63,11 @@ export async function importLabels(imagery: RasterSource, file: LabelSource, tab
     const { labels } = r;
     let any = false;
     for (const v of labels) if (v) { any = true; count++; seen.add(v); }
-    if (!any) continue;
-    labelled.add(`${w.x0},${w.y0}`);
-    fillPreview(values, cells, buckets, w, labels);
+    if (any) {
+      labelled.add(`${w.x0},${w.y0}`);
+      fillPreview(values, cells, buckets, w, labels);
+    }
+    onProgress?.(++done, total);
   }
   if (!count) return "empty";
   const base: MaskBase = { file, lut, count, windows: labelled, preview: { values, width, height, corners, buckets } };

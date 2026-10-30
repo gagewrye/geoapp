@@ -13,7 +13,8 @@ body { display: flex; }
 #classes .class-colour { width: 32px; padding: 0; }
 #brush-size { align-self: center; }
 #panel button[aria-pressed="true"] { font-weight: bold; }
-#open-progress { width: 100%; }
+#open-progress, #import-progress { width: 100%; }
+#panel [hidden] { display: none; } /* outranks #panel button's display: block (Cancel, spec 021) */
 #message { color: #a40000; min-height: 2em; }
 /* Space behind the globe (spec 015): CSS-drawn stars, no asset. Tile sizes 137, 211 and 293 px share
    no factor, so the pattern doesn't look regular. The canvas is transparent off the globe. */

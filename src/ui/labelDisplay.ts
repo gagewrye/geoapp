@@ -42,6 +42,16 @@ export function labelDisplay(map: MapLibreMap, store: () => LabelStore, colours:
       dirty.clear();
       overlays = new LabelOverlays(map, grid);
     },
+    /** Removes every overlay and the mask from the map, keeping the store (spec 021's hold); a redraw and setMask draw them again. */
+    hide(): void {
+      if (frame) cancelAnimationFrame(frame);
+      frame = 0;
+      dirty.clear();
+      overlays?.clear();
+      mask?.remove();
+      mask = null;
+      maskDirty = false;
+    },
     /** Shows this mask preview instead of the current one (null: none); call redraw with the stored keys after. */
     setMask(preview: MaskPreview | null): void {
       mask?.remove();
