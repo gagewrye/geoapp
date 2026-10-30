@@ -1,3 +1,4 @@
+import type { Window } from "../core/grid";
 import type { Block, Overview } from "../core/imagery";
 import type { Affine, Tile } from "../core/types";
 
@@ -38,6 +39,8 @@ export interface RasterSource {
   readSamples?(image: number, x0: number, y0: number, w: number, h: number, bands: number[], signal?: AbortSignal): Promise<ArrayLike<number>[]>;
   /** Images readSamples reads without decoding whole blocks (spec 028, ADR 0024); every other image's reads decode their blocks. */
   raw?: number[];
+  /** Keeps the file bytes of the blocks these windows of an image decode (those samples' planes) until the release; a raw image holds nothing. */
+  hold?(image: number, windows: Window[], bands: number[]): Promise<() => void>;
 }
 
 /** A source that can draw full-resolution imagery: a GeoTIFF file. */

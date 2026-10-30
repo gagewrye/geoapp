@@ -3,10 +3,14 @@ import { classesFromValues, ClassTableError, decodeClasses, mergeClasses, parseC
 import type { Window } from "../core/grid";
 import type { LabelStore } from "../core/labelStore";
 import { cellBuckets, fillPreview, PREVIEW_MAX_SIDE, previewCells } from "../core/maskPreview";
+import { countRaw, finishImport, maskVals, rawCounts } from "../core/rawCounts";
 import { markValues, seedLut, seedWindows, sourceCells } from "../core/seed";
+import type { ValidMask } from "../core/validMask";
 import type { LabelSource } from "./labelFile";
-import { fileLabels, gather, gridOf, maskRow, windowLabels, type MaskBase } from "./maskBase";
-import type { ImagerySource, RasterSource } from "./source";
+import { gather, gridOf, type MaskBase } from "./maskBase";
+import { MaskCache, STROKE } from "./maskCache";
+import type { RasterSource } from "./source";
+import { TASK_BUDGET_MS, yieldToBrowser } from "./yieldTask";
 
 /** seedWindows (row-major) grouped by row. */
 function rowsOf(windows: Window[]): Window[][] {
@@ -37,70 +41,87 @@ export function importTable(file: LabelSource, classMap?: string): ClassEntry[] 
   return parseClasses(json, file.meta.nodata);
 }
 
-/** Imports a class raster as the mask base, by nearest pixel centre, masked by imagery nodata (specs 004, 014). */
-// A null table takes classes from the values first, in a pass that reads no imagery, so the list is
-// known before any value is mapped. The labelling pass visits every seedWindows window once, reading
-// imagery only where a label would land, and keeps only counts and preview values: the file stays the
-// base, read again on demand (ADR 0018). A source with blocks reads its imagery one row of windows at a
-// time, after that row's file reads (spec 022 rule R). Every import replaces (spec 017): no stored tile, new classes.
+/** Imports a class raster as the mask base, by nearest pixel centre, masked by imagery nodata (specs 004, 014, 024). */
+// One pass over the seedWindows, a row at a time: the file's values come from its row bands (each strip of an
+// equal grid decoded once), imagery validity from the mask cache (the windows the file covers, at stroke priority,
+// left cached for painting), and only raw counts and preview values are kept. Classes and the LUT follow the pass:
+// the class map's, else the file's table, else every value met before masking, as spec 004's first pass found
+// them. The file stays the base, read again on demand (ADR 0018). Every import replaces (spec 017).
 // `stale` turns true when another raster opened or the user cancelled: the run stops and nothing changes.
-// onProgress counts windows done over both passes (spec 021).
+// onProgress counts windows whose file values are read (spec 021): a row's masks follow its last window.
 export async function importLabels(imagery: RasterSource, file: LabelSource, table: ClassEntry[] | null,
-  stale: () => boolean = () => false, onProgress?: (done: number, total: number) => void): Promise<SeedOutcome> {
+  stale: () => boolean = () => false, onProgress?: (done: number, total: number) => void,
+  cache: MaskCache = new MaskCache(imagery)): Promise<SeedOutcome> {
+  // with a table the classes are known now: "too many" before any read; from values, only after the pass
+  const early = table && mergeClasses([], table);
+  if (early === "too many") return early;
   const dst = gridOf(imagery.meta), src = gridOf(file.meta);
   const windows = seedWindows(dst, src);
-  const total = windows.length * (table ? 1 : 2);
-  let done = 0;
-  let entries = table;
-  if (!entries) {
-    const seen = new Uint8Array(256);
-    for (const w of windows) {
-      markValues(await gather(file, sourceCells(dst, src, w), w.width * w.height), seen);
-      if (stale()) return "stale";
-      onProgress?.(++done, total);
-    }
-    entries = classesFromValues(seen, file.meta.nodata);
-  }
-  const merged = mergeClasses([], entries);
-  if (merged === "too many") return merged;
-  const lut = seedLut(entries, merged.values);
+  const counts = rawCounts(windows.length);
   const { cells, width, height, corners } = previewCells(dst, PREVIEW_MAX_SIDE);
   const buckets = cellBuckets(cells, dst);
-  const values = new Uint8Array(width * height);
-  const labelled = new Set<string>(), seen = new Set<number>();
-  let count = 0;
-  const add = (w: Window, labels: Uint8Array) => {
-    let any = false;
-    for (const v of labels) if (v) { any = true; count++; seen.add(v); }
-    if (any) {
-      labelled.add(`${w.x0},${w.y0}`);
-      fillPreview(values, cells, buckets, w, labels);
-    }
-    onProgress?.(++done, total);
+  const raw = new Uint16Array(width * height); // raw value + 1; 0 for none
+  const { nodata } = file.meta;
+  let done = 0, slice = performance.now();
+  /** After TASK_BUDGET_MS of work, gives the bar and Cancel a turn (a row whose bands are cached runs on microtasks alone); true when stale. */
+  const breathe = async (): Promise<boolean> => {
+    if (performance.now() - slice < TASK_BUDGET_MS) return false;
+    await yieldToBrowser(); // not setTimeout, which nested timers clamp to 4 ms: thousands of yields per import
+    slice = performance.now();
+    return stale();
   };
-  const batched = imagery.readSamples && imagery.block ? imagery as ImagerySource : null;
-  if (!batched) {
-    // a source with no block to plan reads by (a test double) reads window by window
-    for (const w of windows) {
-      const r = await windowLabels(imagery, file, lut, w, stale);
-      if (!r || stale()) return "stale";
-      add(w, r.labels);
+  for (const row of rowsOf(windows)) {
+    const first = done, vals: Int16Array[] = [], covered: Window[] = [];
+    for (const w of row) {
+      const v = await gather(file, sourceCells(dst, src, w), w.width * w.height);
+      if (stale()) return "stale";
+      markValues(v, counts.seen);
+      let on = false;
+      for (let i = 0; i < v.length; i++) {
+        if (v[i] === nodata) v[i] = -1; // never a class: no imagery read for it
+        else if (v[i]! >= 0) on = true;
+      }
+      vals.push(v);
+      if (on) covered.push(w);
+      done++; // outside onProgress?.(), which skips its arguments with no listener
+      onProgress?.(done, windows.length);
+      if (await breathe()) return "stale";
     }
-  } else {
-    for (const ws of rowsOf(windows)) {
-      const row: { w: Window; labels: Uint8Array }[] = [];
-      for (const w of ws) {
-        row.push({ w, labels: await fileLabels(imagery, file, lut, w) });
-        if (stale()) return "stale";
-      }
-      await maskRow(batched, row);
-      for (const { w, labels } of row) {
-        if (stale()) return "stale";
-        add(w, labels);
-      }
+    let masks: ValidMask[];
+    try {
+      masks = await rowMasks(cache, covered);
+    } catch (e) {
+      if (stale()) return "stale";
+      throw e;
+    }
+    if (stale()) return "stale";
+    for (let i = 0; i < row.length; i++) {
+      const w = row[i]!, v = vals[i]!, k = covered.indexOf(w);
+      if (k < 0) continue;
+      maskVals(masks[k]!, v);
+      countRaw(v, counts, first + i);
+      fillPreview(raw, cells, buckets, w, Uint16Array.from(v, (x) => x + 1));
+      if (await breathe()) return "stale";
     }
   }
-  if (!count) return "empty";
-  const base: MaskBase = { file, lut, count, windows: labelled, preview: { values, width, height, corners, buckets } };
-  return { store: { width: dst.width, height: dst.height, tiles: new Map(), base: true }, classes: merged.list, base, pixels: count, classCount: seen.size };
+  const entries = table ?? classesFromValues(counts.seen, file.meta.nodata);
+  const merged = early ?? mergeClasses([], entries);
+  if (merged === "too many") return merged;
+  const lut = seedLut(entries, merged.values);
+  const r = finishImport(counts, lut, raw);
+  if (!r.count) return "empty";
+  const labelled = new Set(r.labelled.map((i) => `${windows[i]!.x0},${windows[i]!.y0}`));
+  const base: MaskBase = { file, lut, count: r.count, windows: labelled, preview: { values: r.preview, width, height, corners, buckets } };
+  return { store: { width: dst.width, height: dst.height, tiles: new Map(), base: true }, classes: merged.list, base, pixels: r.count, classCount: r.classCount };
+}
+
+/** The valid masks of one row's windows, read at stroke priority; a mask evicted before use is read once more. */
+async function rowMasks(cache: MaskCache, row: Window[]): Promise<ValidMask[]> {
+  if (!row.length) return [];
+  for (let tries = 0; ; tries++) {
+    await cache.need(row[0]!.y0, STROKE, row.map((w) => w.x0));
+    const masks = row.map((w) => cache.get(`${w.x0},${w.y0}`));
+    if (masks.every((m) => m !== undefined)) return masks as ValidMask[];
+    if (tries === 1) throw new Error("The imagery's valid masks were evicted before the import could use them");
+  }
 }

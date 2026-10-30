@@ -21,13 +21,18 @@ The long task is one `readSamples` call followed by drawing the tiles it fed, al
    - `readSamples` computes each row's byte range for the window's columns from the eagerly loaded offsets (spec 025), and fetches those ranges through `blobSource`. Ranges up to 64 KiB apart merge, as spec 025 does.
    - It copies only the requested samples of the requested columns into typed arrays, one tight loop per row.
    - Strips and uncompressed tiles both qualify. Any other file uses geotiff.
-2. **Smaller decodes elsewhere.** For files that still go through geotiff, the imagery loader's and spec 023's mask-cache reads are split so each decodes at most `TASK_READ_BYTES` = 512 KiB (`rowReads` with that cap). geotiff decodes a whole read in one task, about 8 ms per 256² LZW RGBA tile. Amended under Gage's perf delegation: 4 MiB gave 130 ms tasks on the tiled chunk. Raw reads (item 1) aren't split. The import keeps `MAX_READ_BYTES`.
+2. **Smaller decodes elsewhere.** For files that still go through geotiff, the imagery loader's and spec 023's mask-cache reads are split so each decodes at most `TASK_READ_BYTES` = 512 KiB (`rowReads` with that cap). geotiff decodes a whole read in one task, about 8 ms per 256² LZW RGBA tile. Amended under Gage's perf delegation: 4 MiB gave 130 ms tasks on the tiled chunk. Raw reads (item 1) aren't split. The import's imagery reads go through the mask cache (spec 024), so they are capped too. Only label-file reads (`rowBandReader`, `io/labelFile.ts`) keep `MAX_READ_BYTES`.
 3. **Yield between draws.**
    - The imagery loader draws ready tiles from a queue, centre first, until 8 ms have passed in the task, then yields with a `MessageChannel` post before drawing more.
-   - Mask-cache reads yield the same way between bands.
+   - Mask-cache reads yield the same way between bands, and also within a band once `TASK_BUDGET_MS` (8 ms) has passed. The import yields with `yieldToBrowser` too, not `setTimeout(0)`.
    - A tile drawn after its view went stale is skipped, as today.
+4. **Held block bytes (amended under Gage's perf delegation, for spec 024's tiled import target).** Item 2's capped reads would each fetch their own blocks. Instead, `MaskCache.readBand` splits a band's capped reads into groups (`groupReads`), each decoding at most `MAX_READ_BYTES`.
+   - Before a group, `source.hold(image, windows, bands)` reads the file bytes of every block those windows decode (`blockIndices`, from the offsets loaded at open). `blobSource.hold` reads them in one call per run of at most `MAX_FETCH`.
+   - It then serves the group's fetches from those bytes, and releases them after the group.
+   - Raw images (item 1) hold nothing.
+   - Peak per group: ≤ 16 MiB of held compressed bytes plus one 512 KiB decode, within ADR 0021's about 48 MiB per read.
 
-**Out of scope:** workers; LZW speed (a single 256² LZW tile decodes in a few ms, well within budget).
+**Out of scope:** workers; LZW speed (a single 256² LZW tile decodes in a few ms, well within budget). The 50/60 ms rule covers loading tiles and mask reads, not imports. Known follow-up: the typical (raw) import still has one task of about 342 ms in `previewCells` (`core/maskPreview.ts`).
 
 ## Interfaces
 - `io/rawReader.ts`:
@@ -35,7 +40,9 @@ The long task is one `readSamples` call followed by drawing the tiles it fed, al
   - `rawWindow(image, source, offsets, x0, y0, w, h, samples): Promise<TypedArray[]>`
 - `core/raw.ts` (pure): `rowRanges(layout, x0, y0, w, h): { offset: number; length: number }[]` and `copySamples(...)`.
 - `core/imagery.ts`: `TASK_READ_BYTES = 512 * 1024`.
-- `io/yieldTask.ts`: `yieldToBrowser(): Promise<void>` (a `MessageChannel` post).
+- `io/yieldTask.ts`: `yieldToBrowser(): Promise<void>` (a `MessageChannel` post), and `TASK_BUDGET_MS = 8`.
+- `io/source.ts`: optional `hold?(image, windows, bands): Promise<() => void>`, which resolves to a release function. `io/blobSource.ts`: `hold(ranges): Promise<() => void>`.
+- `core/blocks.ts` (pure): `blockIndices(windows, block, width, height, planes?)` and `groupReads(reads, block, width, height, max): Window[][]`.
 
 ## Acceptance criteria
 1. **Unit, byte-equal to geotiff `readRasters`:** `rawWindow` on random windows and sample lists, for 1-row and 16-row strips and 256² uncompressed tiles. Formats: uint8 RGBA, uint16 little-endian, float32, overviews, and windows at the right and bottom edges.
@@ -52,4 +59,10 @@ The long task is one `readSamples` call followed by drawing the tiles it fed, al
    - Tiled targets amended under Gage's perf delegation: a single LZW decode task can't be split below one read.
 5. **Real chunks:** full-resolution zoom reads on Chunk 11 are ≤ 10 MB (was 113 MB for 12 tiles), and full-zoom pan has no task over 50 ms.
 6. **Real chunks:** spec 023's background mask reads, run over a mid-zoom view at rest, give no task over 50 ms.
-7. Spec 020 criteria 4, 6, 8 and 10, spec 022 criteria 3, 4 and 7, and spec 025 criteria 2–4 pass. `npm run check` passes.
+7. **Unit, held bytes:**
+   - `blockIndices` lists exactly the blocks the windows decode (brute force over tiles and strips).
+   - Each group from `groupReads` decodes ≤ `MAX_READ_BYTES`.
+   - Within a hold, a group's reads make no `blob.slice` call beyond the hold's own, and decode byte-equal to unheld reads.
+   - After release, fetches read the file again.
+   - A raw image's `hold` reads nothing.
+8. Spec 020 criteria 4, 6, 8 and 10, spec 022 criteria 3, 4 and 7, and spec 025 criteria 2–4 pass. `npm run check` passes.

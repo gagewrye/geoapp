@@ -1,8 +1,9 @@
 import { GeoTIFF, type GeoTIFFImage } from "geotiff";
 import { alphaOf } from "../core/alpha";
+import { blockIndices } from "../core/blocks";
 import { affineFromTags } from "../core/geotags";
 import { MAX_BLOCK_BYTES, type Block, type Overview } from "../core/imagery";
-import { blobSource } from "./blobSource";
+import { blobSource, type BlobSource } from "./blobSource";
 import { rawEligible, rawOffsets, rawWindow, type BlockOffsets } from "./rawReader";
 import type { GeoTags, ImagerySource, RasterMeta } from "./source";
 
@@ -56,6 +57,7 @@ export async function openGeoTiff(tiff: GeoTIFF): Promise<ImagerySource> {
   // uncompressed chunky images read only the window's columns (ADR 0024); the rest go through geotiff
   const raw = new Map<number, BlockOffsets>();
   for (const [i, im] of images) if (rawEligible(im)) raw.set(i, await rawOffsets(im));
+  const blocks = new Map<number, BlockOffsets>(raw); // every image's block offsets, for hold()
   return {
     meta: { width, height, bandCount, gt, epsg, nodata, float, alpha, geoTags },
     block: blockOf(image),
@@ -70,6 +72,15 @@ export async function openGeoTiff(tiff: GeoTIFF): Promise<ImagerySource> {
       const rasters = await im.readRasters({ window: [x0, y0, x0 + w, y0 + h], samples, signal });
       signal?.throwIfAborted();
       return Array.from(rasters as unknown as ArrayLike<number>[]);
+    },
+    async hold(index, windows, samples) {
+      const im = images.get(index), src = tiff.source as unknown as Partial<BlobSource>;
+      if (!im || raw.has(index) || !src.hold) return () => {};
+      if (!blocks.has(index)) blocks.set(index, await rawOffsets(im)); // loaded at open (loadBlockOffsets), so no file read
+      const { offsets, counts } = blocks.get(index)!;
+      const planes = Number(im.fileDirectory.getValue("PlanarConfiguration") ?? 1) === 2 ? samples : [0];
+      const ids = blockIndices(windows, { width: im.getTileWidth(), height: im.getTileHeight() }, im.getWidth(), im.getHeight(), planes);
+      return src.hold(ids.map((i) => ({ offset: offsets[i]!, length: counts[i]! })));
     },
     async readWindow(x0, y0, w, h) {
       const rasters = (await image.readRasters({ window: [x0, y0, x0 + w, y0 + h] })) as unknown as ArrayLike<number>[];
@@ -86,7 +97,7 @@ export async function loadBlockOffsets(im: GeoTIFFImage): Promise<void> {
 }
 
 /** An image's tile or strip, with all its samples decoded (spec 020 Block): a separate-planes file decodes one block per band. */
-function blockOf(im: GeoTIFFImage): Block {
+export function blockOf(im: GeoTIFFImage): Block {
   const width = im.getTileWidth(), height = im.getTileHeight();
   return { width, height, bytes: width * height * im.getBytesPerPixel() };
 }
