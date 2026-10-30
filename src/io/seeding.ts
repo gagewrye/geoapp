@@ -1,11 +1,22 @@
 import type { LabelClass } from "../core/classes";
 import { classesFromValues, ClassTableError, decodeClasses, mergeClasses, parseClasses, type ClassEntry } from "../core/classTable";
+import type { Window } from "../core/grid";
 import type { LabelStore } from "../core/labelStore";
 import { cellBuckets, fillPreview, PREVIEW_MAX_SIDE, previewCells } from "../core/maskPreview";
 import { markValues, seedLut, seedWindows, sourceCells } from "../core/seed";
 import type { LabelSource } from "./labelFile";
-import { gather, gridOf, windowLabels, type MaskBase } from "./maskBase";
-import type { RasterSource } from "./source";
+import { fileLabels, gather, gridOf, maskRow, windowLabels, type MaskBase } from "./maskBase";
+import type { ImagerySource, RasterSource } from "./source";
+
+/** seedWindows (row-major) grouped by row. */
+function rowsOf(windows: Window[]): Window[][] {
+  const rows: Window[][] = [];
+  for (const w of windows) {
+    const last = rows[rows.length - 1];
+    if (last && last[0]!.y0 === w.y0) last.push(w); else rows.push([w]);
+  }
+  return rows;
+}
 
 /** A label store and its class list (label value = index + 1). */
 export type Labels = { store: LabelStore; classes: LabelClass[] };
@@ -30,7 +41,8 @@ export function importTable(file: LabelSource, classMap?: string): ClassEntry[] 
 // A null table takes classes from the values first, in a pass that reads no imagery, so the list is
 // known before any value is mapped. The labelling pass visits every seedWindows window once, reading
 // imagery only where a label would land, and keeps only counts and preview values: the file stays the
-// base, read again on demand (ADR 0018). Every import replaces (spec 017): no stored tile, new classes.
+// base, read again on demand (ADR 0018). A source with blocks reads its imagery one row of windows at a
+// time, after that row's file reads (spec 022 rule R). Every import replaces (spec 017): no stored tile, new classes.
 // `stale` turns true when another raster opened or the user cancelled: the run stops and nothing changes.
 // onProgress counts windows done over both passes (spec 021).
 export async function importLabels(imagery: RasterSource, file: LabelSource, table: ClassEntry[] | null,
@@ -57,10 +69,7 @@ export async function importLabels(imagery: RasterSource, file: LabelSource, tab
   const values = new Uint8Array(width * height);
   const labelled = new Set<string>(), seen = new Set<number>();
   let count = 0;
-  for (const w of windows) {
-    const r = await windowLabels(imagery, file, lut, w, stale);
-    if (!r || stale()) return "stale";
-    const { labels } = r;
+  const add = (w: Window, labels: Uint8Array) => {
     let any = false;
     for (const v of labels) if (v) { any = true; count++; seen.add(v); }
     if (any) {
@@ -68,6 +77,28 @@ export async function importLabels(imagery: RasterSource, file: LabelSource, tab
       fillPreview(values, cells, buckets, w, labels);
     }
     onProgress?.(++done, total);
+  };
+  const batched = imagery.readSamples && imagery.block ? imagery as ImagerySource : null;
+  if (!batched) {
+    // a source with no block to plan reads by (a test double) reads window by window
+    for (const w of windows) {
+      const r = await windowLabels(imagery, file, lut, w, stale);
+      if (!r || stale()) return "stale";
+      add(w, r.labels);
+    }
+  } else {
+    for (const ws of rowsOf(windows)) {
+      const row: { w: Window; labels: Uint8Array }[] = [];
+      for (const w of ws) {
+        row.push({ w, labels: await fileLabels(imagery, file, lut, w) });
+        if (stale()) return "stale";
+      }
+      await maskRow(batched, row);
+      for (const { w, labels } of row) {
+        if (stale()) return "stale";
+        add(w, labels);
+      }
+    }
   }
   if (!count) return "empty";
   const base: MaskBase = { file, lut, count, windows: labelled, preview: { values, width, height, corners, buckets } };
