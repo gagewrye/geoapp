@@ -67,3 +67,26 @@ describe("imagery quad cache (spec 026 criterion 5)", () => {
     expect(cache.size).toBe(2048);
   });
 });
+
+describe("imagery quad cache bound (tester, spec 029 criterion 3)", () => {
+  it("a hit refreshes an entry, so a tile in use outlives older unused ones", () => {
+    const cache: QuadCache = new Map();
+    for (let i = 0; i < QUAD_CACHE; i++) imageryQuads(level, tile(i), cache, key(i));
+    imageryQuads(level, tile(0), cache, key(0)); // hit: now the most recent
+    imageryQuads(level, tile(QUAD_CACHE), cache, key(QUAD_CACHE)); // drops the oldest unused, tile 1
+    expect(cache.size).toBe(QUAD_CACHE);
+    expect(cache.has(`1:${key(0)}`)).toBe(true);
+    expect(cache.has(`1:${key(1)}`)).toBe(false);
+  });
+
+  it("through ImageryLayer: after 3,000 tiles the first is recomputed once, the most recent not at all", () => {
+    const layer = new ImageryLayer(fakeMap());
+    for (let i = 0; i < 3000; i++) layer.draw(key(i), level, tile(i), rgba);
+    const spy = vi.spyOn(labelQuads, "tileQuads");
+    layer.draw(key(2999 - IMAGERY_TILES), level, tile(2999 - IMAGERY_TILES), rgba); // evicted from the map, still cached
+    expect(spy).not.toHaveBeenCalled();
+    layer.draw(key(0), level, tile(0), rgba);
+    layer.draw(key(0), level, tile(0), rgba);
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+});
