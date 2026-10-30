@@ -2,6 +2,9 @@
 
 One entry per merge to main, newest first. Details are in the named spec.
 
+## 2026-10-30
+- **Spec 021:** Importing labels shows a progress bar with Cancel; the old labels leave the map while it runs and come back if it's cancelled, fails or finds nothing.
+
 ## 2026-10-29
 - **Spec 020:** Zooming in now shows the imagery at full resolution, loaded tile by tile for the area in view, with the preview filling in until tiles arrive; memory stays bounded (about 530 MiB at worst), and if part of a file can't be read you see "Couldn't read part of this file, so some detail may be missing."
 - **Spec 019:** A progress bar shows while a raster opens, Paint stays unavailable until the imagery is drawn, a file that can't be read now says so, and opening another file stops the previous one's reads.
