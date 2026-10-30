@@ -79,7 +79,7 @@ export async function loadBlockOffsets(im: GeoTIFFImage): Promise<void> {
 }
 
 /** An image's tile or strip, with all its samples decoded (spec 020 Block): a separate-planes file decodes one block per band. */
-function blockOf(im: GeoTIFFImage): Block {
+export function blockOf(im: GeoTIFFImage): Block {
   const width = im.getTileWidth(), height = im.getTileHeight();
   return { width, height, bytes: width * height * im.getBytesPerPixel() };
 }
