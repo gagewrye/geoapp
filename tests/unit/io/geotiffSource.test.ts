@@ -19,6 +19,13 @@ describe("geotiff.js source", () => {
     expect(t.bands[0]![71 * 44 + 43]).toBe(199 * 0.5 + 299);
   });
 
+  it("marks floating-point samples (SampleFormat 3) as float, and 8-bit ones not (spec 021 criterion 9)", async () => {
+    const geo = { epsg: 32633, gt: [400000, 30, 0, 5300000, 0, -30] as [number, number, number, number, number, number] };
+    expect((await openGeoTiff(await fromArrayBuffer(geotiffBuffer(10, 10, 1, () => 1, geo)))).meta.float).toBe(true);
+    const u8 = uint8Tiff([{ width: 10, height: 10, bands: 4, value: () => 1, layout: { tile: [16, 16] } }], geo);
+    expect((await openGeoTiff(await fromArrayBuffer(u8))).meta.float).toBe(false);
+  });
+
   it("reads EPSG:4326 geographic keys", async () => {
     const buf = geotiffBuffer(10, 10, 1, () => 1, { epsg: 4326, gt: [170, 1, 0, 10, 0, -1] });
     const src = await openGeoTiff(await fromArrayBuffer(buf));
