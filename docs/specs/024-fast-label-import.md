@@ -41,8 +41,8 @@
 ## Interfaces (`core/`)
 ```ts
 export function gridOffset(dst: Grid, src: Grid): [number, number] | null;   // integer pixel offset src - dst, or null
-export type RawCounts = { hist: Float64Array; present: Uint8Array };        // present: 32 bytes per seed window
-export function finishImport(counts: RawCounts, lut: Uint8Array, previewRaw: Uint16Array): { count: number; labelled: number[]; preview: Uint8Array };   // previewRaw: value + 1, 0 = none
+export type RawCounts = { hist: Float64Array; present: Uint8Array; seen: Uint8Array };   // present: 32 bytes per seed window; seen: values met before masking
+export function finishImport(counts: RawCounts, lut: Uint8Array, previewRaw: Uint16Array): { count: number; labelled: number[]; classCount: number; preview: Uint8Array };   // previewRaw: value + 1, 0 = none
 ```
 `io/maskCache.ts`: `need(y0: number, priority, x0s?: number[])`, where `x0s` limits a tiled band read to those windows.
 
