@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { applyAffine, fromLonLat, toLonLat } from "../../src/core/crs";
 import { footprint, footprintRing } from "../../src/core/pixel";
 import type { Affine, Grid } from "../../src/core/types";
-import { BACKGROUND, clickAt, hideImagery, jumpTo, message, openApp, openRaster, paintMode, settled, tiff, toScreen, type LngLat } from "./helpers";
+import { BACKGROUND, clickAt, hideImagery, hoverFeatures, jumpTo, message, openApp, openRaster, paintMode, settled, tiff, toScreen, type LngLat } from "./helpers";
 
 // Spec 018 criterion 3: after a dab, the colour covers exactly the pixels the hover outline marks.
 // Positions and sizes are fixed; at least 10 per raster are where main's shared overlay grid put a painted
@@ -96,6 +96,8 @@ for (const [name, grid] of RASTERS) {
         await clickAt(page, await toScreen(page, lonLat(c + 0.5, r + 0.5)));
         await settled(page);
         await page.mouse.move(panel.x + panel.width / 2, panel.y + 10); // no outline over the samples
+        // the outline stays drawn about 2 frames after the pointer leaves: wait until the hover source is empty, then one more frame (spec 029)
+        await expect.poll(async () => (await hoverFeatures(page)).length).toBe(0);
         await frames(page);
         const ring = footprintRing(grid, footprint(grid, c, r, side)!) as LngLat[];
         for (const p of await samples(page, ring)) {
