@@ -61,10 +61,10 @@
    - Pan away and zoom in, then press `Home`: the map bounds equal those right after open, to 1e-6°.
    - The ⌂ button does the same.
 5. **E2E:** with 60 classes, `#classes` scrolls inside `#side`, and `#side`'s Labels section stays visible.
-6. **E2E:** every existing spec's e2e test passes unchanged, apart from selectors that depended on the sidebar's ancestry. Each changed selector is listed in the change.
+6. **E2E:** every existing spec's e2e test passes. The only edits allowed are ones this spec's scope forces: selectors, texts, Tab order, and coordinates or zooms for the narrower canvas. Each edit is listed in the change, with the scope item that forces it.
 7. **Scope 8:**
    - `src/ui/modes.ts` exists, and `src/ui/labels.ts` no longer defines `MODES`, `setMode` or `deferMode`'s `keyed`.
-   - The spec 033 and 034 unit and e2e tests pass with no edits.
+   - The spec 033 and 034 unit and e2e tests pass. They are edited only where this spec's scope forces it (criterion 6, plus `peek` mocks returning a boolean), and no assertion about mode or peek behaviour is weakened.
 8. **Unit (labelKeys, scope 8):**
    - when `view.peek(true)` returns false, a peek keyup and a window `blur` don't call `peek(false)`;
    - when it returns true, the keyup calls `peek(false)` once.
