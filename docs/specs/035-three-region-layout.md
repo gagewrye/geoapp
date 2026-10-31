@@ -32,11 +32,17 @@
    - The state is kept in `localStorage` (`geoplatform.collapsed`). A storage failure is ignored.
 7. **Zoom to raster.** `Home`, or a ⌂ button added under MapLibre's zoom buttons as a custom control, fits the raster's bounds exactly as opening does (`padding: 40`, no animation).
 
+8. **Carried from spec 034's review** (same code, non-blocking there):
+   - `labels.ts` (about 269 lines) hands its mode and peek wiring to a new `ui/modes.ts`: `MODES`, `setMode`, `choose`, `keyed`, the mode-button loop and the peek handler. Behaviour is unchanged. Spec 036 moves the class-list wiring separately.
+   - `labelKeys` marks a peek as started only when `view.peek(true)` says one started, so a keyup with labels already hidden calls nothing.
+
 **Out of scope:** resizable or draggable panels, themes, a minimap, mobile layout.
 
 ## Interfaces
 - `map/preview.ts`: its fit becomes `fitRaster(map, bounds)`, used by both open and Home.
 - `ui/layout.ts` (wiring): `initLayout({ map, open: () => boolean }): { opened(): void }`.
+- `ui/modes.ts` (wiring): takes over the mode and peek wiring from `labels.ts`. Its exact shape is the implementer's call.
+- `peek(on: boolean): boolean` in `ui/labelView.ts` and in `labelKeys`' deps returns true only when the call changed the peek state.
 - No `core/` change.
 
 ## Acceptance criteria
@@ -56,4 +62,11 @@
    - The ⌂ button does the same.
 5. **E2E:** with 60 classes, `#classes` scrolls inside `#side`, and `#side`'s Labels section stays visible.
 6. **E2E:** every existing spec's e2e test passes unchanged, apart from selectors that depended on the sidebar's ancestry. Each changed selector is listed in the change.
-7. `npm run check` passes.
+7. **Scope 8:**
+   - `src/ui/modes.ts` exists, and `src/ui/labels.ts` no longer defines `MODES`, `setMode` or `deferMode`'s `keyed`.
+   - The spec 033 and 034 unit and e2e tests pass with no edits.
+8. **Unit (labelKeys, scope 8):**
+   - when `view.peek(true)` returns false, a peek keyup and a window `blur` don't call `peek(false)`;
+   - when it returns true, the keyup calls `peek(false)` once.
+9. **Unit (labelView, scope 8):** `peek(true)` returns true with labels shown and false with them hidden, and `peek(false)` returns true only after a started peek.
+10. `npm run check` passes.
