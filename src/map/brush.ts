@@ -31,6 +31,7 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
   let space = false;
   let stroke: Stroke | null = null;
   let locked = false; // while seeding (spec 004): no strokes and no footprint; Paint mode's handlers stay
+  let blocked = false; // while peeking (spec 034): no strokes start, and the cursor shows locked; the footprint stays
   let lastType = "mouse";
   let pointer: { x: number; y: number; target: EventTarget | null } | null = null; // last mouse or pen position
   const painting = () => grid !== null && mode !== "pan" && !space; // Paint or Erase (spec 033)
@@ -39,8 +40,8 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
   // Locked, a left drag neither paints nor pans, so neither the brush nor MapLibre's grab would be true.
   let cursor = "";
   const syncCursor = () => {
-    container.classList.toggle("brush-cursor", painting() && !locked);
-    container.classList.toggle("locked-cursor", painting() && locked);
+    container.classList.toggle("brush-cursor", painting() && !locked && !blocked);
+    container.classList.toggle("locked-cursor", painting() && (locked || blocked));
     const c = brushCursor(deps.colour());
     if (c !== cursor) container.style.setProperty("--brush-cursor", cursor = c);
   };
@@ -103,7 +104,7 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
     lastType = e.pointerType;
     if (e.pointerType === "touch") { pointer = null; hover(); return; }
     if (!painting() || stroke || deps.panning() || (e.button !== 0 && e.button !== 2)) return;
-    if (locked) return;
+    if (locked || blocked) return;
     stroke = { pointerId: e.pointerId, erase: mode === "erase" || e.button === 2, prev: null };
     deps.onStroke(true);
     apply(stroke, e);
@@ -145,6 +146,8 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
     setSpace(held: boolean): void { if (space !== held) { space = held; syncHandlers(); hover(); } },
     /** Locked, the brush neither paints nor shows its footprint; a stroke in progress ends. */
     setLocked(on: boolean): void { locked = on; if (on) end(); syncCursor(); hover(); },
+    /** Blocked, no stroke starts (a peek hides the labels: spec 034); one in progress is left alone. */
+    setBlocked(on: boolean): void { blocked = on; syncCursor(); },
     /** Redraw the footprint and cursor after a size or colour change. */
     refresh(): void { syncCursor(); hover(); },
     /** A stroke is in progress. */
