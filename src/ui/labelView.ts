@@ -8,7 +8,7 @@ export function initLabelView(map: MapLibreMap, onVisible: (visible: boolean) =>
   const range = $<HTMLInputElement>("label-opacity"), text = $("label-opacity-text"), show = $<HTMLInputElement>("show-labels");
 
   let peeking = false; // a held peek key hides the layers only: the checkbox and the saved view stay (spec 034)
-  const showText = () => { text.textContent = `Opacity: ${range.value}%`; };
+  const showText = () => { text.textContent = `${range.value}%`; }; // beside its slider (spec 035)
   const layers = () => applyLabelView(map, { opacity: Number(range.value) / 100, visible: show.checked && !peeking });
   const apply = () => {
     showText();
