@@ -114,7 +114,7 @@ test("export, reopen and import the export with Replace restores every tile and 
   await page.waitForTimeout(300);
   expect(requests.map((r) => r.url())).toEqual([]);
 
-  page.once("dialog", (d) => { expect(d.message()).toBe("Discard labels?"); void d.accept(); });
+  page.once("dialog", (d) => { expect(d.message()).toBe("Close these labels? They stay saved in this browser."); void d.accept(); });
   await openRaster(page, { ...rgbFixture(), name: "again.tif" });
   await expect(message(page)).toHaveText("Raster opened.");
   await paintMode(page);

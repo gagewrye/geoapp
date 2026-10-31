@@ -5,6 +5,7 @@ import type { ImagerySource, RasterSource } from "../io/source";
 import { ImageryLayer } from "../map/imagery";
 import { SETTLE_MS } from "../map/navigation";
 import { MESSAGES } from "./messages";
+import type { MessageKind } from "./messages";
 
 const canRead = (s: RasterSource): s is ImagerySource => Boolean(s.block && s.overviews && s.readSamples);
 
@@ -14,7 +15,7 @@ type Nav = {
 };
 
 /** Full-resolution imagery over the preview (spec 020): tiles for each view once the map stops moving. */
-export function initImagery(map: MapLibreMap, say: (text: string) => void = () => {}, nav: Nav = { moving: () => false }) {
+export function initImagery(map: MapLibreMap, say: (text: string, kind?: MessageKind) => void = () => {}, nav: Nav = { moving: () => false }) {
   const layer = new ImageryLayer(map);
   /** The block limit; e2e tests lower it through the page hook. */
   const limits = { maxBlockBytes: MAX_BLOCK_BYTES };
@@ -66,7 +67,7 @@ export function initImagery(map: MapLibreMap, say: (text: string) => void = () =
       if (!canRead(source)) return null;
       if (source.block.bytes > limits.maxBlockBytes) return MESSAGES.largeBlocks(source.block.bytes, limits.maxBlockBytes);
       reported = false;
-      const failed = () => { if (!reported) { reported = true; say(MESSAGES.imageryUnreadable); } };
+      const failed = () => { if (!reported) { reported = true; say(MESSAGES.imageryUnreadable, "error"); } };
       open = { source, loader: new ImageryLoader(source, ranges, layer, failed) };
       if (!nav.moving()) update(); // mid-pan, the settle loads the view (spec 029)
       return null;

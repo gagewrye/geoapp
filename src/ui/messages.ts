@@ -10,7 +10,7 @@ export const MESSAGES = {
   rasterAntimeridian: "Rasters crossing the 180° meridian aren't supported yet.",
   labelLimit: "Label limit reached (256 tiles of 256 x 256 px). Erase elsewhere first.",
   className: "Class names must be unique and not empty.",
-  discard: "Discard labels?",
+  discard: "Close these labels? They stay saved in this browser.", // spec 032: they stay in the browser (spec 031)
   labelFile: "Label files must be single-band 8-bit GeoTIFFs.",
   tooMany: "Too many classes (max 255). Nothing was seeded.",
   noSeed: "No labels to seed here.",
@@ -56,4 +56,15 @@ export function errorText(e: unknown): string {
 /** A paint or export error as shown: a mask file that can't be read any more gets spec 014's message. */
 export function readErrorMessage(e: unknown): string {
   return maskReadFailed(e) ? MESSAGES.maskGone : messageOf(e);
+}
+
+/** A message's kind (spec 032): only errors show in red. */
+export type MessageKind = "info" | "error";
+
+/** say() for #message: sets the text, and class error for errors only. */
+export function messageSink(el: { textContent: string | null; classList: { toggle(c: string, on: boolean): unknown } }) {
+  return (text: string, kind: MessageKind = "info"): void => {
+    el.textContent = text;
+    el.classList.toggle("error", kind === "error");
+  };
 }

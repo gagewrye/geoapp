@@ -7,11 +7,12 @@ import type { RasterSource } from "../io/source";
 import type { Held, initLabels } from "./labels";
 import { MESSAGES, seedMessage } from "./messages";
 import { initProgress } from "./progress";
+import type { MessageKind } from "./messages";
 
 type Deps = {
   labels: ReturnType<typeof initLabels>;
   imagery: () => RasterSource | undefined;
-  say: (text: string) => void;
+  say: (text: string, kind?: MessageKind) => void;
   /** Shows an error the way main's other actions do. */
   error: (e: unknown) => string;
   /** e2e hook: sees each opened label file before it is read. */
@@ -83,12 +84,12 @@ export function initSeeding({ labels, imagery, say, error, opened, imported }: D
       if (cancelled) { labels.restore(held); say(MESSAGES.importCancelled); return; }
       if (typeof r === "string") labels.restore(held);
       else { labels.replace(r.store, r.classes, r.base); imported?.(tif); }
-      say(seedMessage(r) ?? "");
+      say(seedMessage(r) ?? "", r === "too many" ? "error" : "info");
     } catch (e) {
       if (imagery() !== s) return;
       if (held) labels.restore(held);
       if (cancelled) { say(MESSAGES.importCancelled); return; } // a read in flight at Cancel may still reject
-      say(e instanceof LabelFileRefused ? MESSAGES.labelFile : e instanceof ClassTableError ? MESSAGES.classTable(e.field) : error(e));
+      say(e instanceof LabelFileRefused ? MESSAGES.labelFile : e instanceof ClassTableError ? MESSAGES.classTable(e.field) : error(e), "error");
     } finally {
       if (running === s) {
         running = null;
@@ -134,7 +135,7 @@ export function initSeeding({ labels, imagery, say, error, opened, imported }: D
       }
       say("Labels exported.");
     } catch (e) {
-      say(maskReadFailed(e) ? MESSAGES.maskGone : error(e));
+      say(maskReadFailed(e) ? MESSAGES.maskGone : error(e), "error");
     } finally {
       exporting = null;
       relock();

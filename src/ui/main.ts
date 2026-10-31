@@ -10,16 +10,18 @@ import { initImagery } from "./imagery";
 import { inTextField } from "./labelKeys";
 import { openSessionStore } from "../io/session";
 import { initLabels } from "./labels";
-import { errorText, MESSAGES } from "./messages";
+import { errorText, MESSAGES, messageSink } from "./messages";
 import { initProgress } from "./progress";
 import { initPersist } from "./persist";
 import { initSeeding } from "./seeding";
+import { initStatus } from "./status";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
-const message = $("message");
-const say = (text: string) => { message.textContent = text; };
+const say = messageSink($("message")); // only errors show in red (spec 032)
 
 const map = createMap($("map"));
+// the status bar's raster fields stay blank until a raster opens (spec 032)
+const status = initStatus(map, () => (source ? source.meta : null));
 // nav exists before any map event; a held pan key holds tile updates until it settles (spec 027)
 const fullRes = initImagery(map, say, { moving: () => nav.moving() });
 let source: RasterSource | undefined;
@@ -38,7 +40,8 @@ const testHook = (name: string, arg: unknown) => {
 
 // The labels' callbacks run only after the user acts, by when seeding exists.
 const hookValue = (name: string) => (window as unknown as { __geoapp?: Record<string, unknown> }).__geoapp?.[name];
-const labels = initLabels({ map, say, onBusy: () => seeding.sync(), onChange: () => seeding.sync(), panning: () => nav.panning(),
+const labels = initLabels({ map, say, toolChanged: () => queueMicrotask(() => status.tool(labels.tool())), // deferred: initLabels calls it before `labels` is assigned
+  onBusy: () => seeding.sync(), onChange: () => seeding.sync(), panning: () => nav.panning(),
   imageryBusy: fullRes.busy, mapMoving: fullRes.moving, importing: () => seeding.seeding() || hookValue("pauseMasks") === true,
   sweep: () => hookValue("sweep") !== false, op: (o) => testHook("paintOp", o),
   edits: { tiles: (k) => persist.tiles(k), record: () => persist.record(), replaced: () => persist.replaced(), strokeEnded: () => persist.strokeEnded() } });
@@ -71,7 +74,7 @@ async function run(task: () => Promise<void>, stale = () => false): Promise<void
   } catch (e) {
     if (stale()) return;
     progress.hide();
-    say(errorText(e));
+    say(errorText(e), "error");
   }
 }
 
@@ -90,11 +93,10 @@ $<HTMLInputElement>("open-raster").addEventListener("change", (ev) => {
     if (stale()) return;
     await openRaster(f);
     if (stale()) return;
-    // only a raster that opens can discard the labels; Cancel keeps everything
-    if (labels.hasLabels() && !confirm(MESSAGES.discard)) { input.value = ""; progress.hide(); return; }
-    // spec 031 scope 8: a previous raster's unsaved snapshot asks first; Cancel keeps this raster open. Then the
-    // old raster's changes are copied, before labels.open switches the labels
-    if (!persist.open(file.name, file.size, f.meta)) { input.value = ""; progress.hide(); return; }
+    // only a raster that opens can close the labels; Cancel keeps everything. A previous raster's unsaved snapshot
+    // asks instead of the close question (specs 031 scope 8, 032 scope 6). Then the old raster's changes are
+    // copied, before labels.open switches the labels
+    if (!persist.open(file.name, file.size, f.meta, labels.hasLabels())) { input.value = ""; progress.hide(); return; }
     opened = req;
     source = s = f;
     fullRes.clear();
@@ -116,7 +118,9 @@ $<HTMLInputElement>("open-raster").addEventListener("change", (ev) => {
     const off = fullRes.open(f, preview.ranges);
     labels.imageryReady(true);
     progress.hide();
-    say(off ? `Raster opened. ${off}` : "Raster opened.");
+    // the large-blocks notice is an error (spec 032)
+    say(off ? `Raster opened. ${off}` : "Raster opened.", off ? "error" : "info");
+    status.refresh();
     labels.startMasks(); // spec 023 F3: only after the open, and behind the visible tiles
     // spec 031: once the preview is drawn; a store that can't open shows on #save-state when a save fails
     persist.offer().then((m) => { if (m && !stale()) say(m); }, () => {});

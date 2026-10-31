@@ -113,7 +113,7 @@ test("opening a different raster after a save shows no prompt, and the first ras
   await saved(page);
   const tiles = await tileKeysStored(page);
   await open(page, anotherRaster()); // the same grid, another file size: another raster
-  expect(log).toEqual(["confirm: Discard labels?"]);
+  expect(log).toEqual(["confirm: Close these labels? They stay saved in this browser."]);
   expect(await tileKeysStored(page)).toEqual([]);
   await open(page);
   await expect(message(page)).toHaveText("Labels restored.");

@@ -6,7 +6,8 @@ export type SessionRecord = {
   key: string; name: string; savedAt: number;
   classes: LabelClass[]; selected: number; opacity: number; visible: boolean;
   /** The imported mask's derived data (spec 014's MaskBase without the file); null when no mask is loaded. */
-  base: { lut: Uint8Array; count: number; windows: string[]; values: Uint8Array } | null;
+  // copyMissing: saved without a copy of this import's mask (spec 032), so a restore must not open any copy file
+  base: { lut: Uint8Array; count: number; windows: string[]; values: Uint8Array; copyMissing?: boolean } | null;
 };
 
 /** Where sessions live: IndexedDB and OPFS in the app (ADR 0025), a Map-backed fake in tests. */
@@ -24,6 +25,8 @@ export interface SessionStore {
   /** Streams the mask file into the session's copy. */
   saveBase(key: string, file: Blob): Promise<void>;
   base(key: string): Promise<Blob | null>;
+  /** Deletes the mask copy alone, if there is one. */
+  deleteBase(key: string): Promise<void>;
 }
 
 const req = <T>(r: IDBRequest<T>) => new Promise<T>((resolve, reject) => { r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); });
@@ -74,6 +77,7 @@ export async function openSessionStore(): Promise<SessionStore> {
       const w = await (await (await bases()).getFileHandle(name(key), { create: true })).createWritable();
       await file.stream().pipeTo(w);
     },
+    async deleteBase(key) { await (await bases()).removeEntry(name(key)).catch(() => {}); },
     async base(key) {
       try { return await (await (await bases()).getFileHandle(name(key))).getFile(); } catch { return null; }
     },

@@ -21,7 +21,7 @@
 4. The status bar is visible before a raster opens; its raster fields are then blank.
 5. **Save retries** (spec 031 follow-up). When a save of the current raster fails, it is retried after `RETRY_MS` (30 s), as the pending-snapshot path does. New changes still save on the normal 2 s delay.
    - After a quota error (`QuotaExceededError`), the mask copy is left out of every save until the next import. Tiles and the record are still written.
-   - A restore of such a session then follows spec 031's missing-copy path.
+   - A record saved without a copy of its current import's mask marks the copy as missing. A restore then follows spec 031's missing-copy path, even if an older import's copy file is still in OPFS. That stale file is deleted when space allows, but the record's flag alone keeps a restore safe.
    - Today a full disk re-streams Chunk 11's 593 MB mask every 2 s without end (`ui/persist.ts:125-130`).
 6. **Discard question.** When labels are open, `MESSAGES.discard` (asked on opening another raster) becomes `Close these labels? They stay saved in this browser.` While a snapshot is pending, spec 031's pendingDiscard question is asked instead.
 
@@ -56,6 +56,7 @@
    - A write rejecting with `QuotaExceededError` is next retried at 30 s, not at 2 s, and that retry writes tiles and the record but no mask copy.
    - Over 5 minutes of failures, `saveBase` is called at most once.
    - After a new import, the copy is attempted again.
+   - Import mask A (copied), then import mask B while the copy fails with `QuotaExceededError`, so A's copy file is still in the store. Restoring then restores B's tiles, never opens A's copy, and asks for the mask again.
 8. **Unit:**
    - Opening another raster with labels and nothing pending asks the scope 6 text.
    - With a snapshot pending, it asks spec 031's question instead.

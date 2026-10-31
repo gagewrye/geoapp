@@ -10,7 +10,6 @@
       <h1>Geoplatform</h1>
       <label>Open GeoTIFF <input id="open-raster" type="file" accept=".tif,.tiff,image/tiff" /></label>
       <p id="raster-info"></p>
-      <progress id="open-progress" hidden></progress>
       <fieldset id="brush-panel" hidden>
         <legend>Labels</legend>
         <div class="row">
@@ -31,14 +30,21 @@
         <button id="class-add" type="button">Add class</button>
         <label>Class map (optional) <input id="class-map" type="file" accept=".json,application/json" /></label>
         <label>Import labels <input id="import-labels" type="file" accept=".tif,.tiff,image/tiff" /></label>
-        <progress id="import-progress" hidden></progress>
-        <button id="import-cancel" type="button" hidden>Cancel</button>
         <button id="export-labels" type="button">Export labels</button>
       </fieldset>
-      <p id="message" role="status" aria-live="polite"></p>
-      <p id="save-state"></p>
     </aside>
     <main id="map"></main>
+    <footer id="status">
+      <span id="status-lonlat"></span>
+      <span id="status-px"></span>
+      <span id="status-zoom"></span>
+      <span id="status-tool"></span>
+      <span id="save-state"></span>
+      <span id="message" role="status" aria-live="polite"></span>
+      <progress id="open-progress" hidden></progress>
+      <progress id="import-progress" hidden></progress>
+      <button id="import-cancel" type="button" hidden>Cancel</button>
+    </footer>
     <script type="module" src="/src/ui/main.ts"></script>
   </body>
 </html>

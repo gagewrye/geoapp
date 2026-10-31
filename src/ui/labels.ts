@@ -14,10 +14,13 @@ import { initLabelView } from "./labelView";
 import { MESSAGES } from "./messages";
 import { initPaint } from "./paint";
 import { initUndo } from "./undo";
+import type { MessageKind } from "./messages";
 
 type Deps = {
   map: MapLibreMap;
-  say: (text: string) => void;
+  say: (text: string, kind?: MessageKind) => void;
+  /** The brush mode, selected class or brush side changed (spec 032's status bar). */
+  toolChanged?: () => void;
   /** The paint queue became busy or idle (Import labels and Export labels wait while it is busy). */
   onBusy: () => void;
   /** The store changed: a cell applied, labels were replaced, or new imagery opened. */
@@ -45,7 +48,7 @@ export type Held = { readonly store: LabelStore; readonly base: MaskBase | null 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 /** Brush labels on local imagery (spec 003): panel, classes, shortcuts, store, paint queue and overlays. */
-export function initLabels({ map, say, onBusy, onChange, panning, imageryBusy, importing, mapMoving, sweep, op, edits = NO_EDITS }: Deps) {
+export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange, panning, imageryBusy, importing, mapMoving, sweep, op, edits = NO_EDITS }: Deps) {
   const panel = $("brush-panel"), list = $("classes"), add = $<HTMLButtonElement>("class-add");
   const classes: LabelClass[] = initialClasses();
   let selected = 0;
@@ -89,19 +92,23 @@ export function initLabels({ map, say, onBusy, onChange, panning, imageryBusy, i
     panning,
   });
 
+  let mode: BrushMode = "pan";
   const setMode = (m: BrushMode) => {
+    mode = m;
     brush.setMode(m);
+    toolChanged();
     $("mode-paint").setAttribute("aria-pressed", String(m === "paint"));
     $("mode-pan").setAttribute("aria-pressed", String(m === "pan"));
   };
   // Paint never applies to labels you can't see (spec 016): hiding selects Pan, and Paint shows them first
   const view = initLabelView(map, (visible) => { if (!visible) setMode("pan"); }, () => edits.record());
-  const size = initBrushSize(() => brush.refresh());
+  const size = initBrushSize(() => { brush.refresh(); toolChanged(); });
   const select = (i: number) => {
     selected = i;
     edits.record();
     markSelected(list, i);
     brush.refresh();
+    toolChanged();
   };
   const render = () => {
     renderClasses(list, classes, selected, locked, {
@@ -109,9 +116,10 @@ export function initLabels({ map, say, onBusy, onChange, panning, imageryBusy, i
       rename: (i, name) => {
         if (locked) return classes[i]!.name;
         const ok = checkName(classes, i, name);
-        if (ok === null) { say(MESSAGES.className); return classes[i]!.name; }
+        if (ok === null) { say(MESSAGES.className, "error"); return classes[i]!.name; }
         classes[i]!.name = ok;
         edits.record();
+        toolChanged();
         return ok;
       },
       recolour: (i, colour) => {
@@ -200,6 +208,8 @@ export function initLabels({ map, say, onBusy, onChange, panning, imageryBusy, i
       view.set(v.opacity, v.visible);
     },
     selected: () => selected,
+    /** The status bar's tool: mode, selected class name and brush side. */
+    tool: () => ({ mode, className: classes[selected]?.name ?? "", side: size.side() }),
     view: () => view.get(),
     /** Takes the labels off the map for an import (spec 021); the store, classes, base and history stay as they are. */
     hold(): Held {
