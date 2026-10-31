@@ -5,11 +5,12 @@ import { buildPreview, openRaster } from "../io/pipeline";
 import type { RasterSource } from "../io/source";
 import { createMap } from "../map/map";
 import { createNavigation } from "../map/navigation";
-import { fitToPreview, showPreview } from "../map/preview";
+import { fitRaster, previewBounds, showPreview, type Bounds } from "../map/preview";
 import { initImagery } from "./imagery";
 import { inTextField } from "./labelKeys";
 import { openSessionStore } from "../io/session";
 import { initLabels } from "./labels";
+import { initLayout } from "./layout";
 import { errorText, MESSAGES, messageSink } from "./messages";
 import { initProgress } from "./progress";
 import { initPersist } from "./persist";
@@ -19,7 +20,16 @@ import { initStatus } from "./status";
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const say = messageSink($("message")); // only errors show in red (spec 032)
 
-const map = createMap($("map"));
+// the drawn raster's bounds, which Home and the ⌂ button fit again (spec 035)
+let bounds: Bounds | null = null;
+const home = () => { if (bounds) fitRaster(map, bounds); };
+const map = createMap($("map"), home);
+const layout = initLayout({ map, open: () => source !== undefined });
+window.addEventListener("keydown", (e) => {
+  if (e.key !== "Home" || !bounds || e.ctrlKey || e.metaKey || e.altKey || inTextField(document.activeElement)) return;
+  e.preventDefault();
+  home();
+});
 // the status bar's raster fields stay blank until a raster opens (spec 032)
 const status = initStatus(map, () => (source ? source.meta : null));
 // nav exists before any map event; a held pan key holds tile updates until it settles (spec 027)
@@ -103,8 +113,11 @@ $<HTMLInputElement>("open-raster").addEventListener("change", (ev) => {
     previewing?.abort(); // the replaced raster's preview reads stop
     const signal = (previewing = new AbortController()).signal;
     labels.open(f);
+    layout.opened();
+    bounds = null; // until this raster's preview is drawn
     const { width, height, bandCount, epsg } = f.meta;
-    $("raster-info").textContent = `${file.name}: ${width} x ${height}, ${bandCount} band(s), EPSG:${epsg}`;
+    const info = $("raster-info");
+    info.textContent = info.title = `${file.name}: ${width} x ${height}, ${bandCount} band(s), EPSG:${epsg}`; // one line, ellipsised
     testHook("rasterFile", f);
     say(MESSAGES.buildingPreview);
     const preview = await buildPreview(f, PREVIEW_MAX_SIDE, { signal, onProgress: (done, total) => {
@@ -114,7 +127,7 @@ $<HTMLInputElement>("open-raster").addEventListener("change", (ev) => {
     } });
     if (stale()) return;
     showPreview(map, preview);
-    fitToPreview(map, preview.corners);
+    fitRaster(map, bounds = previewBounds(preview.corners));
     const off = fullRes.open(f, preview.ranges);
     labels.imageryReady(true);
     progress.hide();

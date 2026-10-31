@@ -99,7 +99,7 @@ for (const [name, grid] of RASTERS) {
     for (const [c, r] of positions()) {
       await jumpTo(page, lonLat(c + 0.5, r + 0.5), zoom);
       for (const side of [1, 7]) {
-        while ((await page.locator("#brush-size").textContent()) !== `Brush: ${side} px`) await page.click(side === 1 ? "#brush-smaller" : "#brush-larger");
+        while ((await page.locator("#brush-size").textContent()) !== `${side}`) await page.click(side === 1 ? "#brush-smaller" : "#brush-larger");
         await clickAt(page, await toScreen(page, lonLat(c + 0.5, r + 0.5)));
         await settled(page);
         await page.mouse.move(panel.x + panel.width / 2, panel.y + 10); // no outline over the samples

@@ -78,7 +78,7 @@ async function openAt(page: Page, grid: Grid, c: number, r: number) {
   await jumpTo(page, lonLat(c, r), 8);
   const [a, b] = [await toScreen(page, lonLat(c, r)), await toScreen(page, lonLat(c + 1, r))];
   await jumpTo(page, lonLat(c, r), 8 + Math.log2(16 / Math.hypot(b.x - a.x, b.y - a.y)));
-  while ((await page.locator("#brush-size").textContent()) !== "Brush: 7 px") await page.click("#brush-larger");
+  while ((await page.locator("#brush-size").textContent()) !== "7") await page.click("#brush-larger");
   return lonLat;
 }
 

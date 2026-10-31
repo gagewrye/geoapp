@@ -46,8 +46,8 @@ test("a 2,000 px size-127 stroke after the background reads: no imagery read, on
   await expect(message(page)).toHaveText("Raster opened.", { timeout: 120_000 });
   await paintMode(page);
   await page.locator("#brush-size-range").fill("127");
-  await expect(page.locator("#brush-size")).toHaveText("Brush: 127 px");
-  await jumpTo(page, at(2048, 2048), 7); // the whole stroke on the map canvas, right of the panel
+  await expect(page.locator("#brush-size")).toHaveText("127");
+  await jumpTo(page, at(2048, 2048), 6.5); // the whole stroke on the map canvas, between the tool strip and the panel
   await expect.poll(() => page.evaluate(() => (window as any).__geoapp.masksDone()), { timeout: 120_000, intervals: [500] }).toBe(true);
 
   const a = await toScreen(page, at(1000, 1400)), b = await toScreen(page, at(3000, 2600));

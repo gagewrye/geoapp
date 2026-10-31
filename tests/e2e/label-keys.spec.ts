@@ -21,7 +21,7 @@ async function setup(page: Page) {
 
 test("holding ` hides the labels, a press paints nothing; releasing shows them in Paint mode and a stroke paints (criterion 4)", async ({ page }) => {
   await setup(page);
-  const a = await toScreen(page, [14.005, 45.005]);
+  const a = await toScreen(page, [14.505, 45.005]); // on the canvas between the tool strip and the panel (spec 035)
   await stroke(page, [a, { x: a.x + 40, y: a.y }]);
   const before = await labels(page);
   expect(before.size).toBeGreaterThan(0);
@@ -42,7 +42,7 @@ test("holding ` hides the labels, a press paints nothing; releasing shows them i
 
 test("H hides the labels, unchecks Show labels and selects Pan; H again shows them (criterion 5)", async ({ page }) => {
   await setup(page);
-  const a = await toScreen(page, [14.005, 45.005]);
+  const a = await toScreen(page, [14.505, 45.005]); // on the canvas between the tool strip and the panel (spec 035)
   await stroke(page, [a, { x: a.x + 40, y: a.y }]);
   await page.keyboard.press("h");
   await expect(show(page)).not.toBeChecked();

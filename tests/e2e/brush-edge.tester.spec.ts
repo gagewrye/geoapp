@@ -12,7 +12,7 @@ const round = (p: Xy): Xy => ({ x: Math.round(p.x), y: Math.round(p.y) });
 const labelLayers = (page: Page): Promise<string[]> => page.evaluate(() => (window as any).__geoapp.map.getStyle().layers.map((l: any) => l.id as string));
 
 async function setSize(page: Page, px: number) {
-  while ((await page.locator("#brush-size").textContent()) !== `Brush: ${px} px`) await page.click("#brush-larger");
+  while ((await page.locator("#brush-size").textContent()) !== `${px}`) await page.click("#brush-larger");
 }
 
 test.describe("raster edges and partial tiles (tester)", () => {

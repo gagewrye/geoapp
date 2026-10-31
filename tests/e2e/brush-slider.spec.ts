@@ -7,7 +7,7 @@ import { clickAt, hoverFeatures, jumpTo, labels, message, openApp, openRaster, p
 const range = (page: Page) => page.locator("#brush-size-range");
 const sizeText = (page: Page) => page.locator("#brush-size");
 async function expectSize(page: Page, n: number) {
-  await expect(sizeText(page)).toHaveText(`Brush: ${n} px`);
+  await expect(sizeText(page)).toHaveText(`${n}`);
   await expect(range(page)).toHaveValue(String(n));
 }
 

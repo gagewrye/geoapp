@@ -26,7 +26,7 @@ function covered(grid: Grid, cells: ([number, number] | null)[], side: number): 
 const round = (p: Xy): Xy => ({ x: Math.round(p.x), y: Math.round(p.y) });
 
 async function setSize(page: Page, px: number) {
-  while ((await page.locator("#brush-size").textContent()) !== `Brush: ${px} px`) await page.click("#brush-larger");
+  while ((await page.locator("#brush-size").textContent()) !== `${px}`) await page.click("#brush-larger");
 }
 
 test("a fast size-127 drag at zoom 4 over a 65792 px wide strip labels every pixel between its ends, reading no imagery", async ({ page }) => {

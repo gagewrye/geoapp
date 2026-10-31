@@ -64,7 +64,7 @@ test("paint, rename, opacity 30%: after Saved and a reload, accepting the restor
   expect(await classList(page)).toEqual(classes);
   expect(await selected(page)).toBe(1);
   await expect(page.locator("#label-opacity")).toHaveValue("30");
-  await expect(page.locator("#label-opacity-text")).toHaveText("Opacity: 30%");
+  await expect(page.locator("#label-opacity-text")).toHaveText("30%");
 
   await paintMode(page);
   await jumpTo(page, [15, 45], 6);

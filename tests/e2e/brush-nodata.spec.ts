@@ -22,7 +22,7 @@ async function setup(page: Page, centre: [number, number] = [215, 115]) {
   await paintMode(page);
   await jumpTo(page, lonLat(...centre), 14); // about 2.3 screen px per pixel, so a 260 px drag stays on the map
   await page.click("#brush-larger"); // size 15
-  await expect(page.locator("#brush-size")).toHaveText("Brush: 15 px");
+  await expect(page.locator("#brush-size")).toHaveText("15");
 }
 /** Screen point of a pixel centre. */
 const at = (page: Page, c: number, r: number) => toScreen(page, lonLat(c + 0.5, r + 0.5));

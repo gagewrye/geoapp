@@ -6,7 +6,7 @@ import { jumpTo, message, openApp, openRaster, paintMode, rgbFixture, stroke, ti
 // by keyboard or just after an erase stroke.
 
 const PANEL = ["#classes .class-name", "#classes input[type=color]", "#classes input[type=radio]", "#mode-paint", "#brush-larger",
-  "#brush-size-range", "#label-opacity", "#show-labels", "#class-add", "#open-raster", "#import-labels", "#export-labels", "#message", "#panel h1"];
+  "#brush-size-range", "#label-opacity", "#show-labels", "#class-add", "#open-raster", "#import-labels", "#export-labels", "#message", "#topbar h1"];
 const MAP = [".maplibregl-canvas", ".maplibregl-ctrl-zoom-in", ".maplibregl-ctrl-compass", ".maplibregl-ctrl-globe, .maplibregl-ctrl-globe-enabled"];
 
 /** defaultPrevented of a contextmenu dispatched on the first match of each selector. */
@@ -31,7 +31,7 @@ test.describe("contextmenu on every map and panel element (criterion 10, tester 
   test("no imagery: no panel element is prevented", async ({ page }) => {
     await openApp(page);
     expect(await prevented(page, PANEL.filter((s) => !s.startsWith("#classes") && !s.startsWith("#mode") && !s.startsWith("#brush") && s !== "#class-add")))
-      .toEqual(all(["#label-opacity", "#show-labels", "#open-raster", "#import-labels", "#export-labels", "#message", "#panel h1"], false));
+      .toEqual(all(["#label-opacity", "#show-labels", "#open-raster", "#import-labels", "#export-labels", "#message", "#topbar h1"], false));
   });
 
   const states: [string, (page: Page) => Promise<void>][] = [

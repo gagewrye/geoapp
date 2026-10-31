@@ -36,9 +36,10 @@ test("no text or control over the map sits on the stars without its own backgrou
   await expect(message(page)).toHaveText("Raster opened.");
   await jumpTo(page, [15, 45], 2);
   expect(await textOnStars(page)).toEqual([]);
-  // the panel stays beside the map, on the page's own background, not over the stars
-  const panel = (await page.locator("#panel").boundingBox())!, map = (await page.locator("#map").boundingBox())!;
-  expect(panel.x + panel.width).toBeLessThanOrEqual(map.x + 1);
+  // the tool strip and the panel stay beside the map (left and right: spec 035), on the page's own background
+  const tools = (await page.locator("#tools").boundingBox())!, panel = (await page.locator("#panel").boundingBox())!, map = (await page.locator("#map").boundingBox())!;
+  expect(tools.x + tools.width).toBeLessThanOrEqual(map.x + 1);
+  expect(panel.x).toBeGreaterThanOrEqual(map.x + map.width - 1);
   await page.screenshot({ path: test.info().outputPath("globe-with-panel.png") });
 });
 

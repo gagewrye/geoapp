@@ -74,7 +74,7 @@ test("while the preview loads: Space, middle-drag, wheel and WASD move the map; 
   await moved(async () => { await page.keyboard.down("d"); await page.waitForTimeout(300); await page.keyboard.up("d"); });
 
   await page.locator("#label-opacity").fill("30");
-  await expect(page.locator("#label-opacity-text")).toHaveText("Opacity: 30%");
+  await expect(page.locator("#label-opacity-text")).toHaveText("30%");
   await page.locator("#show-labels").uncheck();
   await page.locator("#show-labels").check();
   await expect(paint(page)).toBeDisabled();

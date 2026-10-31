@@ -218,7 +218,7 @@ test("during an import edits are disabled or ignored, and Opacity and Show label
   expect(await classList(page)).toEqual(classes);
   // the view controls work, and apply to the layers drawn after the import
   await page.locator("#label-opacity").fill("30");
-  await expect(page.locator("#label-opacity-text")).toHaveText("Opacity: 30%");
+  await expect(page.locator("#label-opacity-text")).toHaveText("30%");
   await page.click("#show-labels");
   await allow(page, 1000);
   await expect(message(page)).toHaveText(seeded);

@@ -6,35 +6,48 @@
     <title>Geoplatform</title>
   </head>
   <body>
-    <aside id="panel">
+    <!-- three regions around the map (spec 035); ids are kept from the old sidebar -->
+    <header id="topbar">
       <h1>Geoplatform</h1>
-      <label>Open GeoTIFF <input id="open-raster" type="file" accept=".tif,.tiff,image/tiff" /></label>
-      <p id="raster-info"></p>
-      <fieldset id="brush-panel" hidden>
-        <legend>Labels</legend>
-        <div class="row">
-          <button id="mode-paint" type="button" aria-pressed="false">Paint</button>
-          <button id="mode-erase" type="button" aria-pressed="false">Erase</button>
-          <button id="mode-pan" type="button" aria-pressed="true">Pan</button>
-        </div>
-        <div class="row">
-          <button id="brush-smaller" type="button" aria-label="Smaller brush">&minus;</button>
-          <span id="brush-size">Brush: 7 px</span>
-          <button id="brush-larger" type="button" aria-label="Larger brush">+</button>
-        </div>
-        <input id="brush-size-range" type="range" min="1" max="127" step="2" value="7" aria-label="Brush size" />
-        <div id="label-opacity-text">Opacity: 60%</div>
-        <input id="label-opacity" type="range" min="0" max="100" step="5" value="60" aria-label="Opacity" />
-        <label><input id="show-labels" type="checkbox" checked /> Show labels</label>
-        <button id="undo" type="button" disabled>Undo</button>
-        <ul id="classes"></ul>
-        <button id="class-add" type="button">Add class</button>
-        <label>Class map (optional) <input id="class-map" type="file" accept=".json,application/json" /></label>
-        <label>Import labels <input id="import-labels" type="file" accept=".tif,.tiff,image/tiff" /></label>
+      <label class="file">Open GeoTIFF <input id="open-raster" type="file" accept=".tif,.tiff,image/tiff" /></label>
+      <span id="raster-info"></span>
+      <span id="file-actions" hidden>
+        <label class="file">Class map <input id="class-map" type="file" accept=".json,application/json" /></label>
+        <label class="file">Import labels <input id="import-labels" type="file" accept=".tif,.tiff,image/tiff" /></label>
         <button id="export-labels" type="button">Export labels</button>
-      </fieldset>
-    </aside>
+      </span>
+    </header>
+    <nav id="tools" hidden aria-label="Tools">
+      <div id="brush-panel">
+        <button id="mode-pan" type="button" aria-pressed="true" aria-label="Pan" title="Pan (P)">&#x2725;</button>
+        <button id="mode-paint" type="button" aria-pressed="false" aria-label="Paint" title="Paint (B)">&#x270E;</button>
+        <button id="mode-erase" type="button" aria-pressed="false" aria-label="Erase" title="Erase (E)">&#x232B;</button>
+        <hr />
+        <button id="brush-smaller" type="button" aria-label="Smaller brush" title="Smaller brush ([)">&minus;</button>
+        <span id="brush-size" title="Brush size in raster pixels">7</span>
+        <button id="brush-larger" type="button" aria-label="Larger brush" title="Larger brush (])">+</button>
+        <input id="brush-size-range" type="range" min="1" max="127" step="2" value="7" aria-label="Brush size" />
+        <hr />
+        <button id="undo" type="button" disabled aria-label="Undo" title="Undo (Ctrl+Z)">&#x21B6;</button>
+      </div>
+    </nav>
     <main id="map"></main>
+    <aside id="side" hidden>
+      <div id="panel">
+        <section id="class-section">
+          <div class="section-head"><h2>Classes</h2><button id="class-add" type="button">Add class</button></div>
+          <ul id="classes"></ul>
+        </section>
+        <section id="label-section">
+          <h2>Labels</h2>
+          <label><input id="show-labels" type="checkbox" checked /> Show (H)</label>
+          <div class="row">
+            <input id="label-opacity" type="range" min="0" max="100" step="5" value="60" aria-label="Opacity" />
+            <span id="label-opacity-text">60%</span>
+          </div>
+        </section>
+      </div>
+    </aside>
     <footer id="status">
       <span id="status-lonlat"></span>
       <span id="status-px"></span>

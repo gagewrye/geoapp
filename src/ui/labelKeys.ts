@@ -18,7 +18,8 @@ type Deps = {
   canPaint: () => boolean;
   /** A stroke is in progress: a peek doesn't start. */
   stroking: () => boolean;
-  view: { toggle(): void; peek(on: boolean): void };
+  /** peek returns true when the call changed the peek state. */
+  view: { toggle(): void; peek(on: boolean): boolean };
 };
 
 // The key left of 1 on US and UK layouts, by position so other layouts still have it (spec 034)
@@ -46,7 +47,7 @@ export function initLabelKeys(d: Deps): void {
       return;
     }
     if (inTextField(document.activeElement)) return;
-    if (e.code === PEEK) { if (!e.repeat && !d.stroking()) { peeking = true; d.view.peek(true); } return; }
+    if (e.code === PEEK) { if (!e.repeat && !d.stroking() && d.view.peek(true)) peeking = true; return; }
     if (e.key.toLowerCase() === "h") { if (!e.repeat) d.view.toggle(); return; }
     if (e.key === "[") d.size.step(-1);
     else if (e.key === "]") d.size.step(1);

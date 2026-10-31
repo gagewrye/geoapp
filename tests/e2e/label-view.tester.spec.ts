@@ -93,13 +93,13 @@ test("opacity at 0 and 100, live text on keyboard input, and the value survives 
   await stroke(page, [a, { x: a.x + 10, y: a.y }]);
   for (const [v, o] of [["0", 0], ["100", 1]] as const) {
     await opacity(page).fill(v);
-    await expect(page.locator("#label-opacity-text")).toHaveText(`Opacity: ${v}%`);
+    await expect(page.locator("#label-opacity-text")).toHaveText(`${v}%`);
     expect(await labelLayers(page)).toEqual({ "label-256,256": [o, "visible"] });
   }
   await opacity(page).focus();
   await page.keyboard.press("ArrowLeft");
   await expect(opacity(page)).toHaveValue("95");
-  await expect(page.locator("#label-opacity-text")).toHaveText("Opacity: 95%");
+  await expect(page.locator("#label-opacity-text")).toHaveText("95%");
   expect(await labelLayers(page)).toEqual({ "label-256,256": [0.95, "visible"] });
   await toggleShow(page);
   await toggleShow(page);
@@ -109,11 +109,11 @@ test("opacity at 0 and 100, live text on keyboard input, and the value survives 
 test("the brush size is kept when another raster opens (spec 017)", async ({ page }) => {
   await setup(page);
   await page.locator("#brush-size-range").fill("41");
-  await expect(page.locator("#brush-size")).toHaveText("Brush: 41 px");
+  await expect(page.locator("#brush-size")).toHaveText("41");
   await openRaster(page, { ...rgbFixture(), name: "other.tif" });
   await expect(page.locator("#raster-info")).toContainText("other.tif");
   await expect(message(page)).toHaveText("Raster opened.");
-  await expect(page.locator("#brush-size")).toHaveText("Brush: 41 px");
+  await expect(page.locator("#brush-size")).toHaveText("41");
   await expect(page.locator("#brush-size-range")).toHaveValue("41");
 });
 
@@ -123,7 +123,7 @@ test("an even value on the slider snaps to an odd size that the text matches (sp
   await page.locator("#brush-size-range").evaluate((e: HTMLInputElement) => { e.value = "40"; e.dispatchEvent(new Event("input", { bubbles: true })); });
   const v = Number(await page.locator("#brush-size-range").inputValue());
   expect(v % 2).toBe(1);
-  await expect(page.locator("#brush-size")).toHaveText(`Brush: ${v} px`);
+  await expect(page.locator("#brush-size")).toHaveText(`${v}`);
 });
 
 test("a size change mid-stroke applies to later cells only (spec 017)", async ({ page }) => {
@@ -137,7 +137,7 @@ test("a size change mid-stroke applies to later cells only (spec 017)", async ({
   await page.mouse.down();
   for (let i = 1; i <= 6; i++) await page.mouse.move(a.x + 10 * i, a.y);
   await page.keyboard.press("]"); // 7 -> 15
-  await expect(page.locator("#brush-size")).toHaveText("Brush: 15 px");
+  await expect(page.locator("#brush-size")).toHaveText("15");
   for (let i = 1; i <= 6; i++) await page.mouse.move(a2.x + 10 * i, a.y);
   await page.mouse.up();
   await settled(page);

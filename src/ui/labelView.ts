@@ -8,7 +8,7 @@ export function initLabelView(map: MapLibreMap, onVisible: (visible: boolean) =>
   const range = $<HTMLInputElement>("label-opacity"), text = $("label-opacity-text"), show = $<HTMLInputElement>("show-labels");
 
   let peeking = false; // a held peek key hides the layers only: the checkbox and the saved view stay (spec 034)
-  const showText = () => { text.textContent = `Opacity: ${range.value}%`; };
+  const showText = () => { text.textContent = `${range.value}%`; }; // beside its slider (spec 035)
   const layers = () => applyLabelView(map, { opacity: Number(range.value) / 100, visible: show.checked && !peeking });
   const apply = () => {
     showText();
@@ -28,11 +28,12 @@ export function initLabelView(map: MapLibreMap, onVisible: (visible: boolean) =>
   return {
     /** Toggle Show labels, as a click on it does (spec 034's H). */
     toggle(): void { show.checked = !show.checked; toggled(); },
-    /** Hide the layers while on, leaving the checkbox alone; a peek doesn't start while the labels are hidden already. */
-    peek(on: boolean): void {
-      if (on === peeking || (on && !show.checked)) return;
+    /** Hide the layers while on, leaving the checkbox alone; true when this changed the peek (none starts while hidden already). */
+    peek(on: boolean): boolean {
+      if (on === peeking || (on && !show.checked)) return false;
       peeking = on;
       layers();
+      return true;
     },
     peeking: () => peeking,
     /** Check Show labels if it isn't. */

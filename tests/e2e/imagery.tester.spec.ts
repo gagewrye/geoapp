@@ -88,7 +88,7 @@ test("rotated UTM at 45N: screen samples at pixel centres match the source, from
 test("rotated UTM at 45N: a painted pixel's colour edges fall on the imagery's pixel edges, within 1 device px", async ({ page }) => {
   await openRotated(page);
   await paintMode(page);
-  while ((await page.locator("#brush-size").textContent()) !== "Brush: 1 px") await page.click("#brush-smaller");
+  while ((await page.locator("#brush-size").textContent()) !== "1") await page.click("#brush-smaller");
   const [c, r] = [420, 300];
   await zoomTo(page, c + 0.5, r + 0.5, 14);
   const centre = await toScreen(page, lonLat(c + 0.5, r + 0.5));

@@ -10,7 +10,7 @@ export function initBrushSize(changed: () => void) {
   const set = (side: number) => {
     size = side;
     range.value = String(side);
-    text.textContent = `Brush: ${side} px`;
+    text.textContent = String(side); // the tool strip shows the number only (spec 035)
     changed(); // the footprint redraws at once; a stroke in progress uses it from its next cell
   };
   const step = (d: 1 | -1) => set(stepBrush(size, d));
