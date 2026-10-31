@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { jumpTo, labels, message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture, selectClass, settled, stroke, toScreen, type Xy } from "./helpers";
+import { anotherRaster, jumpTo, labels, message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture, selectClass, settled, stroke, toScreen, type Xy } from "./helpers";
 
 // Spec 010: undo of paint and erase strokes (button and Ctrl+Z), and the brush cursor.
 const undoButton = (page: Page) => page.locator("#undo");
@@ -132,7 +132,7 @@ test("opening another raster clears the history (criterion 5)", async ({ page })
   expect(one.every(([, v]) => v === 1)).toBe(true);
   await expect(undoButton(page)).toBeEnabled(); // the class 1 stroke is still there
   page.on("dialog", (d) => void d.accept());
-  await openRaster(page, rgbFixture());
+  await openRaster(page, anotherRaster()); // spec 031 would offer the same raster's saved labels back
   await expect(message(page)).toHaveText("Raster opened.");
   await paintMode(page);
   await expect(undoButton(page)).toBeDisabled();

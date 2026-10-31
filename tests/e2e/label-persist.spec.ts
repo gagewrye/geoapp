@@ -1,6 +1,6 @@
 import { expect, test, type Dialog, type Page } from "@playwright/test";
 import {
-  jumpTo, labels, message, openApp, openRaster, paintMode, paintTwoClasses, path, rgbFixture, selectClass, stroke, tileKeysStored, toScreen,
+  anotherRaster, jumpTo, labels, message, openApp, openRaster, paintMode, paintTwoClasses, path, rgbFixture, selectClass, stroke, tileKeysStored, toScreen,
 } from "./helpers";
 import { at, classList, download, importFile, maskFile, noSavePicker, storeTiles } from "./seeding";
 
@@ -112,9 +112,7 @@ test("opening a different raster after a save shows no prompt, and the first ras
   await paintTwoClasses(page);
   await saved(page);
   const tiles = await tileKeysStored(page);
-  const other = rgbFixture();
-  other.buffer = Buffer.concat([other.buffer, Buffer.alloc(16)]); // the same grid, another file size: another raster
-  await open(page, { ...other, name: "other.tif" });
+  await open(page, anotherRaster()); // the same grid, another file size: another raster
   expect(log).toEqual(["confirm: Discard labels?"]);
   expect(await tileKeysStored(page)).toEqual([]);
   await open(page);
