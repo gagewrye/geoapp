@@ -1,6 +1,6 @@
 # 038: Class picker
 
-**Status:** Approved by Gage 2026-10-30, with the draft answers to its questions. **ADRs:** none. **Builds on specs 014, 032 and 033.**
+**Status:** Approved by Gage 2026-10-30, with the draft answers to its questions. **ADRs:** none. **Builds on specs 014, 032 and 033.** Amended after implementation (2026-10-30): a failed mask read (scope 3, criterion 3).
 
 **Goal:** Alt+click on a labelled pixel, or `I` while hovering one, selects its class.
 
@@ -11,6 +11,7 @@
    - A value v > 0 selects class v − 1 and says `Picked <name>.` (info).
    - A value of 0 says `No label here.` (info) and keeps the selection.
    - A pick that is still reading when another starts is dropped.
+   - A failed tile read says `errorText(e)` (error) through `say`, and keeps the selection and the mode.
 4. The mode is unchanged by a pick.
 5. Holding Alt by itself does nothing. The Alt keyup is `preventDefault`ed while the pointer is over the map, so Firefox's menu bar doesn't take focus.
 
@@ -36,6 +37,7 @@
    - A pick of value 3 selects index 2 and says `Picked <class 3 name>.`
    - A pick of value 0 keeps the selection and says `No label here.`
    - Of two overlapping picks, only the second applies.
+   - A pick whose `tile()` rejects says `errorText` of the error as an error, leaves the selection and mode unchanged, and leaves no unhandled rejection.
 4. **E2E:**
    - Paint class 2. Select class 1, then Alt+click the painted pixel: class 2 is selected and the tile is unchanged.
    - Hover the pixel and press `I` with class 1 selected: the same result.
