@@ -8,6 +8,7 @@ import { PaintQueue, type PaintOp } from "../io/paintQueue";
 import type { RasterSource } from "../io/source";
 import type { StrokeEdit, UndoHistory } from "../io/undoHistory";
 import { MESSAGES, readErrorMessage } from "./messages";
+import type { MessageKind } from "./messages";
 
 type Deps = {
   store: () => LabelStore;
@@ -24,7 +25,7 @@ type Deps = {
   prefetch: (keys: string[]) => void;
   /** A paint or erase stroke is being drawn. */
   stroking: () => boolean;
-  say: (text: string) => void;
+  say: (text: string, kind?: MessageKind) => void;
   /** The queue became busy or idle. */
   busy: () => void;
   /** Spec 020's loader has reads queued or in flight, and an import runs: background mask reads wait for both. */
@@ -50,9 +51,9 @@ export function initPaint(d: Deps) {
       cache = new MaskCache(source, { loaderBusy: d.imageryBusy, paused: d.importing, moving: d.mapMoving });
       queue = new PaintQueue(source, d.store, {
         applied: d.applied,
-        full: () => d.say(d.store().base ? MESSAGES.editLimit : MESSAGES.labelLimit),
+        full: () => d.say(d.store().base ? MESSAGES.editLimit : MESSAGES.labelLimit, "error"),
         busy: d.busy,
-        error: (e) => d.say(readErrorMessage(e)),
+        error: (e) => d.say(readErrorMessage(e), "error"),
       }, d.history, d.base, cache);
     },
     /** One pointer move's stroke cells: a single op over the union of their footprints (F6). */

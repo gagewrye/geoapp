@@ -1,6 +1,7 @@
 html, body { margin: 0; height: 100%; font: 14px system-ui, sans-serif; }
-body { display: flex; }
-#panel { width: 280px; padding: 12px; overflow-y: auto; box-sizing: border-box; background: #f4f4f4; }
+/* sidebar and map above a full-width status bar (spec 032) */
+body { display: grid; grid-template: 1fr 28px / 280px 1fr; }
+#panel { grid-area: 1 / 1; min-height: 0; padding: 12px; overflow-y: auto; box-sizing: border-box; background: #f4f4f4; }
 #panel h1 { font-size: 18px; margin: 0 0 12px; }
 #panel label, #panel button { display: block; margin: 6px 0; }
 #panel .row { display: flex; gap: 6px; }
@@ -13,13 +14,19 @@ body { display: flex; }
 #classes .class-colour { width: 32px; padding: 0; }
 #brush-size { align-self: center; }
 #panel button[aria-pressed="true"] { font-weight: bold; }
-#open-progress, #import-progress { width: 100%; }
 #panel [hidden] { display: none; } /* outranks #panel button's display: block (Cancel, spec 021) */
-#message { color: #a40000; min-height: 2em; }
+#status { grid-area: 2 / 1 / 3 / 3; display: flex; gap: 14px; align-items: center; padding: 0 8px; overflow: hidden;
+  background: #e6e6e6; border-top: 1px solid #ccc; font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+#status [hidden] { display: none; }
+#status-lonlat { min-width: 19ch; }
+#message { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#status progress { width: 160px; }
+/* only errors show in red (spec 032) */
+#status .error { color: #a40000; }
 /* Space behind the globe (spec 015): CSS-drawn stars, no asset. Tile sizes 137, 211 and 293 px share
    no factor, so the pattern doesn't look regular. The canvas is transparent off the globe. */
 #map {
-  flex: 1; height: 100%;
+  grid-area: 1 / 2; min-width: 0; min-height: 0;
   background-color: #03050a;
   background-image:
     radial-gradient(circle 2px at 23px 41px, #fff 50%, transparent),
