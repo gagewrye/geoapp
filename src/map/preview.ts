@@ -18,8 +18,16 @@ export function showPreview(map: MapLibreMap, p: Preview): void {
   map.addLayer({ id: SOURCE, type: "raster", source: SOURCE, paint: { "raster-fade-duration": 0, "raster-resampling": "nearest" } }, beforeSlot(map, "preview"));
 }
 
-export function fitToPreview(map: MapLibreMap, corners: [number, number][]): void {
+export type Bounds = [[number, number], [number, number]];
+
+/** The preview's west-south and east-north corners (its corners run NW, NE, SE, SW). */
+export function previewBounds(corners: [number, number][]): Bounds {
   const [w, n] = corners[0]!;
   const [e, s] = corners[2]!;
-  map.fitBounds([[w, s], [e, n]], { padding: 40, animate: false });
+  return [[w, s], [e, n]];
+}
+
+/** Fit the raster in view, on open and on Home (spec 035). */
+export function fitRaster(map: MapLibreMap, bounds: Bounds): void {
+  map.fitBounds(bounds, { padding: 40, animate: false });
 }
