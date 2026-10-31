@@ -4,9 +4,10 @@
 export const formatLonLat = (lon: number, lat: number): string =>
   `${Math.abs(lat).toFixed(5)} ${lat < 0 ? "S" : "N"} ${Math.abs(lon).toFixed(5)} ${lon < 0 ? "W" : "E"}`;
 
+const TOOL = { paint: "Paint", erase: "Erase", pan: "Pan" } as const;
 /** `Paint · Water · 7 px`, from the brush mode, the selected class's name and the brush side. */
-export const formatTool = (mode: "paint" | "pan", className: string, side: number): string =>
-  `${mode === "paint" ? "Paint" : "Pan"} · ${className} · ${side} px`;
+export const formatTool = (mode: keyof typeof TOOL, className: string, side: number): string =>
+  `${TOOL[mode]} · ${className} · ${side} px`;
 
 /** `px col, row` for a pixel on the raster, else blank. */
 export const formatPixel = (dims: { width: number; height: number }, [c, r]: [number, number]): string =>

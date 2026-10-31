@@ -1,4 +1,4 @@
-import type { createBrush } from "../map/brush";
+import type { BrushMode, createBrush } from "../map/brush";
 import type { initBrushSize } from "./brushSize";
 
 const NOT_TEXT = new Set(["checkbox", "radio", "button", "submit", "reset", "color", "file", "range", "image"]);
@@ -13,9 +13,14 @@ type Deps = {
   size: Pick<ReturnType<typeof initBrushSize>, "step">;
   select: (i: number) => void;
   classCount: () => number;
+  setMode: (m: BrushMode) => void;
+  /** The Paint (and Erase) button is enabled (spec 019). */
+  canPaint: () => boolean;
 };
 
-/** Labelling shortcuts (specs 003, 009): Space holds Pan, [ and ] size the brush, 1-9 pick a class. */
+const MODE_KEYS: Record<string, BrushMode> = { b: "paint", e: "erase", p: "pan", escape: "pan" };
+
+/** Labelling shortcuts (specs 003, 009, 033): Space holds Pan, [ and ] size the brush, 1-9 pick a class, B, E, P and Escape pick a mode. */
 export function initLabelKeys(d: Deps): void {
   // Chromium marks the focused element :focus-visible on any keydown, so how it got focus is read when focus arrives
   let keyFocused = false;
@@ -34,6 +39,10 @@ export function initLabelKeys(d: Deps): void {
     if (e.key === "[") d.size.step(-1);
     else if (e.key === "]") d.size.step(1);
     else if (/^[1-9]$/.test(e.key) && Number(e.key) <= d.classCount()) d.select(Number(e.key) - 1);
+    else {
+      const m = MODE_KEYS[e.key.toLowerCase()];
+      if (m && (m === "pan" || d.canPaint())) d.setMode(m);
+    }
   });
   window.addEventListener("keyup", (e) => {
     if (e.code !== "Space") return;
