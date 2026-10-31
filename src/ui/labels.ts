@@ -66,9 +66,9 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
   });
   const display = labelDisplay(map, () => store, () => panel.classes().map((c) => c.colour));
   const redraw = display.redraw;
-  // Paint undo (spec 010): one entry per stroke; opening a raster or replacing the store clears it
+  // Paint undo and redo (specs 010, 037): one entry per stroke; opening a raster or replacing the store clears it
   const undo = initUndo({
-    button: $<HTMLButtonElement>("undo"), store: () => store,
+    button: $<HTMLButtonElement>("undo"), redoButton: $<HTMLButtonElement>("redo"), store: () => store,
     blocked: () => locked || brush.stroking() || paint.size() > 0, shortcut: () => open && !inTextField(document.activeElement),
     // Import and Export follow the store (spec 004)
     undone: (keys) => { keys = [...keys]; edits.tiles(keys); redraw(keys); onChange(); },

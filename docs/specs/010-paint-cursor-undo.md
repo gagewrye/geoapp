@@ -2,13 +2,15 @@
 
 **Goal:** Show a paintbrush cursor in the selected class colour while painting, and let the user undo their latest strokes with a button or Ctrl+Z.
 
-**Status:** Approved (Gage, 2026-10-27; undo cap raised to 32 MiB, 50 steps kept; no redo; class edits not undoable). **ADRs:** 0015 undo history (Accepted). Amends spec 003 (undo was out of scope). Spec 004 is built on main (72cccbe). The clauses marked *(spec 004)* were checked against that build (`ui/labels.ts` `replace`/`lock`, `ui/seeding.ts`, 2026-10-28) and apply once this branch includes it. Partly shelved by spec 013 (2026-10-28), lapsed: the Train and model-seed clauses. Amended 2026-10-29 (Gage):
+**Status:** Approved (Gage, 2026-10-27; undo cap raised to 32 MiB, 50 steps kept; no redo, since added by spec 037; class edits not undoable). **ADRs:** 0015 undo history (Accepted). Amends spec 003 (undo was out of scope). Spec 004 is built on main (72cccbe). The clauses marked *(spec 004)* were checked against that build (`ui/labels.ts` `replace`/`lock`, `ui/seeding.ts`, 2026-10-28) and apply once this branch includes it. Partly shelved by spec 013 (2026-10-28), lapsed: the Train and model-seed clauses. Amended 2026-10-29 (Gage):
 - Spec 016: hiding labels selects Pan, so the Locked cursor rule never involves hidden labels. In criterion 8's third bullet, the import leaves Pan selected, so the cursor is MapLibre's; the Export bullet is unchanged.
 - Spec 017: Undo's `onChange` no longer syncs Seed mode. In criterion 5, "a successful Merge import" becomes "a successful import", and the last bullet (Seed mode reset) lapses.
 
+**Amended by spec 037 (redo):** redo moves in scope. It shares this spec's 32 MiB and 50-step budget (ADR 0015), and this spec's criteria still hold.
+
 ## Scope
 In: the brush cursor; an "Undo" button in the brush panel; Ctrl+Z / Cmd+Z; multi-step undo of paint and erase strokes.
-Out: redo; undoing class edits, imports, seeding or a raster open; persisting history; a custom cursor for Pan mode.
+Out: redo (since added by spec 037); undoing class edits, imports, seeding or a raster open; persisting history; a custom cursor for Pan mode.
 
 ## Interfaces (`core/`)
 ```ts

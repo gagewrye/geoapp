@@ -60,15 +60,17 @@ describe("renaming (criterion 3)", () => {
 
   it("rename opens a field with the name selected; Enter commits through rename and shows the returned name", () => {
     const { list, on } = setup(make(2), false, (_i, name) => name.trim());
+    const outer = vi.fn(); // the event path is fixed at dispatch, so only stopPropagation keeps Enter from the ancestors
+    list.addEventListener("keydown", outer);
     part(list, 1, ".class-rename").click();
     const field = edit(list, 1);
     expect(doc.activeElement).toBe(field);
     expect(field.selection).toBe("Class 2");
     expect(part(list, 1, ".class-name")).toBeNull();
     field.value = " Water ";
-    const e = field.dispatch("keydown", { key: "Enter" });
+    field.dispatch("keydown", { key: "Enter" });
     expect(on.rename).toHaveBeenCalledWith(1, " Water ");
-    expect(e.stopped).toBe(true);
+    expect(outer).not.toHaveBeenCalled();
     expect(edit(list, 1)).toBeNull();
     expect(part(list, 1, ".class-name").textContent).toBe("Water");
     expect(part(list, 1, ".class-rename").getAttribute("aria-label")).toBe("Rename Water");
