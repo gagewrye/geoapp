@@ -110,6 +110,34 @@ describe("a record saved without its import's copy (criterion 7)", () => {
   });
 });
 
+describe("a copy still being written isn't missing (spec 032 review)", () => {
+  it("a save taken while the first save streams the copy doesn't mark it missing or delete it, and a restore opens the copy", async () => {
+    const t = setup();
+    t.copy.full = false;
+    let release!: () => void;
+    const held = new Promise<void>((r) => { release = r; });
+    const saveBase = t.fake.store.saveBase;
+    t.fake.store.saveBase = async (k, f) => { await held; return saveBase(k, f); };
+    t.p.open("a.tif", 1, G); await t.p.offer();
+    t.setBase({ lut: new Uint8Array(4), count: 5, windows: new Set(["0,0"]), preview: { values: new Uint8Array(4) } });
+    t.p.replaced(); t.p.imported(new Blob(["mask"]));
+    await vi.advanceTimersByTimeAsync(SAVE_DELAY_MS); // save 1 streams the copy
+    t.paint("0,0", 1);
+    await vi.advanceTimersByTimeAsync(SAVE_DELAY_MS); // save 2 is taken meanwhile
+    release();
+    await t.p.idle();
+    expect(t.fake.log).not.toContain("deleteBase");
+    const key = [...t.fake.records.keys()][0]!;
+    expect(t.fake.records.get(key)!.base!.copyMissing).toBeUndefined();
+    expect(t.fake.bases.has(key)).toBe(true);
+
+    const b = setup(t.fake);
+    b.p.open("a.tif", 1, G);
+    await b.p.offer();
+    expect(b.opens).toHaveLength(1); // it opened the copy (this fake's openBase then fails)
+  });
+});
+
 describe("the discard question (criterion 8)", () => {
   it("with labels and nothing pending, opening another raster asks the scope 6 text; Cancel stops the open", async () => {
     const t = setup();

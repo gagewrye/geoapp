@@ -119,8 +119,9 @@ export function initPersist(d: Deps) {
       base: base && { lut: base.lut.slice(), count: base.count, windows: [...base.windows], values: base.preview.values.slice() },
     };
     const file = s.noCopy ? null : s.file;
-    // a record saved without this import's copy says so: a restore must not open an older import's copy (spec 032)
-    if (record.base && !s.copied && !file) record.base.copyMissing = true;
+    // a record saved without this import's copy, left out after a quota error, says so: a restore must not open an
+    // older import's copy (spec 032). A copy still being written by an earlier save isn't missing.
+    if (record.base && s.noCopy && !s.copied) record.base.copyMissing = true;
     const snap = { key: s.key, tiles, clear: s.clear, file, record, labelled: labels.hasLabels() };
     s.tiles = new Set(); s.record = false; s.clear = false; s.file = null;
     return snap;

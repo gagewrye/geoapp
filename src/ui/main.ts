@@ -40,7 +40,7 @@ const testHook = (name: string, arg: unknown) => {
 
 // The labels' callbacks run only after the user acts, by when seeding exists.
 const hookValue = (name: string) => (window as unknown as { __geoapp?: Record<string, unknown> }).__geoapp?.[name];
-const labels = initLabels({ map, say, toolChanged: () => queueMicrotask(() => status.tool(labels.tool())), // its first call comes while labels is built
+const labels = initLabels({ map, say, toolChanged: () => queueMicrotask(() => status.tool(labels.tool())), // deferred: initLabels calls it before `labels` is assigned
   onBusy: () => seeding.sync(), onChange: () => seeding.sync(), panning: () => nav.panning(),
   imageryBusy: fullRes.busy, mapMoving: fullRes.moving, importing: () => seeding.seeding() || hookValue("pauseMasks") === true,
   sweep: () => hookValue("sweep") !== false, op: (o) => testHook("paintOp", o),
