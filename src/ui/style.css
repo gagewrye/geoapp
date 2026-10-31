@@ -24,17 +24,25 @@ body.collapsed #tools, body.collapsed #side { display: none; }
 #class-section { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
 #classes { flex: 1; min-height: 0; list-style: none; margin: 0; padding: 0; overflow-y: auto; }
-#classes li { display: flex; gap: 4px; margin: 2px 0; padding: 2px; align-items: center; }
+/* a row: key, swatch, name, rename (spec 036); a click on it selects */
+#classes li { position: relative; display: flex; gap: 6px; margin: 1px 0; padding: 2px 4px; align-items: center; cursor: pointer; }
 #classes li.selected { background: #dde8f5; }
-#classes .class-name { flex: 1; min-width: 0; }
-#classes .class-colour { width: 32px; padding: 0; }
+#classes .class-key { width: 1ch; color: #666; font-variant-numeric: tabular-nums; }
+#classes .class-colour { width: 16px; height: 16px; padding: 0; border: 1px solid #888; flex: none; cursor: pointer; }
+#classes .class-colour::-webkit-color-swatch-wrapper { padding: 0; }
+#classes .class-colour::-webkit-color-swatch { border: none; }
+#classes .class-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#classes .class-name-edit { flex: 1; min-width: 0; font: inherit; }
+#classes .class-rename { padding: 0 4px; border: none; background: none; cursor: pointer; }
+#classes .class-rename:disabled, #classes .class-colour:disabled { cursor: default; opacity: 0.4; }
+/* out of sight but still focusable, so the radio group keeps keyboard selection */
+.visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); }
 #label-section { display: flex; flex-direction: column; gap: 4px; border-top: 1px solid #ccc; padding-top: 6px; }
 #label-section .row { display: flex; gap: 6px; align-items: center; }
 #label-opacity { flex: 1; min-width: 0; }
 #label-opacity-text { min-width: 4ch; text-align: right; font-variant-numeric: tabular-nums; }
 #status { grid-area: 3 / 1 / 4 / 4; display: flex; gap: 14px; align-items: center; padding: 0 8px; overflow: hidden;
   background: #e6e6e6; border-top: 1px solid #ccc; font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-#status [hidden] { display: none; }
 #status-lonlat { min-width: 19ch; }
 #message { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 #status progress { width: 160px; }
