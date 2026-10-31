@@ -43,9 +43,6 @@ export function swapEdit(store: LabelStore, edit: Edit): { inverse: Edit; keys: 
   return { inverse, keys: [...edit.keys()].sort(rowMajor) };
 }
 
-/** Puts each tile back (null deletes it); returns the keys, row-major. */
-export const undoEdit = (store: LabelStore, edit: Edit): string[] => swapEdit(store, edit).keys;
-
 /** Sum of the copies' lengths. */
 export function editBytes(edit: Edit): number {
   let n = 0;
