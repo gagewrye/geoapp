@@ -11,6 +11,7 @@ describe("status formats", () => {
   it("the tool from mode, class and brush side", () => {
     expect(formatTool("paint", "Water", 7)).toBe("Paint · Water · 7 px");
     expect(formatTool("pan", "Water", 7)).toBe("Pan · Water · 7 px");
+    expect(formatTool("erase", "Water", 7)).toBe("Erase · Water · 7 px"); // spec 033 scope 6
   });
 
   it("the pixel only on the raster, and the zoom to one decimal", () => {
