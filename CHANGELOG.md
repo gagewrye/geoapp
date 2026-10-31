@@ -3,6 +3,7 @@
 One entry per merge to main, newest first. Details are in the named spec.
 
 ## 2026-10-30
+- **Spec 039:** ? or the top-bar button lists every shortcut (other shortcuts pause while it is open), buttons show their keys in tooltips, and a class pick still reading is cancelled when another raster or label file opens.
 - **Spec 038:** Alt+click a pixel, or press I while hovering, to select its class without leaving the current tool; a failed read of an imported mask shows the error.
 - **Spec 037:** Redo (button, Ctrl/Cmd+Shift+Z, Ctrl+Y) brings back undone strokes within the shared 32 MiB undo budget, and Home works with a checkbox focused.
 - **Spec 036:** Each class row shows its key number, a colour swatch and its name; renaming takes the pencil button or a double-click (Enter saves, Esc cancels), so typing a shortcut can't change a name, and the list fills the panel and scrolls the selected class into view.
