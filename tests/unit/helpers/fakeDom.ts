@@ -54,7 +54,9 @@ export class FakeElement {
   dispatch(type: string, init: { key?: string } = {}): FakeEvent {
     const e = new FakeEvent(type, init);
     e.target = this;
-    for (let el: FakeElement | null = this; el && !e.stopped; el = el.parentElement) for (const f of el.listeners.get(type) ?? []) f(e);
+    const path: FakeElement[] = [];
+    for (let el = this.parentElement; el; el = el.parentElement) path.push(el);
+    for (const el of [this as FakeElement, ...path]) { if (e.stopped) break; for (const f of el.listeners.get(type) ?? []) f(e); }
     return e;
   }
   click(): FakeEvent { return this.dispatch("click"); }
