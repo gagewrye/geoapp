@@ -9,16 +9,23 @@ import { classList, effectiveTiles, importFile, storeTiles, upload } from "./see
 
 // Spec 004 criteria 12 (classes) and 15 (refusals), on spec 001's EPSG:4326 fixture.
 
+const watched = new WeakSet<Page>();
 /** Opens the fixture; with no labels an import asks nothing, so a dialog fails the test unless `replace` accepts "Replace labels?". */
+// Spec 031: a reload with unsaved labels asks to leave (accepted), and reopening offers them back (declined: a fresh start).
 async function setup(page: Page, replace = false) {
+  if (!watched.has(page)) {
+    watched.add(page);
+    page.on("dialog", (d) => {
+      if (d.type() === "beforeunload") return void d.accept();
+      if (d.message().startsWith("Restore labels saved ")) return void d.dismiss();
+      if (!replace || d.message() !== MESSAGES.replace) throw new Error(`unexpected dialog ${d.message()}`);
+      void d.accept();
+    });
+  }
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
   await paintMode(page);
-  page.on("dialog", (d) => {
-    if (!replace || d.message() !== MESSAGES.replace) throw new Error(`unexpected dialog ${d.message()}`);
-    void d.accept();
-  });
 }
 const seeded = /^Seeded \d+ pixels in \d+ classes\.$/;
 

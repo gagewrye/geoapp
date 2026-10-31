@@ -30,6 +30,11 @@ export const MESSAGES = {
   // spec 020
   imageryUnreadable: "Couldn't read part of this file, so some detail may be missing.",
   largeBlocks: (bytes: number, limit: number) => `Full resolution isn't available: this file stores pixels in ${mib(bytes)} MiB blocks (limit ${mib(limit)} MiB). Re-save it tiled, e.g. gdal_translate -of COG.`,
+  // spec 031
+  restore: (savedAt: string, name: string) => `Restore labels saved ${savedAt} for ${name}?`,
+  restored: "Labels restored.",
+  pendingDiscard: (name: string, reason: string) => `Labels for ${name} couldn't be saved (${reason}). Discard them?`,
+  restoredNoMask: "Labels restored without the imported mask, whose saved copy can't be read. Import it again.",
 } as const;
 
 /** What a seeding run says (spec 004); null for a run dropped because another raster opened. */

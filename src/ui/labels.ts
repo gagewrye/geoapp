@@ -29,10 +29,15 @@ type Deps = {
   importing: () => boolean;
   /** The map moves or just moved (spec 027): background mask reads wait for it too. */
   mapMoving?: () => boolean;
+  /** What spec 031 saves: changed tile keys, record edits (classes, selection, view), replaces and stroke ends. */
+  edits?: Edits;
   /** e2e hooks (spec 023): F6 off when false, and each paint op pushed. */
   sweep?: () => boolean;
   op?: (op: PaintOp) => void;
 };
+
+type Edits = { tiles(keys: Iterable<string>): void; record(): void; replaced(): void; strokeEnded(): void };
+const NO_EDITS: Edits = { tiles() {}, record() {}, replaced() {}, strokeEnded() {} };
 
 /** The labels an import took off the map (spec 021), to restore if it doesn't replace them. */
 export type Held = { readonly store: LabelStore; readonly base: MaskBase | null };
@@ -40,12 +45,15 @@ export type Held = { readonly store: LabelStore; readonly base: MaskBase | null 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 /** Brush labels on local imagery (spec 003): panel, classes, shortcuts, store, paint queue and overlays. */
-export function initLabels({ map, say, onBusy, onChange, panning, imageryBusy, importing, mapMoving, sweep, op }: Deps) {
+export function initLabels({ map, say, onBusy, onChange, panning, imageryBusy, importing, mapMoving, sweep, op, edits = NO_EDITS }: Deps) {
   const panel = $("brush-panel"), list = $("classes"), add = $<HTMLButtonElement>("class-add");
   const classes: LabelClass[] = initialClasses();
   let selected = 0;
   let open = false;
-  let locked = false; // while seeding or exporting labels (spec 004): no painting and no class edits, so no list or tile changes under them
+  // spec 004's lock: no painting and no class edits, so no list or tile changes under a run (seeding or exporting
+  // labels) or a restore offer (spec 031); each holds it under its own name, and it lifts once neither does
+  const holders = new Set<"run" | "restore">();
+  let locked = false;
   let store: LabelStore = emptyStore(0, 0);
   let imagery: RasterSource | null = null;
   let base: MaskBase | null = null; // an imported mask under the stored tiles (spec 014)
@@ -58,6 +66,8 @@ export function initLabels({ map, say, onBusy, onChange, panning, imageryBusy, i
     blocked: () => locked || brush.stroking() || paint.size() > 0,
     shortcut: () => open && !inTextField(document.activeElement),
     undone: (keys) => {
+      keys = [...keys];
+      edits.tiles(keys);
       redraw(keys);
       onChange(); // Import and Export follow the store (spec 004)
     },
@@ -65,7 +75,7 @@ export function initLabels({ map, say, onBusy, onChange, panning, imageryBusy, i
 
   const paint = initPaint({
     store: () => store, base: () => base, history: undo.history, stroke: undo.current, value: () => selected + 1, locked: () => locked,
-    applied: (keys) => { redraw(keys); onChange(); undo.sync(); },
+    applied: (keys) => { keys = [...keys]; edits.tiles(keys); redraw(keys); onChange(); undo.sync(); },
     prefetch: display.prefetch, stroking: () => brush.stroking(), say,
     busy: () => { onBusy(); undo.sync(); },
     imageryBusy, importing, mapMoving, sweep, op,
@@ -75,7 +85,7 @@ export function initLabels({ map, say, onBusy, onChange, panning, imageryBusy, i
     colour: () => classes[selected]!.colour,
     cells: paint.cells,
     hovered: paint.hovered,
-    onStroke: undo.stroke,
+    onStroke: (active) => { undo.stroke(active); if (!active) edits.strokeEnded(); },
     panning,
   });
 
@@ -85,10 +95,11 @@ export function initLabels({ map, say, onBusy, onChange, panning, imageryBusy, i
     $("mode-pan").setAttribute("aria-pressed", String(m === "pan"));
   };
   // Paint never applies to labels you can't see (spec 016): hiding selects Pan, and Paint shows them first
-  const view = initLabelView(map, (visible) => { if (!visible) setMode("pan"); });
+  const view = initLabelView(map, (visible) => { if (!visible) setMode("pan"); }, () => edits.record());
   const size = initBrushSize(() => brush.refresh());
   const select = (i: number) => {
     selected = i;
+    edits.record();
     markSelected(list, i);
     brush.refresh();
   };
@@ -100,11 +111,13 @@ export function initLabels({ map, say, onBusy, onChange, panning, imageryBusy, i
         const ok = checkName(classes, i, name);
         if (ok === null) { say(MESSAGES.className); return classes[i]!.name; }
         classes[i]!.name = ok;
+        edits.record();
         return ok;
       },
       recolour: (i, colour) => {
         if (locked) return;
         classes[i]!.colour = colour;
+        edits.record();
         redraw(store.tiles.keys(), true);
         brush.refresh();
       },
@@ -118,17 +131,23 @@ export function initLabels({ map, say, onBusy, onChange, panning, imageryBusy, i
   add.addEventListener("click", () => {
     if (locked || classes.length >= MAX_CLASSES) return;
     classes.push(nextClass(classes));
+    edits.record();
     render();
   });
   initLabelKeys({ open: () => open, brush, size, select, classCount: () => classes.length });
 
-  /** While seeding or exporting labels: the brush and the class list's edits are off; selecting still works. */
-  function lock(on: boolean): void {
-    if (locked === on) return;
-    locked = on;
-    brush.setLocked(on);
+  /** While seeding or exporting labels ("run") or a restore offer settles: the brush, the class list's edits and Undo are off; selecting still works. */
+  function lock(on: boolean, by: "run" | "restore" = "run"): void {
+    if (on) holders.add(by); else holders.delete(by);
+    apply();
+  }
+  function apply(): void {
+    if (locked === holders.size > 0) return;
+    locked = !locked;
+    brush.setLocked(locked);
     render();
     undo.sync();
+    onBusy(); // Import labels and Export labels follow the lock
   }
 
   /** Paint is offered only once the imagery is drawn (spec 019); Pan stays selected until the user picks Paint. */
@@ -146,7 +165,8 @@ export function initLabels({ map, say, onBusy, onChange, panning, imageryBusy, i
       const { width, height, epsg, gt } = source.meta;
       const grid = { width, height, epsg, gt };
       store = emptyStore(width, height);
-      lock(false);
+      holders.clear(); // the old raster's run or offer no longer holds these labels
+      apply();
       view.reset();
       display.open(grid);
       open = true;
@@ -170,8 +190,17 @@ export function initLabels({ map, say, onBusy, onChange, panning, imageryBusy, i
       render();
       setMode("pan"); // an import selects Pan (spec 014 as amended by spec 016)
       brush.refresh();
+      edits.replaced();
       onChange();
     },
+    /** Swaps in a restored session (spec 031): replace, then its selected class and view. */
+    restoreSession(next: LabelStore, list: LabelClass[], nextBase: MaskBase | null, i: number, v: { opacity: number; visible: boolean }): void {
+      this.replace(next, list, nextBase);
+      select(i < classes.length ? i : 0);
+      view.set(v.opacity, v.visible);
+    },
+    selected: () => selected,
+    view: () => view.get(),
     /** Takes the labels off the map for an import (spec 021); the store, classes, base and history stay as they are. */
     hold(): Held {
       display.hide();
@@ -184,6 +213,10 @@ export function initLabels({ map, say, onBusy, onChange, panning, imageryBusy, i
       redraw(store.tiles.keys());
     },
     lock,
+    /** Spec 031 scope 4: held from "Raster opened." until the restore offer settles. */
+    restoreLock: (on: boolean) => lock(on, "restore"),
+    /** A restore offer holds the lock (a run's own controls follow the run). */
+    restoring: () => holders.has("restore"),
     imageryReady,
     /** Starts reading every valid mask in the background, from the view's centre band (spec 023 F3; after "Raster opened."). */
     startMasks(): void {

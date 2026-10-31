@@ -4,7 +4,7 @@ import { toLonLat } from "../../src/core/crs";
 import { footprint, pixelAt, strokeCells } from "../../src/core/pixel";
 import { CLASS_GRID, classFile } from "../unit/helpers/labelFiles";
 import {
-  clickAt, hideBasemap, jumpTo, labels, logRequests, message, openApp, openRaster, paintMode, path, pixelAt as screenPixel, renameClass, RGB_GRID, rgbFixture,
+  anotherRaster, clickAt, hideBasemap, jumpTo, labels, logRequests, message, openApp, openRaster, paintMode, path, pixelAt as screenPixel, renameClass, RGB_GRID, rgbFixture,
   selectClass, stroke, tileKeysStored, toLngLat, toScreen, type LngLat, type Xy,
 } from "./helpers";
 import { arrayBuffer, at, classList, download, importFile, maskFile, maskValue, noSavePicker, upload } from "./seeding";
@@ -134,13 +134,13 @@ test("opening another raster after an import (OK on the confirm) leaves no label
   await setup(page);
   await importMask(page);
   page.once("dialog", (d) => void d.accept());
-  await openRaster(page, { ...rgbFixture(), name: "other.tif" });
+  await openRaster(page, anotherRaster()); // another raster: spec 031 would offer the same one's saved labels back
   await expect(message(page)).toHaveText("Raster opened.");
   await paintMode(page);
   expect(await page.evaluate(() => (window as any).__geoapp.map.getLayer("mask"))).toBeUndefined();
   // hasLabels is false: the next open asks nothing
   page.on("dialog", (d) => { throw new Error(`unexpected dialog ${d.message()}`); });
-  await openRaster(page, { ...rgbFixture(), name: "third.tif" });
+  await openRaster(page, anotherRaster("third.tif"));
   await expect(message(page)).toHaveText("Raster opened.");
   await paintMode(page);
 });

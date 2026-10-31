@@ -27,6 +27,8 @@ const rgbValue: Value = (b, c, r) => {
 export const rgbFixture = () => tiff("rgb4326.tif", 1000, 1000, 3, rgbValue, { epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01] });
 /** rgbFixture run on south to 37N (still one strip under the 16 MiB block limit), with a nodata value none of its pixels hold: its 6 row bands need mask reads (spec 023 F2), and band 4 lies far from paintTwoClasses' hovers. */
 export const rgbNodataFixture = () => tiff("rgbtall.tif", 1000, 1300, 3, rgbValue, { epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01], nodata: "0" });
+/** rgbFixture with 16 more bytes at its end: the same grid and pixels, but another raster to spec 031, so it offers no saved labels. */
+export const anotherRaster = (name = "other.tif") => { const f = rgbFixture(); return { ...f, name, buffer: Buffer.concat([f.buffer, Buffer.alloc(16)]) }; };
 /** rgbFixture's pixels in 16 tiles, so its preview takes 16 reads (spec 019's bar and read gates). */
 export const rgbTiled = () => tiledTiff("rgb4326.tif", 1000, 1000, 3, rgbValue, { epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01] });
 

@@ -8,9 +8,11 @@ import { createNavigation } from "../map/navigation";
 import { fitToPreview, showPreview } from "../map/preview";
 import { initImagery } from "./imagery";
 import { inTextField } from "./labelKeys";
+import { openSessionStore } from "../io/session";
 import { initLabels } from "./labels";
 import { errorText, MESSAGES } from "./messages";
 import { initProgress } from "./progress";
+import { initPersist } from "./persist";
 import { initSeeding } from "./seeding";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -38,9 +40,13 @@ const testHook = (name: string, arg: unknown) => {
 const hookValue = (name: string) => (window as unknown as { __geoapp?: Record<string, unknown> }).__geoapp?.[name];
 const labels = initLabels({ map, say, onBusy: () => seeding.sync(), onChange: () => seeding.sync(), panning: () => nav.panning(),
   imageryBusy: fullRes.busy, mapMoving: fullRes.moving, importing: () => seeding.seeding() || hookValue("pauseMasks") === true,
-  sweep: () => hookValue("sweep") !== false, op: (o) => testHook("paintOp", o) });
+  sweep: () => hookValue("sweep") !== false, op: (o) => testHook("paintOp", o),
+  edits: { tiles: (k) => persist.tiles(k), record: () => persist.record(), replaced: () => persist.replaced(), strokeEnded: () => persist.strokeEnded() } });
+// Spec 031: labels are kept in this browser as they change, and offered back when the raster is opened again
+const persist = initPersist({ labels, open: openSessionStore, state: $("save-state"), win: window, doc: document,
+  confirm: (t) => confirm(t), persistStorage: () => { void navigator.storage?.persist?.(); } });
 const seeding = initSeeding({ labels, imagery: () => source, say, error: errorText,
-  opened: (f) => testHook("labelFile", f) });
+  opened: (f) => testHook("labelFile", f), imported: (f) => persist.imported(f) });
 // letters type in text fields and pick options in selects, so WASD leaves them alone (spec 009)
 const nav = createNavigation(map, { typing: (el) => inTextField(el) || el instanceof HTMLSelectElement, stroking: labels.stroking });
 nav.onSettle(fullRes.settle);
@@ -50,7 +56,9 @@ map.on("load", () => {
   // rasterFile: set by a test to see (and wrap the reads of) each opened raster before its preview is built; fullRes: spec 020's block limit, which a test may lower before an open.
   // Spec 023: masksDone() says every valid mask is read; a test may set sweep = false (one op per stroke cell), paintOp to see each op,
   // and pauseMasks = true to hold the background mask reads, so strokes wait on reads it gates.
-  const hook = { map, imagery: () => source ?? null, labelFile: null, rasterFile: null, fullRes: fullRes.limits, masksDone: labels.masksDone, sweep: true, paintOp: null, pauseMasks: false };
+  // Spec 031: persistTiles(keys) marks stored tiles a test or perf run set through the hook as changed.
+  const hook = { map, imagery: () => source ?? null, labelFile: null, rasterFile: null, fullRes: fullRes.limits, masksDone: labels.masksDone, sweep: true, paintOp: null, pauseMasks: false,
+    persistTiles: (keys: string[]) => persist.tiles(keys) };
   Object.defineProperty(hook, "labels", { get: () => ({ store: labels.store(), classes: labels.classes(), tile: labels.tile }) });
   (window as unknown as Record<string, unknown>).__geoapp = hook;
   $("map").dataset.ready = "true";
@@ -84,6 +92,9 @@ $<HTMLInputElement>("open-raster").addEventListener("change", (ev) => {
     if (stale()) return;
     // only a raster that opens can discard the labels; Cancel keeps everything
     if (labels.hasLabels() && !confirm(MESSAGES.discard)) { input.value = ""; progress.hide(); return; }
+    // spec 031 scope 8: a previous raster's unsaved snapshot asks first; Cancel keeps this raster open. Then the
+    // old raster's changes are copied, before labels.open switches the labels
+    if (!persist.open(file.name, file.size, f.meta)) { input.value = ""; progress.hide(); return; }
     opened = req;
     source = s = f;
     fullRes.clear();
@@ -107,6 +118,8 @@ $<HTMLInputElement>("open-raster").addEventListener("change", (ev) => {
     progress.hide();
     say(off ? `Raster opened. ${off}` : "Raster opened.");
     labels.startMasks(); // spec 023 F3: only after the open, and behind the visible tiles
+    // spec 031: once the preview is drawn; a store that can't open shows on #save-state when a save fails
+    persist.offer().then((m) => { if (m && !stale()) say(m); }, () => {});
   }, stale);
 });
 
