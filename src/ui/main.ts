@@ -25,8 +25,9 @@ let bounds: Bounds | null = null;
 const home = () => { if (bounds) fitRaster(map, bounds); };
 const map = createMap($("map"), home);
 const layout = initLayout({ map, open: () => source !== undefined });
-// a focused input (a slider included) or select keeps its own Home (spec 036)
-const ownsHome = (el: Element | null) => inTextField(el) || el instanceof HTMLInputElement || el instanceof HTMLSelectElement;
+// text fields, selects, sliders and number fields keep their own Home (specs 036, 037); a checkbox or button doesn't
+const ownsHome = (el: Element | null) => inTextField(el) || el instanceof HTMLSelectElement
+  || (el instanceof HTMLInputElement && (el.type === "range" || el.type === "number"));
 window.addEventListener("keydown", (e) => {
   if (e.key !== "Home" || !bounds || e.ctrlKey || e.metaKey || e.altKey || ownsHome(document.activeElement)) return;
   e.preventDefault();
