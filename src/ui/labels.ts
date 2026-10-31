@@ -147,7 +147,9 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
   });
   initLabelKeys({
     open: () => open, brush, size, select, classCount: () => classes.length,
-    setMode: keyed.request, canPaint: () => !$<HTMLButtonElement>("mode-paint").disabled,
+    setMode: keyed.request, canPaint: () => !$<HTMLButtonElement>("mode-paint").disabled, stroking: brush.stroking,
+    // a peek hides the labels, so no stroke starts under it (spec 034)
+    view: { toggle: view.toggle, peek: (on) => { view.peek(on); brush.setBlocked(view.peeking()); } },
   });
 
   /** While seeding or exporting labels ("run") or a restore offer settles: the brush, the class list's edits and Undo are off; selecting still works. */
@@ -172,6 +174,7 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
   return {
     /** Start labelling newly opened local imagery: an empty store, no masks, labels shown, Pan mode (spec 016). */
     open(source: RasterSource): void {
+      keyed.clear(); // a mode key queued mid-stroke mustn't apply when brush.setImagery ends that stroke (spec 034)
       paint.open(source); // clears the old queue and stops the old raster's mask reads
       undo.clear(); // after the queue, which hands its dropped strokes to the history
       base = null; // opening a raster drops the mask
