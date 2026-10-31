@@ -5,14 +5,14 @@ import { pixelAt } from "../core/pixel";
 import { baseTile, type MaskBase } from "../io/maskBase";
 import type { PaintOp } from "../io/paintQueue";
 import type { RasterSource } from "../io/source";
-import { createBrush, type BrushMode } from "../map/brush";
+import { createBrush } from "../map/brush";
 import { initBrushSize } from "./brushSize";
-import { deferMode } from "./deferMode";
 import { markSelected, renderClasses } from "./classList";
 import { labelDisplay } from "./labelDisplay";
 import { initLabelKeys, inTextField } from "./labelKeys";
 import { initLabelView } from "./labelView";
 import { MESSAGES } from "./messages";
+import { initModes } from "./modes";
 import { initPaint } from "./paint";
 import { initUndo } from "./undo";
 import type { MessageKind } from "./messages";
@@ -50,7 +50,7 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 
 /** Brush labels on local imagery (spec 003): panel, classes, shortcuts, store, paint queue and overlays. */
 export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange, panning, imageryBusy, importing, mapMoving, sweep, op, edits = NO_EDITS }: Deps) {
-  const panel = $("brush-panel"), list = $("classes"), add = $<HTMLButtonElement>("class-add");
+  const list = $("classes"), add = $<HTMLButtonElement>("class-add");
   const classes: LabelClass[] = initialClasses();
   let selected = 0;
   let open = false;
@@ -89,23 +89,13 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
     colour: () => classes[selected]!.colour,
     cells: paint.cells,
     hovered: paint.hovered,
-    onStroke: (active) => { undo.stroke(active); if (!active) { edits.strokeEnded(); keyed.strokeEnded(); } },
+    onStroke: (active) => { undo.stroke(active); if (!active) { edits.strokeEnded(); modes.strokeEnded(); } },
     panning,
   });
 
-  let mode: BrushMode = "pan";
-  const MODES: BrushMode[] = ["paint", "erase", "pan"];
-  const setMode = (m: BrushMode) => {
-    keyed.clear();
-    mode = m;
-    brush.setMode(m);
-    toolChanged();
-    for (const b of MODES) $(`mode-${b}`).setAttribute("aria-pressed", String(m === b));
-  };
-  // Paint and Erase never apply to labels you can't see (specs 016, 033): hiding selects Pan, and either shows them first
-  const choose = (m: BrushMode) => { if (m !== "pan") view.show(); setMode(m); };
-  const keyed = deferMode(() => brush.stroking(), choose);
-  const view = initLabelView(map, (visible) => { if (!visible) setMode("pan"); }, () => edits.record());
+  // hiding labels selects Pan (spec 016)
+  const view = initLabelView(map, (visible) => { if (!visible) modes.setMode("pan"); }, () => edits.record());
+  const modes = initModes({ brush, view, toolChanged });
   const size = initBrushSize(() => { brush.refresh(); toolChanged(); });
   const select = (i: number) => {
     selected = i;
@@ -138,7 +128,6 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
   };
   render();
 
-  for (const m of MODES) $(`mode-${m}`).addEventListener("click", () => choose(m));
   add.addEventListener("click", () => {
     if (locked || classes.length >= MAX_CLASSES) return;
     classes.push(nextClass(classes));
@@ -147,9 +136,7 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
   });
   initLabelKeys({
     open: () => open, brush, size, select, classCount: () => classes.length,
-    setMode: keyed.request, canPaint: () => !$<HTMLButtonElement>("mode-paint").disabled, stroking: brush.stroking,
-    // a peek hides the labels, so no stroke starts under it (spec 034)
-    view: { toggle: view.toggle, peek: (on) => { view.peek(on); brush.setBlocked(view.peeking()); } },
+    setMode: modes.request, canPaint: modes.canPaint, stroking: brush.stroking, view: { toggle: view.toggle, peek: modes.peek },
   });
 
   /** While seeding or exporting labels ("run") or a restore offer settles: the brush, the class list's edits and Undo are off; selecting still works. */
@@ -167,14 +154,12 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
   }
 
   /** Paint is offered only once the imagery is drawn (spec 019); Pan stays selected until the user picks Paint. */
-  function imageryReady(ready: boolean): void {
-    $<HTMLButtonElement>("mode-paint").disabled = $<HTMLButtonElement>("mode-erase").disabled = !ready;
-  }
+  const imageryReady = modes.ready;
 
   return {
     /** Start labelling newly opened local imagery: an empty store, no masks, labels shown, Pan mode (spec 016). */
     open(source: RasterSource): void {
-      keyed.clear(); // a mode key queued mid-stroke mustn't apply when brush.setImagery ends that stroke (spec 034)
+      modes.clearQueued(); // a mode key queued mid-stroke mustn't apply when brush.setImagery ends that stroke (spec 034)
       paint.open(source); // clears the old queue and stops the old raster's mask reads
       undo.clear(); // after the queue, which hands its dropped strokes to the history
       base = null; // opening a raster drops the mask
@@ -187,9 +172,8 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
       view.reset();
       display.open(grid);
       open = true;
-      panel.hidden = false;
       brush.setImagery(grid);
-      setMode("pan");
+      modes.setMode("pan");
       imageryReady(false); // until main draws its preview (spec 019)
       onChange();
       undo.sync();
@@ -205,7 +189,7 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
       if (selected >= classes.length) selected = 0;
       redraw(keys); // colours may have changed too
       render();
-      setMode("pan"); // an import selects Pan (spec 014 as amended by spec 016)
+      modes.setMode("pan"); // an import selects Pan (spec 014 as amended by spec 016)
       brush.refresh();
       edits.replaced();
       onChange();
@@ -218,7 +202,7 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
     },
     selected: () => selected,
     /** The status bar's tool: mode, selected class name and brush side. */
-    tool: () => ({ mode, className: classes[selected]?.name ?? "", side: size.side() }),
+    tool: () => ({ mode: modes.mode(), className: classes[selected]?.name ?? "", side: size.side() }),
     view: () => view.get(),
     /** Takes the labels off the map for an import (spec 021); the store, classes, base and history stay as they are. */
     hold(): Held {
