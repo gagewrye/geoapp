@@ -1,6 +1,6 @@
 # 031: Labels survive a reload
 
-**Status:** Approved by Gage 2026-10-30, with the draft answers to its questions. **ADRs:** 0025. **Amends:**
+**Status:** Approved by Gage 2026-10-30, with the draft answers to its questions. Amended 2026-10-30 after testing: scope 4 (lock), scope 8 (pending snapshot), scope 9 (lint), criteria 11–14. **ADRs:** 0025. **Amends:**
 - Spec 016's "Opacity isn't saved across reloads": a restored session brings its opacity back. Without a restore, a reload still reads 60, so 016's criterion 3 stands.
 - README's "labels live in memory until you export them".
 
@@ -31,11 +31,22 @@
    - It then calls `labels.replace` and restores the selected class and view settings. The message is `Labels restored.`
    - Cancel deletes that session, so new labels start clean.
    - A missing or unreadable mask copy restores the tiles alone. The message then asks the user to import the mask again.
-5. **Unsaved guard.** A `beforeunload` listener (`preventDefault` plus `returnValue`, per MDN) is attached only while something is dirty, a save is in flight, or the last save failed.
+   - **Lock.** The session lookup starts when the raster opens. From "Raster opened." until the lookup has settled with no session, or until the offer is cancelled, or until an accepted restore has finished (or failed), the labels are held with spec 004's lock (`labels.lock(true)`): no strokes, no class edits, and Undo, Import labels and Export labels disabled.
+     - A raster with no saved session is unlocked as soon as its lookup settles.
+     - A failed lookup counts as no session.
+5. **Unsaved guard.** A `beforeunload` listener (`preventDefault` plus `returnValue`, per MDN) is attached only while something is dirty, a save is in flight, the last save failed, or a snapshot is pending (scope 8).
 6. **Save state.** `#save-state` shows `Saved <time>`, `Saving…` or `Not saved: <reason>`.
    - A quota or IndexedDB error keeps the guard on.
    - It never blocks painting.
 7. README: labels are kept in this browser until the user cancels a restore or the session is evicted. They still never leave the device.
+8. **The previous raster's failed save.** When opening raster B saves raster A's snapshot and that fails, the snapshot (copied tiles and record) stays in memory as **pending**. At most one snapshot is ever pending.
+   - Every save attempt writes the pending snapshot first, and B's changes after it. While anything is pending, a retry also runs every 30 s.
+   - While a snapshot is pending, the guard stays on. `#save-state` shows `Not saved: <A's name>: <reason>` and never `Saved`, whatever B's state is.
+   - Opening another raster (including A) while a snapshot is pending first asks `Labels for <A's name> couldn't be saved (<reason>). Discard them?`
+     - OK drops the snapshot and continues the open.
+     - Cancel aborts the open: B stays open and the snapshot stays pending.
+   - A pending snapshot is dropped only when written, or on that OK.
+9. **Lint.** `eslint.config.js` ignores `.vite/`, the worktree Vite cache.
 
 **Out of scope:** saving undo history, a session manager UI, sync across browsers, saving the raster itself.
 
@@ -56,7 +67,7 @@
    - Undoing it back to no tile deletes the saved tile.
    - No transaction carries more than 16 tiles.
 3. **Unit:** a `visibilitychange` to hidden starts a save without waiting for the debounce.
-4. **Unit:** the guard is attached iff (something is dirty, or a save is in flight, or the last save failed). A successful save removes it.
+4. **Unit:** the guard is attached iff (something is dirty, or a save is in flight, or the last save failed, or a snapshot is pending). A successful save that leaves nothing pending removes it.
 5. **Unit:**
    - A replace clears the old tiles before the new ones are written.
    - Cancelling the restore prompt deletes the session.
@@ -70,3 +81,17 @@
 8. **E2E:** opening a different fixture after a save shows no prompt, and the first fixture's session still restores afterwards.
 9. **E2E:** a reload within 2 s of a stroke raises a `beforeunload` dialog. After `Saved`, a reload raises none.
 10. **Perf, Chunk 11:** while saving 256 edited tiles, the longest task is ≤ 50 ms, and the mask copy runs no task over 50 ms. `npm run check` passes.
+11. **Unit, fake store with a delayed `get` and delayed `tiles`:**
+    - With a session for the key, the labels are locked from "Raster opened." through the prompt and until the restore finishes. During that time a stroke changes no tile, and Undo, Import labels and Export labels are disabled.
+    - They are unlocked after it finishes, after Cancel, and after a restore that fails.
+    - With no session, they are locked only until `get` settles, and not at all when it settled before "Raster opened."
+12. **Unit, fake store whose writes reject, then succeed:**
+    - Paint A, then open B: A's snapshot is pending.
+    - Paint B and let its save run: `#save-state` shows `Not saved: <A's name>: …`, never `Saved`, and the guard stays on.
+    - Once writes succeed, the next save (or the 30 s retry, with fake timers) writes A's tiles and record before B's. Then `Saved` shows and the guard comes off.
+    - A's stored tiles equal A's tiles at the moment B was opened.
+13. **Unit:** with A's snapshot pending:
+    - opening C asks the scope 8 question;
+    - Cancel leaves B open, and the snapshot still pending;
+    - OK drops the snapshot, opens C, and `#save-state` then reflects C alone.
+14. **Unit:** with a file under `.vite/` that has a lint error, `eslint .` reports nothing for it.
