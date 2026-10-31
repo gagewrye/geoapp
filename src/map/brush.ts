@@ -5,7 +5,7 @@ import type { Grid } from "../core/types";
 import { brushCursor } from "./cursor";
 import { showHover } from "./hover";
 
-export type BrushMode = "paint" | "pan";
+export type BrushMode = "paint" | "erase" | "pan";
 type Deps = {
   side: () => number;
   colour: () => string;
@@ -21,7 +21,7 @@ type Deps = {
 type Stroke = { pointerId: number; erase: boolean; prev: [number, number] | null };
 
 /** The paint brush on the map (spec 003, ADR 0009): mouse and pen paint and erase; touch never paints. */
-// In Paint mode mouse and pen mousedowns never reach MapLibre, so drags don't move the map while touch
+// In Paint and Erase modes mouse and pen mousedowns never reach MapLibre, so drags don't move the map while touch
 // still pans (dragPan.disable() would stop touch too); rotate, double-click and box zoom are off. Pan
 // mode, or holding Space, gives MapLibre's defaults back and hides the footprint.
 export function createBrush(map: MapLibreMap, deps: Deps) {
@@ -33,7 +33,7 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
   let locked = false; // while seeding (spec 004): no strokes and no footprint; Paint mode's handlers stay
   let lastType = "mouse";
   let pointer: { x: number; y: number; target: EventTarget | null } | null = null; // last mouse or pen position
-  const painting = () => grid !== null && mode === "paint" && !space;
+  const painting = () => grid !== null && mode !== "pan" && !space; // Paint or Erase (spec 033)
 
   // The brush cursor (spec 010) is a class plus a variable, which style.css applies to the canvas over MapLibre's cursors.
   // Locked, a left drag neither paints nor pans, so neither the brush nor MapLibre's grab would be true.
@@ -75,7 +75,7 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
   const hover = () => {
     const cell = pointer && painting() && !locked ? cellAt(pointer.x, pointer.y, pointer.target) : null;
     const w = cell && footprint(grid!, cell[0], cell[1], deps.side());
-    showHover(map, w ? footprintRing(grid!, w) : null, deps.colour());
+    showHover(map, w ? footprintRing(grid!, w) : null, deps.colour(), mode === "erase");
     deps.hovered?.(w);
   };
 
@@ -104,7 +104,7 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
     if (e.pointerType === "touch") { pointer = null; hover(); return; }
     if (!painting() || stroke || deps.panning() || (e.button !== 0 && e.button !== 2)) return;
     if (locked) return;
-    stroke = { pointerId: e.pointerId, erase: e.button === 2, prev: null };
+    stroke = { pointerId: e.pointerId, erase: mode === "erase" || e.button === 2, prev: null };
     deps.onStroke(true);
     apply(stroke, e);
   });
@@ -138,8 +138,8 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
   return {
     /** The local imagery's grid, or null when none is open (the brush is then inert). */
     setImagery(g: Grid | null): void { end(); grid = g; syncHandlers(); hover(); },
-    /** Leaving Paint ends a stroke in progress (spec 016: hiding labels mid-stroke selects Pan). */
-    setMode(m: BrushMode): void { mode = m; if (m !== "paint") end(); syncHandlers(); hover(); },
+    /** Changing mode ends a stroke in progress (spec 016: hiding labels mid-stroke selects Pan). */
+    setMode(m: BrushMode): void { if (m !== mode) end(); mode = m; syncHandlers(); hover(); },
     mode: () => mode,
     /** Space held acts as Pan. */
     setSpace(held: boolean): void { if (space !== held) { space = held; syncHandlers(); hover(); } },
