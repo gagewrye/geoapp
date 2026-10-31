@@ -7,6 +7,7 @@ import type { PaintOp } from "../io/paintQueue";
 import type { RasterSource } from "../io/source";
 import { createBrush, type BrushMode } from "../map/brush";
 import { initBrushSize } from "./brushSize";
+import { deferMode } from "./deferMode";
 import { markSelected, renderClasses } from "./classList";
 import { labelDisplay } from "./labelDisplay";
 import { initLabelKeys, inTextField } from "./labelKeys";
@@ -88,19 +89,22 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
     colour: () => classes[selected]!.colour,
     cells: paint.cells,
     hovered: paint.hovered,
-    onStroke: (active) => { undo.stroke(active); if (!active) edits.strokeEnded(); },
+    onStroke: (active) => { undo.stroke(active); if (!active) { edits.strokeEnded(); keyed.strokeEnded(); } },
     panning,
   });
 
   let mode: BrushMode = "pan";
+  const MODES: BrushMode[] = ["paint", "erase", "pan"];
   const setMode = (m: BrushMode) => {
+    keyed.clear();
     mode = m;
     brush.setMode(m);
     toolChanged();
-    $("mode-paint").setAttribute("aria-pressed", String(m === "paint"));
-    $("mode-pan").setAttribute("aria-pressed", String(m === "pan"));
+    for (const b of MODES) $(`mode-${b}`).setAttribute("aria-pressed", String(m === b));
   };
-  // Paint never applies to labels you can't see (spec 016): hiding selects Pan, and Paint shows them first
+  // Paint and Erase never apply to labels you can't see (specs 016, 033): hiding selects Pan, and either shows them first
+  const choose = (m: BrushMode) => { if (m !== "pan") view.show(); setMode(m); };
+  const keyed = deferMode(() => brush.stroking(), choose);
   const view = initLabelView(map, (visible) => { if (!visible) setMode("pan"); }, () => edits.record());
   const size = initBrushSize(() => { brush.refresh(); toolChanged(); });
   const select = (i: number) => {
@@ -134,15 +138,17 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
   };
   render();
 
-  $("mode-paint").addEventListener("click", () => { view.show(); setMode("paint"); });
-  $("mode-pan").addEventListener("click", () => setMode("pan"));
+  for (const m of MODES) $(`mode-${m}`).addEventListener("click", () => choose(m));
   add.addEventListener("click", () => {
     if (locked || classes.length >= MAX_CLASSES) return;
     classes.push(nextClass(classes));
     edits.record();
     render();
   });
-  initLabelKeys({ open: () => open, brush, size, select, classCount: () => classes.length });
+  initLabelKeys({
+    open: () => open, brush, size, select, classCount: () => classes.length,
+    setMode: keyed.request, canPaint: () => !$<HTMLButtonElement>("mode-paint").disabled,
+  });
 
   /** While seeding or exporting labels ("run") or a restore offer settles: the brush, the class list's edits and Undo are off; selecting still works. */
   function lock(on: boolean, by: "run" | "restore" = "run"): void {
@@ -160,7 +166,7 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
 
   /** Paint is offered only once the imagery is drawn (spec 019); Pan stays selected until the user picks Paint. */
   function imageryReady(ready: boolean): void {
-    $<HTMLButtonElement>("mode-paint").disabled = !ready;
+    $<HTMLButtonElement>("mode-paint").disabled = $<HTMLButtonElement>("mode-erase").disabled = !ready;
   }
 
   return {
