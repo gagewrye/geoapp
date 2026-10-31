@@ -65,7 +65,7 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
     selectedChanged: () => { edits.record(); brush.refresh(); toolChanged(); },
     edited: () => { edits.record(); toolChanged(); },
   });
-  const pick = initPicker({ tile, dims: () => store, classes: panel.classes, select: panel.select, say }); // Alt+click or I (spec 038)
+  const picker = initPicker({ tile, dims: () => store, classes: panel.classes, select: panel.select, say }); // Alt+click or I (spec 038)
   /** The effective tile at key (stored, else the mask's); null when neither exists. Reads the mask file for an unstored key. */
   async function tile(key: string): Promise<Uint8Array | null> {
     const stored = store.tiles.get(key), [x0, y0] = key.split(",").map(Number) as [number, number];
@@ -89,7 +89,7 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
   });
   const brush = createBrush(map, {
     side: () => size.side(), colour: () => panel.classes()[panel.selected()]!.colour, cells: paint.cells, hovered: paint.hovered,
-    onStroke: (active) => { undo.stroke(active); if (!active) { edits.strokeEnded(); modes.strokeEnded(); } }, panning, pick,
+    onStroke: (active) => { undo.stroke(active); if (!active) { edits.strokeEnded(); modes.strokeEnded(); } }, panning, pick: picker.pick,
   });
 
   // hiding labels selects Pan (spec 016)
@@ -97,7 +97,7 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
   const modes = initModes({ brush, view, toolChanged });
   const size = initBrushSize(() => { brush.refresh(); toolChanged(); });
   initLabelKeys({
-    open: () => open, brush, size, select: panel.select, classCount: () => panel.classes().length, pick: () => pick(brush.hoverCell()),
+    open: () => open, brush, size, select: panel.select, classCount: () => panel.classes().length, pick: () => picker.pick(brush.hoverCell()),
     setMode: modes.request, canPaint: modes.canPaint, stroking: brush.stroking, view: { toggle: view.toggle, peek: modes.peek },
   });
 
@@ -121,7 +121,7 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
       modes.clearQueued(); // a mode key queued mid-stroke mustn't apply when brush.setImagery ends that stroke (spec 034)
       paint.open(source); // clears the old queue and stops the old raster's mask reads
       undo.clear(); // after the queue, which hands its dropped strokes to the history
-      base = null; // opening a raster drops the mask
+      base = null; picker.cancel(); // opening a raster drops the mask, and a pick still reading the old one
       imagery = source;
       const { width, height, epsg, gt } = source.meta, grid = { width, height, epsg, gt };
       store = emptyStore(width, height);
@@ -142,7 +142,7 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
       store = next;
       base = nextBase;
       display.setMask(base?.preview ?? null);
-      undo.clear(); // a seed isn't undoable, and strokes recorded against the old store can't be undone over it
+      undo.clear(); picker.cancel(); // a seed isn't undoable, strokes recorded against the old store can't be undone over it, nor a pick apply
       panel.replace(list);
       redraw(keys); // colours may have changed too
       modes.setMode("pan"); // an import selects Pan (spec 014 as amended by spec 016)

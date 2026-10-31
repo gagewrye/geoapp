@@ -38,6 +38,7 @@ export const MESSAGES = {
   // spec 038
   picked: (name: string) => `Picked ${name}.`,
   noLabel: "No label here.",
+  noClass: (v: number) => `No class for value ${v}.`, // spec 039
 } as const;
 
 /** What a seeding run says (spec 004); null for a run dropped because another raster opened. */
