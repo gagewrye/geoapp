@@ -3,6 +3,7 @@
 One entry per merge to main, newest first. Details are in the named spec.
 
 ## 2026-10-30
+- **Spec 032:** A status bar along the bottom shows the cursor's lon/lat and raster pixel, the zoom, the current tool, save state, messages (errors in red) and progress with Cancel; a failed save retries every 30 s, a full disk no longer re-copies an imported mask, and opening another raster asks "Close these labels? They stay saved in this browser."
 - **Spec 031:** Labels, classes and view settings are saved in this browser as you work (2 s after you stop, and at once when the tab is hidden or closed), and reopening the same raster offers to restore them, imported mask included; the page warns before closing only while something is unsaved.
 - **Spec 030:** Opening a raster projects a sparse, self-checked grid of preview points instead of every pixel, with byte-identical results, so a typical chunk draws its preview in about 0.36 s (was 0.68 s) with no pause over 75 ms, and importing labels no longer has its 340 ms pause.
 - **Spec 024:** Importing a label mask reads the label file once in a single pass and the imagery only where needed, without freezing the page: a typical chunk imports in about 3 s (was 69 s), Chunk 11 in 28 s (was about 21 min), the tiled 20000² chunk in 55 s (was about 10 min), and painting right after an import stays smooth.
