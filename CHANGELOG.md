@@ -3,6 +3,7 @@
 One entry per merge to main, newest first. Details are in the named spec.
 
 ## 2026-10-30
+- **Spec 033:** B paints, E erases and P or Esc pans; a new **Erase** mode lets a left drag erase the selected class (dashed brush outline), and a key pressed mid-stroke takes effect when the stroke ends.
 - **Spec 032:** A status bar along the bottom shows the cursor's lon/lat and raster pixel, the zoom, the current tool, save state, messages (errors in red) and progress with Cancel; a failed save retries every 30 s, a full disk no longer re-copies an imported mask, and opening another raster asks "Close these labels? They stay saved in this browser."
 - **Spec 031:** Labels, classes and view settings are saved in this browser as you work (2 s after you stop, and at once when the tab is hidden or closed), and reopening the same raster offers to restore them, imported mask included; the page warns before closing only while something is unsaved.
 - **Spec 030:** Opening a raster projects a sparse, self-checked grid of preview points instead of every pixel, with byte-identical results, so a typical chunk draws its preview in about 0.36 s (was 0.68 s) with no pause over 75 ms, and importing labels no longer has its 340 ms pause.
