@@ -4,7 +4,7 @@ import { MAX_LABEL_TILES, brush, emptyStore, type LabelStore, type NodataMasks }
 import { nodataMask } from "../../../src/core/nodata";
 import { footprint } from "../../../src/core/pixel";
 import { TILE_SIZE } from "../../../src/core/types";
-import { UNDO_BYTES, UNDO_STEPS, editBytes, finishEdit, recordTiles, trimHistory, undoEdit, type Edit } from "../../../src/core/undo";
+import { UNDO_BYTES, UNDO_STEPS, editBytes, finishEdit, recordTiles, swapEdit, trimHistory, type Edit } from "../../../src/core/undo";
 import { makeTile } from "../helpers/tiles";
 
 // Tester edge cases for spec 010's core undo: partial edge tiles, empty edits, the tile cap, and trimming bounds.
@@ -17,7 +17,7 @@ function masksFor(store: LabelStore): NodataMasks {
   return m;
 }
 
-describe("recordTiles / finishEdit / undoEdit edges (spec 010 criterion 1, tester)", () => {
+describe("recordTiles / finishEdit / swapEdit edges (spec 010 criterion 1, tester)", () => {
   it("undoes a dab over the partial bottom-right tiles of a 600x520 raster; copies are window-sized", () => {
     const s = emptyStore(600, 520);
     const m = masksFor(s);
@@ -29,7 +29,7 @@ describe("recordTiles / finishEdit / undoEdit edges (spec 010 criterion 1, teste
     expect(e.get("512,512")!.length).toBe(88 * 8);
     brush(s, m, dab, 2, false);
     const done = finishEdit(s, e)!;
-    expect(undoEdit(s, done)).toEqual(["256,256", "512,256", "256,512", "512,512"]);
+    expect(swapEdit(s, done).keys).toEqual(["256,256", "512,256", "256,512", "512,512"]);
     expect(snapshot(s)).toEqual(before);
   });
 
@@ -56,7 +56,7 @@ describe("recordTiles / finishEdit / undoEdit edges (spec 010 criterion 1, teste
   it("an empty edit finishes as null and undoes nothing", () => {
     const s = emptyStore(512, 512);
     expect(finishEdit(s, new Map())).toBeNull();
-    expect(undoEdit(s, new Map())).toEqual([]);
+    expect(swapEdit(s, new Map()).keys).toEqual([]);
   });
 
   it("returns keys row-major across many tiles regardless of record order", () => {
@@ -64,7 +64,7 @@ describe("recordTiles / finishEdit / undoEdit edges (spec 010 criterion 1, teste
     const m = masksFor(s);
     const e: Edit = new Map();
     for (const w of [win(900, 900, 1), win(10, 900, 1), win(900, 10, 1), win(300, 300, 1)]) { recordTiles(s, e, w); brush(s, m, w, 1, false); }
-    expect(undoEdit(s, finishEdit(s, e)!)).toEqual(["768,0", "256,256", "0,768", "768,768"]);
+    expect(swapEdit(s, finishEdit(s, e)!).keys).toEqual(["768,0", "256,256", "0,768", "768,768"]);
   });
 
   it("at the tile cap a full brush changes nothing new, and undo never exceeds MAX_LABEL_TILES", () => {
@@ -80,7 +80,7 @@ describe("recordTiles / finishEdit / undoEdit edges (spec 010 criterion 1, teste
     const e2: Edit = new Map();
     recordTiles(s, e2, win(5, 5, 1));
     brush(s, m, win(5, 5, 1), 2, false);
-    undoEdit(s, finishEdit(s, e2)!);
+    swapEdit(s, finishEdit(s, e2)!);
     expect(s.tiles.size).toBe(MAX_LABEL_TILES);
   });
 });

@@ -26,16 +26,18 @@ function setup(init: { open?: boolean; canPaint?: boolean; stroking?: boolean; p
   const state = { open: true, canPaint: true, stroking: false, peeks: true, ...init };
   const modes: BrushMode[] = [];
   const view: string[] = []; // "toggle", "peek true", "peek false"
+  const picks: number[] = [];
   initLabelKeys({
     open: () => state.open, brush: { setSpace() {} }, size: { step() {} }, select() {}, classCount: () => 2,
     setMode: (m) => { modes.push(m); }, canPaint: () => state.canPaint, stroking: () => state.stroking,
     view: { toggle: () => { view.push("toggle"); }, peek: (on) => { view.push(`peek ${on}`); return on ? state.peeks : true; } },
+    pick: () => { picks.push(1); },
   });
   const send = (type: string, key: string, mods: Mods = {}) =>
     window.dispatchEvent(Object.assign(new Event(type), { key, code: code(key), ctrlKey: false, metaKey: false, altKey: false, repeat: false, ...mods }));
   const press = (key: string, mods: Mods = {}) => send("keydown", key, mods);
   const release = (key: string, mods: Mods = {}) => send("keyup", key, mods);
-  return { modes, view, press, release, state };
+  return { modes, view, press, release, state, picks };
 }
 
 describe("mode keys", () => {
@@ -111,5 +113,22 @@ describe("peek start", () => {
     press("`"); release("`"); release("`");
     window.dispatchEvent(new Event("blur"));
     expect(view).toEqual(["peek true", "peek false"]);
+  });
+});
+
+// Spec 038 scope 2.
+describe("pick key", () => {
+  it("i and I pick; not in a text field, with Ctrl, Meta or Alt held, or before open", () => {
+    const { picks, modes, press, state } = setup();
+    press("i"); press("I");
+    expect(picks).toHaveLength(2);
+    doc.activeElement = new Input("text");
+    press("i");
+    doc.activeElement = null;
+    for (const mod of ["ctrlKey", "metaKey", "altKey"]) press("i", { [mod]: true });
+    state.open = false;
+    press("i");
+    expect(picks).toHaveLength(2);
+    expect(modes).toEqual([]);
   });
 });

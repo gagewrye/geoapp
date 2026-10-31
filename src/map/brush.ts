@@ -17,6 +17,8 @@ type Deps = {
   onStroke: (active: boolean) => void;
   /** A middle-button pan is in progress (spec 009): presses paint nothing. */
   panning: () => boolean;
+  /** An Alt+left press on a raster cell, in any mode: pick its class instead of painting or panning (spec 038). */
+  pick?: (cell: [number, number]) => void;
 };
 type Stroke = { pointerId: number; erase: boolean; prev: [number, number] | null };
 
@@ -72,6 +74,13 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
     return Number.isFinite(cell[0]) && Number.isFinite(cell[1]) ? cell : null;
   };
 
+  /** The pixel under a client point when it is on the raster itself, else null. */
+  const rasterCell = (x: number, y: number, target: EventTarget | null): [number, number] | null => {
+    const cell = cellAt(x, y, target);
+    return cell && cell[0] >= 0 && cell[1] >= 0 && cell[0] < grid!.width && cell[1] < grid!.height ? cell : null;
+  };
+  const picks = (e: MouseEvent) => deps.pick !== undefined && e.altKey && e.button === 0 && rasterCell(e.clientX, e.clientY, e.target);
+
   // Hovering is synchronous and reads nothing: the ring covers the whole footprint, nodata included.
   const hover = () => {
     const cell = pointer && painting() && !locked ? cellAt(pointer.x, pointer.y, pointer.target) : null;
@@ -103,6 +112,7 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
   container.addEventListener("pointerdown", (e) => {
     lastType = e.pointerType;
     if (e.pointerType === "touch") { pointer = null; hover(); return; }
+    if (!stroke && !deps.panning() && picks(e)) { deps.pick!(rasterCell(e.clientX, e.clientY, e.target)!); return; }
     if (!painting() || stroke || deps.panning() || (e.button !== 0 && e.button !== 2)) return;
     if (locked || blocked) return;
     stroke = { pointerId: e.pointerId, erase: mode === "erase" || e.button === 2, prev: null };
@@ -130,8 +140,13 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
 
   // Capture on the map container runs before MapLibre's mousedown listener on the canvas container.
   map.getContainer().addEventListener("mousedown", (e) => {
-    if (painting() && lastType !== "touch" && e.target instanceof Node && container.contains(e.target)) e.stopPropagation();
+    if (lastType === "touch" || !(e.target instanceof Node) || !container.contains(e.target)) return;
+    if (painting() || (grid && picks(e))) e.stopPropagation(); // an Alt pick doesn't pan in Pan mode either
   }, { capture: true });
+  // Alt alone does nothing over the map; released there it mustn't hand focus to Firefox's menu bar (spec 038)
+  window.addEventListener("keyup", (e) => {
+    if (e.key === "Alt" && pointer?.target instanceof Node && container.contains(pointer.target)) e.preventDefault();
+  });
   // Only on the map, which also covers a right release that fires contextmenu late (Windows); the panel
   // keeps its menu even just after an erase, so text fields keep copy and paste (spec 003 Strokes)
   map.getContainer().addEventListener("contextmenu", (e) => { if (grid) e.preventDefault(); });
@@ -152,5 +167,7 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
     refresh(): void { syncCursor(); hover(); },
     /** A stroke is in progress. */
     stroking: () => stroke !== null,
+    /** The raster pixel under the last mouse or pen position over the map, or null (spec 038's I key). */
+    hoverCell: (): [number, number] | null => (pointer && grid ? rasterCell(pointer.x, pointer.y, pointer.target) : null),
   };
 }
