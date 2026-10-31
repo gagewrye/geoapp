@@ -33,6 +33,7 @@ export const MESSAGES = {
   // spec 031
   restore: (savedAt: string, name: string) => `Restore labels saved ${savedAt} for ${name}?`,
   restored: "Labels restored.",
+  pendingDiscard: (name: string, reason: string) => `Labels for ${name} couldn't be saved (${reason}). Discard them?`,
   restoredNoMask: "Labels restored without the imported mask, whose saved copy can't be read. Import it again.",
 } as const;
 

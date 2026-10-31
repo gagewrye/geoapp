@@ -92,12 +92,14 @@ $<HTMLInputElement>("open-raster").addEventListener("change", (ev) => {
     if (stale()) return;
     // only a raster that opens can discard the labels; Cancel keeps everything
     if (labels.hasLabels() && !confirm(MESSAGES.discard)) { input.value = ""; progress.hide(); return; }
+    // spec 031 scope 8: a previous raster's unsaved snapshot asks first; Cancel keeps this raster open. Then the
+    // old raster's changes are copied, before labels.open switches the labels
+    if (!persist.open(file.name, file.size, f.meta)) { input.value = ""; progress.hide(); return; }
     opened = req;
     source = s = f;
     fullRes.clear();
     previewing?.abort(); // the replaced raster's preview reads stop
     const signal = (previewing = new AbortController()).signal;
-    persist.open(file.name, file.size, f.meta); // before labels.open, so the old raster's changes are copied first
     labels.open(f);
     const { width, height, bandCount, epsg } = f.meta;
     $("raster-info").textContent = `${file.name}: ${width} x ${height}, ${bandCount} band(s), EPSG:${epsg}`;

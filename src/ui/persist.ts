@@ -1,19 +1,19 @@
 import type { LabelClass } from "../core/classes";
 import type { LabelStore } from "../core/labelStore";
-import { batches, evict, rasterKey, restoredPreview } from "../core/session";
+import { rasterKey } from "../core/session";
 import type { Grid } from "../core/types";
 import { openLabelFile, type LabelSource } from "../io/labelFile";
 import type { MaskBase } from "../io/maskBase";
 import type { SessionRecord, SessionStore } from "../io/session";
 import { yieldToBrowser } from "../io/yieldTask";
 import { MESSAGES } from "./messages";
+import { loadSession, mergeSnapshots, writeSnapshot, type Snapshot } from "./snapshot";
 
+export { MAX_SESSIONS, TILE_BATCH } from "./snapshot";
 /** Spec 031: a save starts this long after the last change. */
 export const SAVE_DELAY_MS = 2000;
-/** Tiles per IndexedDB transaction (about 1 MiB), and per read on restore. */
-export const TILE_BATCH = 16;
-/** Sessions kept; the least recently saved goes first, with its mask copy. */
-export const MAX_SESSIONS = 8;
+/** While a previous raster's snapshot is pending (scope 8), a save is tried this often. */
+export const RETRY_MS = 30_000;
 
 /** What persistence reads from and restores into the labels. */
 export type PersistLabels = {
@@ -26,6 +26,8 @@ export type PersistLabels = {
   hasLabels(): boolean;
   /** Swaps in a restored session; its replace must not count as an edit. */
   restoreSession(store: LabelStore, classes: LabelClass[], base: MaskBase | null, selected: number, view: { opacity: number; visible: boolean }): void;
+  /** Spec 004's lock, held until the restore offer settles (scope 4). */
+  restoreLock?(on: boolean): void;
 };
 
 type Deps = {
@@ -49,6 +51,8 @@ type Deps = {
 /** One raster's session: what changed since its last save, and whether it may save yet. */
 type Session = {
   key: string; name: string; grid: Grid;
+  /** The saved session's lookup, started at open; settled once it resolves (a failed one resolves null). */
+  lookup: Promise<SessionRecord | null>; settled: boolean; found: boolean;
   /** Its restore offer has been answered (or there was none): until then nothing saves over the saved one. */
   ready: boolean;
   /** A record of it is saved from this page, so labels going to none delete it. */
@@ -56,13 +60,15 @@ type Session = {
   tiles: Set<string>; record: boolean; clear: boolean; file: Blob | null;
 };
 
-type Snapshot = { s: Session; tiles: [string, ArrayBuffer | null][]; clear: boolean; file: Blob | null; record: Omit<SessionRecord, "savedAt">; labelled: boolean };
+/** A previous raster's snapshot whose write failed (scope 8): kept and written before anything else. */
+type Pending = { s: Session; snap: Snapshot; reason: string };
 
 const reasonOf = (e: unknown) =>
   e instanceof DOMException && e.name === "QuotaExceededError" ? "the browser's storage is full" : e instanceof Error && e.message ? e.message : String(e);
 
 /** Saves the labels in this browser as they change and offers them back on reopening the raster (spec 031, ADR 0025). */
-// Changes mark tile keys and the record dirty; a save copies them (a snapshot) and writes it in batches, one save at a time.
+// Changes mark tile keys and the record dirty; a save copies them (a snapshot) and writes it, one save at a time,
+// after any pending snapshot of a previous raster.
 export function initPersist(d: Deps) {
   const { labels, state, win, doc } = d;
   const now = d.now ?? Date.now, yieldTask = d.yieldTask ?? yieldToBrowser;
@@ -70,18 +76,20 @@ export function initPersist(d: Deps) {
   const dateTime = d.dateTime ?? ((ms) => new Date(ms).toLocaleString());
   let db: Promise<SessionStore> | null = null;
   const store = () => (db ??= d.open());
-  let current: Session | null = null;
-  let timer: ReturnType<typeof setTimeout> | null = null;
+  let current: Session | null = null, pending: Pending | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null, retry: ReturnType<typeof setTimeout> | null = null;
   let chain: Promise<void> = Promise.resolve();
-  let inFlight = 0, failed = false, applying = false, persisted = false, guarded = false;
+  let inFlight = 0, failed = "", saved = "", applying = false, persisted = false, guarded = false;
 
   const dirty = (s: Session | null) => !!s && (s.tiles.size > 0 || s.record || s.clear || s.file !== null);
   // changes to a raster with no labels, and no session saved from this page, have nothing to save (an open resets the view)
   const unsaved = (s: Session | null) => dirty(s) && (s!.owned || labels.hasLabels());
   const guard = (e: Event) => { e.preventDefault(); (e as BeforeUnloadEvent).returnValue = ""; };
-  /** The beforeunload guard is on iff something is dirty, a save is in flight, or the last save failed. */
+  /** #save-state and the beforeunload guard: on iff something is dirty, a save is in flight, the last failed, or a snapshot is pending. */
   function sync(): void {
-    const on = unsaved(current) || inFlight > 0 || failed;
+    state.textContent = pending ? `Not saved: ${pending.snap.record.name}: ${pending.reason}`
+      : inFlight > 0 ? "Saving…" : failed ? `Not saved: ${failed}` : saved;
+    const on = unsaved(current) || inFlight > 0 || failed !== "" || pending !== null;
     if (on === guarded) return;
     guarded = on;
     if (on) win.addEventListener("beforeunload", guard); else win.removeEventListener("beforeunload", guard);
@@ -102,94 +110,100 @@ export function initPersist(d: Deps) {
       key: s.key, name: s.name, classes: labels.classes().map((c) => ({ ...c })), selected: labels.selected(), ...view,
       base: base && { lut: base.lut.slice(), count: base.count, windows: [...base.windows], values: base.preview.values.slice() },
     };
-    const snap = { s, tiles, clear: s.clear, file: s.file, record, labelled: labels.hasLabels() };
+    const snap = { key: s.key, tiles, clear: s.clear, file: s.file, record, labelled: labels.hasLabels() };
     s.tiles = new Set(); s.record = false; s.clear = false; s.file = null;
     return snap;
   }
 
-  async function write(p: Snapshot): Promise<void> {
+  async function write(s: Session, snap: Snapshot): Promise<void> {
     const sessions = await store();
     if (!persisted) { persisted = true; d.persistStorage?.(); }
-    if (!p.labelled) {
-      // no labels left: nothing to offer back, so a session saved from this page goes
-      if (p.s.owned) { await sessions.delete(p.s.key); p.s.owned = false; }
-      return;
-    }
-    if (p.clear) await sessions.clearTiles(p.s.key); // a replace's old tiles go before its new ones are written
-    if (p.file) await sessions.saveBase(p.s.key, p.file);
-    for (const b of batches(p.tiles.map(([k]) => k), TILE_BATCH)) {
-      const set = new Set(b);
-      await sessions.putTiles(p.s.key, p.tiles.filter(([k]) => set.has(k)));
-      await yieldTask();
-    }
-    await sessions.putRecord({ ...p.record, savedAt: now() }); // last: a record's tiles are all written
-    p.s.owned = true;
-    for (const k of evict(await sessions.list(), MAX_SESSIONS)) await sessions.delete(k);
+    s.owned = await writeSnapshot(sessions, snap, s.owned, now, yieldTask);
   }
 
-  /** Starts a save of the current session's changes; force: a hidden or closing tab, which doesn't wait for a stroke. */
-  function save(force: boolean): void {
-    if (timer) { clearTimeout(timer); timer = null; }
-    if (!current) return;
-    if (!force && labels.stroking()) { schedule(); return; }
-    const snap = take(current);
-    if (snap) enqueue(snap);
-  }
-
-  function enqueue(snap: Snapshot): void {
-    inFlight++;
-    state.textContent = "Saving…";
-    sync();
-    chain = chain.then(() => write(snap)).then(() => {
-      failed = false;
-      if (inFlight === 1) state.textContent = `Saved ${time(now())}`;
-    }, (e: unknown) => {
-      failed = true;
-      state.textContent = `Not saved: ${reasonOf(e)}`;
-      // what it held is dirty again, for the next save
-      const { s } = snap;
+  /** A snapshot that wasn't written: the current raster's is dirty again; another raster's becomes (or joins) the pending one. */
+  function lost(s: Session, snap: Snapshot, reason: string): void {
+    if (s === current) {
       for (const [k] of snap.tiles) s.tiles.add(k);
       s.record = true; s.clear ||= snap.clear; s.file ??= snap.file;
-      if (s === current) schedule(); // tried again after the next delay
+      schedule(); // tried again after the next delay
+      return;
+    }
+    pending = { s, snap: pending?.s === s ? mergeSnapshots(pending.snap, snap) : snap, reason };
+    retry ??= setTimeout(() => { retry = null; save(false); }, RETRY_MS);
+  }
+
+  /** Writes the pending snapshot, if any, then this one. */
+  function enqueue(s: Session | null, snap: Snapshot | null): void {
+    inFlight++;
+    sync();
+    chain = chain.then(async () => {
+      const p = pending;
+      if (p) {
+        try {
+          await write(p.s, p.snap);
+          if (pending === p) pending = null;
+        } catch (e) {
+          if (pending === p) p.reason = reasonOf(e);
+          if (s && snap) lost(s, snap, reasonOf(e));
+          if (pending && !retry) retry = setTimeout(() => { retry = null; save(false); }, RETRY_MS);
+          return reasonOf(e);
+        }
+      }
+      if (!s || !snap) return "";
+      try { await write(s, snap); return ""; } catch (e) { lost(s, snap, reasonOf(e)); return reasonOf(e); }
+    }).then((reason) => {
+      failed = reason;
+      if (!reason && !pending) saved = `Saved ${time(now())}`;
+      if (!pending && retry) { clearTimeout(retry); retry = null; }
     }).finally(() => { inFlight--; sync(); });
+  }
+
+  /** Starts a save of the current session's changes, after any pending snapshot; force: a hidden or closing tab, which doesn't wait for a stroke. */
+  function save(force: boolean): void {
+    if (timer) { clearTimeout(timer); timer = null; }
+    if (!force && labels.stroking()) { schedule(); return; }
+    const snap = current && take(current);
+    if (snap || pending) enqueue(snap ? current : null, snap);
   }
 
   doc.addEventListener("visibilitychange", () => { if (doc.visibilityState === "hidden") save(true); });
   win.addEventListener("pagehide", () => save(true));
 
   return {
-    /** A raster opens (before the labels switch to it): the old one's changes are copied and saved now, and the new one waits for offer(). */
-    open(name: string, size: number, grid: Grid): void {
+    /**
+     * A raster is about to open (before the labels switch to it). With a snapshot pending, first asks to discard it:
+     * false on Cancel, and the open must stop. Else the old raster's changes are copied and saved now, and the
+     * saved session's lookup starts; the new raster saves nothing until offer() settles.
+     */
+    open(name: string, size: number, grid: Grid): boolean {
+      if (pending) {
+        if (!d.confirm(MESSAGES.pendingDiscard(pending.snap.record.name, pending.reason))) return false;
+        pending = null;
+        if (retry) { clearTimeout(retry); retry = null; }
+        failed = ""; saved = "";
+      }
       if (current) save(true);
-      current = { key: rasterKey(size, grid), name, grid, ready: false, owned: false, tiles: new Set(), record: false, clear: false, file: null };
+      const key = rasterKey(size, grid);
+      const s: Session = { key, name, grid, lookup: Promise.resolve(null), settled: false, found: false, ready: false, owned: false, tiles: new Set(), record: false, clear: false, file: null };
+      // a failed lookup counts as no session
+      s.lookup = store().then((db) => db.get(key)).catch(() => null).then((r) => { s.settled = true; s.found = r !== null; return r; });
+      current = s;
       sync();
+      return true;
     },
-    /** Once the preview is drawn: offers a saved session back. Resolves with the message to show, or null for none. */
+    /** At "Raster opened.": offers a saved session back, the labels locked until it settles. Resolves with the message to show, or null. */
     async offer(): Promise<string | null> {
       const s = current;
       if (!s || s.ready) return null;
+      const locked = !s.settled || s.found; // a lookup that already found nothing needs no lock
+      if (locked) labels.restoreLock?.(true);
       try {
+        const r = await s.lookup;
+        if (s !== current || !r) return null;
         const sessions = await store();
-        const r = await sessions.get(s.key);
-        if (s !== current) return null;
-        if (!r) return null;
         if (!d.confirm(MESSAGES.restore(dateTime(r.savedAt), r.name))) { await sessions.delete(s.key); return null; }
-        const tiles = new Map<string, Uint8Array>();
-        for (let after: string | null = null; ;) {
-          const batch = await sessions.tiles(s.key, after, TILE_BATCH);
-          for (const [k, buf] of batch) tiles.set(k, new Uint8Array(buf));
-          if (batch.length < TILE_BATCH) break;
-          after = batch[batch.length - 1]![0];
-        }
-        let base: MaskBase | null = null, missing = false;
-        if (r.base) {
-          try {
-            const blob = await sessions.base(s.key);
-            if (!blob) throw new Error("no mask copy");
-            const file = await (d.openBase ?? openLabelFile)(blob);
-            base = { file, lut: r.base.lut, count: r.base.count, windows: new Set(r.base.windows), preview: restoredPreview(s.grid, r.base.values) };
-          } catch { missing = true; }
-        }
+        const { tiles, base, missing } = await loadSession(sessions, r, s.grid, d.openBase ?? openLabelFile);
         if (s !== current) return null;
         applying = true;
         try {
@@ -199,7 +213,13 @@ export function initPersist(d: Deps) {
         if (missing) s.record = true; // saved again without the mask
         return missing ? MESSAGES.restoredNoMask : MESSAGES.restored;
       } finally {
-        if (s === current) { s.ready = true; if (dirty(s)) schedule(); sync(); }
+        // another raster's open has unlocked the labels already, and may hold its own lock
+        if (s === current) {
+          if (locked) labels.restoreLock?.(false);
+          s.ready = true;
+          if (dirty(s)) schedule();
+          sync();
+        }
       }
     },
     /** These tile keys changed: applied cells, an undo, erase to empty. */
