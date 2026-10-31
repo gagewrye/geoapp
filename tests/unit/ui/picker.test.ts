@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { errorText } from "../../../src/ui/messages";
 import { initPicker } from "../../../src/ui/picker";
 
 // Spec 038 criterion 3, with fake tiles: the 512 x 512 store's tile 256,0 holds value v at pixel (300 + v, 10).
@@ -41,6 +42,24 @@ describe("picker", () => {
     release();
     await first;
     expect(t.select.mock.calls).toEqual([[1]]);
+    expect(t.say.mock.calls).toEqual([["Picked Sand.", "info"]]);
+  });
+
+  it("a failed tile read says errorText as an error, keeps the selection, and its promise resolves (no unhandled rejection)", async () => {
+    const err = new Error("The label mask can't be read.");
+    const t = setup(async () => { throw err; });
+    await expect(t.pick([303, 10])).resolves.toBeUndefined();
+    expect(t.select).not.toHaveBeenCalled();
+    expect(t.say.mock.calls).toEqual([[errorText(err), "error"]]);
+  });
+
+  it("a failed read superseded by a newer pick says nothing", async () => {
+    let fail = (_e: Error) => {};
+    const t = setup(async (k) => (t.keys.length === 1 ? new Promise<never>((_r, j) => { fail = j; }) : (void k, tile())));
+    const first = t.pick([301, 10]);
+    await t.pick([302, 10]);
+    fail(new Error("late"));
+    await first;
     expect(t.say.mock.calls).toEqual([["Picked Sand.", "info"]]);
   });
 });
