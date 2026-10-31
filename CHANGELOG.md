@@ -3,6 +3,7 @@
 One entry per merge to main, newest first. Details are in the named spec.
 
 ## 2026-10-30
+- **Spec 036:** Each class row shows its key number, a colour swatch and its name; renaming takes the pencil button or a double-click (Enter saves, Esc cancels), so typing a shortcut can't change a name, and the list fills the panel and scrolls the selected class into view.
 - **Spec 035:** The app is laid out in regions: file actions in a top bar, tools in a left strip, classes and label view in a right panel, and the status bar below; \ collapses both side panels (remembered), and Home or the ⌂ button zooms back to the raster.
 - **Spec 034:** H shows or hides labels, and holding ` hides them only while held without changing the tool (no stroke starts during it); opening a raster mid-stroke no longer flashes a queued tool.
 - **Spec 033:** B paints, E erases and P or Esc pans; a new **Erase** mode lets a left drag erase the selected class (dashed brush outline), and a key pressed mid-stroke takes effect when the stroke ends.
