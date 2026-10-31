@@ -22,6 +22,12 @@ type Deps = {
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
+/** Import labels needs imagery, no run, no queued strokes and unlocked labels; Export labels also no export in progress (specs 004, 031). */
+export function controlsDisabled(o: { imagery: boolean; seeding: boolean; queued: boolean; exporting: boolean; locked: boolean }) {
+  const importLabels = !o.imagery || o.seeding || o.queued || o.locked;
+  return { importLabels, exportLabels: importLabels || o.exporting };
+}
+
 /** Import labels and Export labels (spec 004), with the import's progress and Cancel (spec 021). */
 // A run belongs to the imagery it started on: once another raster opens it sets no labels and no
 // message (spec 003's rule for replaced rasters), and the new raster's controls are free at once.
@@ -45,8 +51,9 @@ export function initSeeding({ labels, imagery, say, error, opened, imported }: D
   function sync(): void {
     const s = imagery(), busy = seeding(), queued = labels.busy();
     if (running && !busy) showRun(false); // its run may still be waiting on a read (spec 021 criterion 7)
-    importInput.disabled = classMap.disabled = !s || busy || queued;
-    exportBtn.disabled = !s || busy || queued || exporting !== null;
+    const off = controlsDisabled({ imagery: !!s, seeding: busy, queued, exporting: exporting !== null, locked: labels.restoring() });
+    importInput.disabled = classMap.disabled = off.importLabels;
+    exportBtn.disabled = off.exportLabels;
   }
 
   /** Every import replaces (spec 017): true unless labels exist and the user cancels the confirm. */

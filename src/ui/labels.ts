@@ -50,7 +50,10 @@ export function initLabels({ map, say, onBusy, onChange, panning, imageryBusy, i
   const classes: LabelClass[] = initialClasses();
   let selected = 0;
   let open = false;
-  let locked = false; // while seeding or exporting labels (spec 004): no painting and no class edits, so no list or tile changes under them
+  // spec 004's lock: no painting and no class edits, so no list or tile changes under a run (seeding or exporting
+  // labels) or a restore offer (spec 031); each holds it under its own name, and it lifts once neither does
+  const holders = new Set<"run" | "restore">();
+  let locked = false;
   let store: LabelStore = emptyStore(0, 0);
   let imagery: RasterSource | null = null;
   let base: MaskBase | null = null; // an imported mask under the stored tiles (spec 014)
@@ -133,13 +136,18 @@ export function initLabels({ map, say, onBusy, onChange, panning, imageryBusy, i
   });
   initLabelKeys({ open: () => open, brush, size, select, classCount: () => classes.length });
 
-  /** While seeding or exporting labels: the brush and the class list's edits are off; selecting still works. */
-  function lock(on: boolean): void {
-    if (locked === on) return;
-    locked = on;
-    brush.setLocked(on);
+  /** While seeding or exporting labels ("run") or a restore offer settles: the brush, the class list's edits and Undo are off; selecting still works. */
+  function lock(on: boolean, by: "run" | "restore" = "run"): void {
+    if (on) holders.add(by); else holders.delete(by);
+    apply();
+  }
+  function apply(): void {
+    if (locked === holders.size > 0) return;
+    locked = !locked;
+    brush.setLocked(locked);
     render();
     undo.sync();
+    onBusy(); // Import labels and Export labels follow the lock
   }
 
   /** Paint is offered only once the imagery is drawn (spec 019); Pan stays selected until the user picks Paint. */
@@ -157,7 +165,8 @@ export function initLabels({ map, say, onBusy, onChange, panning, imageryBusy, i
       const { width, height, epsg, gt } = source.meta;
       const grid = { width, height, epsg, gt };
       store = emptyStore(width, height);
-      lock(false);
+      holders.clear(); // the old raster's run or offer no longer holds these labels
+      apply();
       view.reset();
       display.open(grid);
       open = true;
@@ -204,6 +213,10 @@ export function initLabels({ map, say, onBusy, onChange, panning, imageryBusy, i
       redraw(store.tiles.keys());
     },
     lock,
+    /** Spec 031 scope 4: held from "Raster opened." until the restore offer settles. */
+    restoreLock: (on: boolean) => lock(on, "restore"),
+    /** A restore offer holds the lock (a run's own controls follow the run). */
+    restoring: () => holders.has("restore"),
     imageryReady,
     /** Starts reading every valid mask in the background, from the view's centre band (spec 023 F3; after "Raster opened."). */
     startMasks(): void {
