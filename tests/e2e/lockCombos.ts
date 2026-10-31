@@ -34,7 +34,7 @@ const PROBE: [number, number] = [15.505, 45.505]; // unlabelled by paintTwoClass
 export async function expectLock(page: Page, on: boolean, why: string): Promise<void> {
   const state = (l: ReturnType<Page["locator"]>) => (on ? expect(l, why).toBeDisabled() : expect(l, why).toBeEnabled());
   await state(page.locator("#class-add"));
-  for (const sel of ["#classes .class-name", "#classes .class-colour"]) {
+  for (const sel of ["#classes .class-rename", "#classes .class-colour"]) {
     const n = await page.locator(sel).count();
     for (let i = 0; i < n; i++) await state(page.locator(sel).nth(i));
   }

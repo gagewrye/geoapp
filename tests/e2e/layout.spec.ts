@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { jumpTo, message, openApp, openRaster, rgbFixture } from "./helpers";
+import { editName, jumpTo, message, openApp, openRaster, rgbFixture } from "./helpers";
 
 // Spec 035 criteria 1-5, at 1280x720.
 test.use({ viewport: { width: 1280, height: 720 } });
@@ -63,8 +63,7 @@ test("\\ collapses and restores the side columns, the state survives a reload, a
   await unfocus(page);
   await page.keyboard.press("\\");
   await expect.poll(() => canvasWidth(page)).toBeCloseTo(1280 - 56 - 260, 0);
-  const name = page.locator("#classes .class-name").first();
-  await name.click();
+  const name = await editName(page, 0);
   await page.keyboard.press("End");
   await page.keyboard.press("\\");
   await expect(name).toHaveValue("Class 1\\");

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
-import { hoverFeatures, jumpTo, labels, message, openApp, openRaster, paintMode, rgbFixture, selectClass, settled, toScreen } from "./helpers";
+import { editName, hoverFeatures, jumpTo, labels, message, openApp, openRaster, paintMode, renameClass, rgbFixture, selectClass, settled, toScreen } from "./helpers";
 
 // Spec 003 criteria 13 (brush size) and 14 (classes).
 
@@ -12,7 +12,7 @@ async function setup(page: Page) {
   await jumpTo(page, [15, 45], 9);
 }
 const sizeText = (page: Page) => page.locator("#brush-size");
-const names = (page: Page) => page.locator("#classes .class-name").evaluateAll((els) => els.map((e) => (e as HTMLInputElement).value));
+const names = (page: Page) => page.locator("#classes .class-name").evaluateAll((els) => els.map((e) => e.textContent));
 const selected = (page: Page) => page.locator("#classes li").evaluateAll((els) => els.findIndex((e) => e.getAttribute("aria-selected") === "true"));
 const hookClasses = (page: Page) => page.evaluate(() => (window as any).__geoapp.labels.classes.map((c: any) => ({ ...c })));
 
@@ -48,8 +48,7 @@ test.describe("brush size (criterion 13)", () => {
   test("typing [, ] or 1 in a class name field changes neither the size nor the selected class", async ({ page }) => {
     await setup(page);
     await selectClass(page, 1);
-    const field = page.locator("#classes .class-name").nth(1);
-    await field.click();
+    const field = await editName(page, 1);
     await field.press("End");
     await page.keyboard.type("[]1[1]");
     await expect(sizeText(page)).toHaveText("7");
@@ -84,16 +83,13 @@ test.describe("classes (criterion 14)", () => {
     await setup(page);
     await page.click("#class-add");
     expect(await names(page)).toEqual(["Class 1", "Class 2", "Class 3"]);
-    const field = page.locator("#classes .class-name").nth(2);
-    await field.fill("Mangrove");
-    await field.press("Enter");
+    await renameClass(page, 2, "Mangrove");
     expect((await hookClasses(page)).map((c: any) => c.name)).toEqual(["Class 1", "Class 2", "Mangrove"]);
     for (const bad of ["", "   ", "Class 1"]) {
       await message(page).evaluate((e) => { e.textContent = ""; });
-      await field.fill(bad);
-      await field.press("Enter");
+      await renameClass(page, 2, bad);
       await expect(message(page)).toHaveText(MESSAGES.className);
-      await expect(field).toHaveValue("Mangrove");
+      await expect(page.locator("#classes .class-name").nth(2)).toHaveText("Mangrove");
       expect((await hookClasses(page))[2].name).toBe("Mangrove");
     }
   });

@@ -72,7 +72,7 @@ test("while an import runs the brush and class edits are disabled; while mask re
   await importFile(page, classes());
   await expect.poll(() => page.evaluate(() => (window as any).__fileGate.reads)).toBe(1);
   for (const id of ["#export-labels", "#import-labels", "#class-add"]) await expect(page.locator(id)).toBeDisabled();
-  await expect(page.locator("#classes .class-name").first()).toBeDisabled();
+  await expect(page.locator("#classes .class-rename").first()).toBeDisabled();
   // a drag paints nothing and shows no footprint
   await jumpTo(page, [15, 45], 6);
   const a = await toScreen(page, [16.005, 45.505]);
@@ -89,7 +89,7 @@ test("while an import runs the brush and class edits are disabled; while mask re
   await paintMode(page);
   await page.mouse.move(a.x + 1, a.y);
   await expect.poll(async () => (await hoverFeatures(page)).length).toBe(1);
-  await expect(page.locator("#classes .class-name").first()).toBeEnabled();
+  await expect(page.locator("#classes .class-rename").first()).toBeEnabled();
 
   // a dab on row band 4 waits for its read: the background is held, and the strokes and their hovers (spec 023 F3) read bands near 45N
   await pauseImagery(page);

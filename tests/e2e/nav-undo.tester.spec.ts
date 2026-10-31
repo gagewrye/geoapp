@@ -71,7 +71,7 @@ test.describe("spec 009 edges (tester)", () => {
   });
 
   const stoppers: [string, (page: Page) => Promise<void>][] = [
-    ["focus entering a class name field", (page) => page.focus("#classes .class-name")],
+    ["focus entering a class name field", (page) => page.dispatchEvent("#classes .class-name", "dblclick")],
     ["a Control keydown", async (page) => { await page.keyboard.down("Control"); await page.keyboard.up("Control"); }],
     ["an Alt keydown", async (page) => { await page.keyboard.down("Alt"); await page.keyboard.up("Alt"); }],
     ["visibilitychange to hidden", (page) => page.evaluate(() => {

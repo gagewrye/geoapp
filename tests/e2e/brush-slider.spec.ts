@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { footprint, footprintRing, pixelAt } from "../../src/core/pixel";
-import { clickAt, hoverFeatures, jumpTo, labels, message, openApp, openRaster, paintMode, RGB_GRID, rgbFixture, toLngLat, toScreen, view } from "./helpers";
+import { clickAt, editName, hoverFeatures, jumpTo, labels, message, openApp, openRaster, paintMode, RGB_GRID, rgbFixture, toLngLat, toScreen, view } from "./helpers";
 
 // Spec 017 criteria 2 (slider), 3 (keys) and 4 (Space).
 
@@ -53,8 +53,7 @@ test("] and [ halve and double between 1 and 127; with the slider focused ] stil
   await expectSize(page, 19);
   await expect(range(page)).toBeFocused();
   // typed in a class name field, [ and ] change nothing
-  const field = page.locator("#classes .class-name").first();
-  await field.click();
+  await editName(page, 0);
   await page.keyboard.type("[]]");
   await expectSize(page, 19);
 });

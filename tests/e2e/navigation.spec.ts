@@ -1,7 +1,7 @@
 import { expect, test, type CDPSession, type Page } from "@playwright/test";
 import { pixelAt as cellOf, strokeCells } from "../../src/core/pixel";
 import {
-  paintMode, RGB_GRID, jumpTo, labels, message, moveTo, openApp, openRaster, rgbFixture, settled, toLngLat, toScreen, view, type LngLat, type Xy,
+  editName, paintMode, RGB_GRID, jumpTo, labels, message, moveTo, openApp, openRaster, rgbFixture, settled, toLngLat, toScreen, view, type LngLat, type Xy,
 } from "./helpers";
 
 // Spec 009: centre wheel zoom, middle-button pan, smooth WASD, and lifting the brush on a camera move.
@@ -254,8 +254,7 @@ test.describe("WASD stops and ignores (criterion 6)", () => {
 
   test("W typed in a class name field types and doesn't pan", async ({ page }) => {
     await setup(page, "paint");
-    const field = page.locator("#classes .class-name").first();
-    await field.click();
+    const field = await editName(page, 0);
     await field.press("End");
     const c0 = await centre(page);
     await page.keyboard.down("KeyW");

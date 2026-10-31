@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { anotherRaster, jumpTo, labels, message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture, selectClass, settled, stroke, toScreen, type Xy } from "./helpers";
+import { anotherRaster, editName, jumpTo, labels, message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture, selectClass, settled, stroke, toScreen, type Xy } from "./helpers";
 
 // Spec 010: undo of paint and erase strokes (button and Ctrl+Z), and the brush cursor.
 const undoButton = (page: Page) => page.locator("#undo");
@@ -78,8 +78,7 @@ test("Ctrl+Z in a class name field undoes the typing, not a stroke (criterion 3)
   const c = await toScreen(page, [15.005, 45.005]);
   await stroke(page, [c, { x: c.x + 60, y: c.y }]);
   const painted = await snapshot(page);
-  const field = page.locator("#classes .class-name").first();
-  await field.click();
+  const field = await editName(page, 0);
   await field.press("End");
   await page.keyboard.type("xy");
   await expect(field).toHaveValue("Class 1xy");
