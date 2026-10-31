@@ -19,6 +19,11 @@
 5. The list fills spec 035's Classes section, with no 40vh cap. Selecting a class by key scrolls its row into view (`block: "nearest"`).
 6. **Split** (spec 031 review follow-up). The class-list wiring moves out of `ui/labels.ts` (250 lines) into `ui/classPanel.ts`: the classes array, `selected`, `select`, `render`, rename, recolour and Add class. `labels.ts` keeps the store, brush, paint and undo.
 
+7. **Carried from spec 035's review** (non-blocking there):
+   - `Home` in `ui/main.ts` returns before `preventDefault` when focus is in an `input` (range included) or a `select`, so a focused slider gets its own Home and the map doesn't zoom;
+   - the README's labels line reads "clear **Show** (H)" and "the opacity slider beside it";
+   - the dead `#status [hidden]` rule in `ui/style.css` is deleted, since the global `[hidden]` rule covers it.
+
 **Out of scope:** reordering, deleting classes, per-class visibility, user-set hotkeys.
 
 ## Interfaces
@@ -44,3 +49,5 @@
 7. Spec 003's class criteria (rename, recolour, Add class) pass with the new selectors. `npm run check` passes.
 8. **Unit (classPanel):** `replace` clamps an out-of-range `selected` to 0, recolour calls `recoloured`, and locked blocks rename, recolour and Add.
    - `ui/labels.ts` no longer imports `renderClasses`, and is under 200 lines.
+9. **E2E (scope 7):** after open, pan and zoom away, focus `#label-opacity` and press `Home`. The slider reads its minimum, and the map bounds are unchanged to 1e-6°. With focus on the map, `Home` still fits the raster (spec 035).
+10. **Scope 7:** `README.md` contains "clear **Show** (H)" and "the opacity slider beside it", and `src/ui/style.css` has no `#status [hidden]` rule. The status bar's raster fields stay hidden before open (spec 032 e2e).
