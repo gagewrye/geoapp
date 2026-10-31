@@ -10,6 +10,7 @@ import { initImagery } from "./imagery";
 import { inTextField } from "./labelKeys";
 import { openSessionStore } from "../io/session";
 import { initLabels } from "./labels";
+import { initHelp } from "./help";
 import { initLayout } from "./layout";
 import { errorText, MESSAGES, messageSink } from "./messages";
 import { initProgress } from "./progress";
@@ -25,6 +26,7 @@ let bounds: Bounds | null = null;
 const home = () => { if (bounds) fitRaster(map, bounds); };
 const map = createMap($("map"), home);
 const layout = initLayout({ map, open: () => source !== undefined });
+initHelp({ dialog: $<HTMLDialogElement>("help"), button: $<HTMLButtonElement>("help-button"), list: $("help-list") }); // works before an open (spec 039)
 // text fields, selects, sliders and number fields keep their own Home (specs 036, 037); a checkbox or button doesn't
 const ownsHome = (el: Element | null) => inTextField(el) || el instanceof HTMLSelectElement
   || (el instanceof HTMLInputElement && (el.type === "range" || el.type === "number"));

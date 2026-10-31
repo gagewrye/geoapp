@@ -16,6 +16,7 @@
         <label class="file">Import labels <input id="import-labels" type="file" accept=".tif,.tiff,image/tiff" /></label>
         <button id="export-labels" type="button">Export labels</button>
       </span>
+      <button id="help-button" type="button" aria-label="Shortcuts" title="Shortcuts (?)">?</button>
     </header>
     <nav id="tools" hidden aria-label="Tools">
       <div id="brush-panel">
@@ -33,6 +34,12 @@
       </div>
     </nav>
     <main id="map"></main>
+    <!-- the shortcut list (spec 039), filled from ui/shortcuts.ts -->
+    <dialog id="help" aria-labelledby="help-title">
+      <h2 id="help-title">Shortcuts</h2>
+      <div id="help-list"></div>
+      <form method="dialog"><button type="submit">Close</button></form>
+    </dialog>
     <aside id="side" hidden>
       <div id="panel">
         <section id="class-section">

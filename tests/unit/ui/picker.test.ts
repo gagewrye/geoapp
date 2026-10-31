@@ -8,8 +8,9 @@ const tile = () => { const t = new Uint8Array(256 * 256); for (const v of [1, 2,
 
 function setup(read: (key: string) => Promise<Uint8Array | null> = async () => tile()) {
   const select = vi.fn(), say = vi.fn(), keys: string[] = [];
-  const pick = initPicker({ tile: (k) => { keys.push(k); return read(k); }, dims: () => ({ width: 512, height: 512 }), classes: () => classes, select, say });
-  return { pick, select, say, keys };
+  let dims = { width: 512, height: 512 };
+  const picker = initPicker({ tile: (k) => { keys.push(k); return read(k); }, dims: () => dims, classes: () => classes, select, say });
+  return { pick: picker.pick, cancel: picker.cancel, select, say, keys, shrink: () => { dims = { width: 100, height: 100 }; } };
 }
 
 describe("picker", () => {
@@ -61,5 +62,29 @@ describe("picker", () => {
     fail(new Error("late"));
     await first;
     expect(t.say.mock.calls).toEqual([["Picked Sand.", "info"]]);
+  });
+
+  // Spec 039 criteria 7 and 9.
+  for (const outcome of ["resolves", "rejects"] as const) {
+    it(`a pick whose read ${outcome} after cancel() calls neither select nor say, even with dims shrunk past its cell`, async () => {
+      let settle = () => {};
+      const t = setup(() => new Promise((ok, fail) => { settle = () => (outcome === "resolves" ? ok(tile()) : fail(new Error("gone"))); }));
+      const p = t.pick([303, 10]);
+      t.cancel();
+      t.shrink(); // a smaller raster opened: 303,10 is outside its tile windows
+      settle();
+      await expect(p).resolves.toBeUndefined();
+      expect(t.select).not.toHaveBeenCalled();
+      expect(t.say).not.toHaveBeenCalled();
+    });
+  }
+
+  it("with 3 classes a value of 5 keeps the selection and says No class for value 5.; 0 still says No label here.", async () => {
+    const t = setup(async () => { const x = tile(); x[10 * 256 + 49] = 5; return x; });
+    await t.pick([305, 10]);
+    expect(t.select).not.toHaveBeenCalled();
+    expect(t.say.mock.calls).toEqual([["No class for value 5.", "info"]]);
+    await t.pick([400, 10]);
+    expect(t.say.mock.calls[1]).toEqual(["No label here.", "info"]);
   });
 });
