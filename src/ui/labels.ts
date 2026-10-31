@@ -13,6 +13,7 @@ import { initLabelKeys, inTextField } from "./labelKeys";
 import { initLabelView } from "./labelView";
 import { initModes } from "./modes";
 import { initPaint } from "./paint";
+import { initPicker } from "./picker";
 import { initUndo } from "./undo";
 import type { MessageKind } from "./messages";
 
@@ -64,14 +65,20 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
     selectedChanged: () => { edits.record(); brush.refresh(); toolChanged(); },
     edited: () => { edits.record(); toolChanged(); },
   });
+  const pick = initPicker({ tile, dims: () => store, classes: panel.classes, select: panel.select, say }); // Alt+click or I (spec 038)
+  /** The effective tile at key (stored, else the mask's); null when neither exists. Reads the mask file for an unstored key. */
+  async function tile(key: string): Promise<Uint8Array | null> {
+    const stored = store.tiles.get(key), [x0, y0] = key.split(",").map(Number) as [number, number];
+    if (stored || !base || !imagery) return stored?.slice() ?? null;
+    return (await baseTile(imagery, base, tileWindow(store, x0, y0))).labels;
+  }
   const display = labelDisplay(map, () => store, () => panel.classes().map((c) => c.colour));
   const redraw = display.redraw;
   // Paint undo and redo (specs 010, 037): one entry per stroke; opening a raster or replacing the store clears it
   const undo = initUndo({
     button: $<HTMLButtonElement>("undo"), redoButton: $<HTMLButtonElement>("redo"), store: () => store,
     blocked: () => locked || brush.stroking() || paint.size() > 0, shortcut: () => open && !inTextField(document.activeElement),
-    // Import and Export follow the store (spec 004)
-    undone: (keys) => { keys = [...keys]; edits.tiles(keys); redraw(keys); onChange(); },
+    undone: (keys) => { keys = [...keys]; edits.tiles(keys); redraw(keys); onChange(); }, // Import and Export follow the store (spec 004)
   });
 
   const paint = initPaint({
@@ -82,7 +89,7 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
   });
   const brush = createBrush(map, {
     side: () => size.side(), colour: () => panel.classes()[panel.selected()]!.colour, cells: paint.cells, hovered: paint.hovered,
-    onStroke: (active) => { undo.stroke(active); if (!active) { edits.strokeEnded(); modes.strokeEnded(); } }, panning,
+    onStroke: (active) => { undo.stroke(active); if (!active) { edits.strokeEnded(); modes.strokeEnded(); } }, panning, pick,
   });
 
   // hiding labels selects Pan (spec 016)
@@ -90,7 +97,7 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
   const modes = initModes({ brush, view, toolChanged });
   const size = initBrushSize(() => { brush.refresh(); toolChanged(); });
   initLabelKeys({
-    open: () => open, brush, size, select: panel.select, classCount: () => panel.classes().length,
+    open: () => open, brush, size, select: panel.select, classCount: () => panel.classes().length, pick: () => pick(brush.hoverCell()),
     setMode: modes.request, canPaint: modes.canPaint, stroking: brush.stroking, view: { toggle: view.toggle, peek: modes.peek },
   });
 
@@ -178,14 +185,7 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
     masks: paint.masks,
     /** The mask base, if one is loaded. */
     base: () => base,
-    /** The effective tile at key (stored, else the mask's); null when neither exists. Reads the mask file for an unstored key. */
-    async tile(key: string): Promise<Uint8Array | null> {
-      const stored = store.tiles.get(key);
-      if (stored) return stored.slice();
-      if (!base || !imagery) return null;
-      const [x0, y0] = key.split(",").map(Number) as [number, number];
-      return (await baseTile(imagery, base, tileWindow(store, x0, y0))).labels;
-    },
+    tile,
     /** A paint or erase stroke is in progress. */
     stroking: brush.stroking,
     /** True when a tile is stored or a mask with labelled pixels is loaded. */

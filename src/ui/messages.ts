@@ -35,6 +35,9 @@ export const MESSAGES = {
   restored: "Labels restored.",
   pendingDiscard: (name: string, reason: string) => `Labels for ${name} couldn't be saved (${reason}). Discard them?`,
   restoredNoMask: "Labels restored without the imported mask, whose saved copy can't be read. Import it again.",
+  // spec 038
+  picked: (name: string) => `Picked ${name}.`,
+  noLabel: "No label here.",
 } as const;
 
 /** What a seeding run says (spec 004); null for a run dropped because another raster opened. */
