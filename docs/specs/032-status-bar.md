@@ -19,6 +19,11 @@
    - Everything else is info.
    - `#message` gets class `error` for errors only. The CSS colours only `.error` red.
 4. The status bar is visible before a raster opens; its raster fields are then blank.
+5. **Save retries** (spec 031 follow-up). When a save of the current raster fails, it is retried after `RETRY_MS` (30 s), as the pending-snapshot path does. New changes still save on the normal 2 s delay.
+   - After a quota error (`QuotaExceededError`), the mask copy is left out of every save until the next import. Tiles and the record are still written.
+   - A restore of such a session then follows spec 031's missing-copy path.
+   - Today a full disk re-streams Chunk 11's 593 MB mask every 2 s without end (`ui/persist.ts:125-130`).
+6. **Discard question.** When labels are open, `MESSAGES.discard` (asked on opening another raster) becomes `Close these labels? They stay saved in this browser.` While a snapshot is pending, spec 031's pendingDiscard question is asked instead.
 
 **Out of scope:** scale bar, pixel band values, any layout change beyond adding the bar (spec 035).
 
@@ -47,4 +52,11 @@
    - Opening shows `#open-progress` inside `#status`.
    - Importing shows `#import-progress` and `#import-cancel` there, and Cancel still cancels (spec 021's criteria pass).
 6. **E2E:** `#status` stays in the viewport at 1280×720 and at 800×600, with the map above it, not under it.
-7. `npm run check` passes.
+7. **Unit, fake store and fake timers:**
+   - A write rejecting with `QuotaExceededError` is next retried at 30 s, not at 2 s, and that retry writes tiles and the record but no mask copy.
+   - Over 5 minutes of failures, `saveBase` is called at most once.
+   - After a new import, the copy is attempted again.
+8. **Unit:**
+   - Opening another raster with labels and nothing pending asks the scope 6 text.
+   - With a snapshot pending, it asks spec 031's question instead.
+9. `npm run check` passes.

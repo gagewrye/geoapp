@@ -17,11 +17,14 @@
    - While the input has focus, every shortcut is ignored (`inTextField`). The `Escape` keydown does not reach spec 033's Pan key.
 4. When locked (spec 004), the rename button and swatch are disabled and double-click does nothing. Selection still works.
 5. The list fills spec 035's Classes section, with no 40vh cap. Selecting a class by key scrolls its row into view (`block: "nearest"`).
+6. **Split** (spec 031 review follow-up). The class-list wiring moves out of `ui/labels.ts` (250 lines) into `ui/classPanel.ts`: the classes array, `selected`, `select`, `render`, rename, recolour and Add class. `labels.ts` keeps the store, brush, paint and undo.
 
 **Out of scope:** reordering, deleting classes, per-class visibility, user-set hotkeys.
 
 ## Interfaces
 - `ui/classList.ts`: `renderClasses` keeps its signature and its `Handlers`. `markSelected` also scrolls the selected row into view.
+- `ui/classPanel.ts`: `initClassPanel({ list, add, say, locked: () => boolean, recoloured: () => void, selectedChanged: () => void })` returns:
+  - `{ classes(): LabelClass[]; selected(): number; select(i): void; replace(list: LabelClass[], selected?: number): void; render(): void }`.
 - No `core/` change.
 
 ## Acceptance criteria
@@ -39,3 +42,5 @@
 5. **E2E:** while renaming, typing `b2e]` puts those characters in the name and changes neither the mode, the class nor the brush size.
 6. **E2E:** with 40 classes, `#classes` is taller than 40vh when the window allows it. Selecting the 9th class by key leaves its row visible.
 7. Spec 003's class criteria (rename, recolour, Add class) pass with the new selectors. `npm run check` passes.
+8. **Unit (classPanel):** `replace` clamps an out-of-range `selected` to 0, recolour calls `recoloured`, and locked blocks rename, recolour and Add.
+   - `ui/labels.ts` no longer imports `renderClasses`, and is under 200 lines.
