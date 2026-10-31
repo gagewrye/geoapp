@@ -1,7 +1,7 @@
 import type { Window } from "./grid";
 import { tileKeys, type LabelStore } from "./labelStore";
 
-/** History plus the stroke in progress stay within this many bytes of tile copies (ADR 0015). */
+/** History, redo stack and unfinished strokes stay within this many bytes of tile copies (ADR 0015, spec 037). */
 export const UNDO_BYTES = 32 * 1024 * 1024;
 export const UNDO_STEPS = 50;
 
@@ -32,14 +32,19 @@ const rowMajor = (a: string, b: string) => {
   return ay - by || ax - bx;
 };
 
-/** Puts each tile back (null deletes it); returns the keys, row-major. */
-export function undoEdit(store: LabelStore, edit: Edit): string[] {
+/** Puts each tile back (null deletes it); returns copies of what it replaced (the inverse) and the keys, row-major. */
+export function swapEdit(store: LabelStore, edit: Edit): { inverse: Edit; keys: string[] } {
+  const inverse: Edit = new Map();
   for (const [key, before] of edit) {
+    inverse.set(key, store.tiles.get(key)?.slice() ?? null);
     if (before) store.tiles.set(key, before);
     else store.tiles.delete(key);
   }
-  return [...edit.keys()].sort(rowMajor);
+  return { inverse, keys: [...edit.keys()].sort(rowMajor) };
 }
+
+/** Puts each tile back (null deletes it); returns the keys, row-major. */
+export const undoEdit = (store: LabelStore, edit: Edit): string[] => swapEdit(store, edit).keys;
 
 /** Sum of the copies' lengths. */
 export function editBytes(edit: Edit): number {
@@ -48,8 +53,13 @@ export function editBytes(edit: Edit): number {
   return n;
 }
 
-/** Drops the oldest entries until the total editBytes <= maxBytes and length <= maxSteps. */
-export function trimHistory(history: Edit[], maxBytes: number, maxSteps: number): void {
-  let total = history.reduce((n, e) => n + editBytes(e), 0);
-  while (history.length && (history.length > maxSteps || total > maxBytes)) total -= editBytes(history.shift()!);
+/**
+ * Drops entries until both stacks' editBytes <= maxBytes and their lengths <= maxSteps: the redo stack's
+ * oldest-undone first (redo[0], the last to be redone), then the history's oldest.
+ */
+export function trimHistory(history: Edit[], maxBytes: number, maxSteps: number, redo: Edit[] = []): void {
+  let total = [...history, ...redo].reduce((n, e) => n + editBytes(e), 0);
+  const over = () => history.length + redo.length > maxSteps || total > maxBytes;
+  while (redo.length && over()) total -= editBytes(redo.shift()!);
+  while (history.length && over()) total -= editBytes(history.shift()!);
 }
