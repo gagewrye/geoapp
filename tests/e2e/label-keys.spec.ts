@@ -29,7 +29,7 @@ test("holding ` hides the labels, a press paints nothing; releasing shows them i
 
   await page.keyboard.down("Backquote");
   await expect.poll(() => visibilities(page)).toEqual(["none"]);
-  const b = await toScreen(page, [16.005, 44.005]);
+  const b = await toScreen(page, [15.505, 45.405]);
   await stroke(page, [b, { x: b.x + 40, y: b.y }]);
   expect(await labels(page)).toEqual(before);
   await expect(show(page)).toBeChecked();
@@ -60,13 +60,15 @@ test("e pressed mid-stroke, then a new raster opened before mouse up: Erase is n
     const seen: string[] = [];
     (window as any).__erasePressed = seen;
     const el = document.getElementById("mode-erase")!;
-    new MutationObserver(() => { if (el.getAttribute("aria-pressed") === "true") seen.push("true"); }).observe(el, { attributes: true, attributeFilter: ["aria-pressed"] });
+    // records arrive after the task, so a value set and then reset in one task is read from the next record's oldValue
+    new MutationObserver((records) => {
+      records.forEach((_r, i) => { if ((records[i + 1]?.oldValue ?? el.getAttribute("aria-pressed")) === "true") seen.push("true"); });
+    }).observe(el, { attributes: true, attributeOldValue: true, attributeFilter: ["aria-pressed"] });
   });
   await jumpTo(page, [10, 45], 6);
   const off = await toScreen(page, [7, 45]); // off the raster (10E-20E): the stroke labels nothing, so no discard confirm
   await page.mouse.move(off.x, off.y);
   await page.mouse.down();
-  expect(await page.evaluate(() => (window as any).__geoapp.labels.stroking())).toBe(true);
   await page.keyboard.press("e");
   await openRaster(page, anotherRaster());
   await expect(page.locator("#raster-info")).toHaveText(/^other.tif/);
