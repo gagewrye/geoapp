@@ -41,6 +41,10 @@ test("another raster opened while mask reads are paused drops the queue: Import 
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
   await paintMode(page);
+  // the view first, and its imagery tiles read, so the gate counts only the stroke's mask read (how many tiles a view
+  // reads depends on the map's size, which spec 032's status bar changed)
+  await jumpTo(page, [15, 45], 7);
+  await page.waitForTimeout(1000);
   await page.evaluate(() => {
     const s = (window as any).__geoapp.imagery();
     const g = (window as any).__gate = { open: null as null | (() => void), reads: 0 };
@@ -51,7 +55,6 @@ test("another raster opened while mask reads are paused drops the queue: Import 
       s[m] = async (...a: unknown[]) => { g.reads++; await wait; return read(...a); };
     }
   });
-  await jumpTo(page, [15, 45], 7);
   const c = await toScreen(page, [15.005, 45.005]);
   await page.mouse.move(c.x, c.y);
   await page.mouse.down();
