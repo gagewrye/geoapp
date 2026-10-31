@@ -14,6 +14,8 @@
 4. The mode is unchanged by a pick.
 5. Holding Alt by itself does nothing. The Alt keyup is `preventDefault`ed while the pointer is over the map, so Firefox's menu bar doesn't take focus.
 
+6. **Carried from spec 037's review** (non-blocking there): `undoEdit` in `core/undo.ts` now copies every tile through `swapEdit` and throws the copies away, and only tests call it. Delete it, and move its tests in `tests/unit/core/undo.test.ts` and `undo.tester.test.ts` to `swapEdit(...).keys`. This replaces spec 037's "`undoEdit` becomes `swapEdit(...).keys`".
+
 **Out of scope:** picking from imagery values, swapping with the last class.
 
 ## Interfaces
@@ -39,3 +41,6 @@
    - Hover the pixel and press `I` with class 1 selected: the same result.
 5. **E2E:** after importing the fixture mask, Alt+click on a mask-only pixel of class 3 selects class 3.
 6. `npm run check` passes.
+7. **Scope 6:**
+   - no file under `src/` or `tests/` names `undoEdit`;
+   - the moved tests expect the same keys as before, and the undo history's tests pass unchanged.
