@@ -193,7 +193,8 @@ test.describe("spec 010 edges (tester)", () => {
     await expect(undoButton(page)).toBeDisabled();
   });
 
-  test("Ctrl+Shift+Z is not redo, and Ctrl+Z with a select focused undoes a stroke", async ({ page }) => {
+  // spec 037 made Ctrl+Shift+Z redo: with nothing undone it changes nothing, and after an undo it puts the stroke back
+  test("Ctrl+Shift+Z with nothing undone changes nothing, and Ctrl+Z and Ctrl+Shift+Z with a select focused undo and redo a stroke", async ({ page }) => {
     await paintSetup(page);
     const c = await toScreen(page, [15.005, 45.005]);
     await stroke(page, [c, { x: c.x + 40, y: c.y }]);
@@ -206,7 +207,7 @@ test.describe("spec 010 edges (tester)", () => {
     await page.keyboard.press("Control+z");
     expect(await snapshot(page)).toEqual([]);
     await page.keyboard.press("Control+Shift+z");
-    expect(await snapshot(page)).toEqual([]);
+    expect(await snapshot(page)).toEqual(painted);
   });
 
   test("undo of a stroke across the raster's partial right and bottom edge tiles restores the store and removes overlays", async ({ page }) => {
