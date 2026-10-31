@@ -28,8 +28,9 @@
 
 ## Interfaces
 - `ui/classList.ts`: `renderClasses` keeps its signature and its `Handlers`. `markSelected` also scrolls the selected row into view.
-- `ui/classPanel.ts`: `initClassPanel({ list, add, say, locked: () => boolean, recoloured: () => void, selectedChanged: () => void })` returns:
+- `ui/classPanel.ts`: `initClassPanel({ list, add, say, locked: () => boolean, recoloured: () => void, selectedChanged: () => void, edited: () => void })` returns:
   - `{ classes(): LabelClass[]; selected(): number; select(i): void; replace(list: LabelClass[], selected?: number): void; render(): void }`.
+  - `edited` runs after a committed rename or an Add, so spec 031's session save (`edits.record`) and the status bar's class name see the change.
 - No `core/` change.
 
 ## Acceptance criteria
