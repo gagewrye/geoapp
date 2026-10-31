@@ -19,15 +19,23 @@ beforeEach(() => {
 });
 afterEach(() => { vi.unstubAllGlobals(); });
 
-function setup(state = { open: true, canPaint: true }) {
+type Mods = { ctrlKey?: boolean; metaKey?: boolean; altKey?: boolean; repeat?: boolean };
+const code = (key: string) => (key === "`" ? "Backquote" : `Key${key.toUpperCase()}`);
+
+function setup(init: { open?: boolean; canPaint?: boolean; stroking?: boolean } = {}) {
+  const state = { open: true, canPaint: true, stroking: false, ...init };
   const modes: BrushMode[] = [];
+  const view: string[] = []; // "toggle", "peek true", "peek false"
   initLabelKeys({
     open: () => state.open, brush: { setSpace() {} }, size: { step() {} }, select() {}, classCount: () => 2,
-    setMode: (m) => { modes.push(m); }, canPaint: () => state.canPaint,
+    setMode: (m) => { modes.push(m); }, canPaint: () => state.canPaint, stroking: () => state.stroking,
+    view: { toggle: () => { view.push("toggle"); }, peek: (on) => { view.push(`peek ${on}`); } },
   });
-  const press = (key: string, mods: { ctrlKey?: boolean; metaKey?: boolean; altKey?: boolean } = {}) =>
-    window.dispatchEvent(Object.assign(new Event("keydown"), { key, code: `Key${key.toUpperCase()}`, ctrlKey: false, metaKey: false, altKey: false, ...mods }));
-  return { modes, press, state };
+  const send = (type: string, key: string, mods: Mods = {}) =>
+    window.dispatchEvent(Object.assign(new Event(type), { key, code: code(key), ctrlKey: false, metaKey: false, altKey: false, repeat: false, ...mods }));
+  const press = (key: string, mods: Mods = {}) => send("keydown", key, mods);
+  const release = (key: string, mods: Mods = {}) => send("keyup", key, mods);
+  return { modes, view, press, release, state };
 }
 
 describe("mode keys", () => {
@@ -49,8 +57,42 @@ describe("mode keys", () => {
   });
 
   it("B and E do nothing while Paint is disabled; P and Escape still select Pan", () => {
-    const { modes, press } = setup({ open: true, canPaint: false });
+    const { modes, press } = setup({ canPaint: false });
     for (const k of ["b", "e", "B", "E", "p", "Escape"]) press(k);
     expect(modes).toEqual(["pan", "pan"]);
+  });
+});
+
+// Spec 034 criteria 1 and 2.
+describe("label visibility keys", () => {
+  it("h toggles once per press; a repeated keydown does nothing", () => {
+    const { view, press, release } = setup();
+    press("h"); release("h");
+    press("h"); press("h", { repeat: true }); release("h");
+    expect(view).toEqual(["toggle", "toggle"]);
+  });
+
+  it("the peek key peeks on keydown and stops on keyup; repeats do nothing; a window blur stops it", () => {
+    const { view, press, release } = setup();
+    press("`"); press("`", { repeat: true }); press("`", { repeat: true });
+    release("`");
+    expect(view).toEqual(["peek true", "peek false"]);
+    press("`");
+    window.dispatchEvent(new Event("blur"));
+    expect(view).toEqual(["peek true", "peek false", "peek true", "peek false"]);
+  });
+
+  it("neither key acts in a text field, with Ctrl held or before open; peek doesn't start during a stroke", () => {
+    const { view, press, release, state } = setup();
+    doc.activeElement = new Input("text");
+    press("h"); press("`"); release("`");
+    doc.activeElement = null;
+    press("h", { ctrlKey: true }); press("`", { ctrlKey: true }); release("`", { ctrlKey: true });
+    state.open = false;
+    press("h"); press("`"); release("`");
+    state.open = true;
+    state.stroking = true;
+    press("`"); release("`");
+    expect(view).toEqual([]);
   });
 });
