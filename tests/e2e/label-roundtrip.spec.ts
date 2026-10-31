@@ -36,7 +36,7 @@ test("export then import restores every tile byte for byte and the class list, w
   const file = await download(page, "#export-labels");
   await expect(message(page)).toHaveText("Labels exported.");
 
-  page.once("dialog", (d) => { expect(d.message()).toBe("Discard labels?"); void d.accept(); });
+  page.once("dialog", (d) => { expect(d.message()).toBe("Close these labels? They stay saved in this browser."); void d.accept(); });
   await openRaster(page, nodataImagery());
   await expect(message(page)).toHaveText("Raster opened.");
   await paintMode(page);
