@@ -3,7 +3,7 @@ import { tileWindows, type Window } from "../../../src/core/grid";
 import { brush, emptyStore, type LabelStore, type NodataMasks } from "../../../src/core/labelStore";
 import { nodataMask } from "../../../src/core/nodata";
 import { TILE_SIZE } from "../../../src/core/types";
-import { UNDO_BYTES, UNDO_STEPS, editBytes, finishEdit, recordTiles, trimHistory, undoEdit, type Edit } from "../../../src/core/undo";
+import { UNDO_BYTES, UNDO_STEPS, editBytes, finishEdit, recordTiles, swapEdit, trimHistory, type Edit } from "../../../src/core/undo";
 import { makeTile } from "../helpers/tiles";
 
 const TILE = TILE_SIZE * TILE_SIZE;
@@ -18,7 +18,7 @@ function masksFor(store: LabelStore, nodata: (c: number, r: number) => boolean =
 const win = (x0: number, y0: number, width: number, height = width): Window => ({ x0, y0, width, height });
 const snapshot = (s: LabelStore) => new Map([...s.tiles].map(([k, t]) => [k, t.slice()]));
 
-describe("recordTiles / finishEdit / undoEdit (spec 010 criterion 1)", () => {
+describe("recordTiles / finishEdit / swapEdit (spec 010 criterion 1)", () => {
   it("undoes a size-7 dab across the corner of a 2x2-tile store", () => {
     const s = emptyStore(512, 512);
     const m = masksFor(s);
@@ -32,7 +32,7 @@ describe("recordTiles / finishEdit / undoEdit (spec 010 criterion 1)", () => {
     expect(s.tiles.has("256,0")).toBe(true); // created by the dab
     const done = finishEdit(s, edit)!;
     expect(done).not.toBeNull();
-    expect(undoEdit(s, done)).toEqual(["0,0", "256,0", "0,256", "256,256"]);
+    expect(swapEdit(s, done).keys).toEqual(["0,0", "256,0", "0,256", "256,256"]);
     expect([...s.tiles.keys()].sort()).toEqual([...before.keys()].sort());
     for (const [k, t] of before) expect(s.tiles.get(k)).toEqual(t);
     expect(s.tiles.has("256,0")).toBe(false);

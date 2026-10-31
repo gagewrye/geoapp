@@ -59,3 +59,73 @@ describe("setBlocked", () => {
     expect(calls).toEqual([false]);
   });
 });
+
+// Spec 038 criterion 2: an Alt+left press picks, in every mode, and starts no stroke.
+describe("Alt+left press picks", () => {
+  function picking(mode: BrushMode) {
+    const { map, pointer } = fakeBrushMap(vi.stubGlobal);
+    const picks: [number, number][] = [], strokes: boolean[] = [], cells: boolean[] = [];
+    const brush = createBrush(map, {
+      side: () => 1, colour: () => "#ff0000", cells: (_c, _s, erase) => { cells.push(erase); }, onStroke: (a) => strokes.push(a),
+      panning: () => false, pick: (cell) => picks.push(cell),
+    });
+    brush.setImagery(BRUSH_GRID);
+    brush.setMode(mode);
+    const canvas = map.getCanvasContainer() as unknown as EventTarget;
+    const altDown = (x: number, y: number) => {
+      const e = Object.assign(new Event("pointerdown"), { pointerType: "mouse", pointerId: 1, button: 0, buttons: 1, clientX: x, clientY: y, altKey: true });
+      canvas.dispatchEvent(e);
+    };
+    /** The mousedown MapLibre would get, through the map container's capture listener; whether the brush stopped it. */
+    const altMouse = (x: number, y: number) => {
+      const e = Object.assign(new Event("mousedown"), { button: 0, clientX: x, clientY: y, altKey: true });
+      Object.defineProperty(e, "target", { value: canvas });
+      let stopped = false;
+      e.stopPropagation = () => { stopped = true; };
+      (map.getContainer() as unknown as EventTarget).dispatchEvent(e);
+      return stopped;
+    };
+    return { brush, pointer, picks, strokes, cells, altDown, altMouse };
+  }
+
+  for (const mode of ["paint", "erase", "pan"] as const) {
+    it(`in ${mode} mode it calls pick with the cell, starts no stroke, and MapLibre gets no mousedown`, () => {
+      const t = picking(mode);
+      t.altDown(10, 12);
+      expect(t.picks).toEqual([[10, 12]]);
+      expect(t.brush.stroking()).toBe(false);
+      expect(t.altMouse(10, 12)).toBe(true);
+      t.pointer("pointerup", 10, 12);
+      expect(t.strokes).toEqual([]);
+      expect(t.cells).toEqual([]);
+    });
+  }
+
+  it("off the raster an Alt press picks nothing, and in Pan mode MapLibre keeps the mousedown", () => {
+    const t = picking("pan");
+    t.altDown(80, 80); // the grid is 50 x 50
+    expect(t.picks).toEqual([]);
+    expect(t.altMouse(80, 80)).toBe(false);
+  });
+
+  it("hoverCell is the raster cell under the last pointer position, or null off the raster", () => {
+    const t = picking("pan");
+    expect(t.brush.hoverCell()).toBeNull();
+    t.pointer("pointermove", 7, 9);
+    expect(t.brush.hoverCell()).toEqual([7, 9]);
+    t.pointer("pointermove", 70, 9);
+    expect(t.brush.hoverCell()).toBeNull();
+  });
+
+  it("an Alt keyup is prevented while the pointer is over the map, not otherwise", () => {
+    const t = picking("paint");
+    const altUp = () => {
+      const e = Object.assign(new Event("keyup", { cancelable: true }), { key: "Alt", code: "AltLeft" });
+      (globalThis.window as unknown as EventTarget).dispatchEvent(e);
+      return e.defaultPrevented;
+    };
+    expect(altUp()).toBe(false);
+    t.pointer("pointermove", 7, 9);
+    expect(altUp()).toBe(true);
+  });
+});
