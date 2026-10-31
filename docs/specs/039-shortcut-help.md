@@ -14,11 +14,16 @@
 4. Every button named by a `button` field gets `title` and `aria-keyshortcuts` from the table, for example `Paint (B)` and `aria-keyshortcuts="B"`.
 5. The keys are ignored in text fields, with Ctrl/Meta/Alt held, as the other shortcuts are. `?` also works before a raster opens.
 
+6. **Carried from spec 038's review** (non-blocking there):
+   - `labels.open()` and `replace()` cancel a pick still reading. Otherwise, after a smaller raster opens, `labelAt` throws an uncaught `RangeError`, and after an import the old value selects from the new class list.
+   - A labelled value above the class count says its own info message, `MESSAGES.noClass(v)` = `No class for value <v>.`, not `No label here.`
+
 **Out of scope:** remapping keys, a first-run tour.
 
 ## Interfaces
 - `ui/shortcuts.ts`: `type Shortcut = { section: string; keys: string[]; action: string; button?: string }` and `SHORTCUTS: readonly Shortcut[]`.
 - `ui/labelKeys.ts`: `KEYMAP: Record<string, string>`, which maps a `KeyboardEvent.key` or `code` to an action id that `SHORTCUTS` also uses.
+- `ui/picker.ts`: `initPicker` returns `{ pick(cell): Promise<void>; cancel(): void }`. `cancel` bumps `latest`, so a pick still reading ends silently, even if its read then fails.
 - No `core/` change.
 
 ## Acceptance criteria
@@ -33,3 +38,6 @@
 4. **E2E:** with `#help` open, pressing `B`, `H` or `]` changes nothing.
 5. **E2E:** with focus in a class-name field, typing `?` puts the character in the name.
 6. `npm run check` passes.
+7. **Unit (picker, scope 6):** a pick whose `tile()` resolves, or rejects, after `cancel()` calls neither `select` nor `say`, with no unhandled rejection. This holds with `dims()` shrunk so that the cell lies outside it.
+8. **Unit (labels, scope 6):** `open()` and `replace()` each call the picker's `cancel` once.
+9. **Unit (picker, scope 6):** with 3 classes, a value of 5 keeps the selection and says `No class for value 5.` (info). A value of 0 still says `No label here.`
