@@ -11,25 +11,26 @@ const G: Grid = { width: 1000, height: 700, epsg: 32633, gt: [500000, 0.1, 0, 40
 const tile = (v: number) => new Uint8Array(256 * 256).fill(v);
 const QUOTA = () => new DOMException("full", "QuotaExceededError");
 
-function setup() {
-  const fake = fakeSessionStore();
+function setup(fake = fakeSessionStore()) {
   let store: LabelStore = emptyStore(G.width, G.height);
+  let base: unknown = null;
+  const opens: Blob[] = [];
   const classes: LabelClass[] = [{ name: "Class 1", colour: "#1f77b4" }];
   const prompts: string[] = [], answers: boolean[] = [];
   const labels: PersistLabels = {
-    store: () => store, classes: () => classes, selected: () => 0, view: () => ({ opacity: 0.6, visible: true }), base: () => null,
-    stroking: () => false, hasLabels: () => store.tiles.size > 0, restoreSession(s) { store = s; },
+    store: () => store, classes: () => classes, selected: () => 0, view: () => ({ opacity: 0.6, visible: true }), base: () => base as never,
+    stroking: () => false, hasLabels: () => store.tiles.size > 0 || base !== null, restoreSession(s) { store = s; },
   };
   const classes2 = new Set<string>();
   const state = { textContent: "" as string | null, classList: { toggle: (c: string, on: boolean) => { if (on) classes2.add(c); else classes2.delete(c); } } };
   const p = initPersist({ labels, open: async () => fake.store, state, win: new EventTarget(), doc: Object.assign(new EventTarget(), { visibilityState: "visible" }),
-    yieldTask: async () => {}, time: () => "12:00", confirm: (t) => { prompts.push(t); return answers.shift() ?? true; } });
+    yieldTask: async () => {}, time: () => "12:00", openBase: async (blob) => { opens.push(blob); throw new Error("opened a copy"); }, confirm: (t) => { prompts.push(t); return answers.shift() ?? true; } });
   // saveBase counted, failing with quota while `full`
   const copy = { calls: 0, full: true };
   const saveBase = fake.store.saveBase.bind(fake.store);
   fake.store.saveBase = async (k, f) => { copy.calls++; if (copy.full) throw QUOTA(); return saveBase(k, f); };
   const paint = (k: string, v: number) => { store.tiles.set(k, tile(v)); p.tiles([k]); };
-  return { fake, p, prompts, answers, state, stateClasses: classes2, copy, paint, emptyStore: () => { store = emptyStore(G.width, G.height); } };
+  return { fake, p, prompts, answers, state, stateClasses: classes2, copy, paint, emptyStore: () => { store = emptyStore(G.width, G.height); }, setBase: (b: unknown) => { base = b; }, store: () => store, opens };
 }
 
 beforeEach(() => { vi.useFakeTimers(); });
@@ -74,6 +75,38 @@ describe("save retries (criterion 7)", () => {
     await vi.advanceTimersByTimeAsync(SAVE_DELAY_MS); await t.p.idle();
     expect(t.copy.calls).toBe(2);
     expect(t.fake.bases.size).toBe(1);
+  });
+});
+
+describe("a record saved without its import's copy (criterion 7)", () => {
+  it("import A copied, then import B whose copy fails on quota: a restore brings back B's tiles, never opens A's copy, and asks for the mask", async () => {
+    const t = setup();
+    t.copy.full = false;
+    t.p.open("a.tif", 1, G); await t.p.offer();
+    const base = (count: number) => ({ lut: new Uint8Array(4), count, windows: new Set(["0,0"]), preview: { values: new Uint8Array(4) } });
+    t.setBase(base(5));
+    t.p.replaced(); t.p.imported(new Blob(["mask A"]));
+    await vi.advanceTimersByTimeAsync(SAVE_DELAY_MS); await t.p.idle();
+    expect(t.copy.calls).toBe(1);
+    // import B: its own tiles, its copy refused
+    t.copy.full = true;
+    t.emptyStore();
+    t.paint("512,256", 3);
+    t.setBase(base(9));
+    t.p.replaced(); t.p.imported(new Blob(["mask B"]));
+    await vi.advanceTimersByTimeAsync(SAVE_DELAY_MS); await t.p.idle();
+    await vi.advanceTimersByTimeAsync(RETRY_MS); await t.p.idle();
+    const r = [...t.fake.records.values()][0]!;
+    expect(r.base!.count).toBe(9);
+    expect(r.base!.copyMissing).toBe(true);
+    expect(t.fake.bases.size).toBe(0); // the stale copy of A is deleted when space allows
+
+    const b = setup(t.fake);
+    b.p.open("a.tif", 1, G);
+    t.fake.bases.set(r.key, new Blob(["mask A"])); // even with A's copy still there
+    expect(await b.p.offer()).toBe(MESSAGES.restoredNoMask);
+    expect(b.opens).toEqual([]);
+    expect([...b.store().tiles.keys()]).toEqual(["512,256"]);
   });
 });
 

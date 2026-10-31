@@ -60,11 +60,16 @@ type Session = {
   tiles: Set<string>; record: boolean; clear: boolean; file: Blob | null;
   /** A save hit the quota (spec 032 scope 5): the mask copy is left out until the next import. */
   noCopy: boolean;
+  /** The current import's mask copy is written (true too with no import since open or restore). */
+  copied: boolean;
 };
 
 /** A previous raster's snapshot whose write failed (scope 8): kept and written before anything else. */
 type Pending = { s: Session; snap: Snapshot; reason: string };
 
+/** A snapshot whose mask copy is left out: its record says the copy is missing. */
+const withoutCopy = (p: Snapshot): Snapshot =>
+  p.file ? { ...p, file: null, record: { ...p.record, base: p.record.base && { ...p.record.base, copyMissing: true } } } : p;
 const isQuota = (e: unknown) => e instanceof DOMException && e.name === "QuotaExceededError";
 const reasonOf = (e: unknown) => isQuota(e) ? "the browser's storage is full" : e instanceof Error && e.message ? e.message : String(e);
 
@@ -109,11 +114,14 @@ export function initPersist(d: Deps) {
     if (!s.ready || !unsaved(s)) return null;
     const store = labels.store(), base = labels.base(), view = labels.view();
     const tiles = [...s.tiles].map((k): [string, ArrayBuffer | null] => [k, store.tiles.get(k)?.slice().buffer ?? null]);
-    const record = {
+    const record: Omit<SessionRecord, "savedAt"> = {
       key: s.key, name: s.name, classes: labels.classes().map((c) => ({ ...c })), selected: labels.selected(), ...view,
       base: base && { lut: base.lut.slice(), count: base.count, windows: [...base.windows], values: base.preview.values.slice() },
     };
-    const snap = { key: s.key, tiles, clear: s.clear, file: s.noCopy ? null : s.file, record, labelled: labels.hasLabels() };
+    const file = s.noCopy ? null : s.file;
+    // a record saved without this import's copy says so: a restore must not open an older import's copy (spec 032)
+    if (record.base && !s.copied && !file) record.base.copyMissing = true;
+    const snap = { key: s.key, tiles, clear: s.clear, file, record, labelled: labels.hasLabels() };
     s.tiles = new Set(); s.record = false; s.clear = false; s.file = null;
     return snap;
   }
@@ -122,6 +130,7 @@ export function initPersist(d: Deps) {
     const sessions = await store();
     if (!persisted) { persisted = true; d.persistStorage?.(); }
     s.owned = await writeSnapshot(sessions, snap, s.owned, now, yieldTask);
+    if (snap.file) s.copied = true;
   }
 
   const retryLater = () => { retry ??= setTimeout(() => { retry = null; save(false); }, RETRY_MS); };
@@ -139,7 +148,7 @@ export function initPersist(d: Deps) {
       s.record = true; s.clear ||= snap.clear; s.file ??= snap.file;
     } else {
       const merged = pending?.s === s ? mergeSnapshots(pending.snap, snap) : snap;
-      pending = { s, snap: quota ? { ...merged, file: null } : merged, reason: reasonOf(e) };
+      pending = { s, snap: quota ? withoutCopy(merged) : merged, reason: reasonOf(e) };
     }
     retryLater();
   }
@@ -155,7 +164,7 @@ export function initPersist(d: Deps) {
           await write(p.s, p.snap);
           if (pending === p) pending = null;
         } catch (e) {
-          if (pending === p) { p.reason = reasonOf(e); if (isQuota(e)) p.snap = { ...p.snap, file: null }; }
+          if (pending === p) { p.reason = reasonOf(e); if (isQuota(e)) p.snap = withoutCopy(p.snap); }
           if (s && snap) lost(s, snap, e);
           retryLater();
           return reasonOf(e);
@@ -198,7 +207,7 @@ export function initPersist(d: Deps) {
       }
       if (current) save(true);
       const key = rasterKey(size, grid);
-      const s: Session = { key, name, grid, lookup: Promise.resolve(null), settled: false, found: false, ready: false, owned: false, tiles: new Set(), record: false, clear: false, file: null, noCopy: false };
+      const s: Session = { key, name, grid, lookup: Promise.resolve(null), settled: false, found: false, ready: false, owned: false, tiles: new Set(), record: false, clear: false, file: null, noCopy: false, copied: true };
       // a failed lookup counts as no session
       s.lookup = store().then((db) => db.get(key)).catch(() => null).then((r) => { s.settled = true; s.found = r !== null; return r; });
       current = s;
@@ -264,6 +273,7 @@ export function initPersist(d: Deps) {
       if (!current) return;
       current.file = file;
       current.noCopy = false; // a new import tries the copy again
+      current.copied = false;
       changed();
     },
     /** The saves started so far have ended (tests). */

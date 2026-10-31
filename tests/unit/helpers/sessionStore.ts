@@ -26,6 +26,7 @@ export function fakeSessionStore() {
     async list() { return [...records.values()].map(({ key, savedAt }) => ({ key, savedAt })); },
     async saveBase(key, file) { check(); log.push("saveBase"); bases.set(key, file); },
     async base(key) { return bases.get(key) ?? null; },
+    async deleteBase(key) { log.push("deleteBase"); bases.delete(key); },
   };
   return { store, records, tiles, bases, log, failWith: (e: Error | null) => { fail = e; } };
 }

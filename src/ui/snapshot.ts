@@ -46,6 +46,8 @@ export async function writeSnapshot(sessions: SessionStore, p: Snapshot, owned: 
     await yieldTask();
   }
   await sessions.putRecord({ ...p.record, savedAt: now() });
+  // the record already says the copy is missing; an older import's copy goes too, if the disk lets it
+  if (p.record.base?.copyMissing) await sessions.deleteBase(p.key).catch(() => {});
   for (const k of evict(await sessions.list(), MAX_SESSIONS)) await sessions.delete(k);
   return true;
 }
@@ -60,7 +62,8 @@ export async function loadSession(sessions: SessionStore, r: SessionRecord, grid
     after = batch[batch.length - 1]![0];
   }
   let base: MaskBase | null = null, missing = false;
-  if (r.base) {
+  if (r.base?.copyMissing) missing = true;
+  else if (r.base) {
     try {
       const blob = await sessions.base(r.key);
       if (!blob) throw new Error("no mask copy");
