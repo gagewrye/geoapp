@@ -60,3 +60,18 @@ describe("labelView peek and toggle", () => {
     expect(visible).toEqual([false, true]);
   });
 });
+
+// Spec 035 criterion 9.
+describe("peek's result", () => {
+  it("peek(true) is true with labels shown and false hidden; peek(false) is true only after a started peek", () => {
+    const view = initLabelView(map, () => {});
+    expect(view.peek(false)).toBe(false);
+    expect(view.peek(true)).toBe(true);
+    expect(view.peek(true)).toBe(false);
+    expect(view.peek(false)).toBe(true);
+    expect(view.peek(false)).toBe(false);
+    view.set(0.6, false);
+    expect(view.peek(true)).toBe(false);
+    expect(view.peek(false)).toBe(false);
+  });
+});

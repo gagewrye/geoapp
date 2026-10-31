@@ -22,14 +22,14 @@ afterEach(() => { vi.unstubAllGlobals(); });
 type Mods = { ctrlKey?: boolean; metaKey?: boolean; altKey?: boolean; repeat?: boolean };
 const code = (key: string) => (key === "`" ? "Backquote" : `Key${key.toUpperCase()}`);
 
-function setup(init: { open?: boolean; canPaint?: boolean; stroking?: boolean } = {}) {
-  const state = { open: true, canPaint: true, stroking: false, ...init };
+function setup(init: { open?: boolean; canPaint?: boolean; stroking?: boolean; peeks?: boolean } = {}) {
+  const state = { open: true, canPaint: true, stroking: false, peeks: true, ...init };
   const modes: BrushMode[] = [];
   const view: string[] = []; // "toggle", "peek true", "peek false"
   initLabelKeys({
     open: () => state.open, brush: { setSpace() {} }, size: { step() {} }, select() {}, classCount: () => 2,
     setMode: (m) => { modes.push(m); }, canPaint: () => state.canPaint, stroking: () => state.stroking,
-    view: { toggle: () => { view.push("toggle"); }, peek: (on) => { view.push(`peek ${on}`); } },
+    view: { toggle: () => { view.push("toggle"); }, peek: (on) => { view.push(`peek ${on}`); return on ? state.peeks : true; } },
   });
   const send = (type: string, key: string, mods: Mods = {}) =>
     window.dispatchEvent(Object.assign(new Event(type), { key, code: code(key), ctrlKey: false, metaKey: false, altKey: false, repeat: false, ...mods }));
@@ -94,5 +94,22 @@ describe("label visibility keys", () => {
     state.stroking = true;
     press("`"); release("`");
     expect(view).toEqual([]);
+  });
+});
+
+// Spec 035 criterion 8: only a peek that started ends.
+describe("peek start", () => {
+  it("when peek(true) starts none, neither the keyup nor a blur calls peek(false)", () => {
+    const { view, press, release } = setup({ peeks: false });
+    press("`"); release("`");
+    press("`"); window.dispatchEvent(new Event("blur"));
+    expect(view).toEqual(["peek true", "peek true"]);
+  });
+
+  it("when peek(true) starts one, the keyup calls peek(false) once", () => {
+    const { view, press, release } = setup();
+    press("`"); release("`"); release("`");
+    window.dispatchEvent(new Event("blur"));
+    expect(view).toEqual(["peek true", "peek false"]);
   });
 });
