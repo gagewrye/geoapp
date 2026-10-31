@@ -2,8 +2,8 @@ import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  // shelf/ holds code kept out of the app and out of check (ADR 0017)
-  { ignores: ["dist/", "node_modules/", "test-results/", "playwright-report/", "shelf/"] },
+  // shelf/ holds code kept out of the app and out of check (ADR 0017); .vite/ is an agent worktree's Vite cache (spec 031)
+  { ignores: ["dist/", "node_modules/", "test-results/", "playwright-report/", "shelf/", ".vite/"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   { rules: { "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }] } },
