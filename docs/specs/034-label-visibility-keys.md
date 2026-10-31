@@ -16,6 +16,10 @@
    - peeking does nothing while a stroke is in progress, or while labels are already hidden.
 3. Both keys are ignored while a text field has focus, while Ctrl, Meta or Alt is held, or before a raster opens.
 4. Peeking changes only the layers' visibility, not their opacity. Releasing restores the exact previous opacity.
+5. **Carried from spec 033's review** (same code, non-blocking there):
+   - `labels.open()` calls `keyed.clear()` before `brush.setImagery`, so a mode key queued mid-stroke never applies when a new raster ends that stroke;
+   - an e2e step covers `onStroke(false)` applying a queued mode key;
+   - the `deferMode` unit tests move from `tests/unit/map/brush.test.ts` to `tests/unit/ui/deferMode.test.ts`, so `tests/` mirrors `src/`.
 
 **Out of scope:** "show selected class only", contour display.
 
@@ -42,4 +46,7 @@
    - A left press on the map changes no tile.
    - Release: visible again, still Paint mode, and a stroke paints.
 5. **E2E:** pressing `H` hides the labels, unchecks `#show-labels` and selects Pan. Pressing it again shows them.
-6. `npm run check` passes.
+6. **E2E (scope 5):** in Paint mode, mouse down on the map, press `e`, then open a new raster before mouse up. `#mode-erase` is never `aria-pressed="true"` (a MutationObserver records none), and afterwards Pan is pressed.
+7. **E2E (scope 5):** in Paint mode, mouse down on the map and press `p`: Paint stays pressed. Mouse up: Pan is pressed.
+8. **Scope 5:** `tests/unit/ui/deferMode.test.ts` holds the `deferMode` tests, and `tests/unit/map/brush.test.ts` no longer imports `deferMode`.
+9. `npm run check` passes.
