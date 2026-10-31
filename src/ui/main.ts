@@ -56,7 +56,9 @@ map.on("load", () => {
   // rasterFile: set by a test to see (and wrap the reads of) each opened raster before its preview is built; fullRes: spec 020's block limit, which a test may lower before an open.
   // Spec 023: masksDone() says every valid mask is read; a test may set sweep = false (one op per stroke cell), paintOp to see each op,
   // and pauseMasks = true to hold the background mask reads, so strokes wait on reads it gates.
-  const hook = { map, imagery: () => source ?? null, labelFile: null, rasterFile: null, fullRes: fullRes.limits, masksDone: labels.masksDone, sweep: true, paintOp: null, pauseMasks: false };
+  // Spec 031: persistTiles(keys) marks stored tiles a test or perf run set through the hook as changed.
+  const hook = { map, imagery: () => source ?? null, labelFile: null, rasterFile: null, fullRes: fullRes.limits, masksDone: labels.masksDone, sweep: true, paintOp: null, pauseMasks: false,
+    persistTiles: (keys: string[]) => persist.tiles(keys) };
   Object.defineProperty(hook, "labels", { get: () => ({ store: labels.store(), classes: labels.classes(), tile: labels.tile }) });
   (window as unknown as Record<string, unknown>).__geoapp = hook;
   $("map").dataset.ready = "true";
