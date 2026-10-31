@@ -20,7 +20,7 @@ describe("SHORTCUTS and KEYMAP", () => {
   it("lists scope 1's keys in the six sections", () => {
     const keys = SHORTCUTS.flatMap((s) => s.keys);
     for (const k of ["1", "9", "[", "]", "Space", "KeyW", "KeyA", "KeyS", "KeyD", "Ctrl+Z", "Ctrl+Shift+Z", "Ctrl+Y", "b", "e", "p", "Escape", "h",
-      "Backquote", "Backslash", "Home", "i", "Alt+click", "Right drag", "Middle drag", "Wheel", "?"]) expect(keys, k).toContain(k);
+      "Backquote", "Backslash", "Home", "i", "Alt+click", "Right drag", "Middle drag", "Mouse wheel", "?"]) expect(keys, k).toContain(k);
     expect([...new Set(SHORTCUTS.map((s) => s.section))]).toEqual(["Tools", "Brush", "Classes", "View", "Navigation", "Edit"]);
     expect(SHORTCUTS.length).toBeGreaterThanOrEqual(19);
   });
