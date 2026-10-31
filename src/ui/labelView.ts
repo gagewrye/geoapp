@@ -3,14 +3,16 @@ import { applyLabelView, DEFAULT_LABEL_OPACITY } from "../map/layers";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
-/** The Opacity slider and Show labels checkbox (spec 016). They change how labels show, never the labels, so no lock disables them. */
+/** The Opacity slider and Show labels checkbox (spec 016), and the peek (spec 034). They change how labels show, never the labels, so no lock disables them. */
 export function initLabelView(map: MapLibreMap, onVisible: (visible: boolean) => void, onChange: () => void = () => {}) {
   const range = $<HTMLInputElement>("label-opacity"), text = $("label-opacity-text"), show = $<HTMLInputElement>("show-labels");
 
+  let peeking = false; // a held peek key hides the layers only: the checkbox and the saved view stay (spec 034)
   const showText = () => { text.textContent = `Opacity: ${range.value}%`; };
+  const layers = () => applyLabelView(map, { opacity: Number(range.value) / 100, visible: show.checked && !peeking });
   const apply = () => {
     showText();
-    applyLabelView(map, { opacity: Number(range.value) / 100, visible: show.checked });
+    layers();
     onChange();
   };
   // Only a visibility change reports, so dragging the slider while hidden doesn't select Pan on every event
@@ -24,6 +26,15 @@ export function initLabelView(map: MapLibreMap, onVisible: (visible: boolean) =>
   show.addEventListener("change", toggled);
 
   return {
+    /** Toggle Show labels, as a click on it does (spec 034's H). */
+    toggle(): void { show.checked = !show.checked; toggled(); },
+    /** Hide the layers while on, leaving the checkbox alone; a peek doesn't start while the labels are hidden already. */
+    peek(on: boolean): void {
+      if (on === peeking || (on && !show.checked)) return;
+      peeking = on;
+      layers();
+    },
+    peeking: () => peeking,
     /** Check Show labels if it isn't. */
     show(): void {
       if (!show.checked) { show.checked = true; toggled(); }
