@@ -46,7 +46,7 @@ test("while Export writes, strokes and class edits are refused, so the file hold
   // header written, tile 0,0 waiting: tile 512,512 hasn't been read for the file yet.
   // Class edits are off (selecting still works), and erasing or painting over the stroke changes nothing.
   await expect(page.locator("#class-add")).toBeDisabled();
-  for (const sel of ["#classes .class-name", "#classes .class-colour"]) {
+  for (const sel of ["#classes .class-rename", "#classes .class-colour"]) {
     const n = await page.locator(sel).count();
     for (let i = 0; i < n; i++) await expect(page.locator(sel).nth(i)).toBeDisabled();
   }

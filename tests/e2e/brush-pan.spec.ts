@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { hoverFeatures, jumpTo, labels, message, moveTo, openApp, openRaster, paintMode, rgbFixture, settled, stroke, toScreen, toucher, view } from "./helpers";
+import { editName, hoverFeatures, jumpTo, labels, message, moveTo, openApp, openRaster, paintMode, rgbFixture, settled, stroke, toScreen, toucher, view } from "./helpers";
 
 // Spec 003 criterion 12: pan and zoom alongside the brush.
 
@@ -68,8 +68,7 @@ test.describe("pan and zoom (criterion 12)", () => {
 
   test("Space on a focused form control does its native action, not Pan; on the map it pans", async ({ page }) => {
     const c = await setup(page);
-    await page.locator("#classes .class-name").first().focus();
-    await expect(page.locator("#classes .class-name").first()).toBeFocused();
+    await editName(page, 0);
     await page.keyboard.down("Space");
     expect(await spacePan(page)).toBe(false); // held in a class name field, Space isn't Pan
     await page.keyboard.up("Space");
@@ -158,7 +157,7 @@ test.describe("pan and zoom (criterion 12)", () => {
     await stroke(page, [c, { x: c.x + 60, y: c.y }], "right");
     expect(await count(page)).toBe(0);
     await paintHandlers(page);
-    await page.locator("#classes .class-name").first().focus();
+    await editName(page, 0);
     await page.keyboard.down("Space");
     expect(await spacePan(page)).toBe(false);
     await page.keyboard.up("Space");

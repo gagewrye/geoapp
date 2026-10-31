@@ -240,9 +240,17 @@ export const hoverFeatures = (page: Page): Promise<any[]> => page.evaluate(async
 /** Choose the class at a 0-based index by clicking its row. */
 export const selectClass = (page: Page, i: number) => page.locator("#classes li").nth(i).click({ position: { x: 4, y: 4 } });
 
+/** Opens class i's rename field with its button (spec 036) and returns the field, focused. */
+export async function editName(page: Page, i: number) {
+  await page.locator("#classes li").nth(i).locator(".class-rename").click();
+  const field = page.locator("#classes .class-name-edit");
+  await expect(field).toBeFocused();
+  return field;
+}
+
 /** Rename class i in the class list (Enter commits). */
 export async function renameClass(page: Page, i: number, name: string): Promise<void> {
-  const field = page.locator("#classes .class-name").nth(i);
+  const field = await editName(page, i);
   await field.fill(name);
   await field.press("Enter");
 }

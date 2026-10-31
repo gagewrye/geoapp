@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { jumpTo, message, openApp, openRaster, paintMode, rgbFixture, stroke, tiff, toScreen } from "./helpers";
+import { editName, jumpTo, message, openApp, openRaster, paintMode, rgbFixture, stroke, tiff, toScreen } from "./helpers";
 
 // Tester pass 4: spec 003 Strokes / criterion 10. contextmenu is prevented on the map while local
 // imagery is open, in every mode, and never on any panel element, whether opened by mouse,
@@ -75,7 +75,7 @@ test.describe("contextmenu on every map and panel element (criterion 10, tester 
     expect(got).toEqual(targets.flatMap(() => [[true, true], [false, false]]));
   });
 
-  test("a keyboard contextmenu (Shift+F10) on a focused class name field isn't prevented", async ({ page }) => {
+  test("a keyboard contextmenu (Shift+F10) on a focused class rename field isn't prevented", async ({ page }) => {
     await open(page);
     const c = await toScreen(page, [15.005, 45.005]);
     await stroke(page, [c, { x: c.x + 40, y: c.y }]);
@@ -84,10 +84,10 @@ test.describe("contextmenu on every map and panel element (criterion 10, tester 
       const g = (window as any).__menus = [] as unknown[];
       window.addEventListener("contextmenu", (e) => g.push([(e.target as Element).className, e.defaultPrevented]));
     });
-    await page.locator("#classes .class-name").first().focus();
+    await editName(page, 0);
     await page.keyboard.press("Shift+F10");
     const got = await page.evaluate(() => (window as any).__menus as [string, boolean][]);
     test.skip(got.length === 0, "this Chromium fires no contextmenu for Shift+F10");
-    expect(got).toEqual([["class-name", false]]);
+    expect(got).toEqual([["class-name-edit", false]]);
   });
 });

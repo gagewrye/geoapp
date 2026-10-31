@@ -11,7 +11,7 @@ async function reopen(page: Page) {
   await openRaster(page, { ...rgbFixture(), name: "other.tif" });
   await expect(message(page)).toHaveText("Raster opened.");
   await expect(page.locator("#import-labels")).toBeEnabled(); // the new raster's controls are free at once
-  await expect(page.locator("#classes .class-name").first()).toBeEnabled();
+  await expect(page.locator("#classes .class-rename").first()).toBeEnabled();
 }
 async function expectDropped(page: Page, list: unknown) {
   await page.waitForTimeout(500);

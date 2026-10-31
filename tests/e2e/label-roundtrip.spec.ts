@@ -51,5 +51,5 @@ test("export then import restores every tile byte for byte and the class list, w
   for (const [k, t] of tiles) expect(Buffer.from(back.get(k)!).equals(Buffer.from(t)), k).toBe(true);
   expectNoNodata(back, 1000, inNodata);
   expect(await classList(page)).toEqual(list);
-  await expect(page.locator("#classes .class-name").nth(1)).toHaveValue("Mangrove & <salt>");
+  await expect(page.locator("#classes .class-name").nth(1)).toHaveText("Mangrove & <salt>");
 });

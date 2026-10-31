@@ -20,17 +20,18 @@ test("while an export holds the Save dialog, a forced rename or recolour changes
   const before = await classList(page);
   await page.click("#export-labels");
   await expect.poll(() => page.evaluate(() => (window as any).__save.opened)).toBe(1);
-  await expect(page.locator("#classes .class-name").first()).toBeDisabled();
+  await expect(page.locator("#classes .class-rename").first()).toBeDisabled();
   await page.evaluate(() => {
-    const name = document.querySelector<HTMLInputElement>("#classes .class-name")!;
-    name.value = "renamed";
-    name.dispatchEvent(new Event("change"));
+    // locked, neither a double-click nor a forced rename click opens a name field (spec 036)
+    document.querySelector("#classes .class-name")!.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    document.querySelector<HTMLButtonElement>("#classes .class-rename")!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     const colour = document.querySelector<HTMLInputElement>("#classes .class-colour")!;
     colour.value = "#123456";
     colour.dispatchEvent(new Event("input"));
   });
   expect(await classList(page)).toEqual(before);
-  await expect(page.locator("#classes .class-name").first()).toHaveValue(before[0]!.name);
+  await expect(page.locator("#classes .class-name-edit")).toHaveCount(0);
+  await expect(page.locator("#classes .class-name").first()).toHaveText(before[0]!.name);
   await page.evaluate(() => (window as any).__save.cancel());
-  await expect(page.locator("#classes .class-name").first()).toBeEnabled();
+  await expect(page.locator("#classes .class-rename").first()).toBeEnabled();
 });

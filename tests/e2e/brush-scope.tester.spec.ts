@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
-import { hoverFeatures, jumpTo, labels, message, openApp, openRaster, paintMode, renameClass, rgbFixture, stroke, tiff, toScreen } from "./helpers";
+import { editName, hoverFeatures, jumpTo, labels, message, openApp, openRaster, paintMode, renameClass, rgbFixture, stroke, tiff, toScreen } from "./helpers";
 
 import { holdMasks } from "./seeding";
 // Tester: spec 003 Local imagery (refused files keep the labels), the paint queue when another raster
@@ -89,7 +89,7 @@ test.describe("classes and shortcuts (tester)", () => {
     await expect(message(page)).toHaveText(MESSAGES.className);
     await renameClass(page, 1, "Class 3");
     await page.click("#class-add");
-    const names = () => page.locator("#classes .class-name").evaluateAll((els) => els.map((e) => (e as HTMLInputElement).value));
+    const names = () => page.locator("#classes .class-name").evaluateAll((els) => els.map((e) => e.textContent));
     expect(await names()).toEqual(["Class 1", "Class 3", "Class 4"]);
     await renameClass(page, 0, "  water ");
     expect(await names()).toEqual(["water", "Class 3", "Class 4"]);
@@ -105,8 +105,7 @@ test.describe("classes and shortcuts (tester)", () => {
     await expect(message(page)).toHaveText("Raster opened.");
     await paintMode(page);
     await jumpTo(page, [15, 45], 7);
-    const field = page.locator("#classes .class-name").first();
-    await field.click();
+    const field = await editName(page, 0);
     await field.press("End");
     await page.keyboard.down("Space");
     await expect(field).toHaveValue("Class 1 ");
