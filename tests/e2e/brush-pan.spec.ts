@@ -106,7 +106,7 @@ test.describe("pan and zoom (criterion 12)", () => {
     await page.click("#brush-larger");
     await expect(page.locator("#brush-larger")).toBeFocused();
     const s1 = await size.textContent();
-    expect(s1).not.toBe("Brush: 7 px");
+    expect(s1).not.toBe("7");
     const v0 = await view(page);
     await page.mouse.move(c.x, c.y);
     await page.keyboard.down("Space");
@@ -132,7 +132,7 @@ test.describe("pan and zoom (criterion 12)", () => {
     expect(await prevented(page)).toEqual([true]);
 
     await page.click("#brush-smaller");
-    await expect(size).toHaveText("Brush: 7 px");
+    await expect(size).toHaveText("7");
     await page.keyboard.press("Tab");
     await expect(page.locator("#brush-larger")).toBeFocused();
     await prevented(page);

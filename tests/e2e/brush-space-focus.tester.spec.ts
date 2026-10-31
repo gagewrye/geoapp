@@ -36,12 +36,12 @@ test.describe("Space and focus (F6, tester)", () => {
     await setup(page);
     await page.click("#brush-larger");
     await page.click("#brush-larger");
-    await expect(size(page)).toHaveText("Brush: 31 px");
+    await expect(size(page)).toHaveText("31");
     await page.keyboard.press("Shift+Tab");
     await expect(page.locator("#brush-smaller")).toBeFocused();
     await prevented(page);
     expect(await holdSpace(page)).toBe(false);
-    await expect(size(page)).toHaveText("Brush: 15 px");
+    await expect(size(page)).toHaveText("15");
     expect(await prevented(page)).toEqual([false]);
   });
 
@@ -49,7 +49,7 @@ test.describe("Space and focus (F6, tester)", () => {
     await setup(page);
     await page.click("#mode-pan"); // mouse-focused
     await expect(page.locator("#mode-pan")).toHaveAttribute("aria-pressed", "true");
-    await page.keyboard.press("Shift+Tab");
+    await page.keyboard.press("Tab"); // the strip's order is Pan, Paint, Erase (spec 035)
     await expect(page.locator("#mode-paint")).toBeFocused();
     await prevented(page);
     await page.keyboard.press("Space"); // in Pan mode MapLibre's handlers are on anyway, so watch the default
@@ -61,7 +61,7 @@ test.describe("Space and focus (F6, tester)", () => {
     await page.keyboard.press("Tab");
     await expect(page.locator("#brush-larger")).toBeFocused();
     expect(await holdSpace(page)).toBe(false);
-    await expect(size(page)).toHaveText("Brush: 15 px");
+    await expect(size(page)).toHaveText("15");
     // a mouse click on the map (focus leaves the panel), then keyboard back to the button
     const c = await toScreen(page, [15.005, 45.005]);
     await stroke(page, [c, { x: c.x + 5, y: c.y }]);
@@ -69,7 +69,7 @@ test.describe("Space and focus (F6, tester)", () => {
     await page.keyboard.press("Tab");
     await expect(page.locator("#brush-larger")).toBeFocused();
     expect(await holdSpace(page)).toBe(false);
-    await expect(size(page)).toHaveText("Brush: 15 px");
+    await expect(size(page)).toHaveText("15");
   });
 
   test("a touch tap and a pen tap on the larger-brush button leave Space as Pan, like a mouse click", async ({ page }) => {
@@ -80,11 +80,11 @@ test.describe("Space and focus (F6, tester)", () => {
     const touch = toucher(cdp);
     await touch("touchStart", [[1, p]]);
     await touch("touchEnd");
-    await expect(size(page)).toHaveText("Brush: 15 px");
+    await expect(size(page)).toHaveText("15");
     await expect(page.locator("#brush-larger")).toBeFocused();
     await prevented(page);
     expect(await holdSpace(page)).toBe(true);
-    await expect(size(page)).toHaveText("Brush: 15 px");
+    await expect(size(page)).toHaveText("15");
     expect(await prevented(page)).toEqual([true]);
 
     await page.keyboard.press("Tab"); // keyboard-focused somewhere else, then a pen tap back
@@ -92,10 +92,10 @@ test.describe("Space and focus (F6, tester)", () => {
     await pen("mouseMoved", p, false);
     await pen("mousePressed", p, true);
     await pen("mouseReleased", p, false);
-    await expect(size(page)).toHaveText("Brush: 31 px");
+    await expect(size(page)).toHaveText("31");
     await expect(page.locator("#brush-larger")).toBeFocused();
     expect(await holdSpace(page)).toBe(true);
-    await expect(size(page)).toHaveText("Brush: 31 px");
+    await expect(size(page)).toHaveText("31");
     expect(await prevented(page)).toEqual([true]);
     expect((await labels(page)).size).toBe(0);
   });
@@ -149,7 +149,7 @@ test.describe("Space and focus (F6, tester)", () => {
     await expect(page.locator("#brush-larger")).toBeFocused();
     await prevented(page);
     expect(await holdSpace(page)).toBe(false);
-    await expect(size(page)).toHaveText("Brush: 7 px");
+    await expect(size(page)).toHaveText("7");
     expect(await prevented(page)).toEqual([false]);
     await other.close();
   });

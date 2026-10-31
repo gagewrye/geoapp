@@ -70,7 +70,7 @@ test("a painted pixel's colour edges fall on the imagery's pixel edges (criterio
   await openRaster(page, checkerboard());
   await expect(message(page)).toHaveText("Raster opened.");
   await paintMode(page);
-  while ((await page.locator("#brush-size").textContent()) !== "Brush: 1 px") await page.click("#brush-smaller");
+  while ((await page.locator("#brush-size").textContent()) !== "1") await page.click("#brush-smaller");
   const [c, r] = [600, 400];
   await zoomTo(page, CHECK_GT, c + 0.5, r + 0.5, 12);
   const centre = await toScreen(page, lonLat(CHECK_GT, c + 0.5, r + 0.5));

@@ -222,7 +222,7 @@ test.describe("WASD pans smoothly while held (criterion 5)", () => {
       const down = e[1] - wd.start[1], left = wd.start[0] - e[0];
       expect(down).toBeGreaterThan(100);
       expect(Math.abs(down - left) / down).toBeLessThan(0.1);
-      if (how === "plus") await expect(page.locator("#brush-size")).toHaveText("Brush: 7 px");
+      if (how === "plus") await expect(page.locator("#brush-size")).toHaveText("7");
     });
   }
 });
@@ -287,7 +287,7 @@ test.describe("a camera move lifts the brush (criterion 7)", () => {
   for (const [name, move] of moves) {
     test(`${name} mid-stroke: labels are strokeCells(p, q) plus r`, async ({ page }) => {
       await setup(page, "paint");
-      while ((await page.locator("#brush-size").textContent()) !== "Brush: 1 px") await page.click("#brush-smaller");
+      while ((await page.locator("#brush-size").textContent()) !== "1") await page.click("#brush-smaller");
       const m = await mapCentreXy(page);
       const a = { x: m.x - 250, y: m.y - 150 }, b = { x: m.x + 250, y: m.y - 150 }, c = { x: m.x - 250, y: m.y + 250 };
       const [la, lb] = await toLngLat(page, [a, b]);

@@ -57,7 +57,7 @@ test("controls: Opacity 0-100 step 5 at 60, Show labels checked; both enabled du
   await expect(opacity(page)).toHaveAttribute("type", "range");
   for (const [k, v] of [["min", "0"], ["max", "100"], ["step", "5"]]) await expect(opacity(page)).toHaveAttribute(k!, v!);
   await expect(opacity(page)).toHaveValue("60");
-  await expect(opacityText(page)).toHaveText("Opacity: 60%");
+  await expect(opacityText(page)).toHaveText("60%");
   await expect(show(page)).toBeChecked();
   await pauseLabelFile(page);
   await importFile(page, upload("classes.tif", classFile("255")));
@@ -79,7 +79,7 @@ test("opacity 30 sets 0.3 on every overlay and the mask, and on a later tile; a 
   const { m, p } = await maskAndTile(page);
   expect([m, p]).toEqual([probes.m, probes.p]);
   await opacity(page).fill("30");
-  await expect(opacityText(page)).toHaveText("Opacity: 30%");
+  await expect(opacityText(page)).toHaveText("30%");
   expect(await labelLayers(page)).toEqual({ "mask": [0.3, "visible"], "label-256,256": [0.3, "visible"] });
   const [c1, c2] = await colours(page);
   const blend = (hex: string, u: number[]) => rgb(hex).map((v, i) => 0.3 * v + 0.7 * u[i]!);
@@ -104,7 +104,7 @@ test("the opacity is kept when another raster opens, and a reload resets it to 6
   await expect(page.locator("#raster-info")).toContainText("other.tif");
   await expect(message(page)).toHaveText("Raster opened.");
   await expect(opacity(page)).toHaveValue("30");
-  await expect(opacityText(page)).toHaveText("Opacity: 30%");
+  await expect(opacityText(page)).toHaveText("30%");
   await paintMode(page);
   await jumpTo(page, [15, 45], 9);
   await clickAt(page, await toScreen(page, [15.005, 45.005]));
@@ -112,7 +112,7 @@ test("the opacity is kept when another raster opens, and a reload resets it to 6
   await page.reload();
   await expect(page.locator("#map[data-ready=true]")).toBeVisible();
   await expect(opacity(page)).toHaveValue("60");
-  await expect(opacityText(page)).toHaveText("Opacity: 60%");
+  await expect(opacityText(page)).toHaveText("60%");
 });
 
 test("hiding sets visibility none on the overlays and mask and shows the imagery; nothing else changes (criterion 4)", async ({ page }) => {
@@ -192,7 +192,7 @@ test("hiding labels mid-stroke by keyboard ends the stroke; later moves label no
   await settled(page);
   await page.waitForTimeout(100);
   await page.locator("#label-opacity").focus(); // after the press, which focuses the map
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("Shift+Tab"); // Show comes before Opacity in the right panel (spec 035)
   await expect(show(page)).toBeFocused();
   await page.keyboard.press("Space");
   await expect(show(page)).not.toBeChecked();

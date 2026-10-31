@@ -63,7 +63,7 @@ test("keyboard zoom and the navigation control work in Paint mode and paint noth
   await idle(page);
   const z1 = (await view(page)).zoom;
   expect(z1).toBeGreaterThan(z0 + 0.5);
-  await expect(page.locator("#brush-size")).toHaveText("Brush: 7 px"); // = / - zoom; [ ] size
+  await expect(page.locator("#brush-size")).toHaveText("7"); // = / - zoom; [ ] size
   await page.locator(".maplibregl-ctrl-zoom-out").click();
   await page.waitForTimeout(400);
   await idle(page);

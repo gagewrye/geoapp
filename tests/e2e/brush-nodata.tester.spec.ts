@@ -25,7 +25,7 @@ async function setup(page: Page) {
   await paintMode(page);
   await jumpTo(page, lonLat(270, 150), 14);
   for (let i = 0; i < 2; i++) await page.click("#brush-larger"); // 31
-  await expect(page.locator("#brush-size")).toHaveText("Brush: 31 px");
+  await expect(page.locator("#brush-size")).toHaveText("31");
 }
 async function points(page: Page, c0: number, c1: number, r: number, n: number): Promise<Xy[]> {
   return Promise.all(Array.from({ length: n }, async (_, i) => round(await toScreen(page, lonLat(c0 + ((c1 - c0) * i) / (n - 1) + 0.5, r + 0.5)))));

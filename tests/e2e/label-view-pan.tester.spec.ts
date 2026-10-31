@@ -192,7 +192,7 @@ test("Paint chosen by keyboard (Tab, Space) while hidden shows the labels", asyn
   await setup(page);
   await toggleShow(page);
   await page.locator("#mode-pan").focus();
-  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Tab"); // the strip's order is Pan, Paint, Erase (spec 035)
   await expect(page.locator("#mode-paint")).toBeFocused();
   await page.keyboard.press("Space");
   expect(await mode(page)).toEqual(PAINT);

@@ -19,22 +19,22 @@ const hookClasses = (page: Page) => page.evaluate(() => (window as any).__geoapp
 test.describe("brush size (criterion 13)", () => {
   test("] and + step up and stop at 127; [ and the minus button step down and stop at 1; the text follows", async ({ page }) => {
     await setup(page);
-    await expect(sizeText(page)).toHaveText("Brush: 7 px");
+    await expect(sizeText(page)).toHaveText("7");
     await page.locator("#map canvas").focus();
     const up: string[] = [];
     for (let i = 0; i < 3; i++) { await page.keyboard.press("]"); up.push((await sizeText(page).textContent())!); }
     for (let i = 0; i < 3; i++) { await page.click("#brush-larger"); up.push((await sizeText(page).textContent())!); }
-    expect(up).toEqual(["Brush: 15 px", "Brush: 31 px", "Brush: 63 px", "Brush: 127 px", "Brush: 127 px", "Brush: 127 px"]);
+    expect(up).toEqual(["15", "31", "63", "127", "127", "127"]);
     const down: string[] = [];
     for (let i = 0; i < 4; i++) { await page.keyboard.press("["); down.push((await sizeText(page).textContent())!); }
     for (let i = 0; i < 4; i++) { await page.click("#brush-smaller"); down.push((await sizeText(page).textContent())!); }
-    expect(down).toEqual(["Brush: 63 px", "Brush: 31 px", "Brush: 15 px", "Brush: 7 px", "Brush: 3 px", "Brush: 1 px", "Brush: 1 px", "Brush: 1 px"]);
+    expect(down).toEqual(["63", "31", "15", "7", "3", "1", "1", "1"]);
   });
 
   test("a size-15 dab labels 15x15 pixels", async ({ page }) => {
     await setup(page);
     await page.click("#brush-larger");
-    await expect(sizeText(page)).toHaveText("Brush: 15 px");
+    await expect(sizeText(page)).toHaveText("15");
     const c = await toScreen(page, [15.005, 45.005]);
     await page.mouse.click(c.x, c.y);
     await settled(page);
@@ -52,7 +52,7 @@ test.describe("brush size (criterion 13)", () => {
     await field.click();
     await field.press("End");
     await page.keyboard.type("[]1[1]");
-    await expect(sizeText(page)).toHaveText("Brush: 7 px");
+    await expect(sizeText(page)).toHaveText("7");
     expect(await selected(page)).toBe(1);
     await expect(field).toHaveValue("Class 2[]1[1]");
   });
