@@ -7,7 +7,7 @@ import type { LabelSource } from "../../../src/io/labelFile";
 import type { MaskBase } from "../../../src/io/maskBase";
 import type { SessionRecord } from "../../../src/io/session";
 import { MESSAGES } from "../../../src/ui/messages";
-import { initPersist, MAX_SESSIONS, SAVE_DELAY_MS, type PersistLabels } from "../../../src/ui/persist";
+import { initPersist, MAX_SESSIONS, RETRY_MS, SAVE_DELAY_MS, type PersistLabels } from "../../../src/ui/persist";
 import { fakeSessionStore } from "../helpers/sessionStore";
 
 // Spec 031 criteria 2-5, with the fake store and fake timers.
@@ -150,7 +150,7 @@ describe("the unsaved guard (criterion 4)", () => {
     expect(t.state.textContent).toBe("Not saved: the browser's storage is full");
     expect(t.guarded()).toBe(true); // failed (and dirty again)
     t.fake.failWith(null);
-    await vi.advanceTimersByTimeAsync(SAVE_DELAY_MS); await t.p.idle();
+    await vi.advanceTimersByTimeAsync(RETRY_MS); await t.p.idle(); // spec 032: a failed save is retried after RETRY_MS
     expect(t.guarded()).toBe(false);
     expect([...t.fake.tiles.get(KEY)!.keys()].sort()).toEqual(["0,0", "256,0"]);
   });

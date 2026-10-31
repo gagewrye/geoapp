@@ -5,7 +5,7 @@ import { rasterKey } from "../../../src/core/session";
 import type { Grid } from "../../../src/core/types";
 import type { LabelSource } from "../../../src/io/labelFile";
 import type { MaskBase } from "../../../src/io/maskBase";
-import { initPersist, SAVE_DELAY_MS, TILE_BATCH, type PersistLabels } from "../../../src/ui/persist";
+import { initPersist, RETRY_MS, SAVE_DELAY_MS, TILE_BATCH, type PersistLabels } from "../../../src/ui/persist";
 import { fakeSessionStore } from "../helpers/sessionStore";
 
 // Tester, spec 031: strokes made before the restore prompt is answered, restores across batch boundaries,
@@ -103,21 +103,22 @@ describe("writes", () => {
     expect(t.fake.log).toEqual(["clearTiles", "saveBase", "putTiles 16", "putTiles 16", "putTiles 8", "putRecord"]);
   });
 
+  // spec 032 scope 5: a quota error leaves the copy out until the next import, so this failure is another write error
   it("a failed mask copy keeps the guard on and shows the reason; the retry copies the file again before the record", async () => {
     const t = setup();
     t.p.open("a.tif", SIZE, G); await t.p.offer();
     t.setBase({ lut: new Uint8Array(2), count: 9, windows: new Set(["0,0"]), preview: { values: new Uint8Array(4) } } as unknown as MaskBase);
     const save = t.fake.store.saveBase.bind(t.fake.store);
     let fail = true;
-    t.fake.store.saveBase = async (k, f) => { if (fail) throw new DOMException("full", "QuotaExceededError"); return save(k, f); };
+    t.fake.store.saveBase = async (k, f) => { if (fail) throw new Error("the disk failed"); return save(k, f); };
     t.p.replaced(); t.p.imported(new Blob(["mask"]));
     await t.flush();
-    expect(t.state.textContent).toBe("Not saved: the browser's storage is full");
+    expect(t.state.textContent).toBe("Not saved: the disk failed");
     expect(t.guarded()).toBe(true);
     expect(t.fake.records.has(KEY)).toBe(false);
     fail = false;
     t.fake.log.length = 0;
-    await t.flush();
+    await vi.advanceTimersByTimeAsync(RETRY_MS); await t.p.idle(); // retried after RETRY_MS (spec 032)
     expect(t.fake.log).toEqual(["clearTiles", "saveBase", "putRecord"]);
     expect(t.fake.bases.has(KEY)).toBe(true);
     expect(t.guarded()).toBe(false);

@@ -34,8 +34,8 @@ type Deps = {
   labels: PersistLabels;
   /** Opens the store; called once, on first use. */
   open: () => Promise<SessionStore>;
-  /** #save-state. */
-  state: { textContent: string | null };
+  /** #save-state; its Not saved text has class error (spec 032). */
+  state: { textContent: string | null; classList?: { toggle(c: string, on: boolean): unknown } };
   win: Pick<EventTarget, "addEventListener" | "removeEventListener">;
   doc: Pick<EventTarget, "addEventListener"> & { visibilityState: string };
   confirm: (text: string) => boolean;
@@ -58,13 +58,15 @@ type Session = {
   /** A record of it is saved from this page, so labels going to none delete it. */
   owned: boolean;
   tiles: Set<string>; record: boolean; clear: boolean; file: Blob | null;
+  /** A save hit the quota (spec 032 scope 5): the mask copy is left out until the next import. */
+  noCopy: boolean;
 };
 
 /** A previous raster's snapshot whose write failed (scope 8): kept and written before anything else. */
 type Pending = { s: Session; snap: Snapshot; reason: string };
 
-const reasonOf = (e: unknown) =>
-  e instanceof DOMException && e.name === "QuotaExceededError" ? "the browser's storage is full" : e instanceof Error && e.message ? e.message : String(e);
+const isQuota = (e: unknown) => e instanceof DOMException && e.name === "QuotaExceededError";
+const reasonOf = (e: unknown) => isQuota(e) ? "the browser's storage is full" : e instanceof Error && e.message ? e.message : String(e);
 
 /** Saves the labels in this browser as they change and offers them back on reopening the raster (spec 031, ADR 0025). */
 // Changes mark tile keys and the record dirty; a save copies them (a snapshot) and writes it, one save at a time,
@@ -89,6 +91,7 @@ export function initPersist(d: Deps) {
   function sync(): void {
     state.textContent = pending ? `Not saved: ${pending.snap.record.name}: ${pending.reason}`
       : inFlight > 0 ? "Saving…" : failed ? `Not saved: ${failed}` : saved;
+    state.classList?.toggle("error", state.textContent.startsWith("Not saved"));
     const on = unsaved(current) || inFlight > 0 || failed !== "" || pending !== null;
     if (on === guarded) return;
     guarded = on;
@@ -110,7 +113,7 @@ export function initPersist(d: Deps) {
       key: s.key, name: s.name, classes: labels.classes().map((c) => ({ ...c })), selected: labels.selected(), ...view,
       base: base && { lut: base.lut.slice(), count: base.count, windows: [...base.windows], values: base.preview.values.slice() },
     };
-    const snap = { key: s.key, tiles, clear: s.clear, file: s.file, record, labelled: labels.hasLabels() };
+    const snap = { key: s.key, tiles, clear: s.clear, file: s.noCopy ? null : s.file, record, labelled: labels.hasLabels() };
     s.tiles = new Set(); s.record = false; s.clear = false; s.file = null;
     return snap;
   }
@@ -121,16 +124,24 @@ export function initPersist(d: Deps) {
     s.owned = await writeSnapshot(sessions, snap, s.owned, now, yieldTask);
   }
 
-  /** A snapshot that wasn't written: the current raster's is dirty again; another raster's becomes (or joins) the pending one. */
-  function lost(s: Session, snap: Snapshot, reason: string): void {
+  const retryLater = () => { retry ??= setTimeout(() => { retry = null; save(false); }, RETRY_MS); };
+
+  /**
+   * A snapshot that wasn't written: the current raster's is dirty again; another raster's becomes (or joins) the pending
+   * one. Either is tried again after RETRY_MS (new changes still save after SAVE_DELAY_MS). After a quota error the mask
+   * copy is left out until the next import: a full disk would otherwise stream the whole mask on every try (spec 032).
+   */
+  function lost(s: Session, snap: Snapshot, e: unknown): void {
+    const quota = isQuota(e);
+    if (quota) s.noCopy = true;
     if (s === current) {
       for (const [k] of snap.tiles) s.tiles.add(k);
       s.record = true; s.clear ||= snap.clear; s.file ??= snap.file;
-      schedule(); // tried again after the next delay
-      return;
+    } else {
+      const merged = pending?.s === s ? mergeSnapshots(pending.snap, snap) : snap;
+      pending = { s, snap: quota ? { ...merged, file: null } : merged, reason: reasonOf(e) };
     }
-    pending = { s, snap: pending?.s === s ? mergeSnapshots(pending.snap, snap) : snap, reason };
-    retry ??= setTimeout(() => { retry = null; save(false); }, RETRY_MS);
+    retryLater();
   }
 
   /** Writes the pending snapshot, if any, then this one. */
@@ -144,18 +155,18 @@ export function initPersist(d: Deps) {
           await write(p.s, p.snap);
           if (pending === p) pending = null;
         } catch (e) {
-          if (pending === p) p.reason = reasonOf(e);
-          if (s && snap) lost(s, snap, reasonOf(e));
-          if (pending && !retry) retry = setTimeout(() => { retry = null; save(false); }, RETRY_MS);
+          if (pending === p) { p.reason = reasonOf(e); if (isQuota(e)) p.snap = { ...p.snap, file: null }; }
+          if (s && snap) lost(s, snap, e);
+          retryLater();
           return reasonOf(e);
         }
       }
       if (!s || !snap) return "";
-      try { await write(s, snap); return ""; } catch (e) { lost(s, snap, reasonOf(e)); return reasonOf(e); }
+      try { await write(s, snap); return ""; } catch (e) { lost(s, snap, e); return reasonOf(e); }
     }).then((reason) => {
       failed = reason;
       if (!reason && !pending) saved = `Saved ${time(now())}`;
-      if (!pending && retry) { clearTimeout(retry); retry = null; }
+      if (!reason && !pending && retry) { clearTimeout(retry); retry = null; }
     }).finally(() => { inFlight--; sync(); });
   }
 
@@ -172,11 +183,13 @@ export function initPersist(d: Deps) {
 
   return {
     /**
-     * A raster is about to open (before the labels switch to it). With a snapshot pending, first asks to discard it:
-     * false on Cancel, and the open must stop. Else the old raster's changes are copied and saved now, and the
-     * saved session's lookup starts; the new raster saves nothing until offer() settles.
+     * A raster is about to open (before the labels switch to it). With a snapshot pending, first asks to discard it;
+     * else, with labels open, asks to close them (spec 032 scope 6). False on Cancel, and the open must stop.
+     * Then the old raster's changes are copied and saved now, and the saved session's lookup starts; the new
+     * raster saves nothing until offer() settles.
      */
-    open(name: string, size: number, grid: Grid): boolean {
+    open(name: string, size: number, grid: Grid, hasLabels = false): boolean {
+      if (!pending && hasLabels && !d.confirm(MESSAGES.discard)) return false;
       if (pending) {
         if (!d.confirm(MESSAGES.pendingDiscard(pending.snap.record.name, pending.reason))) return false;
         pending = null;
@@ -185,7 +198,7 @@ export function initPersist(d: Deps) {
       }
       if (current) save(true);
       const key = rasterKey(size, grid);
-      const s: Session = { key, name, grid, lookup: Promise.resolve(null), settled: false, found: false, ready: false, owned: false, tiles: new Set(), record: false, clear: false, file: null };
+      const s: Session = { key, name, grid, lookup: Promise.resolve(null), settled: false, found: false, ready: false, owned: false, tiles: new Set(), record: false, clear: false, file: null, noCopy: false };
       // a failed lookup counts as no session
       s.lookup = store().then((db) => db.get(key)).catch(() => null).then((r) => { s.settled = true; s.found = r !== null; return r; });
       current = s;
@@ -250,6 +263,7 @@ export function initPersist(d: Deps) {
     imported(file: Blob): void {
       if (!current) return;
       current.file = file;
+      current.noCopy = false; // a new import tries the copy again
       changed();
     },
     /** The saves started so far have ended (tests). */
