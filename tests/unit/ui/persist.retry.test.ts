@@ -138,6 +138,42 @@ describe("a copy still being written isn't missing (spec 032 review)", () => {
   });
 });
 
+describe("a copy that failed for another reason is missing (spec 032 review)", () => {
+  it("import A copied, then B whose first copy rejects with a disk error: a save taken meanwhile marks the copy missing, and a restore never opens A's copy", async () => {
+    const t = setup();
+    t.copy.full = false;
+    const base = (count: number) => ({ lut: new Uint8Array(4), count, windows: new Set(["0,0"]), preview: { values: new Uint8Array(4) } });
+    t.p.open("a.tif", 1, G); await t.p.offer();
+    t.setBase(base(5));
+    t.p.replaced(); t.p.imported(new Blob(["mask A"]));
+    await vi.advanceTimersByTimeAsync(SAVE_DELAY_MS); await t.p.idle();
+    const key = [...t.fake.records.keys()][0]!;
+    expect(t.fake.bases.has(key)).toBe(true);
+    // import B: its first copy is held, then rejects
+    let reject!: (e: unknown) => void;
+    const held = new Promise<void>((_, r) => { reject = r; });
+    t.fake.store.saveBase = async () => { await held; };
+    t.setBase(base(9));
+    t.p.replaced(); t.p.imported(new Blob(["mask B"]));
+    await vi.advanceTimersByTimeAsync(SAVE_DELAY_MS); // save 1 copies B
+    t.paint("512,256", 3);
+    await vi.advanceTimersByTimeAsync(SAVE_DELAY_MS); // save 2 is taken meanwhile
+    reject(new Error("the disk failed"));
+    await t.p.idle();
+    const r = t.fake.records.get(key)!;
+    expect(r.base!.count).toBe(9);
+    expect(r.base!.copyMissing).toBe(true);
+    expect(t.fake.bases.has(key)).toBe(false); // A's stale copy is deleted
+
+    const b = setup(t.fake);
+    t.fake.bases.set(key, new Blob(["mask A"])); // even with A's copy still there
+    b.p.open("a.tif", 1, G);
+    expect(await b.p.offer()).toBe(MESSAGES.restoredNoMask);
+    expect(b.opens).toEqual([]);
+    expect([...b.store().tiles.keys()]).toEqual(["512,256"]);
+  });
+});
+
 describe("the discard question (criterion 8)", () => {
   it("with labels and nothing pending, opening another raster asks the scope 6 text; Cancel stops the open", async () => {
     const t = setup();

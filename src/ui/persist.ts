@@ -119,9 +119,6 @@ export function initPersist(d: Deps) {
       base: base && { lut: base.lut.slice(), count: base.count, windows: [...base.windows], values: base.preview.values.slice() },
     };
     const file = s.noCopy ? null : s.file;
-    // a record saved without this import's copy, left out after a quota error, says so: a restore must not open an
-    // older import's copy (spec 032). A copy still being written by an earlier save isn't missing.
-    if (record.base && s.noCopy && !s.copied) record.base.copyMissing = true;
     const snap = { key: s.key, tiles, clear: s.clear, file, record, labelled: labels.hasLabels() };
     s.tiles = new Set(); s.record = false; s.clear = false; s.file = null;
     return snap;
@@ -130,6 +127,9 @@ export function initPersist(d: Deps) {
   async function write(s: Session, snap: Snapshot): Promise<void> {
     const sessions = await store();
     if (!persisted) { persisted = true; d.persistStorage?.(); }
+    // decided now, not when copied: saves run one at a time, so every earlier copy attempt has ended and `copied` is
+    // accurate. A record saved without its import's copy says so, so a restore never opens an older copy (spec 032)
+    if (snap.record.base && !snap.file && !s.copied) snap.record.base.copyMissing = true;
     s.owned = await writeSnapshot(sessions, snap, s.owned, now, yieldTask);
     if (snap.file) s.copied = true;
   }
