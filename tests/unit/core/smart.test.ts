@@ -9,9 +9,8 @@ describe("samWindow (criterion 1)", () => {
       const step = width > 1024 ? 7 : 1; // brute force, thinned on the large raster to keep the test quick
       for (let row = 0; row < height; row += step) for (let col = 0; col < width; col += step) {
         const w = samWindow({ width, height }, col, row);
-        expect(w.width).toBe(Math.min(SAM_SIDE, width));
-        expect(w.height).toBe(Math.min(SAM_SIDE, height));
-        const ok = col >= w.x0 && col < w.x0 + w.width && row >= w.y0 && row < w.y0 + w.height
+        const ok = w.width === Math.min(SAM_SIDE, width) && w.height === Math.min(SAM_SIDE, height)
+          && col >= w.x0 && col < w.x0 + w.width && row >= w.y0 && row < w.y0 + w.height
           && w.x0 >= 0 && w.y0 >= 0 && w.x0 + w.width <= width && w.y0 + w.height <= height
           && (w.x0 === 0 || col - w.x0 >= 384) && (w.y0 === 0 || row - w.y0 >= 384)
           && (w.x0 + w.width === width || w.x0 + w.width - col >= 384) && (w.y0 + w.height === height || w.y0 + w.height - row >= 384);
