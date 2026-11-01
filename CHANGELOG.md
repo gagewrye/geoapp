@@ -3,6 +3,7 @@
 One entry per merge to main, newest first. Details are in the named spec.
 
 ## 2026-10-31
+- **Spec 046:** Smart select (M): click points on the imagery and SAM 2.1 Tiny, running locally on WebGPU, proposes a mask to fill with the selected class; Enter applies it, Escape discards it. Fetch the model once with `npm run fetch-model`.
 - **Spec 045:** The top of a zoomed, tilted map no longer flickers navy: the basemap stops drawing from zoom 12, leaving plain navy ground outside the raster. Holding ? no longer flickers the help list, macOS tooltips say Cmd, and Ctrl+Shift+Z also redoes on macOS.
 
 ## 2026-10-30
