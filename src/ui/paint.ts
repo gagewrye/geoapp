@@ -68,9 +68,9 @@ export function initPaint(d: Deps) {
         queue.push(op);
       }
     },
-    /** One whole op, such as spec 046's smart fill; nothing while locked. */
+    /** One whole op, such as spec 046's smart fill; while locked or before an open it is dropped, and its done hears so. */
     push(op: PaintOp): void {
-      if (d.locked() || !queue) return;
+      if (d.locked() || !queue) { op.done?.("dropped"); return; }
       d.op?.(op);
       queue.push(op);
     },
