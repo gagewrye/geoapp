@@ -94,7 +94,7 @@ test.describe("flicker probe (spec 045)", () => {
   });
 
   for (const run of RUNS) {
-    test(`${run.name}: navy pops in the top band`, async ({ page }) => {
+    test(`${run.name}: navy pops in the top band @probe`, async ({ page }) => {
       test.setTimeout(180_000);
       await openApp(page);
       await openRaster(page, rgbFixture());

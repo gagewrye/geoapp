@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "check": "npm run lint && npm run typecheck && npm run test",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "e2e:probe": "playwright test flicker-probe --grep @probe"
   },
   "dependencies": {
     "geotiff": "3.0.5",
