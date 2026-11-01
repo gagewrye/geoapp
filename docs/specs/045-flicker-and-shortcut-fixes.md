@@ -1,8 +1,8 @@
 # 045: Background flicker, and spec 039 follow-ups
 
-**Status:** Approved by Gage 2026-10-31. Scopes 1-3, criteria 2-3 and the causes were revised the same day after Gage's report, and await re-approval. **ADRs:** none. **Builds on specs 012, 020, 037 and 039, and ADRs 0014 and 0019.** **Amends spec 012's criterion 3:** the basemap is hidden from `BASEMAP_MAXZOOM` up, so the "zoom 12 Mercator" placement check runs at `BASEMAP_MAXZOOM − 0.1` (z11.9 at the draft value). That is the end of the z11-12 globe-to-Mercator morph (ADR 0004), not pure Mercator: no pure-Mercator zoom shows the basemap any more. Checked against maplibre-gl 6.16.0 (`node_modules/maplibre-gl/src`).
+**Status:** Approved by Gage 2026-10-31. Scopes 1-3, criteria 2-3 and the causes were revised the same day after Gage's report. Gage accepted the revision, with navy ground above z12, on 2026-10-31. **ADRs:** none. **Builds on specs 012, 020, 037 and 039, and ADRs 0014 and 0019.** **Amends spec 012's criterion 3:** the basemap is hidden from `BASEMAP_MAXZOOM` up, so the "zoom 12 Mercator" placement check runs at `BASEMAP_MAXZOOM − 0.1` (z11.9 at the draft value). That is the end of the z11-12 globe-to-Mercator morph (ADR 0004), not pure Mercator: no pure-Mercator zoom shows the basemap any more. Checked against maplibre-gl 6.16.0 (`node_modules/maplibre-gl/src`).
 
-**Open questions (Gage):**
+**Decided by Gage (2026-10-31), as drafted:**
 1. Above `BASEMAP_MAXZOOM` (draft 12), the ground outside the raster becomes plain dark navy `BACKGROUND` instead of the blurred basemap. At z12 and above the basemap is only a few blurred pixels. The alternative is to re-tile the basemap as a raster source through `addProtocol`, which amends ADR 0014 and needs a new ADR. Draft: the former.
 
 **Goal:** Zooming, panning and tilting no longer flicker, and the shortcut list from spec 039 behaves on held keys and on macOS.
