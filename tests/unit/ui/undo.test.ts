@@ -15,7 +15,7 @@ function setup(platform = "Win32") {
   const button = new Button(), redoButton = new Button();
   const undone = vi.fn();
   const u = initUndo({ button: button as unknown as HTMLButtonElement, redoButton: redoButton as unknown as HTMLButtonElement,
-    store: () => store, blocked: () => blocked, shortcut: () => shortcut, undone });
+    store: () => store, blocked: () => blocked, shortcut: () => shortcut, undone, mac: platform.startsWith("Mac") });
   // one stroke that labels tile 0,0, then undone
   const s = u.history.begin();
   u.history.record(s, ["0,0"]);
@@ -79,6 +79,30 @@ describe("redo keys and button", () => {
     t.u.clear();
     expect(t.redoButton.disabled).toBe(true);
     t.press({ key: "y", ctrlKey: true });
+    expect(t.store.tiles.size).toBe(0);
+  });
+});
+
+// Spec 045 criterion 7: on Mac, Cmd+Shift+Z, Ctrl+Shift+Z and Ctrl+Y redo, and Ctrl+Z does nothing.
+describe("Mac redo keys", () => {
+  for (const [name, k] of [
+    ["Meta+Shift+Z", { key: "Z", metaKey: true, shiftKey: true }],
+    ["Ctrl+Shift+Z", { key: "Z", ctrlKey: true, shiftKey: true }],
+    ["Ctrl+Y", { key: "y", ctrlKey: true }],
+  ] as const) {
+    it(`${name} redoes on Mac`, () => {
+      const t = setup("MacIntel");
+      t.press(k);
+      expect(t.store.tiles.size).toBe(1);
+    });
+  }
+
+  it("Ctrl+Z does nothing on Mac; Cmd+Z undoes", () => {
+    const t = setup("MacIntel");
+    t.redoButton.click();
+    t.press({ key: "z", ctrlKey: true });
+    expect(t.store.tiles.size).toBe(1);
+    t.press({ key: "z", metaKey: true });
     expect(t.store.tiles.size).toBe(0);
   });
 });

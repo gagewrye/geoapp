@@ -1,6 +1,6 @@
 import { readFileSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { baseStyle } from "../../../src/map/style";
+import { BASEMAP_MAXZOOM, baseStyle } from "../../../src/map/style";
 
 const JPG = "src/map/basemap.jpg";
 const NOTICE = "src/map/basemap.NOTICE.md";
@@ -43,5 +43,23 @@ describe("bundled basemap asset (spec 012 criterion 1)", () => {
 describe("base style (spec 015 criterion 1)", () => {
   it("has no sky, so MapLibre draws no atmosphere over or around the globe", () => {
     expect(baseStyle()).not.toHaveProperty("sky");
+  });
+});
+
+// Spec 045 criterion 1: a re-added basemap tile doesn't fade in from the background.
+describe("basemap fade", () => {
+  it("the basemap layer has raster-fade-duration 0", () => {
+    const layer = baseStyle().layers.find((l) => l.id === "basemap") as { paint?: Record<string, unknown> };
+    expect(layer.paint?.["raster-fade-duration"]).toBe(0);
+  });
+});
+
+// Spec 045 criterion 3: above BASEMAP_MAXZOOM the world-sized basemap quad isn't drawn, so it can't lose to the background.
+describe("basemap maxzoom", () => {
+  it("the basemap layer's maxzoom is BASEMAP_MAXZOOM, between 10 and 12", () => {
+    const layer = baseStyle().layers.find((l) => l.id === "basemap") as { maxzoom?: number };
+    expect(layer.maxzoom).toBe(BASEMAP_MAXZOOM);
+    expect(BASEMAP_MAXZOOM).toBeGreaterThanOrEqual(10);
+    expect(BASEMAP_MAXZOOM).toBeLessThanOrEqual(12);
   });
 });

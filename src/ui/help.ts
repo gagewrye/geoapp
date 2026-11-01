@@ -7,7 +7,7 @@ export function labelButtons(byId: (id: string) => HTMLElement | null): void {
     const el = s.button ? byId(s.button) : null;
     if (!el) continue;
     el.title = `${s.action} (${keyLabel(s.keys[0]!)})`;
-    el.setAttribute("aria-keyshortcuts", s.keys.map(ariaKey).join(" "));
+    el.setAttribute("aria-keyshortcuts", s.keys.map((k) => ariaKey(k)).join(" "));
   }
 }
 
@@ -35,9 +35,15 @@ export function initHelp({ dialog, button, list }: Deps): void {
   // Capture on the window runs before every other shortcut listener: while the list is open none of them sees a key,
   // so Escape only closes it (the dialog's own close) and doesn't select Pan
   window.addEventListener("keydown", (e) => {
-    const toggle = actionOf(e) === "Shortcuts" && !e.ctrlKey && !e.metaKey && !e.altKey;
+    const toggle = actionOf(e) === "help" && !e.ctrlKey && !e.metaKey && !e.altKey;
+    // a held ? repeats: swallowed, so the list neither flickers nor reaches another listener (spec 045)
+    if (toggle && e.repeat && (dialog.open || !inTextField(document.activeElement))) {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      return;
+    }
     if (dialog.open) {
-      e.stopPropagation();
+      e.stopImmediatePropagation();
       if (toggle) { e.preventDefault(); dialog.close(); }
     } else if (toggle && !inTextField(document.activeElement)) {
       e.preventDefault();

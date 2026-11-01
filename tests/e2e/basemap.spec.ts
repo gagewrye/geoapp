@@ -57,10 +57,12 @@ async function uniformPoints(page: Page, n: number): Promise<{ ll: LngLat; rgb: 
   }, [lls, n] as const);
 }
 
-for (const [label, centre, zoom] of [["zoom 3 globe", [-30, 20], 3], ["zoom 12 Mercator", [-30, 30], 12]] as const) {
+// the second runs just below the basemap's maxzoom, the end of the globe-to-Mercator morph (spec 045 amends criterion 3)
+const belowMax = (page: Page): Promise<number> => page.evaluate(() => (window as any).__geoapp.map.getLayer("basemap").maxzoom - 0.1);
+for (const [label, centre, zoom] of [["zoom 3 globe", [-30, 20], 3], ["BASEMAP_MAXZOOM - 0.1", [-30, 30], null]] as const) {
   test(`placement at ${label}: the rendered pixel matches the asset within 12 per channel (criterion 3)`, async ({ page }) => {
     await openApp(page);
-    await jumpTo(page, [...centre], zoom);
+    await jumpTo(page, [...centre], zoom ?? await belowMax(page));
     const pts = await uniformPoints(page, 8);
     expect(pts).toHaveLength(8);
     for (const { ll, rgb } of pts) {

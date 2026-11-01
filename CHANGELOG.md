@@ -2,6 +2,9 @@
 
 One entry per merge to main, newest first. Details are in the named spec.
 
+## 2026-10-31
+- **Spec 045:** The top of a zoomed, tilted map no longer flickers navy: the basemap stops drawing from zoom 12, leaving plain navy ground outside the raster. Holding ? no longer flickers the help list, macOS tooltips say Cmd, and Ctrl+Shift+Z also redoes on macOS.
+
 ## 2026-10-30
 - **Spec 039:** ? or the top-bar button lists every shortcut (other shortcuts pause while it is open), buttons show their keys in tooltips, and a class pick still reading is cancelled when another raster or label file opens.
 - **Spec 038:** Alt+click a pixel, or press I while hovering, to select its class without leaving the current tool; a failed read of an imported mask shows the error.

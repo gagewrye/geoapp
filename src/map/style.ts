@@ -5,6 +5,10 @@ import basemapUrl from "./basemap.jpg?url";
 
 export const BACKGROUND = "#1d2b3a";
 
+// The basemap is one world-sized quad; magnified past this, its far edge near the far plane loses the depth test to
+// the background and flickers navy (spec 045). Above it the ground outside the raster is plain BACKGROUND.
+export const BASEMAP_MAXZOOM = 12;
+
 /** Offline style: no tiles, glyphs or sprites; only the bundled basemap image. */
 export function baseStyle(): StyleSpecification {
   return {
@@ -16,7 +20,8 @@ export function baseStyle(): StyleSpecification {
     },
     layers: [
       { id: "background", type: "background", paint: { "background-color": BACKGROUND } },
-      { id: "basemap", type: "raster", source: "basemap" },
+      // fade 0, as every other raster layer: a re-added basemap tile would fade in from the background (spec 045)
+      { id: "basemap", type: "raster", source: "basemap", maxzoom: BASEMAP_MAXZOOM, paint: { "raster-fade-duration": 0 } },
     ],
   };
 }
