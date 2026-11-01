@@ -1,6 +1,6 @@
 # 045: Background flicker, and spec 039 follow-ups
 
-**Status:** Draft, 2026-10-31. Gage asked for this scope; this spec awaits his approval. **ADRs:** none, unless open question 2 turns out to be the cause. **Builds on specs 012, 020, 037 and 039, and ADRs 0014 and 0019.** Checked against maplibre-gl 6.16.0 (`node_modules/maplibre-gl/src`).
+**Status:** Approved by Gage 2026-10-31. **ADRs:** none, unless open question 2 turns out to be the cause. **Builds on specs 012, 020, 037 and 039, and ADRs 0014 and 0019.** Checked against maplibre-gl 6.16.0 (`node_modules/maplibre-gl/src`).
 
 **Open questions (Gage):**
 1. Which "background" flickers: the basemap around the raster, or the imagery under the labels? Does it flicker with no raster open? A short screen capture would settle it.
