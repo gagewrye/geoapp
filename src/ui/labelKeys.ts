@@ -22,6 +22,8 @@ type Deps = {
   view: { toggle(): void; peek(on: boolean): boolean };
   /** Picks the class under the pointer (spec 038), if it is over the raster. */
   pick?: () => void;
+  /** Spec 046: M chooses Smart (once enabled), Enter applies its mask, and Escape discards its prompt (false: none, so Pan). */
+  smart?: { choose(): void; canChoose(): boolean; apply(): boolean; discard(): boolean };
 };
 
 /**
@@ -35,6 +37,7 @@ export const KEYMAP: Record<string, string> = {
   i: "Pick the class under the pointer", h: "Show or hide labels", Backquote: "Hide labels while held",
   Backslash: "Hide the side panels", Home: "Zoom to the raster", "?": "Shortcuts",
   KeyW: "Move the map", KeyA: "Move the map", KeyS: "Move the map", KeyD: "Move the map",
+  m: "Smart select", Enter: "Apply smart selection", // spec 046; Escape discards a smart prompt before it selects Pan
 };
 /** The action of a key event: by its key first (so letters follow the layout), else by its code. */
 export const actionOf = (e: Pick<KeyboardEvent, "key" | "code">): string | undefined =>
@@ -42,7 +45,7 @@ export const actionOf = (e: Pick<KeyboardEvent, "key" | "code">): string | undef
 
 const MODES: Record<string, BrushMode> = { Paint: "paint", Erase: "erase", Pan: "pan" };
 
-/** Labelling shortcuts (specs 003, 009, 033, 034): Space holds Pan, [ ] size, 1-9 class, B E P Escape mode, H Show labels, ` held peeks, I picks; keys looked up in KEYMAP. */
+/** Labelling shortcuts (specs 003, 009, 033, 034, 046): Space holds Pan, [ ] size, 1-9 class, B E P M Escape mode, H Show labels, ` held peeks, I picks, Enter applies; keys looked up in KEYMAP. */
 export function initLabelKeys(d: Deps): void {
   // Chromium marks the focused element :focus-visible on any keydown, so how it got focus is read when focus arrives
   let keyFocused = false;
@@ -69,6 +72,10 @@ export function initLabelKeys(d: Deps): void {
     else if (a === "Smaller brush") d.size.step(-1);
     else if (a === "Larger brush") d.size.step(1);
     else if (a === "Select class 1-9") { if (Number(e.key) <= d.classCount()) d.select(Number(e.key) - 1); }
+    else if (a === "Smart select") { if (!e.repeat && d.smart?.canChoose()) d.smart.choose(); }
+    // a focused button takes Enter as its own click
+    else if (a === "Apply smart selection") { if (!(document.activeElement instanceof HTMLButtonElement) && d.smart?.apply()) e.preventDefault(); }
+    else if (e.key === "Escape" && d.smart?.discard()) e.preventDefault();
     else {
       const m = a === undefined ? undefined : MODES[a];
       if (m && (m === "pan" || d.canPaint())) d.setMode(m);

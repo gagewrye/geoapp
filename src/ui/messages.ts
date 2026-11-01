@@ -39,6 +39,9 @@ export const MESSAGES = {
   picked: (name: string) => `Picked ${name}.`,
   noLabel: "No label here.",
   noClass: (v: number) => `No class for value ${v}.`, // spec 039
+  // spec 046
+  noWebGpu: "Smart select needs WebGPU.",
+  smartDownload: "Smart select downloads an 80 MB model once. Download it?",
 } as const;
 
 /** What a seeding run says (spec 004); null for a run dropped because another raster opened. */

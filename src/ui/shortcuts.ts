@@ -1,6 +1,6 @@
 /**
  * One shortcut (spec 039). Single keys are written as labelKeys' KEYMAP keys: a KeyboardEvent.key, or a code for keys
- * read by position (Space, Backquote, Backslash, KeyW...). Chords use "+" and mouse actions a space ("Right drag").
+ * read by position (Space, Backquote, Backslash, KeyW...). Chords use "+" and mouse actions a space ("Right drag"), or are "Click".
  * The action is the text the help shows and the id KEYMAP maps to; a button gets it as its title.
  */
 export type Shortcut = { section: string; keys: string[]; action: string; button?: string };
@@ -13,6 +13,10 @@ export const SHORTCUTS: readonly Shortcut[] = [
   { section: "Tools", keys: ["e"], action: "Erase", button: "mode-erase" },
   { section: "Tools", keys: ["p", "Escape"], action: "Pan", button: "mode-pan" },
   { section: "Tools", keys: ["Space"], action: "Pan while held" },
+  { section: "Tools", keys: ["m"], action: "Smart select", button: "mode-smart" },
+  { section: "Tools", keys: ["Click", "Right click"], action: "Include / exclude a point" },
+  { section: "Tools", keys: ["Enter"], action: "Apply smart selection", button: "smart-apply" },
+  { section: "Tools", keys: ["Escape"], action: "Discard the selection" },
   { section: "Brush", keys: ["["], action: "Smaller brush", button: "brush-smaller" },
   { section: "Brush", keys: ["]"], action: "Larger brush", button: "brush-larger" },
   { section: "Brush", keys: ["Right drag"], action: "Erase the selected class (Paint mode)" },
@@ -31,8 +35,8 @@ export const SHORTCUTS: readonly Shortcut[] = [
   { section: "Edit", keys: ["Ctrl+Shift+Z", "Ctrl+Y"], action: "Redo", button: "redo" },
 ];
 
-/** A key KEYMAP holds: not a chord ("+") or a mouse action (a space). */
-export const isSingleKey = (k: string) => !/[+ ]/.test(k);
+/** A key KEYMAP holds: not a chord ("+") or a mouse action (a space, or "Click"). */
+export const isSingleKey = (k: string) => !/[+ ]|^Click$/.test(k);
 
 const NAMES: Record<string, string> = { Backquote: "`", Backslash: "\\", Escape: "Esc" };
 /** How a key reads to the user: B, W, `, Esc, Ctrl+Z. */

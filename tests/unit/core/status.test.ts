@@ -12,6 +12,8 @@ describe("status formats", () => {
     expect(formatTool("paint", "Water", 7)).toBe("Paint · Water · 7 px");
     expect(formatTool("pan", "Water", 7)).toBe("Pan · Water · 7 px");
     expect(formatTool("erase", "Water", 7)).toBe("Erase · Water · 7 px"); // spec 033 scope 6
+    expect(formatTool("smart", "Water", 7)).toBe("Smart · Water"); // spec 046 scope 8: no brush
+    expect(formatTool("smart", "Water", 7, true)).toBe("Smart · Water · reading…");
   });
 
   it("the pixel only on the raster, and the zoom to one decimal", () => {
