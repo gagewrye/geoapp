@@ -45,3 +45,11 @@ describe("base style (spec 015 criterion 1)", () => {
     expect(baseStyle()).not.toHaveProperty("sky");
   });
 });
+
+// Spec 045 criterion 1: a re-added basemap tile doesn't fade in from the background.
+describe("basemap fade", () => {
+  it("the basemap layer has raster-fade-duration 0", () => {
+    const layer = baseStyle().layers.find((l) => l.id === "basemap") as { paint?: Record<string, unknown> };
+    expect(layer.paint?.["raster-fade-duration"]).toBe(0);
+  });
+});
