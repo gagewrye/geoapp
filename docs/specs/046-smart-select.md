@@ -1,8 +1,8 @@
 # 046: Smart select
 
-**Status:** Approved by Gage 2026-10-31, with the recommended answers. **ADRs:** 0031 onnxruntime-web, 0032 SAM 2.1 Tiny weights (both Accepted). **Builds on specs 003, 010, 014, 019, 023, 033, 037, 038 and 039.** Amends spec 033 scope 3 (Escape) and takes up ADR 0012 option (i) for one small model.
+**Status:** Approved by Gage 2026-10-31, with the recommended answers. **ADRs:** 0031 onnxruntime-web, 0032 SAM 2.1 Tiny weights (both Accepted). **Builds on specs 003, 010, 014, 019, 023, 033, 037, 038 and 039.** Amends spec 033 scope 3 (Escape) and takes up ADR 0012 option (i) for one small model. **Amended after merge (Gage, 2026-10-31):** which mask is shown, a padding point and a decode log. See Amendment A, which changes scope 6, the Interfaces and criterion 2.
 
-**Decided (Gage, 2026-10-31):** the recommended answer to each question at the end:
+**Decided (Gage, 2026-10-31):** the recommended answer to each open question. The questions and their alternatives were removed after merge and remain in git history.
 1. SAM 2.1 Tiny.
 2. A 1024² window of native pixels.
 3. A preview, then Enter.
@@ -20,7 +20,7 @@
 3. **Prompt.** A left click (press and release within 4 px) adds an include point, and a right click adds an exclude point. The first point fixes the window: `samWindow` of its cell. A point outside that window starts a new prompt, discarding the pending one. Escape discards a pending prompt and keeps Smart mode; with no prompt, Escape selects Pan as before.
 4. **Imagery.** The window is read as 256×256 `readSamples` calls of `displaySamples` bands, one at a time, mapped to RGB with `toRgba` and the preview's ranges. So the model sees what the user sees, and nodata and alpha-0 pixels are the ImageNet mean grey (0 after normalisation). `samInput` builds the encoder tensor.
 5. **Embedding.** It is computed on the first point of a prompt, in a dedicated worker, unless the worker already holds the embedding for that same window. The worker holds one. Points added while it encodes are decoded once it finishes. A result for a superseded prompt is dropped. Opening a raster drops the embedding and the prompt.
-6. **Preview.** Each decode uses the include and exclude points. With one point, the decoder returns three masks and the one with the best score is shown; with more points, one mask is shown. The mask shows in the selected class colour at opacity 0.5 in a new layer slot `smart` between `label-` and `brush-hover`, drawn as ADR 0019 quads of the window. It recolours on select or recolour.
+6. **Preview.** Each decode uses the include and exclude points, plus the padding point (A2). The export returns SAM's three multimask outputs for any number of points, and `chooseMask` picks the one shown (A1). The mask shows in the selected class colour at opacity 0.5 in a new layer slot `smart` between `label-` and `brush-hover`, drawn as ADR 0019 quads of the window. It recolours on select or recolour.
 7. **Commit.** Enter, or the `#smart-apply` button, pushes one spec 023 `PaintOp` with spans from `maskSpans`, the selected class value, `erase: false`, and a fresh `UndoHistory` stroke, which is ended at once. So, as with Paint:
    - nodata is skipped;
    - base tiles are copied on touch (spec 014);
@@ -39,10 +39,10 @@
   - `samWindow(dims, col, row): Window`. The window is SAM_SIDE square, or the raster's side where smaller. `x0 = clamp(256·round((col − 512)/256), 0, max(0, width − 1024))`, and likewise for y0.
   - `samInput(rgba: Uint8ClampedArray, w: number, h: number): Float32Array`. It gives 1×3×1024×1024 CHW values `(v/255 − mean)/std` with ImageNet mean and std. Alpha-0 pixels, and padding beyond w×h, are 0.
   - `promptPoints(points: [number, number][], w: Window): Float32Array`. Each point maps to `cell + 0.5 − origin`, in encoder pixels.
-  - `bestMask(scores: Float32Array): number` is the first maximum.
+  - `bestMask` is deleted. A1 to A3 below add `stability`, `maskShare`, `chooseMask`, `padPrompt` and `decodeLog`.
   - `maskBits(logits: Float32Array, side: number, w: Window): Uint8Array`. It upsamples `side²` logits covering SAM_SIDE² bilinearly (half-pixel centres) and thresholds them at > 0. It returns w.width × w.height bits as 0 or 1.
   - `maskSpans(bits: Uint8Array, w: Window): Span[]` gives row runs in raster coordinates. The preview canvas is `paintLabels(bits, [colour], rgba)`.
-- `io/segmenter.ts`: `interface Segmenter { encode(input: Float32Array, key: string): Promise<void>; has(key: string): boolean; decode(points: Float32Array, labels: Uint8Array): Promise<{ masks: Float32Array; scores: Float32Array; side: number }> }`. `loadSegmenter(onProgress, signal): Promise<Segmenter | "no-webgpu">` is the ORT worker (ADR 0031). `io/modelCache.ts` `fetchCached(url, onProgress, signal): Promise<Uint8Array>`.
+- `io/segmenter.ts`: `interface Segmenter { encode(input: Float32Array, key: string): Promise<void>; has(key: string): boolean; decode(points: Float32Array, labels: Int8Array): Promise<{ masks: Float32Array; scores: Float32Array; side: number }> }`. `loadSegmenter(onProgress, signal): Promise<Segmenter | "no-webgpu">` is the ORT worker (ADR 0031). `io/modelCache.ts` `fetchCached(url, onProgress, signal): Promise<Uint8Array>`.
 - `ui/smart.ts` wires it. The e2e hook `__geoapp.segmenter` replaces the Segmenter.
 
 ## Acceptance criteria
@@ -53,7 +53,7 @@
 2. **Unit (core):**
    - `maskBits` with side 256 equals a brute-force bilinear reference on random logits, for a full window and a 300×200 one.
    - `maskSpans` of the bits covers exactly the 1-bits.
-   - `bestMask([0.2, 0.9, 0.9])` is 1.
+   - The `bestMask` test is removed with `bestMask`. A's criteria cover the choice.
 3. **Unit (ui, fake Segmenter that returns a square around each include point):**
    - A first click encodes once, and a second click in the window decodes without encoding.
    - A click outside the window starts a new prompt.
@@ -78,12 +78,34 @@
     - ADR 0012's Status names ADR 0031.
     - CLAUDE.md's `core/` line gains "smart-select windows and masks". Only Gage edits CLAUDE.md.
 
-## Open questions for Gage (recommended default first)
-1. **Model:** SAM 2.1 Hiera Tiny fp16, about 78 MB (ADR 0032). The alternative is SlimSAM-77, about 21 MB fp16, which is smaller but rougher.
-2. **Window:** 1024×1024 native pixels around the click. The alternative is the current view, which is resampled and changes with zoom. With the default, objects over 1024 px are filled in parts.
-3. **Commit:** preview, then Enter. The alternative is to fill on every click, which is faster but needs more undo.
-4. **Overwrite:** fill over existing classes, as Paint does. The alternative is to fill only unlabelled pixels.
-5. **Without WebGPU or `shader-f16`:** Smart is disabled. A WASM fallback would be single-threaded, because static hosting can't send COOP/COEP, and would take tens of seconds per click.
-6. **Weights:** same-origin static files from `npm run fetch-model`, at a pinned revision with a sha256 check, kept out of git. The alternatives are Git LFS, or Hugging Face at runtime, which is a third-party request.
-7. **Keys:** `M` for Smart select. Escape discards a pending prompt before it selects Pan.
-8. **Bands:** as displayed, meaning bands 1–3, or band 1 as grey, with the preview stretch. No band picker in v1.
+## Amendment A (Gage, 2026-10-31): mask choice
+**Why:** Gage reported that, occasionally, a single click gives a mask covering the whole window, or one far too large, and that more clicks often make it worse. The example was a muddy pool between desert and dead trees. The implementer found no bug in coordinates, preprocessing, thresholding or embeddings. The good masks had stability ≥ 0.9. The oversized ones were low-stability blobs (0.1–0.7) that IoU sometimes ranked first, for example IoU 0.96 with stability 0.68 covering 52% of the window. Filtering by stability removed every blob without losing a good mask. The original questions' alternatives are in git history.
+
+- **A1. Choice.** For each of the three masks, compute `stability` over its `side²` logits, then `chooseMask`. The shown mask is the highest IoU among masks with stability ≥ `STABLE`. If none qualifies, it is the most stable. Ties go to the lower index.
+- **A2. Padding point.** Every decode appends the point (0, 0) with label −1, as SAM's reference predictor does when there is no box. v1 has no boxes, so this applies to every decode. Labels become `Int8Array`.
+- **A3. Log.** Each decode whose result is shown writes one `console.info(decodeLog(...))` line from `ui/smart.ts`. There is no UI.
+
+**Interfaces** (`core/smart.ts`, pure):
+- `STABLE = 0.9`.
+- `stability(logits: Float32Array, offset = 1): number`. It is the count of logits > offset divided by the count of logits > −offset, and 0 when the latter is 0.
+- `maskShare(logits: Float32Array): number` is the share of logits > 0.
+- `chooseMask(scores: Float32Array, stabilities: number[]): number` applies A1.
+- `padPrompt(points: Float32Array, labels: Int8Array): { points: Float32Array; labels: Int8Array }` appends (0, 0, −1) to new arrays.
+- `decodeLog(points: number, scores: Float32Array, stabilities: number[], shares: number[], chosen: number): string` gives one line, for example `smart: 2 pts | #0 iou 0.96 stab 0.68 area 52% | #1 iou 0.91 stab 0.95 area 6% * | #2 …`. Values have 2 decimals, the area is a whole percent, and `*` marks the chosen mask.
+
+**Criteria:**
+12. **Unit (core):**
+    - `stability` of logits [2, 0.5, −0.5, −2] is 1/3.
+    - With all logits ≤ −1 it is 0.
+    - `maskShare` of the same logits is 0.5.
+13. **Unit (core):** `chooseMask`:
+    - scores [0.96, 0.91, 0.80] with stabilities [0.68, 0.95, 0.97] give 1;
+    - stabilities [0.5, 0.7, 0.6] give 1, the most stable;
+    - equal qualifying scores give the lower index.
+14. **Unit (core):**
+    - `padPrompt` of one point returns 2 points and labels [l, −1], with the last point (0, 0), and leaves its inputs unchanged.
+    - `decodeLog` of a fixed input equals the expected string.
+15. **Unit (ui, fake Segmenter):**
+    - every `decode` call's labels end with −1, and its points end with (0, 0);
+    - with masks whose stabilities are [0.68, 0.95, 0.97] and IoU scores [0.96, 0.91, 0.80], the shown bits are mask 1's `maskBits`;
+    - each shown decode makes exactly one `console.info` call, equal to `decodeLog` of its values, and a superseded decode makes none.
