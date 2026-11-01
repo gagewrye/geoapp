@@ -1,5 +1,6 @@
 // The ORT worker (ADR 0031): SAM 2.1 Tiny's encoder and decoder on WebGPU only, holding one embedding.
 // ORT is imported here, dynamically, so neither the main bundle nor this worker's first load contains it.
+// The webgpu build (1.31.1) loads this wasm, 28.7 MB (7.3 MB gzip); ADR 0031 asks for it to be recorded.
 import wasmUrl from "onnxruntime-web/ort-wasm-simd-threaded.asyncify.wasm?url";
 import type { InferenceSession, Tensor } from "onnxruntime-web/webgpu";
 import { SAM_SIDE } from "../core/smart";

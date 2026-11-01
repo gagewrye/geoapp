@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "check": "npm run lint && npm run typecheck && npm run test",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "fetch-model": "node scripts/fetch-model.mjs"
   },
   "dependencies": {
     "geotiff": "3.0.5",
