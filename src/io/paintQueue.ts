@@ -8,7 +8,8 @@ import type { RasterSource } from "./source";
 import type { StrokeEdit, UndoHistory } from "./undoHistory";
 
 /** One pointer move (spec 023 F6): the union of its footprints as spans, their bounding box, label value, paint or erase, and the stroke's undo edit. */
-export type PaintOp = { spans: Span[]; box: Window; value: number; erase: boolean; stroke?: StrokeEdit };
+// done hears how the op ended: applied, refused at the cap, or dropped with the queue (spec 046's commit).
+export type PaintOp = { spans: Span[]; box: Window; value: number; erase: boolean; stroke?: StrokeEdit; done?: (r: "ok" | "full" | "dropped") => void };
 
 /** A single footprint as a PaintOp. */
 export const cellOp = (w: Window, value: number, erase: boolean, stroke?: StrokeEdit): PaintOp => ({ spans: windowSpans(w), box: w, value, erase, stroke });
@@ -58,11 +59,13 @@ export class PaintQueue {
   clear(): void {
     this.generation++;
     this.running = false;
+    const dropped = this.ops;
     this.ops = [];
     this.pending.clear();
     this.held.clear();
     this.history?.dropQueued();
     this.setBusy(false);
+    for (const op of dropped) op.done?.("dropped");
   }
 
   private setBusy(busy: boolean): void {
@@ -124,6 +127,7 @@ export class PaintQueue {
         if (op.stroke) this.history?.applied(op.stroke);
         if (full) this.on.full();
         this.on.applied(keys);
+        op.done?.(full ? "full" : "ok");
         if (!this.ops.length) this.setBusy(false);
       }
     } catch (e) {

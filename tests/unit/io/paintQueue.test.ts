@@ -141,6 +141,22 @@ describe("paint reads (criterion 8)", () => {
     expect(store.tiles.size).toBe(256);
     expect(store.tiles.get("0,0")![100 * 256 + 100]).toBe(2);
   });
+
+  it("tells each op's done how it ended: full, ok, or dropped by clear (spec 046 scope 7)", async () => {
+    const { source } = fakeSource({ width: 4096, height: 8192 }, () => 5);
+    const store = emptyStore(4096, 8192);
+    for (let i = 0; i < 256; i++) store.tiles.set(`${(i % 16) * 256},${Math.floor(i / 16) * 256}`, new Uint8Array(65536).fill(1));
+    const q = new PaintQueue(source, () => store, { applied() {}, full() {}, busy() {}, error: (e) => { throw e; } });
+    const ends: string[] = [];
+    const op = (c: number, r: number, tag: string) => ({ ...cellOp(dab(store, c, r), 2, false), done: (x: string) => ends.push(`${tag} ${x}`) });
+    q.push(op(100, 16 * 256 + 100, "a"));
+    q.push(op(100, 100, "b"));
+    await idle(q);
+    expect(ends).toEqual(["a full", "b ok"]);
+    q.push(op(100, 20 * 256 + 100, "c")); // waits for its mask read
+    q.clear();
+    expect(ends).toEqual(["a full", "b ok", "c dropped"]);
+  });
 });
 
 describe("errors", () => {
