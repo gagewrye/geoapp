@@ -25,22 +25,22 @@ type Deps = {
 };
 
 /**
- * Single keys to their SHORTCUTS action (spec 039): a KeyboardEvent.key, or a code for keys read by position, such as
+ * Single keys to their SHORTCUTS id (specs 039, 045): a KeyboardEvent.key, or a code for keys read by position, such as
  * the peek key left of 1 on US and UK layouts (spec 034). WASD, \, Home and ? are handled by navigation, layout, main
  * and help, and listed here so the help table can be checked against one map.
  */
 export const KEYMAP: Record<string, string> = {
-  b: "Paint", e: "Erase", p: "Pan", Escape: "Pan", Space: "Pan while held", "[": "Smaller brush", "]": "Larger brush",
-  ...Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => [String(n), "Select class 1-9"])),
-  i: "Pick the class under the pointer", h: "Show or hide labels", Backquote: "Hide labels while held",
-  Backslash: "Hide the side panels", Home: "Zoom to the raster", "?": "Shortcuts",
-  KeyW: "Move the map", KeyA: "Move the map", KeyS: "Move the map", KeyD: "Move the map",
+  b: "paint", e: "erase", p: "pan", Escape: "pan", Space: "hold-pan", "[": "brush-smaller", "]": "brush-larger",
+  ...Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => [String(n), "select-class"])),
+  i: "pick", h: "toggle-labels", Backquote: "peek",
+  Backslash: "collapse", Home: "home", "?": "help",
+  KeyW: "move", KeyA: "move", KeyS: "move", KeyD: "move",
 };
-/** The action of a key event: by its key first (so letters follow the layout), else by its code. */
+/** The SHORTCUTS id of a key event: by its key first (so letters follow the layout), else by its code. */
 export const actionOf = (e: Pick<KeyboardEvent, "key" | "code">): string | undefined =>
   KEYMAP[e.key.length === 1 ? e.key.toLowerCase() : e.key] ?? KEYMAP[e.code];
 
-const MODES: Record<string, BrushMode> = { Paint: "paint", Erase: "erase", Pan: "pan" };
+const MODES: Record<string, BrushMode> = { paint: "paint", erase: "erase", pan: "pan" };
 
 /** Labelling shortcuts (specs 003, 009, 033, 034): Space holds Pan, [ ] size, 1-9 class, B E P Escape mode, H Show labels, ` held peeks, I picks; keys looked up in KEYMAP. */
 export function initLabelKeys(d: Deps): void {
@@ -58,17 +58,17 @@ export function initLabelKeys(d: Deps): void {
   window.addEventListener("keydown", (e) => {
     if (!d.open() || e.ctrlKey || e.metaKey || e.altKey) return;
     const a = actionOf(e);
-    if (a === "Pan while held") {
+    if (a === "hold-pan") {
       if (!nativeSpace(document.activeElement)) { e.preventDefault(); d.brush.setSpace(true); }
       return;
     }
     if (inTextField(document.activeElement)) return;
-    if (a === "Hide labels while held") { if (!e.repeat && !d.stroking() && d.view.peek(true)) peeking = true; }
-    else if (a === "Show or hide labels") { if (!e.repeat) d.view.toggle(); }
-    else if (a === "Pick the class under the pointer") d.pick?.();
-    else if (a === "Smaller brush") d.size.step(-1);
-    else if (a === "Larger brush") d.size.step(1);
-    else if (a === "Select class 1-9") { if (Number(e.key) <= d.classCount()) d.select(Number(e.key) - 1); }
+    if (a === "peek") { if (!e.repeat && !d.stroking() && d.view.peek(true)) peeking = true; }
+    else if (a === "toggle-labels") { if (!e.repeat) d.view.toggle(); }
+    else if (a === "pick") d.pick?.();
+    else if (a === "brush-smaller") d.size.step(-1);
+    else if (a === "brush-larger") d.size.step(1);
+    else if (a === "select-class") { if (Number(e.key) <= d.classCount()) d.select(Number(e.key) - 1); }
     else {
       const m = a === undefined ? undefined : MODES[a];
       if (m && (m === "pan" || d.canPaint())) d.setMode(m);
@@ -76,8 +76,8 @@ export function initLabelKeys(d: Deps): void {
   });
   window.addEventListener("keyup", (e) => {
     const a = actionOf(e);
-    if (a === "Hide labels while held") { unpeek(); return; }
-    if (a !== "Pan while held") return;
+    if (a === "peek") { unpeek(); return; }
+    if (a !== "hold-pan") return;
     if (d.open() && !nativeSpace(document.activeElement)) e.preventDefault();
     d.brush.setSpace(false);
   });

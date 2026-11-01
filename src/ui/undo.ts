@@ -1,5 +1,6 @@
 import type { LabelStore } from "../core/labelStore";
 import { UndoHistory, type StrokeEdit } from "../io/undoHistory";
+import { IS_MAC } from "./shortcuts";
 
 type Deps = {
   button: HTMLButtonElement;
@@ -11,10 +12,12 @@ type Deps = {
   shortcut: () => boolean;
   /** An undo or redo changed these tiles. */
   undone: (keys: Iterable<string>) => void;
+  /** Cmd, not Ctrl, is the undo modifier: IS_MAC unless a test says otherwise. */
+  mac?: boolean;
 };
 
-/** Paint undo's wiring (specs 010, 037): Undo and Ctrl+Z (Cmd+Z on macOS); Redo, Ctrl+Shift+Z (Cmd+Shift+Z) and Ctrl+Y. */
-export function initUndo({ button, redoButton, store, blocked, shortcut, undone }: Deps) {
+/** Paint undo's wiring (specs 010, 037, 045): Undo and Mod+Z; Redo, Mod+Shift+Z and Ctrl+Y, and Ctrl+Shift+Z on Mac too. */
+export function initUndo({ button, redoButton, store, blocked, shortcut, undone, mac = IS_MAC }: Deps) {
   const history = new UndoHistory(store);
   let current: StrokeEdit | null = null;
 
@@ -32,11 +35,12 @@ export function initUndo({ button, redoButton, store, blocked, shortcut, undone 
 
   button.addEventListener("click", undo);
   redoButton.addEventListener("click", redo);
-  const mac = /Mac|iPhone|iPad/.test(navigator.platform);
   window.addEventListener("keydown", (e) => {
     const k = e.key.toLowerCase(), mod = mac ? e.metaKey : e.ctrlKey;
     if (e.altKey) return;
-    const act = k === "z" && mod ? (e.shiftKey ? redo : undo) : k === "y" && e.ctrlKey && !e.shiftKey ? redo : null;
+    // on Mac Ctrl+Shift+Z redoes too, as nothing else binds it; Ctrl+Z stays unbound there (spec 045)
+    const act = k === "z" && e.shiftKey && (mod || e.ctrlKey) ? redo : k === "z" && mod ? undo
+      : k === "y" && e.ctrlKey && !e.shiftKey ? redo : null;
     if (act && shortcut()) { e.preventDefault(); act(); }
   });
 
