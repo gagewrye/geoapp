@@ -30,6 +30,6 @@ export async function fetchCached(url: string, onProgress: (done: number, total:
   const bytes = new Uint8Array(done);
   let o = 0;
   for (const p of parts) { bytes.set(p, o); o += p.length; }
-  await cache.put(url, new Response(bytes.slice()));
+  await cache.put(url, new Response(bytes)); // Response copies a BufferSource itself
   return bytes;
 }

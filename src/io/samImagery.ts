@@ -6,7 +6,7 @@ import { TILE_SIZE } from "../core/types";
 import type { ImagerySource } from "./source";
 
 /** A window's encoder tensor (spec 046 scope 4): the displayed bands in the preview's colours, read one 256 px tile at a time. */
-// So the model sees what the user sees: nodata and alpha-0 pixels are black, and padding is 0.
+// So the model sees what the user sees; nodata, alpha-0 pixels and padding are the ImageNet mean grey (0 after normalisation).
 export async function readSamInput(source: ImagerySource, w: Window, ranges: [number, number][], signal: AbortSignal): Promise<Float32Array> {
   const { bandCount, alpha, nodata } = source.meta;
   const samples = displaySamples(bandCount, alpha);

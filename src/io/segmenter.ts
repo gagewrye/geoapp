@@ -35,7 +35,7 @@ type Reply = { id: number; ok: true; value: unknown } | { id: number; ok: false;
 
 /** Downloads (or reads from the cache) the model, then loads it in the ORT worker; progress counts bytes of all four files. */
 export async function loadSegmenter(onProgress: (done: number, total: number) => void, signal: AbortSignal): Promise<Segmenter | "no-webgpu"> {
-  if (!(await hasWebGpu())) return "no-webgpu";
+  // smartLoad's ensure() checked WebGPU before asking to download; the worker checks again where ORT runs
   const total = FILES.reduce((n, [, bytes]) => n + bytes, 0);
   const files: Uint8Array[] = [];
   let before = 0;
