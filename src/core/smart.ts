@@ -31,11 +31,41 @@ export function promptPoints(points: [number, number][], w: Window): Float32Arra
   return Float32Array.from(points.flatMap(([c, r]) => [c + 0.5 - w.x0, r + 0.5 - w.y0]));
 }
 
-/** The index of the first highest score. */
-export function bestMask(scores: Float32Array): number {
-  let best = 0;
-  for (let i = 1; i < scores.length; i++) if (scores[i]! > scores[best]!) best = i;
+/** Stability below which a mask is passed over: SAM's own threshold for its automatic masks. */
+export const STABLE = 0.9;
+
+/** SAM's stability score: logits > offset over logits > -offset; 0 when none exceed -offset. */
+export function stability(logits: Float32Array, offset = 1): number {
+  let hi = 0, lo = 0;
+  for (const v of logits) {
+    if (v > offset) hi++;
+    if (v > -offset) lo++;
+  }
+  return lo === 0 ? 0 : hi / lo;
+}
+
+/** The share of logits above 0, i.e. of the window the mask covers. */
+export function maskShare(logits: Float32Array): number {
+  let n = 0;
+  for (const v of logits) if (v > 0) n++;
+  return logits.length === 0 ? 0 : n / logits.length;
+}
+
+/** Highest IoU among masks at least STABLE, else the most stable; ties to the lower index. */
+export function chooseMask(scores: Float32Array, stabilities: number[]): number {
+  let best = -1;
+  for (let i = 0; i < scores.length; i++) if (stabilities[i]! >= STABLE && (best < 0 || scores[i]! > scores[best]!)) best = i;
+  if (best >= 0) return best;
+  best = 0;
+  for (let i = 1; i < stabilities.length; i++) if (stabilities[i]! > stabilities[best]!) best = i;
   return best;
+}
+
+/** One console line per shown decode, so a bad choice can be read off without a debugger. */
+export function decodeLog(points: number, scores: Float32Array, stabilities: number[], shares: number[], chosen: number): string {
+  const masks = [...scores].map((s, i) =>
+    `#${i} iou ${s.toFixed(2)} stab ${stabilities[i]!.toFixed(2)} area ${Math.round(shares[i]! * 100)}%${i === chosen ? " *" : ""}`);
+  return [`smart: ${points} pts`, ...masks].join(" | ");
 }
 
 /** Source index pairs and weights for bilinear upsampling with half-pixel centres, edges clamped. */

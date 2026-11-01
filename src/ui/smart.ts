@@ -1,5 +1,5 @@
 import type { Window } from "../core/grid";
-import { bestMask, maskBits, maskSpans, promptPoints, samWindow } from "../core/smart";
+import { chooseMask, decodeLog, maskBits, maskShare, maskSpans, promptPoints, samWindow, stability } from "../core/smart";
 import { spansBox } from "../core/spans";
 import type { PaintOp } from "../io/paintQueue";
 import type { Segmenter } from "../io/segmenter";
@@ -76,10 +76,12 @@ export function initSmart(d: Deps) {
       if (!current()) return;
       const r = await seg.decode(promptPoints(p.points, p.window), Uint8Array.from(p.labels));
       if (!current()) return;
-      // the export returns only SAM's three multimask outputs (tokens 1-3), for any point count, so the best-scoring
-      // one shows; SAM's single-mask output (token 0) isn't among them (ADR 0032)
-      const k = bestMask(r.scores), plane = r.side * r.side;
-      setMask({ bits: maskBits(r.masks.subarray(k * plane, (k + 1) * plane), r.side, p.window), window: p.window });
+      // the export returns only SAM's three multimask outputs (tokens 1-3), for any point count; IoU alone picks
+      // unstable blobs, so the most confident stable one shows (ADR 0032, spec 046 Amendment A)
+      const plane = r.side * r.side, planes = [...r.scores].map((_, i) => r.masks.subarray(i * plane, (i + 1) * plane));
+      const stab = planes.map((m) => stability(m)), k = chooseMask(r.scores, stab);
+      setMask({ bits: maskBits(planes[k]!, r.side, p.window), window: p.window });
+      console.info(decodeLog(p.points.length, r.scores, stab, planes.map(maskShare), k));
     } catch (e) {
       if (p === prompt && !p.ac.signal.aborted) d.error(e);
     }

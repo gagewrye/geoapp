@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Window } from "../../../src/core/grid";
 import { emptyStore } from "../../../src/core/labelStore";
-import { maskBits, maskSpans, SAM_SIDE } from "../../../src/core/smart";
+import { decodeLog, maskBits, maskShare, maskSpans, SAM_SIDE } from "../../../src/core/smart";
 import type { PaintOp } from "../../../src/io/paintQueue";
 import type { Masks, Segmenter } from "../../../src/io/segmenter";
 import { UndoHistory } from "../../../src/io/undoHistory";
@@ -10,11 +10,11 @@ import { initSmart, type SmartMask } from "../../../src/ui/smart";
 // Spec 046 criterion 3, with a fake Segmenter that returns a square around each include point.
 const SIDE = 256, R = 8; // logits half-width: 32 encoder pixels
 
-/** side² logits: 1 on squares of half-width r around the points (encoder pixels), else -1. */
-function squares(points: number[], r: number, into = new Float32Array(SIDE * SIDE).fill(-1)): Float32Array {
+/** side² logits: 2 on squares of half-width r around the points (encoder pixels), else -2, so every mask is stable. */
+function squares(points: number[], r: number, into = new Float32Array(SIDE * SIDE).fill(-2)): Float32Array {
   for (let i = 0; i < points.length; i += 2) {
     const cx = Math.floor(points[i]! / 4), cy = Math.floor(points[i + 1]! / 4);
-    for (let y = Math.max(0, cy - r); y <= Math.min(SIDE - 1, cy + r); y++) for (let x = Math.max(0, cx - r); x <= Math.min(SIDE - 1, cx + r); x++) into[y * SIDE + x] = 1;
+    for (let y = Math.max(0, cy - r); y <= Math.min(SIDE - 1, cy + r); y++) for (let x = Math.max(0, cx - r); x <= Math.min(SIDE - 1, cx + r); x++) into[y * SIDE + x] = 2;
   }
   return into;
 }
@@ -27,6 +27,8 @@ function fakeSegmenter() {
     log,
     /** Holds every decode (and with holdEncode, every encode) until release() is called. */
     hold: false,
+    /** When set, every decode returns these masks and scores instead of squares. */
+    fixed: null as Masks | null,
     holdEncode: false,
     release: () => { for (const g of gates.splice(0)) g(); },
     async encode(_input: Float32Array, key: string) {
@@ -39,8 +41,9 @@ function fakeSegmenter() {
     async decode(points: Float32Array, labels: Uint8Array): Promise<Masks> {
       log.decodes.push([...points]);
       if (s.hold) await new Promise<void>((r) => gates.push(r));
+      if (s.fixed) return { masks: s.fixed.masks.slice(), scores: s.fixed.scores.slice(), side: s.fixed.side };
       // as the export does for any point count: three masks, of half-width R - 2, R and R + 2, the second scoring best
-      const n = 3, masks = new Float32Array(n * SIDE * SIDE).fill(-1);
+      const n = 3, masks = new Float32Array(n * SIDE * SIDE).fill(-2);
       const include = [...points].filter((_, j) => labels[j >> 1] === 1);
       for (let k = 0; k < n; k++) squares(include, R - 2 + 2 * k, masks.subarray(k * SIDE * SIDE, (k + 1) * SIDE * SIDE));
       return { masks, scores: Float32Array.from({ length: n }, (_, k) => (k === 1 ? 0.9 : 0.5)), side: SIDE };
@@ -177,5 +180,44 @@ describe("smart select prompts (criterion 3)", () => {
     ops[0]!.done!("full");
     expect(smart.apply()).toBe(true);
     expect(ops).toHaveLength(2);
+  });
+});
+
+// Amendment A, criterion 15 (A1 and A3).
+describe("mask choice and decode log (criterion 15)", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  /** Three masks with stabilities [0.68, 0.95, 0.97]: 100 logits above -1, of which that many are above 1, in a different band each. */
+  function unstableFirst(): Masks {
+    const masks = new Float32Array(3 * SIDE * SIDE).fill(-5);
+    [68, 95, 97].forEach((hi, k) => {
+      const plane = masks.subarray(k * SIDE * SIDE, (k + 1) * SIDE * SIDE), row = (40 + 60 * k) * SIDE;
+      for (let i = 0; i < 100; i++) plane[row + i] = i < hi ? 3 : 0.5;
+    });
+    return { masks, scores: Float32Array.from([0.96, 0.91, 0.8]), side: SIDE };
+  }
+
+  it("shows the highest-IoU stable mask, and logs each shown decode once", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    const { seg, smart, shown } = setup();
+    const fixed = seg.fixed = unstableFirst();
+    smart.click([1500, 1000], true);
+    await settle();
+    const m = shown.at(-1)!, plane = (k: number) => fixed.masks.subarray(k * SIDE * SIDE, (k + 1) * SIDE * SIDE);
+    expect([...m.bits]).toEqual([...maskBits(plane(1), SIDE, m.window)]);
+    const shares = [0, 1, 2].map((k) => maskShare(plane(k)));
+    expect(info.mock.calls).toEqual([[decodeLog(1, fixed.scores, [0.68, 0.95, 0.97], shares, 1)]]);
+  });
+
+  it("a superseded decode logs nothing", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    const { seg, smart } = setup();
+    seg.hold = true;
+    smart.click([1500, 1000], true);
+    await settle();
+    smart.discard();
+    seg.release();
+    await settle();
+    expect(info).not.toHaveBeenCalled();
   });
 });
