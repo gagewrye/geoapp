@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Window } from "../../../src/core/grid";
-import { bestMask, maskBits, maskSpans, promptPoints, SAM_SIDE, samInput, samWindow } from "../../../src/core/smart";
+import { chooseMask, decodeLog, maskBits, maskShare, maskSpans, promptPoints, SAM_SIDE, samInput, samWindow, stability } from "../../../src/core/smart";
 
 // Spec 046 criteria 1 and 2.
 describe("samWindow (criterion 1)", () => {
@@ -67,7 +67,7 @@ function reference(logits: Float32Array, side: number, w: Window): Uint8Array {
   return out;
 }
 
-describe("maskBits, maskSpans and bestMask (criterion 2)", () => {
+describe("maskBits and maskSpans (criterion 2)", () => {
   let seed = 7;
   const rand = () => ((seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31) * 2 - 1;
   const logits = Float32Array.from({ length: 256 * 256 }, rand);
@@ -95,8 +95,31 @@ describe("maskBits, maskSpans and bestMask (criterion 2)", () => {
     });
   }
 
-  it("bestMask is the first maximum", () => {
-    expect(bestMask(Float32Array.from([0.2, 0.9, 0.9]))).toBe(1);
-    expect(bestMask(Float32Array.from([0.5]))).toBe(0);
+});
+
+// Amendment A, criteria 12-14 (A2's padPrompt isn't built: the export pads internally).
+describe("stability and maskShare (criterion 12)", () => {
+  const logits = Float32Array.from([2, 0.5, -0.5, -2]);
+  it("stability is the share of logits > 1 among those > -1", () => {
+    expect(stability(logits)).toBeCloseTo(1 / 3, 12);
+    expect(stability(Float32Array.from([-1, -2, -5]))).toBe(0);
+  });
+  it("maskShare is the share of logits > 0", () => expect(maskShare(logits)).toBe(0.5));
+});
+
+describe("chooseMask (criterion 13)", () => {
+  const scores = Float32Array.from([0.96, 0.91, 0.8]);
+  it("takes the highest IoU among stable masks", () => expect(chooseMask(scores, [0.68, 0.95, 0.97])).toBe(1));
+  it("takes the most stable when none is stable", () => expect(chooseMask(scores, [0.5, 0.7, 0.6])).toBe(1));
+  it("breaks ties to the lower index", () => {
+    expect(chooseMask(Float32Array.from([0.9, 0.9, 0.9]), [0.95, 0.95, 0.95])).toBe(0);
+    expect(chooseMask(Float32Array.from([0.5, 0.9, 0.9]), [0.5, 0.7, 0.7])).toBe(1);
+  });
+});
+
+describe("decodeLog (criterion 14)", () => {
+  it("writes one line per decode, marking the chosen mask", () => {
+    expect(decodeLog(2, Float32Array.from([0.96, 0.91, 0.8]), [0.68, 0.95, 0.97], [0.523, 0.06, 0.004], 1))
+      .toBe("smart: 2 pts | #0 iou 0.96 stab 0.68 area 52% | #1 iou 0.91 stab 0.95 area 6% * | #2 iou 0.80 stab 0.97 area 0%");
   });
 });
