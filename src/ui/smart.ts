@@ -35,6 +35,8 @@ const inside = (w: Window, [c, r]: [number, number]) => c >= w.x0 && c < w.x0 + 
 export function initSmart(d: Deps) {
   let prompt: Prompt | null = null, mask: SmartMask | null = null;
   let raster = 0, encoding = 0; // raster: bumped by open(), so an older raster's embedding is never reused
+  // the encode running, whatever its prompt: a prompt in the same window waits for it (Escape mid-encode, then a click)
+  let inflight: { key: string; done: Promise<void> } | null = null;
   const setMask = (m: SmartMask | null) => { mask = m; d.show(m); };
   const drop = () => {
     prompt?.ac.abort();
@@ -42,7 +44,16 @@ export function initSmart(d: Deps) {
     if (mask) setMask(null);
   };
 
-  const encode = async (p: Prompt, seg: Segmenter) => {
+  const encode = (p: Prompt, seg: Segmenter): Promise<void> => {
+    const shared = inflight?.key === p.key ? inflight.done : null;
+    // a dropped prompt's encode that never reached the worker (its read was aborted) leaves this one to encode
+    const done = shared ? shared.catch(() => encodeOwn(p, seg)) : encodeOwn(p, seg);
+    const mine = { key: p.key, done };
+    inflight = mine;
+    void done.catch(() => {}).finally(() => { if (inflight === mine) inflight = null; });
+    return done;
+  };
+  const encodeOwn = async (p: Prompt, seg: Segmenter) => {
     if (encoding++ === 0) d.reading(true);
     try {
       const input = await d.input(p.window, p.ac.signal);
@@ -63,11 +74,11 @@ export function initSmart(d: Deps) {
         await p.encoded;
       }
       if (!current()) return;
-      const one = p.points.length === 1;
       const r = await seg.decode(promptPoints(p.points, p.window), Uint8Array.from(p.labels));
       if (!current()) return;
-      // with one point the decoder's three masks are ranked; with more, SAM's single-mask output is the first
-      const k = one ? bestMask(r.scores) : 0, plane = r.side * r.side;
+      // the export returns only SAM's three multimask outputs (tokens 1-3), for any point count, so the best-scoring
+      // one shows; SAM's single-mask output (token 0) isn't among them (ADR 0032)
+      const k = bestMask(r.scores), plane = r.side * r.side;
       setMask({ bits: maskBits(r.masks.subarray(k * plane, (k + 1) * plane), r.side, p.window), window: p.window });
     } catch (e) {
       if (p === prompt && !p.ac.signal.aborted) d.error(e);

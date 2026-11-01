@@ -25,18 +25,24 @@ function fakeSegmenter() {
   const gates: (() => void)[] = [];
   const s = {
     log,
-    /** Holds every decode until release() is called. */
+    /** Holds every decode (and with holdEncode, every encode) until release() is called. */
     hold: false,
+    holdEncode: false,
     release: () => { for (const g of gates.splice(0)) g(); },
-    async encode(_input: Float32Array, key: string) { log.encodes.push(key); held = null; await Promise.resolve(); held = key; },
+    async encode(_input: Float32Array, key: string) {
+      log.encodes.push(key);
+      held = null;
+      await (s.holdEncode ? new Promise<void>((r) => gates.push(r)) : Promise.resolve());
+      held = key;
+    },
     has: (key: string) => held === key,
     async decode(points: Float32Array, labels: Uint8Array): Promise<Masks> {
       log.decodes.push([...points]);
       if (s.hold) await new Promise<void>((r) => gates.push(r));
-      // one point: three masks of half-width R - 2, R and R + 2, the second scoring best; more points: one mask
-      const n = labels.length === 1 ? 3 : 1, masks = new Float32Array(n * SIDE * SIDE).fill(-1);
+      // as the export does for any point count: three masks, of half-width R - 2, R and R + 2, the second scoring best
+      const n = 3, masks = new Float32Array(n * SIDE * SIDE).fill(-1);
       const include = [...points].filter((_, j) => labels[j >> 1] === 1);
-      for (let k = 0; k < n; k++) squares(include, n === 1 ? R : R - 2 + 2 * k, masks.subarray(k * SIDE * SIDE, (k + 1) * SIDE * SIDE));
+      for (let k = 0; k < n; k++) squares(include, R - 2 + 2 * k, masks.subarray(k * SIDE * SIDE, (k + 1) * SIDE * SIDE));
       return { masks, scores: Float32Array.from({ length: n }, (_, k) => (k === 1 ? 0.9 : 0.5)), side: SIDE };
     },
   };
@@ -81,6 +87,30 @@ describe("smart select prompts (criterion 3)", () => {
     await settle();
     const w = shown.at(-1)!.window;
     expect([...shown.at(-1)!.bits]).toEqual([...maskBits(squares([1500.5 - w.x0, 1000.5 - w.y0], R), SIDE, w)]);
+  });
+
+  it("with more points, the best-scoring mask shows too", async () => {
+    const { smart, shown } = setup();
+    smart.click([1500, 1000], true);
+    smart.click([1600, 1100], true);
+    await settle();
+    const w = shown.at(-1)!.window;
+    expect([...shown.at(-1)!.bits]).toEqual([...maskBits(squares([1500.5 - w.x0, 1000.5 - w.y0, 1600.5 - w.x0, 1100.5 - w.y0], R), SIDE, w)]);
+  });
+
+  it("Escape during an encode, then a click in the same window, waits for that encode instead of encoding again", async () => {
+    const { seg, smart, shown } = setup();
+    seg.holdEncode = true;
+    smart.click([1500, 1000], true);
+    await settle();
+    expect(seg.log.encodes).toHaveLength(1);
+    smart.discard();
+    smart.click([1510, 1000], true);
+    await settle();
+    seg.release();
+    await settle();
+    expect(seg.log.encodes).toHaveLength(1);
+    expect(shown.at(-1)).not.toBeNull();
   });
 
   it("a click outside the window starts a new prompt", async () => {
