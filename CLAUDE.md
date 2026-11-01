@@ -10,7 +10,7 @@ Local-first browser app for labelling geospatial imagery. User data (local raste
 ## Layout
 ```
 src/
-  core/   pure logic: projections, preview warping and decimation, nodata masks, classes, label store and brush, label quads, undo, label seeding, WASD steps. No DOM.
+  core/   pure logic: projections, preview warping and decimation, nodata masks, classes, label store and brush, label quads, undo, label seeding, WASD steps, smart-select windows and masks. No DOM.
   io/     raster read/write, file access
   map/    MapLibre layers, brush, navigation
   ui/     DOM wiring only
