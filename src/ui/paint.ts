@@ -68,6 +68,12 @@ export function initPaint(d: Deps) {
         queue.push(op);
       }
     },
+    /** One whole op, such as spec 046's smart fill; nothing while locked. */
+    push(op: PaintOp): void {
+      if (d.locked() || !queue) return;
+      d.op?.(op);
+      queue.push(op);
+    },
     /** The Paint hover moved: read the bands under and next to it first (F3), and compute nearby quads between strokes (F5). */
     // A quad set can take 100 ms on UTM: none is queued with no hover, or while a stroke is drawn or its moves
     // wait, so idle quad work never delays a stroke's moves and frames; tiles a stroke makes compute theirs on demand.

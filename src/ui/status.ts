@@ -29,8 +29,8 @@ export function initStatus(map: MapLibreMap, grid: () => Grid | null) {
 
   return {
     /** The brush mode, selected class or brush side changed. */
-    tool(t: { mode: BrushMode; className: string; side: number } | null): void {
-      tool.textContent = t ? formatTool(t.mode, t.className, t.side) : "";
+    tool(t: { mode: BrushMode; className: string; side: number; reading?: boolean } | null): void {
+      tool.textContent = t ? formatTool(t.mode, t.className, t.side, t.reading) : "";
     },
     /** A raster opened: the pixel field follows its grid from the next move. */
     refresh: later,

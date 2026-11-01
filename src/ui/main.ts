@@ -2,7 +2,9 @@ import "./style.css";
 import { PREVIEW_MAX_SIDE } from "../core/maskPreview";
 import { openFile } from "../io/geotiffSource";
 import { buildPreview, openRaster } from "../io/pipeline";
-import type { RasterSource } from "../io/source";
+import { readSamInput } from "../io/samImagery";
+import type { Segmenter } from "../io/segmenter";
+import type { ImagerySource, RasterSource } from "../io/source";
 import { createMap } from "../map/map";
 import { createNavigation } from "../map/navigation";
 import { fitRaster, previewBounds, showPreview, type Bounds } from "../map/preview";
@@ -16,6 +18,7 @@ import { errorText, MESSAGES, messageSink } from "./messages";
 import { initProgress } from "./progress";
 import { initPersist } from "./persist";
 import { initSeeding } from "./seeding";
+import { initSmartLoad } from "./smartLoad";
 import { initStatus } from "./status";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -55,10 +58,15 @@ const testHook = (name: string, arg: unknown) => {
 
 // The labels' callbacks run only after the user acts, by when seeding exists.
 const hookValue = (name: string) => (window as unknown as { __geoapp?: Record<string, unknown> }).__geoapp?.[name];
+// Smart select (spec 046) reads the imagery in the preview's colours, so the model sees what the user sees
+let ranges: [number, number][] = [];
+const smartLoad = initSmartLoad({ hook: () => (hookValue("segmenter") as Segmenter | null | undefined) ?? null, confirm: (t) => confirm(t), say, progress,
+  cancel: $<HTMLButtonElement>("smart-cancel") });
 const labels = initLabels({ map, say, toolChanged: () => queueMicrotask(() => status.tool(labels.tool())), // deferred: initLabels calls it before `labels` is assigned
   onBusy: () => seeding.sync(), onChange: () => seeding.sync(), panning: () => nav.panning(),
   imageryBusy: fullRes.busy, mapMoving: fullRes.moving, importing: () => seeding.seeding() || hookValue("pauseMasks") === true,
   sweep: () => hookValue("sweep") !== false, op: (o) => testHook("paintOp", o),
+  smart: { load: smartLoad, input: (w, signal) => readSamInput(source as ImagerySource, w, ranges, signal) },
   edits: { tiles: (k) => persist.tiles(k), record: () => persist.record(), replaced: () => persist.replaced(), strokeEnded: () => persist.strokeEnded() } });
 // Spec 031: labels are kept in this browser as they change, and offered back when the raster is opened again
 const persist = initPersist({ labels, open: openSessionStore, state: $("save-state"), win: window, doc: document,
@@ -74,9 +82,9 @@ map.on("load", () => {
   // rasterFile: set by a test to see (and wrap the reads of) each opened raster before its preview is built; fullRes: spec 020's block limit, which a test may lower before an open.
   // Spec 023: masksDone() says every valid mask is read; a test may set sweep = false (one op per stroke cell), paintOp to see each op,
   // and pauseMasks = true to hold the background mask reads, so strokes wait on reads it gates.
-  // Spec 031: persistTiles(keys) marks stored tiles a test or perf run set through the hook as changed.
+  // Spec 031: persistTiles(keys) marks stored tiles a test or perf run set through the hook as changed. Spec 046: segmenter replaces the model.
   const hook = { map, imagery: () => source ?? null, labelFile: null, rasterFile: null, fullRes: fullRes.limits, masksDone: labels.masksDone, sweep: true, paintOp: null, pauseMasks: false,
-    persistTiles: (keys: string[]) => persist.tiles(keys) };
+    persistTiles: (keys: string[]) => persist.tiles(keys), segmenter: null };
   Object.defineProperty(hook, "labels", { get: () => ({ store: labels.store(), classes: labels.classes(), tile: labels.tile }) });
   (window as unknown as Record<string, unknown>).__geoapp = hook;
   $("map").dataset.ready = "true";
@@ -133,6 +141,7 @@ $<HTMLInputElement>("open-raster").addEventListener("change", (ev) => {
     if (stale()) return;
     showPreview(map, preview);
     fitRaster(map, bounds = previewBounds(preview.corners));
+    ranges = preview.ranges;
     const off = fullRes.open(f, preview.ranges);
     labels.imageryReady(true);
     progress.hide();
