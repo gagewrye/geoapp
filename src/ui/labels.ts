@@ -14,6 +14,7 @@ import { initLabelView } from "./labelView";
 import { initModes } from "./modes";
 import { initPaint } from "./paint";
 import { initPicker } from "./picker";
+import { initSmartTool, type SmartInputs } from "./smartTool";
 import { initUndo } from "./undo";
 import type { MessageKind } from "./messages";
 
@@ -35,9 +36,9 @@ type Deps = {
   mapMoving?: () => boolean;
   /** What spec 031 saves: changed tile keys, record edits (classes, selection, view), replaces and stroke ends. */
   edits?: Edits;
-  /** e2e hooks (spec 023): F6 off when false, and each paint op pushed. */
+  /** e2e hooks (spec 023): F6 off when false, and each paint op pushed. Smart select's model loader and imagery read (spec 046). */
   sweep?: () => boolean;
-  op?: (op: PaintOp) => void;
+  op?: (op: PaintOp) => void; smart?: SmartInputs;
 };
 
 type Edits = { tiles(keys: Iterable<string>): void; record(): void; replaced(): void; strokeEnded(): void };
@@ -49,7 +50,7 @@ export type Held = { readonly store: LabelStore; readonly base: MaskBase | null 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 /** Brush labels on local imagery (spec 003): panel, classes, shortcuts, store, paint queue and overlays. */
-export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange, panning, imageryBusy, importing, mapMoving, sweep, op, edits = NO_EDITS }: Deps) {
+export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange, panning, imageryBusy, importing, mapMoving, sweep, op, smart: smartDeps, edits = NO_EDITS }: Deps) {
   let open = false;
   // spec 004's lock: no painting and no class edits, so no list or tile changes under a run (seeding or exporting
   // labels) or a restore offer (spec 031); each holds it under its own name, and it lifts once neither does
@@ -61,16 +62,15 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
   // the Classes section (spec 036)
   const panel = initClassPanel({
     list: $("classes"), add: $<HTMLButtonElement>("class-add"), say, locked: () => locked,
-    recoloured: () => { edits.record(); redraw(store.tiles.keys(), true); brush.refresh(); },
-    selectedChanged: () => { edits.record(); brush.refresh(); toolChanged(); },
+    recoloured: () => { edits.record(); redraw(store.tiles.keys(), true); brush.refresh(); smart?.redraw(); },
+    selectedChanged: () => { edits.record(); brush.refresh(); smart?.redraw(); toolChanged(); },
     edited: () => { edits.record(); toolChanged(); },
   });
   const picker = initPicker({ tile, dims: () => store, classes: panel.classes, select: panel.select, say }); // Alt+click or I (spec 038)
   /** The effective tile at key (stored, else the mask's); null when neither exists. Reads the mask file for an unstored key. */
   async function tile(key: string): Promise<Uint8Array | null> {
     const stored = store.tiles.get(key), [x0, y0] = key.split(",").map(Number) as [number, number];
-    if (stored || !base || !imagery) return stored?.slice() ?? null;
-    return (await baseTile(imagery, base, tileWindow(store, x0, y0))).labels;
+    return stored || !base || !imagery ? stored?.slice() ?? null : (await baseTile(imagery, base, tileWindow(store, x0, y0))).labels;
   }
   const display = labelDisplay(map, () => store, () => panel.classes().map((c) => c.colour));
   const redraw = display.redraw;
@@ -90,15 +90,15 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
   const brush = createBrush(map, {
     side: () => size.side(), colour: () => panel.classes()[panel.selected()]!.colour, cells: paint.cells, hovered: paint.hovered,
     onStroke: (active) => { undo.stroke(active); if (!active) { edits.strokeEnded(); modes.strokeEnded(); } }, panning, pick: picker.pick,
-  });
+    click: (cell, include) => smart?.click(cell, include) }); // Smart mode's clicks (spec 046)
 
-  // hiding labels selects Pan (spec 016)
-  const view = initLabelView(map, (visible) => { if (!visible) modes.setMode("pan"); }, () => edits.record());
-  const modes = initModes({ brush, view, toolChanged });
+  const view = initLabelView(map, (visible) => { if (!visible) modes.setMode("pan"); }, () => edits.record()); // hiding labels selects Pan (spec 016)
+  const modes = initModes({ brush, view, toolChanged: () => { if (modes.mode() !== "smart") smart?.discard(); toolChanged(); }, smart: () => void smart?.choose() }); // leaving Smart drops its prompt
+  const smart = smartDeps && initSmartTool({ map, store: () => store, undo, push: paint.push, panel, locked: () => locked, say, modes, toolChanged, edits, ...smartDeps });
   const size = initBrushSize(() => { brush.refresh(); toolChanged(); });
   initLabelKeys({
     open: () => open, brush, size, select: panel.select, classCount: () => panel.classes().length, pick: () => picker.pick(brush.hoverCell()),
-    setMode: modes.request, canPaint: modes.canPaint, stroking: brush.stroking, view: { toggle: view.toggle, peek: modes.peek },
+    setMode: modes.request, canPaint: modes.canPaint, stroking: brush.stroking, view: { toggle: view.toggle, peek: modes.peek }, smart: smart?.keys,
   });
 
   /** While seeding or exporting labels ("run") or a restore offer settles: the brush, the class list's edits and Undo are off; selecting still works. */
@@ -130,7 +130,7 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
       view.reset();
       display.open(grid);
       open = true;
-      brush.setImagery(grid);
+      brush.setImagery(grid); smart?.open(grid);
       modes.setMode("pan");
       modes.ready(false); // until main draws its preview (spec 019)
       onChange();
@@ -158,7 +158,7 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
     },
     selected: panel.selected,
     /** The status bar's tool: mode, selected class name and brush side. */
-    tool: () => ({ mode: modes.mode(), className: panel.classes()[panel.selected()]?.name ?? "", side: size.side() }),
+    tool: () => ({ mode: modes.mode(), className: panel.classes()[panel.selected()]?.name ?? "", side: size.side(), reading: smart?.reading() ?? false }),
     view: () => view.get(),
     /** Takes the labels off the map for an import (spec 021); the store, classes, base and history stay as they are. */
     hold(): Held { display.hide(); return { store, base }; },

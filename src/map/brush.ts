@@ -5,7 +5,7 @@ import type { Grid } from "../core/types";
 import { brushCursor } from "./cursor";
 import { showHover } from "./hover";
 
-export type BrushMode = "paint" | "erase" | "pan";
+export type BrushMode = "paint" | "erase" | "pan" | "smart";
 type Deps = {
   side: () => number;
   colour: () => string;
@@ -19,6 +19,8 @@ type Deps = {
   panning: () => boolean;
   /** An Alt+left press on a raster cell, in any mode: pick its class instead of painting or panning (spec 038). */
   pick?: (cell: [number, number]) => void;
+  /** Smart mode (spec 046): a left (include) or right click on a raster cell, pressed and released within 4 px. */
+  click?: (cell: [number, number], include: boolean) => void;
 };
 type Stroke = { pointerId: number; erase: boolean; prev: [number, number] | null };
 
@@ -36,7 +38,8 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
   let blocked = false; // while peeking (spec 034): no strokes start, and the cursor shows locked; the footprint stays
   let lastType = "mouse";
   let pointer: { x: number; y: number; target: EventTarget | null } | null = null; // last mouse or pen position
-  const painting = () => grid !== null && mode !== "pan" && !space; // Paint or Erase (spec 033)
+  let press: { pointerId: number; button: number; x: number; y: number } | null = null; // a Smart mode click in progress
+  const painting = () => grid !== null && (mode === "paint" || mode === "erase") && !space; // Paint or Erase (spec 033); Smart pans
 
   // The brush cursor (spec 010) is a class plus a variable, which style.css applies to the canvas over MapLibre's cursors.
   // Locked, a left drag neither paints nor pans, so neither the brush nor MapLibre's grab would be true.
@@ -113,6 +116,7 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
     lastType = e.pointerType;
     if (e.pointerType === "touch") { pointer = null; hover(); return; }
     if (!stroke && !deps.panning() && picks(e)) { deps.pick!(rasterCell(e.clientX, e.clientY, e.target)!); return; }
+    if (mode === "smart" && grid && !space && !e.altKey && (e.button === 0 || e.button === 2)) press = { pointerId: e.pointerId, button: e.button, x: e.clientX, y: e.clientY };
     if (!painting() || stroke || deps.panning() || (e.button !== 0 && e.button !== 2)) return;
     if (locked || blocked) return;
     stroke = { pointerId: e.pointerId, erase: mode === "erase" || e.button === 2, prev: null };
@@ -128,7 +132,14 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
     }
     hover();
   });
-  window.addEventListener("pointerup", (e) => { if (stroke?.pointerId === e.pointerId) end(); });
+  window.addEventListener("pointerup", (e) => {
+    if (stroke?.pointerId === e.pointerId) end();
+    const p = press;
+    if (p?.pointerId !== e.pointerId) return;
+    press = null;
+    const cell = mode === "smart" && e.button === p.button && Math.hypot(e.clientX - p.x, e.clientY - p.y) <= 4 ? rasterCell(e.clientX, e.clientY, e.target) : null;
+    if (cell) deps.click?.(cell, p.button === 0);
+  });
   window.addEventListener("pointercancel", (e) => { if (stroke?.pointerId === e.pointerId) end(); });
   window.addEventListener("blur", () => { end(); space = false; syncHandlers(); pointer = null; hover(); });
   container.addEventListener("pointerleave", (e) => { if (e.pointerType !== "touch") { pointer = null; hover(); } });

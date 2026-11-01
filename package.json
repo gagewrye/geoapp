@@ -12,11 +12,13 @@
     "test": "vitest run",
     "check": "npm run lint && npm run typecheck && npm run test",
     "e2e": "playwright test",
-    "e2e:probe": "playwright test flicker-probe --grep @probe"
+    "e2e:probe": "playwright test flicker-probe --grep @probe",
+    "fetch-model": "node scripts/fetch-model.mjs"
   },
   "dependencies": {
     "geotiff": "3.0.5",
     "maplibre-gl": "6.16.0",
+    "onnxruntime-web": "1.31.1",
     "proj4": "2.22.0"
   },
   "devDependencies": {

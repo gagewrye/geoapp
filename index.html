@@ -23,6 +23,8 @@
         <button id="mode-pan" type="button" aria-pressed="true" aria-label="Pan" title="Pan (P)">&#x2725;</button>
         <button id="mode-paint" type="button" aria-pressed="false" aria-label="Paint" title="Paint (B)">&#x270E;</button>
         <button id="mode-erase" type="button" aria-pressed="false" aria-label="Erase" title="Erase (E)">&#x232B;</button>
+        <button id="mode-smart" type="button" aria-pressed="false" aria-label="Smart select" title="Smart select (M)">&#x2316;</button>
+        <button id="smart-apply" type="button" disabled aria-label="Apply smart selection" title="Apply smart selection (Enter)">&#x2713;</button>
         <hr />
         <button id="brush-smaller" type="button" aria-label="Smaller brush" title="Smaller brush ([)">&minus;</button>
         <span id="brush-size" title="Brush size in raster pixels">7</span>
@@ -64,6 +66,7 @@
       <span id="save-state"></span>
       <span id="message" role="status" aria-live="polite"></span>
       <progress id="open-progress" hidden></progress>
+      <button id="smart-cancel" type="button" hidden>Cancel</button>
       <progress id="import-progress" hidden></progress>
       <button id="import-cancel" type="button" hidden>Cancel</button>
     </footer>

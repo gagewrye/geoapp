@@ -1,7 +1,7 @@
 /**
  * One shortcut (specs 039, 045). Single keys are written as labelKeys' KEYMAP keys: a KeyboardEvent.key, or a code for
  * keys read by position (Space, Backquote, Backslash, KeyW...). Chords use "+", with "Mod" for Cmd on Mac and Ctrl
- * elsewhere, and mouse actions a space ("Right drag"). The id is what KEYMAP maps to and the handlers branch on; the
+ * elsewhere, and mouse actions a space ("Right drag"), or are "Click". The id is what KEYMAP maps to and the handlers branch on; the
  * action is the text the help shows, and a button's title.
  */
 export type Shortcut = { id: string; section: string; keys: string[]; action: string; button?: string };
@@ -17,6 +17,10 @@ export const SHORTCUTS: readonly Shortcut[] = [
   { id: "erase", section: "Tools", keys: ["e"], action: "Erase", button: "mode-erase" },
   { id: "pan", section: "Tools", keys: ["p", "Escape"], action: "Pan", button: "mode-pan" },
   { id: "hold-pan", section: "Tools", keys: ["Space"], action: "Pan while held" },
+  { id: "smart", section: "Tools", keys: ["m"], action: "Smart select", button: "mode-smart" },
+  { id: "smart-point", section: "Tools", keys: ["Click", "Right click"], action: "Include / exclude a point" },
+  { id: "smart-apply", section: "Tools", keys: ["Enter"], action: "Apply smart selection", button: "smart-apply" },
+  { id: "smart-discard", section: "Tools", keys: ["Escape"], action: "Discard the selection" },
   { id: "brush-smaller", section: "Brush", keys: ["["], action: "Smaller brush", button: "brush-smaller" },
   { id: "brush-larger", section: "Brush", keys: ["]"], action: "Larger brush", button: "brush-larger" },
   { id: "right-erase", section: "Brush", keys: ["Right drag"], action: "Erase the selected class (Paint mode)" },
@@ -35,8 +39,8 @@ export const SHORTCUTS: readonly Shortcut[] = [
   { id: "redo", section: "Edit", keys: ["Mod+Shift+Z", "Ctrl+Y"], action: "Redo", button: "redo" },
 ];
 
-/** A key KEYMAP holds: not a chord ("+") or a mouse action (a space). */
-export const isSingleKey = (k: string) => !/[+ ]/.test(k);
+/** A key KEYMAP holds: not a chord ("+") or a mouse action (a space, or "Click"). */
+export const isSingleKey = (k: string) => !/[+ ]|^Click$/.test(k);
 
 const NAMES: Record<string, string> = { Backquote: "`", Backslash: "\\", Escape: "Esc" };
 const one = (k: string) => NAMES[k] ?? (/^Key[A-Z]$/.test(k) ? k.slice(3) : k.length === 1 ? k.toUpperCase() : k);

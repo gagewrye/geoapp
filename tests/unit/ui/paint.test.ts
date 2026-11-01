@@ -28,6 +28,19 @@ function setup() {
 }
 const hover = { x0: 1000, y0: 700, width: 7, height: 7 };
 
+describe("push (spec 046)", () => {
+  it("an op it can't queue (no raster open) is reported dropped", () => {
+    const store = emptyStore(W, H);
+    const paint = initPaint({
+      store: () => store, base: () => null, history: new UndoHistory(() => store), stroke: () => null, value: () => 1, locked: () => false,
+      applied() {}, prefetch() {}, say() {}, busy() {}, imageryBusy: () => false, importing: () => false, stroking: () => false,
+    });
+    const ends: string[] = [];
+    paint.push({ spans: [{ row: 0, x0: 0, x1: 1 }], box: { x0: 0, y0: 0, width: 1, height: 1 }, value: 1, erase: false, done: (r) => ends.push(r) });
+    expect(ends).toEqual(["dropped"]);
+  });
+});
+
 describe("hover prefetch (review 2)", () => {
   it("between strokes, a hover prefetches the 5x5 tiles around it", () => {
     const { paint, prefetched } = setup();

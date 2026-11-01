@@ -13,7 +13,7 @@
 3. Keys, all ignored while a text field has focus, while Ctrl, Meta or Alt is held, or before a raster opens (as `labelKeys` does now):
    - `B`: Paint.
    - `E`: Erase.
-   - `P` or `Escape`: Pan.
+   - `P` or `Escape`: Pan. (Spec 046: in Smart mode, `Escape` first discards a pending smart prompt.)
 4. A mode key pressed during a stroke takes effect when the stroke ends. B and E do nothing while the button they press is disabled.
 5. Spec 016's rule covers Erase: choosing Paint or Erase shows hidden labels first, and hiding labels selects Pan.
 6. Spec 032's `#status-tool` shows `Erase · <class> · <n> px`.
