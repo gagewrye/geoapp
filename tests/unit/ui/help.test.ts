@@ -32,8 +32,9 @@ describe("holding ?", () => {
     expect(dialog.open).toBe(false);
     expect(e.defaultPrevented).toBe(true);
     expect(other).not.toHaveBeenCalled();
-    press(false);
+    press(false); // the opening ? isn't swallowed: other listeners ignore it
     expect(dialog.open).toBe(true);
+    other.mockClear();
     press(true);
     expect(dialog.open).toBe(true);
     expect(other).not.toHaveBeenCalled();
