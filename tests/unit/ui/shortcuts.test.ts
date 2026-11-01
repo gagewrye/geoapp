@@ -71,7 +71,7 @@ describe("Mac modifiers and stable ids", () => {
   it("labelKeys.ts and help.ts branch on ids: no string literal in them equals an action", () => {
     const actions = new Set(SHORTCUTS.map((s) => s.action));
     for (const f of ["src/ui/labelKeys.ts", "src/ui/help.ts"]) {
-      const literals = [...readFileSync(f, "utf8").matchAll(/"((?:[^"\]|\.)*)"|'((?:[^'\]|\.)*)'|`([^`$]*)`/g)].map((m) => m[1] ?? m[2] ?? m[3]);
+      const literals = [...readFileSync(f, "utf8").matchAll(/"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|`([^`$]*)`/g)].map((m) => m[1] ?? m[2] ?? m[3]);
       expect(literals.filter((l) => actions.has(l!)), f).toEqual([]);
     }
   });
