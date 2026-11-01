@@ -16,7 +16,8 @@ export function baseStyle(): StyleSpecification {
     },
     layers: [
       { id: "background", type: "background", paint: { "background-color": BACKGROUND } },
-      { id: "basemap", type: "raster", source: "basemap" },
+      // fade 0, as every other raster layer: a re-added basemap tile would fade in from the background (spec 045)
+      { id: "basemap", type: "raster", source: "basemap", paint: { "raster-fade-duration": 0 } },
     ],
   };
 }
