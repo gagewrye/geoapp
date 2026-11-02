@@ -3,6 +3,7 @@
 One entry per merge to main, newest first. Details are in the named spec.
 
 ## 2026-11-01
+- **Spec 048:** Painting, mask edits and smart-select fills are never refused for a tile limit, so a whole chunk can be labelled; at most 256 tiles nearest the view's centre draw at full resolution, the rest on the preview layer, and the latest edit stays undoable however large.
 - **Spec 047:** Import labels never fails on a class table: bad entries in a file's table are skipped and named in the message, and values it doesn't name import as "Class N". The optional **Apply class map** now comes after Import labels and renames and recolours the loaded classes by value without touching any pixels.
 - **Spec 046 Amendment A:** Smart select no longer shows low-confidence masks that flood the area: it picks the most confident mask among those with stable edges, and logs each mask's scores to the browser console.
 
