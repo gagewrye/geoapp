@@ -45,7 +45,8 @@ test("layers: background, basemap, preview, label overlays, then hover; none is 
   const labelLayers = layers.filter((id) => id.startsWith("label-"));
   expect(labelLayers.length).toBeGreaterThan(0);
   const imagery = layers.filter((id) => id.startsWith("imagery-")); // spec 020's full-resolution tiles
-  expect(layers).toEqual(["background", "basemap", "preview", ...imagery, ...labelLayers, "brush-hover-fill", "brush-hover-line"]);
+  // spec 048 scope 3: a stored tile also adds the preview-resolution mask layer, in its slot under the overlays
+  expect(layers).toEqual(["background", "basemap", "preview", ...imagery, "mask", ...labelLayers, "brush-hover-fill", "brush-hover-line"]);
   for (const id of [...layers, ...(await sourceIds(page))]) {
     expect(id).not.toContain("aef");
     expect(id.startsWith("td-")).toBe(false);

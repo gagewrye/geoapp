@@ -94,16 +94,16 @@ test("opacity at 0 and 100, live text on keyboard input, and the value survives 
   for (const [v, o] of [["0", 0], ["100", 1]] as const) {
     await opacity(page).fill(v);
     await expect(page.locator("#label-opacity-text")).toHaveText(`${v}%`);
-    expect(await labelLayers(page)).toEqual({ "label-256,256": [o, "visible"] });
+    expect(await labelLayers(page)).toEqual({ "mask": [o, "visible"], "label-256,256": [o, "visible"] });
   }
   await opacity(page).focus();
   await page.keyboard.press("ArrowLeft");
   await expect(opacity(page)).toHaveValue("95");
   await expect(page.locator("#label-opacity-text")).toHaveText("95%");
-  expect(await labelLayers(page)).toEqual({ "label-256,256": [0.95, "visible"] });
+  expect(await labelLayers(page)).toEqual({ "mask": [0.95, "visible"], "label-256,256": [0.95, "visible"] });
   await toggleShow(page);
   await toggleShow(page);
-  expect(await labelLayers(page)).toEqual({ "label-256,256": [0.95, "visible"] });
+  expect(await labelLayers(page)).toEqual({ "mask": [0.95, "visible"], "label-256,256": [0.95, "visible"] });
 });
 
 test("the brush size is kept when another raster opens (spec 017)", async ({ page }) => {
