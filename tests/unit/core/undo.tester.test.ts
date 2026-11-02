@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { tileWindows, type Window } from "../../../src/core/grid";
-import { MAX_LABEL_TILES, brush, emptyStore, type LabelStore, type NodataMasks } from "../../../src/core/labelStore";
+import { brush, emptyStore, type LabelStore, type NodataMasks } from "../../../src/core/labelStore";
 import { nodataMask } from "../../../src/core/nodata";
 import { footprint } from "../../../src/core/pixel";
 import { TILE_SIZE } from "../../../src/core/types";
@@ -65,23 +65,6 @@ describe("recordTiles / finishEdit / swapEdit edges (spec 010 criterion 1, teste
     const e: Edit = new Map();
     for (const w of [win(900, 900, 1), win(10, 900, 1), win(900, 10, 1), win(300, 300, 1)]) { recordTiles(s, e, w); brush(s, m, w, 1, false); }
     expect(swapEdit(s, finishEdit(s, e)!).keys).toEqual(["768,0", "256,256", "0,768", "768,768"]);
-  });
-
-  it("at the tile cap a full brush changes nothing new, and undo never exceeds MAX_LABEL_TILES", () => {
-    const s = emptyStore(4096, 4352); // 16x17 tiles
-    const m = masksFor(s);
-    for (const w of tileWindows(4096, 4096)) brush(s, m, win(w.x0, w.y0, 1), 1, false);
-    expect(s.tiles.size).toBe(MAX_LABEL_TILES);
-    const e: Edit = new Map();
-    const w = win(10, 4200, 3); // a new tile row
-    recordTiles(s, e, w);
-    expect(brush(s, m, w, 2, false)).toBe("full");
-    expect(finishEdit(s, e)).toBeNull();
-    const e2: Edit = new Map();
-    recordTiles(s, e2, win(5, 5, 1));
-    brush(s, m, win(5, 5, 1), 2, false);
-    swapEdit(s, finishEdit(s, e2)!);
-    expect(s.tiles.size).toBe(MAX_LABEL_TILES);
   });
 });
 

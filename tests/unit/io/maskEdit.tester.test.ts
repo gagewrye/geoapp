@@ -27,7 +27,7 @@ async function setup(width = 1024, height = width) {
   const store: LabelStore = r.store;
   const history = new UndoHistory(() => store);
   const errors: unknown[] = [];
-  const q = new PaintQueue(imagery.source, () => store, { applied: () => {}, full: () => {}, busy: () => {}, error: (e) => { errors.push(e); } },
+  const q = new PaintQueue(imagery.source, () => store, { applied: () => {}, busy: () => {}, error: (e) => { errors.push(e); } },
     history, () => r.base);
   const strokeAt = async (cells: [number, number][], value: number, erase = false, side = 1) => {
     const s = history.begin();

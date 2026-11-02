@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { initialClasses, type LabelClass } from "../../../src/core/classes";
 import type { ClassEntry } from "../../../src/core/classTable";
 import { tileWindows, type Window } from "../../../src/core/grid";
-import { emptyStore, MAX_LABEL_TILES, type LabelStore } from "../../../src/core/labelStore";
+import { emptyStore, type LabelStore } from "../../../src/core/labelStore";
 import type { Affine, Grid } from "../../../src/core/types";
 import type { LabelSource } from "../../../src/io/labelFile";
 import { importLabels, type Labels, type SeedOutcome } from "../../../src/io/seeding";
@@ -62,7 +62,6 @@ describe("imports never reach the cap (spec 014: the file is a base)", () => {
     expect(r.store.tiles.size).toBe(0);
     expect(r.base.count).toBe(size * size);
     expect(r.classes).toEqual([{ name: "three", colour: expect.any(String) }]);
-    expect(MAX_LABEL_TILES).toBeLessThan(289);
   });
 });
 

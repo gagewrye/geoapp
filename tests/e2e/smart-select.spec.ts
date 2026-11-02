@@ -103,20 +103,22 @@ test("Escape before Enter labels nothing and keeps Smart; a second Escape select
   await expect(smartButton(page)).toHaveAttribute("aria-pressed", "false");
 });
 
-test("with 256 tiles stored, a commit touching a new tile shows the label-limit message and changes nothing (criterion 6)", async ({ page }) => {
+test("with 256 tiles stored, a commit touching a new tile labels it and shows no error (criterion 6, as amended by spec 048)", async ({ page }) => {
   await setup(page);
-  // 256 tiles beyond the raster's 16 keys: the store is full without changing any pixel the labels helper reads
+  // 256 tiles beyond the raster's 16 keys: stored, without changing any pixel the labels helper reads
   await page.evaluate(() => {
     const { store } = (window as any).__geoapp.labels;
     for (let i = 0; i < 256; i++) store.tiles.set(`${(i % 16) * 256},${(8 + Math.floor(i / 16)) * 256}`, new Uint8Array(65536).fill(1));
   });
-  await click(page, await toScreen(page, at(300.5, 300.5)));
+  const cell = await click(page, await toScreen(page, at(300.5, 300.5)));
   await page.keyboard.press("Enter");
-  await expect(message(page)).toHaveText(MESSAGES.labelLimit);
   await settled(page);
-  expect((await labels(page)).size).toBe(0);
-  expect(await page.evaluate(() => (window as any).__geoapp.labels.store.tiles.size)).toBe(256);
-  await expect(page.locator("#smart-apply")).toBeEnabled(); // a refused commit keeps the prompt
+  const got = await labels(page);
+  expect(got.size).toBeGreaterThan(0);
+  expect([...got.keys()].every((k) => square(cell).has(k))).toBe(true);
+  expect(await page.evaluate(() => (window as any).__geoapp.labels.store.tiles.size)).toBeGreaterThan(256);
+  await expect(page.locator("#smart-apply")).toBeDisabled(); // the commit applied, so the prompt is gone
+  await expect(page.locator("#message")).not.toHaveClass(/error/);
 });
 
 test("while an export runs with a paused sink, Enter changes nothing (criterion 6)", async ({ page }) => {

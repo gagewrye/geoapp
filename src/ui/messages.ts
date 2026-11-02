@@ -9,7 +9,6 @@ const mib = (bytes: number) => { const v = bytes / 2 ** 20; return v >= 10 ? Mat
 /** User-facing strings fixed by specs 001-014, and the ones they don't fix. */
 export const MESSAGES = {
   rasterAntimeridian: "Rasters crossing the 180° meridian aren't supported yet.",
-  labelLimit: "Label limit reached (256 tiles of 256 x 256 px). Erase elsewhere first.",
   className: "Class names must be unique and not empty.",
   discard: "Close these labels? They stay saved in this browser.", // spec 032: they stay in the browser (spec 031)
   labelFile: "Label files must be single-band 8-bit GeoTIFFs.",
@@ -18,7 +17,6 @@ export const MESSAGES = {
   // spec 004, Settled in build
   replace: "Replace labels?",
   // spec 014
-  editLimit: "Label limit reached (256 edited tiles of 256 x 256 px). Undo strokes, or export the labels and import the export.",
   maskGone: "The label mask can't be read any more. Import it again.",
   // spec 021
   importing: "Importing labels…",

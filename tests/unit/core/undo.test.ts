@@ -28,7 +28,7 @@ describe("recordTiles / finishEdit / swapEdit (spec 010 criterion 1)", () => {
     const dab = win(253, 253, 7);
     const edit: Edit = new Map();
     recordTiles(s, edit, dab);
-    expect(brush(s, m, dab, 3, false)).toBe("ok");
+    brush(s, m, dab, 3, false);
     expect(s.tiles.has("256,0")).toBe(true); // created by the dab
     const done = finishEdit(s, edit)!;
     expect(done).not.toBeNull();

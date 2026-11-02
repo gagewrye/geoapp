@@ -1,5 +1,5 @@
 import type { Window } from "../core/grid";
-import { brushSpans, MAX_LABEL_TILES, tileWindow, type LabelStore } from "../core/labelStore";
+import { brushSpans, tileWindow, type LabelStore } from "../core/labelStore";
 import { spanKeys, windowSpans, type Span } from "../core/spans";
 import { anyNonZero, maskedBaseTile, type MaskBase } from "./maskBase";
 import type { ValidMask } from "../core/validMask";
@@ -8,8 +8,8 @@ import type { RasterSource } from "./source";
 import type { StrokeEdit, UndoHistory } from "./undoHistory";
 
 /** One pointer move (spec 023 F6): the union of its footprints as spans, their bounding box, label value, paint or erase, and the stroke's undo edit. */
-// done hears how the op ended: applied, refused at the cap, or dropped with the queue (spec 046's commit).
-export type PaintOp = { spans: Span[]; box: Window; value: number; erase: boolean; stroke?: StrokeEdit; done?: (r: "ok" | "full" | "dropped") => void };
+// done hears how the op ended: applied, or dropped with the queue (spec 046's commit).
+export type PaintOp = { spans: Span[]; box: Window; value: number; erase: boolean; stroke?: StrokeEdit; done?: (r: "ok" | "dropped") => void };
 
 /** A single footprint as a PaintOp. */
 export const cellOp = (w: Window, value: number, erase: boolean, stroke?: StrokeEdit): PaintOp => ({ spans: windowSpans(w), box: w, value, erase, stroke });
@@ -17,8 +17,6 @@ export const cellOp = (w: Window, value: number, erase: boolean, stroke?: Stroke
 type Events = {
   /** A move was applied to the store (it may have changed nothing); keys are the tiles its spans meet. */
   applied: (keys: string[]) => void;
-  /** The move would pass MAX_LABEL_TILES (brushSpans' "full", or copying base tiles): it changed nothing. */
-  full: () => void;
   /** The queue became non-empty (true) or empty (false). */
   busy: (busy: boolean) => void;
   /** A mask or base read failed; the queue has been dropped. */
@@ -74,20 +72,15 @@ export class PaintQueue {
     this.on.busy(busy);
   }
 
-  /** Copies the move's pending base tiles into the store (non-zero ones only), then brushes; "full" changes nothing. */
+  /** Copies the move's pending base tiles into the store (non-zero ones only), then brushes. */
   // The undo record already holds these keys as null, so undoing deletes the copies and the mask shows again.
-  private apply(store: LabelStore, op: PaintOp, keys: string[]): "ok" | "full" {
-    const copies: [string, Uint8Array][] = [];
+  private apply(store: LabelStore, op: PaintOp, keys: string[]): void {
     for (const key of keys) {
       const t = this.pending.get(key);
       this.pending.delete(key);
-      if (t && !store.tiles.has(key) && anyNonZero(t)) copies.push([key, t]);
+      if (t && !store.tiles.has(key) && anyNonZero(t)) store.tiles.set(key, t);
     }
-    if (store.tiles.size + copies.length > MAX_LABEL_TILES) return "full";
-    for (const [key, t] of copies) store.tiles.set(key, t);
-    const r = brushSpans(store, { get: (k) => this.held.get(k) ?? this.cache.get(k) }, op.spans, op.value, op.erase);
-    if (r === "full") for (const [key] of copies) store.tiles.delete(key);
-    return r;
+    brushSpans(store, { get: (k) => this.held.get(k) ?? this.cache.get(k) }, op.spans, op.value, op.erase);
   }
 
   // Runs synchronously while no read is needed, so moves with their masks in apply at once.
@@ -122,12 +115,11 @@ export class PaintQueue {
         }
         this.ops.shift();
         if (op.stroke) this.history?.record(op.stroke, keys);
-        const full = this.apply(store, op, keys) === "full";
+        this.apply(store, op, keys);
         this.held.clear();
         if (op.stroke) this.history?.applied(op.stroke);
-        if (full) this.on.full();
         this.on.applied(keys);
-        op.done?.(full ? "full" : "ok");
+        op.done?.("ok");
         if (!this.ops.length) this.setBusy(false);
       }
     } catch (e) {

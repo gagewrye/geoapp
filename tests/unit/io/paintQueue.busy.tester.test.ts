@@ -31,7 +31,7 @@ function setup(failRead: (n: number) => boolean = () => false) {
   const store = emptyStore(2048, 2048);
   const busy: boolean[] = [], errors: string[] = [];
   const q = new PaintQueue(source, () => store, {
-    applied() {}, full() {}, busy: (b) => { busy.push(b); }, error: (e) => { errors.push((e as Error).message); },
+    applied() {}, busy: (b) => { busy.push(b); }, error: (e) => { errors.push((e as Error).message); },
   });
   const dab = (c: number, r: number) => footprint(store, c, r, 7)!;
   return { q, store, busy, errors, dab, get maxInFlight() { return maxInFlight; } };

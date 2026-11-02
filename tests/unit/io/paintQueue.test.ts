@@ -32,10 +32,9 @@ function instrumented(nodata: (c: number, r: number) => boolean = () => false) {
 }
 
 function queue(src: ReturnType<typeof instrumented>, store: LabelStore = emptyStore(2048, 2048)) {
-  const events = { full: 0, applied: 0, busy: [] as boolean[] };
+  const events = { applied: 0, busy: [] as boolean[] };
   const q = new PaintQueue(src.source, () => store, {
     applied: () => { events.applied++; },
-    full: () => { events.full++; },
     busy: (b) => { events.busy.push(b); },
     error: (e) => { throw e; },
   });
@@ -128,34 +127,31 @@ describe("paint reads (criterion 8)", () => {
     expect(q.masks.size).toBe(16); // bands 0 and 512
   });
 
-  it("reports full, changes nothing for that cell and applies the next", async () => {
+  it("past 256 stored tiles a cell still creates a tile (spec 048)", async () => {
     const { source } = fakeSource({ width: 4096, height: 8192 }, () => 5);
     const store = emptyStore(4096, 8192);
     for (let i = 0; i < 256; i++) store.tiles.set(`${(i % 16) * 256},${Math.floor(i / 16) * 256}`, new Uint8Array(65536).fill(1));
-    let full = 0;
-    const q = new PaintQueue(source, () => store, { applied() {}, full: () => { full++; }, busy() {}, error: (e) => { throw e; } });
+    const q = new PaintQueue(source, () => store, { applied() {}, busy() {}, error: (e) => { throw e; } });
     q.push(cellOp(dab(store, 100, 16 * 256 + 100), 2, false));
-    q.push(cellOp(dab(store, 100, 100), 2, false));
     await idle(q);
-    expect(full).toBe(1);
-    expect(store.tiles.size).toBe(256);
-    expect(store.tiles.get("0,0")![100 * 256 + 100]).toBe(2);
+    expect(store.tiles.size).toBe(257);
+    expect(store.tiles.get(`0,${16 * 256}`)![100 * 256 + 100]).toBe(2);
   });
 
-  it("tells each op's done how it ended: full, ok, or dropped by clear (spec 046 scope 7)", async () => {
+  it("tells each op's done how it ended: ok, or dropped by clear (spec 046 scope 7, as amended by spec 048)", async () => {
     const { source } = fakeSource({ width: 4096, height: 8192 }, () => 5);
     const store = emptyStore(4096, 8192);
     for (let i = 0; i < 256; i++) store.tiles.set(`${(i % 16) * 256},${Math.floor(i / 16) * 256}`, new Uint8Array(65536).fill(1));
-    const q = new PaintQueue(source, () => store, { applied() {}, full() {}, busy() {}, error: (e) => { throw e; } });
+    const q = new PaintQueue(source, () => store, { applied() {}, busy() {}, error: (e) => { throw e; } });
     const ends: string[] = [];
     const op = (c: number, r: number, tag: string) => ({ ...cellOp(dab(store, c, r), 2, false), done: (x: string) => ends.push(`${tag} ${x}`) });
     q.push(op(100, 16 * 256 + 100, "a"));
     q.push(op(100, 100, "b"));
     await idle(q);
-    expect(ends).toEqual(["a full", "b ok"]);
+    expect(ends).toEqual(["a ok", "b ok"]);
     q.push(op(100, 20 * 256 + 100, "c")); // waits for its mask read
     q.clear();
-    expect(ends).toEqual(["a full", "b ok", "c dropped"]);
+    expect(ends).toEqual(["a ok", "b ok", "c dropped"]);
   });
 });
 
@@ -166,7 +162,7 @@ describe("errors", () => {
       const src = instrumented();
       const store = emptyStore(2048, 2048);
       const busy: boolean[] = [], errors: unknown[] = [];
-      const q = new PaintQueue(src.source, () => store, { applied() {}, full() {}, busy: (b) => { busy.push(b); }, error: (e) => { errors.push(e); } });
+      const q = new PaintQueue(src.source, () => store, { applied() {}, busy: (b) => { busy.push(b); }, error: (e) => { errors.push(e); } });
       q.push(cellOp(dab(store, 10, 10), 0, erase));
       await new Promise((r) => setTimeout(r, 20));
       expect(errors).toHaveLength(1);

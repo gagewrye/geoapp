@@ -1,21 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { tileWindows } from "../../../src/core/grid";
-import { MAX_LABEL_TILES, type LabelStore } from "../../../src/core/labelStore";
+import type { LabelStore } from "../../../src/core/labelStore";
 import { footprint } from "../../../src/core/pixel";
 import type { Affine, Grid } from "../../../src/core/types";
 import { maskReadFailed } from "../../../src/io/labelFile";
 import { cellOp, PaintQueue } from "../../../src/io/paintQueue";
 import { importLabels } from "../../../src/io/seeding";
 import { UndoHistory } from "../../../src/io/undoHistory";
-import { MESSAGES, readErrorMessage } from "../../../src/ui/messages";
+import { readErrorMessage } from "../../../src/ui/messages";
 import { effectiveTiles } from "../helpers/effective";
 import { fakeLabelSource } from "../helpers/labelFiles";
 import { idle } from "../helpers/paintQueue";
 import { fakeSource } from "../helpers/sources";
 
-// Spec 014 criteria 8 (the cap with a base) and 12 (the mask file gone, for a cell), and copy on touch at the io level.
+// Spec 048 criterion 2 (no cap with a base), spec 014 criterion 12 (the mask file gone, for a cell), and copy on touch at the io level.
 
-const SIDE = 256 * 17; // 289 tiles, for the cap; other tests use 1024 x 1024
+const SIDE = 256 * 18; // 324 tiles, past 300 stored; other tests use 1024 x 1024
 const gt: Affine = [500000, 10, 0, 5000000, 0, -10];
 /** Mask: 4 (label 1) where (c + r) is even, else 6 (label 2); imagery all valid. */
 const maskValue = (c: number, r: number) => ((c + r) % 2 ? 6 : 4);
@@ -29,9 +29,9 @@ async function setup(side = 1024) {
   if (typeof r === "string") throw new Error(r);
   const store: LabelStore = r.store;
   const history = new UndoHistory(() => store);
-  const events = { full: 0, errors: [] as unknown[] };
+  const events = { errors: [] as unknown[] };
   const q = new PaintQueue(imagery.source, () => store, {
-    applied: () => {}, full: () => { events.full++; }, busy: () => {}, error: (e) => { events.errors.push(e); },
+    applied: () => {}, busy: () => {}, error: (e) => { events.errors.push(e); },
   }, history, () => r.base);
   /** One ended stroke of 1x1 (or side) cells. */
   const strokeAt = async (cells: [number, number][], value: number, erase = false, side = 1) => {
@@ -80,27 +80,25 @@ describe("copy on touch (spec 014 Rules)", () => {
   });
 });
 
-describe("the cap with a base (criterion 8)", () => {
-  it("at 256 stored tiles a cell touching a 257th base tile shows the message and changes nothing; after an Undo frees a tile it applies", { timeout: 120_000 }, async () => {
+// Spec 048 criterion 2 (was spec 014 criterion 8, the cap with a base).
+describe("no cap with a base (spec 048 criterion 2)", () => {
+  it("with 300 stored tiles a move touching a new base tile copies it, applies, and done gets ok", { timeout: 120_000 }, async () => {
     const t = await setup(SIDE);
     const windows = tileWindows(SIDE, SIDE);
-    for (const w of windows.slice(0, MAX_LABEL_TILES - 1)) t.store.tiles.set(`${w.x0},${w.y0}`, new Uint8Array(w.width * w.height).fill(2));
-    const [w256, w257] = [windows[MAX_LABEL_TILES - 1]!, windows[MAX_LABEL_TILES]!];
-    await t.strokeAt([[w256.x0 + 5, w256.y0 + 5]], 2); // copies the 256th tile
-    expect(t.store.tiles.size).toBe(MAX_LABEL_TILES);
-    const held = snapshot(t.store);
-    await t.strokeAt([[w257.x0 + 5, w257.y0 + 5]], 2);
-    expect(t.events.full).toBe(1);
-    expectSameTiles(t.store, held);
-    expect(t.history.size).toBe(1); // the refused stroke changed nothing, so it isn't an undo step
-    expect(t.history.undo()).toEqual([`${w256.x0},${w256.y0}`]);
-    expect(t.store.tiles.size).toBe(MAX_LABEL_TILES - 1);
-    await t.strokeAt([[w257.x0 + 5, w257.y0 + 5]], 2);
-    expect(t.events.full).toBe(1);
-    const tile = t.store.tiles.get(`${w257.x0},${w257.y0}`)!;
+    for (const w of windows.slice(0, 300)) t.store.tiles.set(`${w.x0},${w.y0}`, new Uint8Array(w.width * w.height).fill(2));
+    const w = windows[300]!, ends: string[] = [];
+    const s = t.history.begin();
+    t.q.push({ ...cellOp(footprint(t.store, w.x0 + 5, w.y0 + 5, 1)!, 2, false, s), done: (r) => ends.push(r) });
+    t.history.end(s);
+    await idle(t.q);
+    expect(ends).toEqual(["ok"]);
+    expect(t.events.errors).toEqual([]);
+    expect(t.store.tiles.size).toBe(301);
+    const tile = t.store.tiles.get(`${w.x0},${w.y0}`)!;
     expect(tile[5 * 256 + 5]).toBe(2);
     expect(tile[0]).toBe(1); // the rest is the base
-    expect(MESSAGES.editLimit).toBe("Label limit reached (256 edited tiles of 256 x 256 px). Undo strokes, or export the labels and import the export.");
+    expect(t.history.undo()).toEqual([`${w.x0},${w.y0}`]);
+    expect(t.store.tiles.size).toBe(300);
   });
 });
 

@@ -16,7 +16,7 @@ function setup() {
   const { source } = fakeSource({ width: 4096, height: 4096, nodata: -1 }, () => 5);
   const store = emptyStore(4096, 4096);
   const history = new UndoHistory(() => store);
-  const q = new PaintQueue(source, () => store, { applied: () => {}, full: () => {}, busy: () => {}, error: (e) => { throw e; } }, history);
+  const q = new PaintQueue(source, () => store, { applied: () => {}, busy: () => {}, error: (e) => { throw e; } }, history);
   /** One ended stroke of 1x1 cells. */
   const stroke = async (cells: [number, number][], value: number, erase = false) => {
     const s = history.begin();

@@ -172,12 +172,12 @@ describe("smart select prompts (criterion 3)", () => {
     expect(history.size).toBe(0); // the stroke enters the history once its op applies (the fake queue never applies it)
   });
 
-  it("a commit that hits the cap keeps the prompt", async () => {
+  it("a commit the queue drops keeps the prompt", async () => {
     const { smart, ops } = setup();
     smart.click([1500, 1000], true);
     await settle();
     smart.apply();
-    ops[0]!.done!("full");
+    ops[0]!.done!("dropped");
     expect(smart.apply()).toBe(true);
     expect(ops).toHaveLength(2);
   });
