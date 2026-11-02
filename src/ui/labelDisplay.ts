@@ -26,10 +26,21 @@ export function labelDisplay(map: MapLibreMap, store: () => LabelStore, colours:
   const lastWanted = new Map<string, number>();
   let tick = 0;
 
-  const buildGrid = (g: Grid): PreviewGrid => {
-    const pc = previewCells(g, PREVIEW_MAX_SIDE);
-    return { ...pc, buckets: cellBuckets(pc.cells, g) };
-  };
+  /** A raster's preview grid: its cells (pc, computed here unless given) and their buckets. */
+  const buildGrid = (g: Grid, pc = previewCells(g, PREVIEW_MAX_SIDE)): PreviewGrid => ({ ...pc, buckets: cellBuckets(pc.cells, g) });
+  let preparing = false;
+
+  /** Builds the preview grid in two background tasks of about 30 ms each, once per raster (the mask layer builds it at once if needed sooner). */
+  function prepare(): void {
+    const g = grid;
+    if (!g || previewGrid || preparing) return;
+    preparing = true;
+    setTimeout(() => {
+      if (grid !== g || previewGrid) return;
+      const pc = previewCells(g, PREVIEW_MAX_SIDE);
+      setTimeout(() => { if (grid === g && !previewGrid) previewGrid = buildGrid(g, pc); }, 0);
+    }, 0);
+  }
 
   /** The mask layer, made (and filled with every stored tile) when first needed; null while there's nothing to show. */
   function maskLayer(): MaskLayer | null {
@@ -145,8 +156,9 @@ export function labelDisplay(map: MapLibreMap, store: () => LabelStore, colours:
       maskDirty ||= repaintMask;
       if (!frame) frame = requestAnimationFrame(flush);
     },
-    /** The view settled (spec 027's signal): overlays follow it. */
+    /** The view settled (spec 027's signal; the first comes once the preview is drawn): overlays follow it. */
     settled(): void {
+      prepare();
       if (!shown || !overlays) return;
       want();
       fill();
@@ -159,17 +171,8 @@ export function labelDisplay(map: MapLibreMap, store: () => LabelStore, colours:
       shown = true;
       grid = g;
       previewGrid = null;
+      preparing = false;
       overlays = new LabelOverlays(map, g);
-    },
-    /** Builds the raster's preview grid in two background tasks of about 30 ms each, after the open's own work. */
-    prepare(): void {
-      const g = grid;
-      if (!g || previewGrid) return;
-      setTimeout(() => {
-        if (grid !== g || previewGrid) return;
-        const pc = previewCells(g, PREVIEW_MAX_SIDE);
-        setTimeout(() => { if (grid === g && !previewGrid) previewGrid = { ...pc, buckets: cellBuckets(pc.cells, g) }; }, 0);
-      }, 0);
     },
     /** Computes these tiles' quads ahead, in idle time (spec 023 F5). */
     prefetch(keys: string[]): void { overlays?.prefetch(keys); },
