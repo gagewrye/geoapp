@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { pixelAt as cellAt } from "../../src/core/pixel";
 import { maskBits, maskSpans, promptPoints, samWindow } from "../../src/core/smart";
 import { MESSAGES } from "../../src/ui/messages";
-import { jumpTo, labels, logRequests, message, openApp, openRaster, rgbFixture, settled, toLngLat, toScreen, type Xy } from "./helpers";
+import { jumpTo, labels, logRequests, message, openApp, openRaster, rgbFixture, settled, toLngLat, toScreen, view, type Xy } from "./helpers";
 import { gateWrites, openWrite, writeHeld } from "./lockCombos";
 import { at, inNodata, ND_GRID, noSavePicker, nodataImagery } from "./seeding";
 
@@ -12,7 +12,7 @@ const R = 8, SIDE = 256;
 
 /** Installs the fake; `gate` holds each encode until window.__smart.open() is called. */
 const fakeSegmenter = (page: Page, gate = false) => page.evaluate(([R, SIDE, gate]) => {
-  const g = (window as any).__smart = { encodes: 0, open: () => {}, waiting: false };
+  const g = (window as any).__smart = { encodes: 0, open: () => {}, waiting: false, labels: [] as number[][] };
   let held: string | null = null;
   (window as any).__geoapp.segmenter = {
     async encode(_input: Float32Array, key: string) {
@@ -23,6 +23,7 @@ const fakeSegmenter = (page: Page, gate = false) => page.evaluate(([R, SIDE, gat
     },
     has: (key: string) => held === key,
     async decode(points: Float32Array, labels: Uint8Array) {
+      g.labels.push([...labels]);
       const n = labels.length === 1 ? 3 : 1, masks = new Float32Array(n * SIDE * SIDE).fill(-1);
       for (let i = 0; i < labels.length; i++) {
         if (!labels[i]) continue;
@@ -139,7 +140,7 @@ test("while an export runs with a paused sink, Enter changes nothing (criterion 
   expect((await labels(page)).size).toBe(0);
 });
 
-test("the Smart button, M, Escape, the status bar and the help list (criterion 7)", async ({ page }) => {
+test("the Smart button, M, Escape, the status bar and the help list (criterion 7, help as amended by spec 049 criterion 6)", async ({ page }) => {
   await openApp(page);
   await fakeSegmenter(page, true);
   await openRaster(page, nodataImagery());
@@ -170,7 +171,7 @@ test("the Smart button, M, Escape, the status bar and the help list (criterion 7
   await expect(smartButton(page)).toHaveAttribute("aria-pressed", "true");
 
   await page.keyboard.press("?");
-  for (const [k, action] of [["M", "Smart select"], ["Enter", "Apply smart selection"], ["Click / Right click", "Include / exclude a point"], ["Esc", "Discard the selection"]]) {
+  for (const [k, action] of [["M", "Smart select"], ["Enter", "Apply smart selection"], ["Click / Shift+click", "Include / exclude a point"], ["Esc / Right click", "Discard the selection"]]) {
     await expect(page.locator("#help .shortcut").filter({ has: page.getByText(action!, { exact: true }) }).locator("kbd")).toHaveText(k!);
   }
 });
@@ -207,4 +208,76 @@ test("the entry chunk has no onnxruntime, and load through a commit requests onl
   const js = await (await page.request.get(entry)).text();
   expect(js.length).toBeGreaterThan(10_000);
   expect(js).not.toContain("onnxruntime");
+});
+
+// Spec 049 criteria 4 and 5: a right click discards the selection; Shift+click adds an exclude point.
+/** Records whether each contextmenu reached the window with its default prevented. */
+const recordMenus = (page: Page) => page.evaluate(() => {
+  const g = (window as any).__menus = [] as boolean[];
+  window.addEventListener("contextmenu", (e) => g.push(e.defaultPrevented)); // after the app's listener on #map
+});
+const menus = (page: Page) => page.evaluate(() => (window as any).__menus as boolean[]);
+/** The smart preview's map layers (map/smartLayer.ts names them smart-<i>). */
+const previewLayers = (page: Page) => page.evaluate(() =>
+  ((window as any).__geoapp.map.getStyle().layers as { id: string }[]).filter((l) => /^smart-\d+$/.test(l.id)).length);
+const rightClick = (page: Page, p: Xy) => page.mouse.click(p.x, p.y, { button: "right" });
+
+test("a right click hides the preview and keeps Smart; Enter then labels nothing and Undo stays off (spec 049 criterion 4)", async ({ page }) => {
+  await setup(page);
+  await recordMenus(page);
+  const p = await toScreen(page, at(300.5, 300.5));
+  await click(page, p);
+  expect(await previewLayers(page)).toBeGreaterThan(0);
+  await rightClick(page, p);
+  await expect(page.locator("#smart-apply")).toBeDisabled();
+  expect(await previewLayers(page)).toBe(0);
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(200);
+  expect((await labels(page)).size).toBe(0);
+  await expect(smartButton(page)).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#undo")).toBeDisabled();
+  expect(await menus(page)).toEqual([true]);
+});
+
+test("a right click right after Enter leaves the fill, and one Ctrl+Z removes it (spec 049 criterion 4)", async ({ page }) => {
+  await setup(page);
+  await recordMenus(page);
+  const p = await toScreen(page, at(300.5, 300.5));
+  await click(page, p);
+  await page.keyboard.press("Enter");
+  await rightClick(page, p);
+  await settled(page);
+  await expect(page.locator("#smart-apply")).toBeDisabled();
+  expect((await labels(page)).size).toBeGreaterThan(0);
+  await page.keyboard.press("Control+z");
+  expect((await labels(page)).size).toBe(0);
+  await expect(page.locator("#undo")).toBeDisabled();
+  expect(await menus(page)).toEqual([true]);
+});
+
+test("a right click with no prompt keeps Smart selected (spec 049 criterion 4)", async ({ page }) => {
+  await setup(page, [20, 300]);
+  await recordMenus(page);
+  await rightClick(page, await toScreen(page, at(20.5, 300.5)));
+  await rightClick(page, await toScreen(page, at(-20, 300))); // on the map, off the raster
+  await page.waitForTimeout(200);
+  await expect(smartButton(page)).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#mode-pan")).toHaveAttribute("aria-pressed", "false");
+  expect(await menus(page)).toEqual([true, true]);
+});
+
+test("a Shift+left release 3 px from its press adds an exclude point and doesn't zoom (spec 049 criterion 5)", async ({ page }) => {
+  await setup(page);
+  const p = await toScreen(page, at(300.5, 300.5)), q = await toScreen(page, at(310.5, 300.5));
+  await click(page, p);
+  const before = await view(page);
+  await page.keyboard.down("Shift");
+  await page.mouse.move(q.x, q.y);
+  await page.mouse.down();
+  await page.mouse.move(q.x + 3, q.y);
+  await page.mouse.up();
+  await page.keyboard.up("Shift");
+  await expect.poll(() => page.evaluate(() => (window as any).__smart.labels.at(-1))).toEqual([1, 0]);
+  await page.waitForTimeout(300); // a box zoom would ease
+  expect((await view(page)).zoom).toBe(before.zoom);
 });
