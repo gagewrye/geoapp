@@ -24,8 +24,8 @@ export function fakeBrushMap(stub: (name: string, value: unknown) => void) {
     dragRotate: handler, doubleClickZoom: handler, boxZoom: handler,
   };
   /** Dispatches a pointer event on the canvas container (down) or the window (move, up). */
-  const pointer = (type: "pointerdown" | "pointermove" | "pointerup", x: number, y: number, button = 0) => {
-    const e = Object.assign(new Event(type), { pointerType: "mouse", pointerId: 1, button, buttons: type === "pointerup" ? 0 : 1, clientX: x, clientY: y });
+  const pointer = (type: "pointerdown" | "pointermove" | "pointerup", x: number, y: number, button = 0, mods: { shiftKey?: boolean; altKey?: boolean } = {}) => {
+    const e = Object.assign(new Event(type), { pointerType: "mouse", pointerId: 1, button, buttons: type === "pointerup" ? 0 : 1, clientX: x, clientY: y, shiftKey: false, altKey: false, ...mods });
     if (type === "pointerdown") canvas.dispatchEvent(e);
     else {
       Object.defineProperty(e, "target", { value: canvas });

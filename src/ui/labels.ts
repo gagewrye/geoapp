@@ -90,7 +90,7 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
   const brush = createBrush(map, {
     side: () => size.side(), colour: () => panel.classes()[panel.selected()]!.colour, cells: paint.cells, hovered: paint.hovered,
     onStroke: (active) => { undo.stroke(active); if (!active) { edits.strokeEnded(); modes.strokeEnded(); } }, panning, pick: picker.pick,
-    click: (cell, include) => smart?.click(cell, include) }); // Smart mode's clicks (spec 046)
+    click: (cell, include) => smart?.click(cell, include), discard: () => void smart?.discard() }); // Smart mode's clicks (specs 046, 049)
 
   const view = initLabelView(map, (visible) => { if (!visible) modes.setMode("pan"); }, () => edits.record()); // hiding labels selects Pan (spec 016)
   const modes = initModes({ brush, view, toolChanged: () => { if (modes.mode() !== "smart") smart?.discard(); toolChanged(); }, smart: () => void smart?.choose() }); // leaving Smart drops its prompt

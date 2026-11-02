@@ -129,3 +129,82 @@ describe("Alt+left press picks", () => {
     expect(altUp()).toBe(true);
   });
 });
+
+// Spec 049 criteria 1 and 2: in Smart mode a right click discards, and Shift+left adds an exclude point.
+describe("Smart mode clicks", () => {
+  function smart(mode: BrushMode = "smart") {
+    const { map, pointer } = fakeBrushMap(vi.stubGlobal);
+    const clicks: [[number, number], boolean][] = [], cells: boolean[] = [];
+    let discards = 0;
+    const brush = createBrush(map, {
+      side: () => 1, colour: () => "#ff0000", cells: (_c, _s, erase) => { cells.push(erase); }, onStroke: () => {}, panning: () => false,
+      click: (cell, include) => clicks.push([cell, include]), discard: () => { discards++; },
+    });
+    brush.setImagery(BRUSH_GRID);
+    brush.setMode(mode);
+    const canvas = map.getCanvasContainer() as unknown as EventTarget;
+    /** A mousedown through the map container's capture listener; whether the brush stopped it before MapLibre. */
+    const mouse = (button: number, shiftKey: boolean) => {
+      const e = Object.assign(new Event("mousedown"), { button, clientX: 10, clientY: 10, altKey: false, shiftKey });
+      Object.defineProperty(e, "target", { value: canvas });
+      let stopped = false;
+      e.stopPropagation = () => { stopped = true; };
+      (map.getContainer() as unknown as EventTarget).dispatchEvent(e);
+      return stopped;
+    };
+    return { brush, pointer, clicks, cells, discards: () => discards, mouse };
+  }
+
+  it("a right press and release 3 px apart, on the raster or off it, discards once and adds no point", () => {
+    for (const [x, y] of [[10, 10], [80, 80]] as const) { // the grid is 50 x 50, the canvas 100 x 100
+      const t = smart();
+      t.pointer("pointerdown", x, y, 2);
+      t.pointer("pointerup", x + 3, y, 2);
+      expect(t.discards()).toBe(1);
+      expect(t.clicks).toEqual([]);
+    }
+  });
+
+  it("a right drag of 10 px neither discards nor adds a point", () => {
+    const t = smart();
+    t.pointer("pointerdown", 10, 10, 2);
+    t.pointer("pointerup", 20, 10, 2);
+    expect(t.discards()).toBe(0);
+    expect(t.clicks).toEqual([]);
+  });
+
+  it("a left click includes, and a Shift+left click excludes", () => {
+    const t = smart();
+    t.pointer("pointerdown", 10, 12, 0);
+    t.pointer("pointerup", 10, 12, 0);
+    t.pointer("pointerdown", 20, 22, 0, { shiftKey: true });
+    t.pointer("pointerup", 21, 22, 0, { shiftKey: true });
+    expect(t.clicks).toEqual([[[10, 12], true], [[21, 22], false]]);
+    expect(t.discards()).toBe(0);
+  });
+
+  it("Alt+right, and a right click with Space held, do nothing", () => {
+    const t = smart();
+    t.pointer("pointerdown", 10, 10, 2, { altKey: true });
+    t.pointer("pointerup", 10, 10, 2, { altKey: true });
+    t.brush.setSpace(true);
+    t.pointer("pointerdown", 10, 10, 2);
+    t.pointer("pointerup", 10, 10, 2);
+    expect(t.discards()).toBe(0);
+    expect(t.clicks).toEqual([]);
+  });
+
+  it("in Paint mode a right press still erases and discards nothing", () => {
+    const t = smart("paint");
+    t.pointer("pointerdown", 10, 10, 2);
+    t.pointer("pointerup", 10, 10, 2);
+    expect(t.cells).toEqual([true]);
+    expect(t.discards()).toBe(0);
+  });
+
+  it("a Shift+left mousedown on the canvas is stopped before MapLibre; a plain left one isn't", () => {
+    const t = smart();
+    expect(t.mouse(0, true)).toBe(true);
+    expect(t.mouse(0, false)).toBe(false);
+  });
+});
