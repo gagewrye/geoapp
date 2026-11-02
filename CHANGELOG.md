@@ -3,6 +3,7 @@
 One entry per merge to main, newest first. Details are in the named spec.
 
 ## 2026-11-02
+- **Spec 050:** On Chrome and Edge, Open GeoTIFF uses the browser's file picker, so Export labels opens its Save dialog in the imagery's own folder (suggesting `labels.tif`) instead of the last folder used; other browsers are unchanged (ADR 0034).
 - **Spec 049:** In Smart select a right click discards the pending selection (points and preview) without leaving Smart mode, so you can start again quickly; exclude points move to Shift+click. A right drag still rotates the map, and Ctrl+Z still undoes an applied fill.
 
 ## 2026-11-01
