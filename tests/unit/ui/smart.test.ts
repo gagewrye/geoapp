@@ -143,6 +143,35 @@ describe("smart select prompts (criterion 3)", () => {
     expect(smart.discard()).toBe(false); // no prompt left: Escape selects Pan
   });
 
+  // Spec 049 criterion 3: a right click calls discard().
+  it("discard() after a shown mask hides it, a later decode changes nothing, and the next click decodes without encoding", async () => {
+    const { seg, smart, shown } = setup();
+    smart.click([1500, 1000], true);
+    await settle();
+    expect(ones(shown.at(-1))).toBeGreaterThan(0);
+    seg.hold = true;
+    smart.click([1510, 1000], true);
+    await settle();
+    expect(smart.discard()).toBe(true);
+    expect(shown.at(-1)).toBeNull();
+    const n = shown.length;
+    seg.release();
+    await settle();
+    expect(shown.length).toBe(n);
+    seg.hold = false;
+    smart.click([1520, 1000], true);
+    await settle();
+    expect(seg.log.encodes).toHaveLength(1);
+    expect(seg.log.decodes.at(-1)).toEqual([1520.5 - 1024, 1000.5 - 512]); // a fresh prompt: its point alone
+    expect(ones(shown.at(-1))).toBeGreaterThan(0);
+  });
+
+  it("discard() with no prompt returns false and calls nothing", () => {
+    const { seg, smart, shown, ops, reads } = setup();
+    expect(smart.discard()).toBe(false);
+    expect([seg.log.encodes, seg.log.decodes, shown, ops, reads]).toEqual([[], [], [], [], []]);
+  });
+
   it("opening a raster drops the prompt and the embedding", async () => {
     const { seg, smart, shown, ops } = setup();
     smart.click([1500, 1000], true);
