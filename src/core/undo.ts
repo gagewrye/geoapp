@@ -52,11 +52,16 @@ export function editBytes(edit: Edit): number {
 
 /**
  * Drops entries until both stacks' editBytes <= maxBytes and their lengths <= maxSteps: the redo stack's
- * oldest-undone first (redo[0], the last to be redone), then the history's oldest.
+ * oldest-undone first (redo[0], the last to be redone), then the history's oldest. keep, the entry just
+ * appended or pushed, is never dropped, so one edit over maxBytes stays undoable alone (spec 048).
  */
-export function trimHistory(history: Edit[], maxBytes: number, maxSteps: number, redo: Edit[] = []): void {
+export function trimHistory(history: Edit[], maxBytes: number, maxSteps: number, redo: Edit[] = [], keep?: Edit): void {
   let total = [...history, ...redo].reduce((n, e) => n + editBytes(e), 0);
   const over = () => history.length + redo.length > maxSteps || total > maxBytes;
-  while (redo.length && over()) total -= editBytes(redo.shift()!);
-  while (history.length && over()) total -= editBytes(history.shift()!);
+  for (const stack of [redo, history]) {
+    for (let i = 0; i < stack.length && over();) {
+      if (stack[i] === keep) i++;
+      else total -= editBytes(stack.splice(i, 1)[0]!);
+    }
+  }
 }

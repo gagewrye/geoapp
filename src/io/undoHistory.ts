@@ -5,7 +5,7 @@ import { UNDO_BYTES, UNDO_STEPS, editBytes, finishEdit, recordTiles, trimHistory
 /** One stroke's edit while it can still change: in progress, or ended with cells still queued. */
 export type StrokeEdit = { edit: Edit; queued: number; ended: boolean };
 
-/** Paint undo and redo (specs 010, 037, ADR 0015): one entry per stroke, appended once it has ended and its last cell applied. */
+/** Paint undo and redo (specs 010, 037, 048, ADR 0015): one entry per stroke, appended once it has ended and its last cell applied. */
 // Strokes finish in the order they started (one stroke at a time, applied first in first out), so
 // entries stay in stroke order even when a stroke's cells wait for masks.
 export class UndoHistory {
@@ -80,11 +80,12 @@ export class UndoHistory {
     if (!e) return null;
     const { inverse, keys } = swapEdit(this.store(), e);
     to.push(inverse);
-    this.trim(UNDO_BYTES - this.openBytes()); // the inverse may hold more bytes than the entry did
+    this.trim(UNDO_BYTES - this.openBytes(), inverse); // the inverse may hold more bytes than the entry did
     return keys;
   }
 
-  private trim(maxBytes: number): void { trimHistory(this.history, maxBytes, UNDO_STEPS, this.redoStack); }
+  /** keep: the entry just appended or pushed, kept even when it alone is over the budget (spec 048). */
+  private trim(maxBytes: number, keep?: Edit): void { trimHistory(this.history, maxBytes, UNDO_STEPS, this.redoStack, keep); }
 
   private openBytes(): number { return this.open.reduce((n, s) => n + editBytes(s.edit), 0); }
 
@@ -97,6 +98,6 @@ export class UndoHistory {
     if (!done) return;
     this.history.push(done);
     this.redoStack = [];
-    this.trim(UNDO_BYTES - this.openBytes());
+    this.trim(UNDO_BYTES - this.openBytes(), done);
   }
 }
