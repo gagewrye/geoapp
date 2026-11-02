@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 // Tester, spec 032 criterion 2: messageKind.test.ts passes "error" itself, so this checks the app's own call sites do.
 // Every say(...) in src/ui that says a scope 3 error message passes the "error" kind.
-const ERRORS = /MESSAGES\.(labelFile|classTable|className|labelLimit|editLimit|maskGone|imageryUnreadable|largeBlocks|rasterAntimeridian|tooMany)\b|errorText\(|readErrorMessage\(|\berror\(e\)/;
+const ERRORS = /MESSAGES\.(labelFile|className|labelLimit|editLimit|maskGone|imageryUnreadable|largeBlocks|rasterAntimeridian|tooMany)\b|errorText\(|readErrorMessage\(|\berror\(e\)/;
 const dir = join(process.cwd(), "src", "ui");
 
 describe("error call sites (tester, spec 032 criterion 2)", () => {

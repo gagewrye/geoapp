@@ -23,11 +23,13 @@ export const at = (c: number, r: number): LngLat => [10 + c * 0.01, 50 - r * 0.0
 
 export const arrayBuffer = (b: Buffer) => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
 
-/** Import a label file, with a class map when given; doesn't wait for the run. */
-export async function importFile(page: Page, file: ReturnType<typeof upload>, classMap?: ReturnType<typeof upload>): Promise<void> {
-  if (classMap) await page.setInputFiles("#class-map", classMap);
+/** Import a label file; doesn't wait for the run. */
+export async function importFile(page: Page, file: ReturnType<typeof upload>): Promise<void> {
   await page.setInputFiles("#import-labels", file);
 }
+
+/** Apply class map with this JSON text (spec 047); doesn't wait for the message. */
+export const applyMap = (page: Page, text: string) => page.setInputFiles("#class-map", upload("map.json", text));
 
 /** The stored tiles through the hook, decoded from base64 in Node. */
 export async function storeTiles(page: Page): Promise<Map<string, Uint8Array>> {
@@ -114,5 +116,30 @@ export function expectNoNodata(tiles: Map<string, Uint8Array>, width: number, no
   }
   expect(bad).toBe(0);
 }
+
+/** Holds IndexedDB `get` on store sessions and `getAll`/`getAllKeys` on store tiles until each gate opens. */
+export const holdIdb = () => {
+  const w = window as any;
+  const gate = () => { let open!: () => void; const p = new Promise<void>((r) => { open = r; }); return { p, open }; };
+  w.__idb = { get: gate(), tiles: gate() };
+  const wrap = (name: "get" | "getAll" | "getAllKeys", store: string, which: "get" | "tiles") => {
+    const real = IDBObjectStore.prototype[name] as (...a: unknown[]) => IDBRequest;
+    (IDBObjectStore.prototype as any)[name] = function (this: IDBObjectStore, ...a: unknown[]) {
+      const r = real.apply(this, a);
+      if (this.name !== store) return r;
+      return new Proxy(r, {
+        set(t, k, v) {
+          if (k === "onsuccess") (t as any).onsuccess = (e: Event) => { void w.__idb[which].p.then(() => v.call(t, e)); };
+          else (t as any)[k] = v;
+          return true;
+        },
+        get(t, k) { const v = (t as any)[k]; return typeof v === "function" ? v.bind(t) : v; },
+      });
+    };
+  };
+  wrap("get", "sessions", "get");
+  wrap("getAll", "tiles", "tiles");
+  wrap("getAllKeys", "tiles", "tiles");
+};
 
 export type { LabelStore };

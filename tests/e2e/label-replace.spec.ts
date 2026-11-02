@@ -33,12 +33,11 @@ test("there is no Seed mode; with no labels an import shows no confirm, and Undo
   await expect(page.locator("#undo")).toBeDisabled();
 });
 
-test("with painted tiles an import confirms: Cancel keeps labels, classes and the class map, OK replaces them and disables Undo", async ({ page }) => {
+test("with painted tiles an import confirms: Cancel keeps labels and classes, OK replaces them and disables Undo", async ({ page }) => {
   await setup(page);
   await paintTwoClasses(page);
   await expect(page.locator("#undo")).toBeEnabled();
   const before = { tiles: await storeTiles(page), list: await classList(page) };
-  await page.setInputFiles("#class-map", upload("map.json", JSON.stringify([{ value: 3, name: "Water" }])));
   const asked: string[] = [];
   page.once("dialog", (d) => { asked.push(d.message()); void d.dismiss(); });
   await importFile(page, classes());
@@ -46,13 +45,12 @@ test("with painted tiles an import confirms: Cancel keeps labels, classes and th
   await page.waitForTimeout(300);
   expect(await storeTiles(page)).toEqual(before.tiles);
   expect(await classList(page)).toEqual(before.list);
-  expect(await page.locator("#class-map").evaluate((e) => (e as HTMLInputElement).files?.[0]?.name)).toBe("map.json"); // kept for the next try
   page.once("dialog", (d) => { asked.push(d.message()); void d.accept(); });
-  await page.setInputFiles("#import-labels", classes()); // the class map chosen before Cancel applies
+  await page.setInputFiles("#import-labels", classes());
   await expect(message(page)).toHaveText(seeded);
   expect(asked).toEqual([MESSAGES.replace, MESSAGES.replace]);
-  expect(await classList(page)).toEqual([{ name: "Water", colour: paletteColour(0) }]);
-  expect(new Set((await labels(page)).values())).toEqual(new Set([1]));
+  expect(await classList(page)).toEqual(["Class 0", "Class 3", "Class 7"].map((name, i) => ({ name, colour: paletteColour(i) })));
+  expect(new Set((await labels(page)).values())).toEqual(new Set([1, 2, 3]));
   await expect(page.locator("#undo")).toBeDisabled();
   // a second import, over imported labels only, replaces them too (spec 014 criterion 10 covers a mask-only store)
   page.once("dialog", (d) => { asked.push(d.message()); void d.accept(); });

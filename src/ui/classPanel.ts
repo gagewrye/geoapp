@@ -60,6 +60,13 @@ export function initClassPanel({ list, add, say, locked, recoloured, selectedCha
       selected = i >= 0 && i < classes.length ? i : 0;
       render();
     },
+    /** Swaps in renamed and recoloured classes, same length (spec 047's Apply class map): a class edit, saved and repainted. */
+    setClasses(next: LabelClass[]): void {
+      classes.splice(0, classes.length, ...next);
+      render();
+      recoloured();
+      edited();
+    },
     render,
   };
 }

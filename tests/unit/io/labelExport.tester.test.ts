@@ -49,7 +49,7 @@ async function roundTrip(src: RasterSource, store: LabelStore, classes: LabelCla
   const rec = recordingSink();
   await exportLabels(src, store, classes, rec.sink);
   const file = await openLabelTiff(await fromArrayBuffer(rec.bytes().buffer as ArrayBuffer));
-  const r = ok(await importLabels(src, file, importTable(file)));
+  const r = ok(await importLabels(src, file, importTable(file).table));
   return { r, rec, file };
 }
 
@@ -102,7 +102,7 @@ describe("export then import restores labels and classes exactly", () => {
     await exportLabels(src, emptyStore(300, 260), [{ name: "only", colour: "#000000" }], rec.sink);
     const file = await openLabelTiff(await fromArrayBuffer(rec.bytes().buffer as ArrayBuffer));
     const current = { store: emptyStore(300, 260), classes: [{ name: "keep", colour: "#111111" }] };
-    expect(await importLabels(src, file, importTable(file))).toBe("empty");
+    expect(await importLabels(src, file, importTable(file).table)).toBe("empty");
     expect(current.classes).toEqual([{ name: "keep", colour: "#111111" }]);
   });
 

@@ -1,35 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 import { jumpTo, message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture, tileKeysStored, toScreen } from "./helpers";
-import { storeTiles } from "./seeding";
+import { holdIdb, storeTiles } from "./seeding";
 
 // Tester, spec 031 criterion 11 / scope 4 in the browser: from "Raster opened." until the restore offer has settled,
 // strokes change no tile and Undo, Import labels and Export labels are disabled. The session lookup and the restore's
 // tile reads are held in IndexedDB so both halves of the lock (before the prompt, and while tiles load after OK) can be seen.
-
-/** Holds IndexedDB `get` on store sessions and `getAll`/`getAllKeys` on store tiles until each gate opens. */
-const holdIdb = () => {
-  const w = window as any;
-  const gate = () => { let open!: () => void; const p = new Promise<void>((r) => { open = r; }); return { p, open }; };
-  w.__idb = { get: gate(), tiles: gate() };
-  const wrap = (name: "get" | "getAll" | "getAllKeys", store: string, which: "get" | "tiles") => {
-    const real = IDBObjectStore.prototype[name] as (...a: unknown[]) => IDBRequest;
-    (IDBObjectStore.prototype as any)[name] = function (this: IDBObjectStore, ...a: unknown[]) {
-      const r = real.apply(this, a);
-      if (this.name !== store) return r;
-      return new Proxy(r, {
-        set(t, k, v) {
-          if (k === "onsuccess") (t as any).onsuccess = (e: Event) => { void w.__idb[which].p.then(() => v.call(t, e)); };
-          else (t as any)[k] = v;
-          return true;
-        },
-        get(t, k) { const v = (t as any)[k]; return typeof v === "function" ? v.bind(t) : v; },
-      });
-    };
-  };
-  wrap("get", "sessions", "get");
-  wrap("getAll", "tiles", "tiles");
-  wrap("getAllKeys", "tiles", "tiles");
-};
 
 /** A stroke with no wait for settling (Import labels stays disabled under the lock). */
 async function rawStroke(page: Page, at: [number, number]) {

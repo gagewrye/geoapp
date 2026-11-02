@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { RasterRefusedError } from "../../../src/io/pipeline";
-import { errorText, MESSAGES, readErrorMessage, seedMessage } from "../../../src/ui/messages";
+import { classMapMessage, errorText, MESSAGES, readErrorMessage, seedMessage } from "../../../src/ui/messages";
 
 // Spec 004 criterion 16: ui maps "too many" to its message; the rest of the import messages.
 
@@ -15,7 +15,26 @@ describe("seedMessage", () => {
   it("holds spec 004's fixed strings", () => {
     expect(MESSAGES.labelFile).toBe("Label files must be single-band 8-bit GeoTIFFs.");
     expect(MESSAGES.replace).toBe("Replace labels?");
-    expect(MESSAGES.classTable("[2].value")).toBe("The class table is invalid: [2].value.");
+  });
+});
+
+describe("spec 047's messages", () => {
+  const ok = { store: { width: 1, height: 1, tiles: new Map(), base: true }, classes: [], base: null as never, pixels: 12, classCount: 2 };
+  const v = { field: "[0].value", why: "is the file's nodata 0" }, n = { field: "[3].name", why: "must be a unique, non-empty string" };
+
+  it("a successful import names the first part of the file's class table it ignored, and how many more", () => {
+    expect(seedMessage(ok, [])).toBe("Seeded 12 pixels in 2 classes.");
+    expect(seedMessage(ok, [v])).toBe("Seeded 12 pixels in 2 classes. Ignored part of the file's class table: [0].value is the file's nodata 0.");
+    expect(seedMessage(ok, [v, n, n])).toBe("Seeded 12 pixels in 2 classes. Ignored part of the file's class table: [0].value is the file's nodata 0 (+2 more).");
+    expect(seedMessage("empty", [v])).toBe(MESSAGES.noSeed);
+  });
+
+  it("Apply class map says how many classes changed, or matched none as an error, and the first skip", () => {
+    expect(classMapMessage(2, [])).toEqual({ text: "Class map applied to 2 classes.", kind: "info" });
+    expect(classMapMessage(7, [{ field: "[0].value", why: "has no class in these labels" }]).text).toBe("Class map applied to 7 classes. Skipped: [0].value has no class in these labels.");
+    expect(classMapMessage(0, [{ field: "JSON", why: "is not valid JSON" }])).toEqual({ text: "Class map matched no class. Skipped: JSON is not valid JSON.", kind: "error" });
+    expect(classMapMessage(0, [])).toEqual({ text: "Class map matched no class.", kind: "error" });
+    expect(classMapMessage(1, [v, n]).text).toBe("Class map applied to 1 classes. Skipped: [0].value is the file's nodata 0 (+1 more).");
   });
 });
 

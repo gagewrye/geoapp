@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { errorText, MESSAGES, messageSink, readErrorMessage } from "../../../src/ui/messages";
+import { classMapMessage, errorText, MESSAGES, messageSink, readErrorMessage } from "../../../src/ui/messages";
 
 // Spec 032 criterion 2: errors set class error on #message; info messages don't.
 function fakeEl() {
@@ -9,7 +9,7 @@ function fakeEl() {
 
 describe("message kinds", () => {
   const errors = [
-    errorText(new Error("boom")), readErrorMessage(new Error("bad read")), MESSAGES.labelFile, MESSAGES.classTable("[1].value"), MESSAGES.className,
+    errorText(new Error("boom")), readErrorMessage(new Error("bad read")), MESSAGES.labelFile, classMapMessage(0, [{ field: "JSON", why: "is not valid JSON" }]).text, MESSAGES.className,
     MESSAGES.labelLimit, MESSAGES.editLimit, MESSAGES.maskGone, MESSAGES.imageryUnreadable, MESSAGES.largeBlocks(2 ** 25, 2 ** 24),
     MESSAGES.rasterAntimeridian, MESSAGES.tooMany,
   ];

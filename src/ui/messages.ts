@@ -1,3 +1,4 @@
+import type { Skip } from "../core/classTable";
 import { maskReadFailed } from "../io/labelFile";
 import { RasterRefusedError } from "../io/pipeline";
 import type { SeedOutcome } from "../io/seeding";
@@ -16,7 +17,6 @@ export const MESSAGES = {
   noSeed: "No labels to seed here.",
   // spec 004, Settled in build
   replace: "Replace labels?",
-  classTable: (field: string) => `The class table is invalid: ${field}.`,
   // spec 014
   editLimit: "Label limit reached (256 edited tiles of 256 x 256 px). Undo strokes, or export the labels and import the export.",
   maskGone: "The label mask can't be read any more. Import it again.",
@@ -44,12 +44,22 @@ export const MESSAGES = {
   smartDownload: "Smart select downloads an 80 MB model once. Download it?",
 } as const;
 
-/** What a seeding run says (spec 004); null for a run dropped because another raster opened. */
-export function seedMessage(r: SeedOutcome): string | null {
+/** The first skip, and how many more: "[0].value has no class in these labels (+2 more)." (spec 047). */
+const skipText = (s: Skip[]) => `${s[0]!.field} ${s[0]!.why}${s.length > 1 ? ` (+${s.length - 1} more)` : ""}.`;
+
+/** What a seeding run says (spec 004), naming the first part of the file's class table it ignored (spec 047); null for a run dropped because another raster opened. */
+export function seedMessage(r: SeedOutcome, skipped: Skip[] = []): string | null {
   if (r === "stale") return null;
   if (r === "too many") return MESSAGES.tooMany;
   if (r === "empty") return MESSAGES.noSeed;
-  return `Seeded ${r.pixels} pixels in ${r.classCount} classes.`;
+  const ignored = skipped.length ? ` Ignored part of the file's class table: ${skipText(skipped)}` : "";
+  return `Seeded ${r.pixels} pixels in ${r.classCount} classes.${ignored}`;
+}
+
+/** What Apply class map says (spec 047); an error when it matched no class. */
+export function classMapMessage(applied: number, skipped: Skip[]): { text: string; kind: MessageKind } {
+  const head = applied ? `Class map applied to ${applied} classes.` : "Class map matched no class.";
+  return { text: skipped.length ? `${head} Skipped: ${skipText(skipped)}` : head, kind: applied ? "info" : "error" };
 }
 
 // A FileReader failure rejects with a ProgressEvent, which has no message (spec 019)

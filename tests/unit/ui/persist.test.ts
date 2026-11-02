@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LabelClass } from "../../../src/core/classes";
+import { applyClassMap } from "../../../src/core/classTable";
 import { emptyStore, type LabelStore } from "../../../src/core/labelStore";
 import { rasterKey } from "../../../src/core/session";
 import type { Grid } from "../../../src/core/types";
@@ -253,5 +254,33 @@ describe("replace, Cancel and eviction (criterion 5)", () => {
     expect(await t.p.offer()).toBe(null);
     await vi.advanceTimersByTimeAsync(SAVE_DELAY_MS); await t.p.idle();
     expect(t.fake.log).toEqual(["putTiles 1", "putRecord"]);
+  });
+});
+
+describe("Apply class map is a class edit (spec 047 criterion 11)", () => {
+  it("marks the record dirty, the saved record holds the new names and colours, and a restore shows them", async () => {
+    const a = setup();
+    await a.ready();
+    a.set.classes([{ name: "Class 3", colour: "#1f77b4" }, { name: "Class 7", colour: "#ff7f0e" }]);
+    a.set.base({ lut: Uint8Array.from({ length: 256 }, (_, v) => (v === 3 ? 1 : v === 7 ? 2 : 0)), count: 5, windows: new Set(["0,0"]), preview: { values: new Uint8Array([1, 2]) } } as unknown as MaskBase);
+    a.p.imported(new Blob(["mask"]));
+    await vi.advanceTimersByTimeAsync(SAVE_DELAY_MS); await a.p.idle();
+    a.fake.log.length = 0;
+    // what Apply class map does: applyClassMap, then labels.setClasses, whose class edit calls record()
+    const r = applyClassMap(a.get().classes, a.get().base!.lut, [{ value: 3, name: "Water", colour: "#0000FF" }]);
+    a.set.classes(r.classes);
+    a.p.record();
+    expect(a.guarded()).toBe(true); // dirty
+    await vi.advanceTimersByTimeAsync(SAVE_DELAY_MS); await a.p.idle();
+    expect(a.fake.log).toEqual(["putRecord"]);
+    expect(a.fake.records.get(KEY)!.classes).toEqual([{ name: "Water", colour: "#0000ff" }, { name: "Class 7", colour: "#ff7f0e" }]);
+
+    const b = setup();
+    for (const [k, v] of a.fake.records) b.fake.records.set(k, v);
+    for (const [k, v] of a.fake.tiles) b.fake.tiles.set(k, v);
+    for (const [k, v] of a.fake.bases) b.fake.bases.set(k, v);
+    b.p.open("a.tif", SIZE, G);
+    expect(await b.p.offer()).toBe(MESSAGES.restored);
+    expect(b.get().classes).toEqual([{ name: "Water", colour: "#0000ff" }, { name: "Class 7", colour: "#ff7f0e" }]);
   });
 });

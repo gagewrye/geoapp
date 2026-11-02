@@ -2,39 +2,39 @@ import { describe, expect, it } from "vitest";
 import { writeTiff } from "../../../src/io/tiffWriter";
 import { fromArrayBuffer } from "geotiff";
 import { paletteColour, type LabelClass } from "../../../src/core/classes";
-import { CLASS_ITEM, ClassTableError, decodeClasses, encodeClasses, mergeClasses, parseClasses } from "../../../src/core/classTable";
+import { CLASS_ITEM, decodeClasses, encodeClasses, mergeClasses, readClassTable } from "../../../src/core/classTable";
 import { recordingSink } from "../helpers/sources";
 
 // Tester edge cases for spec 004's class tables: the name rule after trimming, field names, the
 // 255-class boundary, exact matching, and encode/decode of hostile and non-ASCII names.
 
-const field = (f: () => unknown): string | null => {
-  try { f(); } catch (e) { return e instanceof ClassTableError ? e.field : `not a ClassTableError: ${(e as Error).message}`; }
-  return null;
-};
+/** The first skip's field, or null when nothing was skipped. */
+const field = (json: unknown, nodata: number | null): string | null => readClassTable(json, nodata).skipped[0]?.field ?? null;
 
-describe("parseClasses edges", () => {
-  it("trims names (spec 003's rule) and rejects names that collide after trimming", () => {
-    expect(parseClasses([{ value: 1, name: "  Water " }], null)).toEqual([{ value: 1, name: "Water" }]);
-    expect(field(() => parseClasses([{ value: 1, name: "Water" }, { value: 2, name: " Water" }], null))).toBe("[1].name");
-    expect(field(() => parseClasses([{ value: 1, name: "   " }], null))).toBe("[0].name");
+describe("readClassTable edges (spec 004's parseClasses edges, moved by spec 047)", () => {
+  it("trims names (spec 003's rule) and skips names that collide after trimming", () => {
+    expect(readClassTable([{ value: 1, name: "  Water " }], null).entries).toEqual([{ value: 1, name: "Water" }]);
+    expect(field([{ value: 1, name: "Water" }, { value: 2, name: " Water" }], null)).toBe("[1].name");
+    expect(field([{ value: 1, name: "   " }], null)).toBe("[0].name");
   });
 
-  it("rejects NaN, Infinity, numeric strings, null entries and null colours, naming the field", () => {
-    expect(field(() => parseClasses([{ value: 1, name: "a" }, { value: Infinity, name: "b" }], null))).toBe("[1].value");
-    expect(field(() => parseClasses([{ value: "3", name: "a" }], null))).toBe("[0].value");
-    expect(field(() => parseClasses([null], null))).toBe("[0]");
-    expect(field(() => parseClasses([{ value: 1, name: "a", colour: null }], null))).toBe("[0].colour");
-    expect(field(() => parseClasses([{ value: 1, name: "a", colour: "#12345" }], null))).toBe("[0].colour");
-    expect(field(() => parseClasses([{ value: 1, name: "a", colour: "123456" }], null))).toBe("[0].colour");
-    expect(field(() => parseClasses({ length: 1, 0: { value: 1, name: "a" } }, null))).toBe("table");
+  it("skips NaN, Infinity, numeric strings, null entries and null colours, naming the field", () => {
+    expect(field([{ value: 1, name: "a" }, { value: Infinity, name: "b" }], null)).toBe("[1].value");
+    expect(field([{ value: "3", name: "a" }], null)).toBe("[0].value");
+    expect(field([null], null)).toBe("[0]");
+    expect(field([{ value: 1, name: "a", colour: null }], null)).toBe("[0].colour");
+    expect(field([{ value: 1, name: "a", colour: "#12345" }], null)).toBe("[0].colour");
+    expect(field([{ value: 1, name: "a", colour: "123456" }], null)).toBe("[0].colour");
+    expect(field({ length: 1, 0: { value: 1, name: "a" } }, null)).toBe("table");
   });
 
-  it("accepts exactly 255 entries; with nodata the 255 can't include it", () => {
+  it("keeps 255 entries; with nodata 0 the 0 entry is skipped, and 256 entries are all kept (\"too many\" is the import's)", () => {
     const t = Array.from({ length: 255 }, (_, i) => ({ value: i, name: `n${i}` }));
-    expect(parseClasses(t, null)).toHaveLength(255);
-    expect(parseClasses(t, 255)).toHaveLength(255);
-    expect(field(() => parseClasses(t, 0))).toBe("[0].value");
+    expect(readClassTable(t, null).entries).toHaveLength(255);
+    expect(readClassTable(t, 255).entries).toHaveLength(255);
+    expect(readClassTable(t, 0).entries).toHaveLength(254);
+    expect(field(t, 0)).toBe("[0].value");
+    expect(readClassTable(Array.from({ length: 256 }, (_, i) => ({ value: i, name: `n${i}` })), null).entries).toHaveLength(256);
   });
 });
 
