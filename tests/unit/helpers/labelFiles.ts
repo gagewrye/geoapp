@@ -42,7 +42,12 @@ export function classItemFile(): Promise<ArrayBuffer> {
 }
 
 /** A file on CLASS_GRID of values f(c, r), nodata "0", whose CLASS_ITEM lists `classes` as values 1..n (an app export's table). */
-export async function itemFile(f: (c: number, r: number) => number, classes: { name: string; colour: string }[]): Promise<ArrayBuffer> {
+export function itemFile(f: (c: number, r: number) => number, classes: { name: string; colour: string }[]): Promise<ArrayBuffer> {
+  return metadataFile(f, encodeClasses(classes));
+}
+
+/** A file on CLASS_GRID of values f(c, r), nodata "0", with this GDAL_METADATA text. */
+export async function metadataFile(f: (c: number, r: number) => number, metadata: string): Promise<ArrayBuffer> {
   const parts: Uint8Array[] = [];
   const g = CLASS_GRID;
   const geo = { GeoKeyDirectory: [1, 1, 0, 3, 1024, 0, 1, 1, 1025, 0, 1, 1, 3072, 0, 1, 32633], ...geoMeta(g) };
@@ -50,7 +55,7 @@ export async function itemFile(f: (c: number, r: number) => number, classes: { n
     const t = new Uint8Array(w.width * w.height);
     for (let r = 0; r < w.height; r++) for (let c = 0; c < w.width; c++) t[r * w.width + c] = f(w.x0 + c, w.y0 + r);
     return t;
-  }, { nodata: "0", metadata: encodeClasses(classes) });
+  }, { nodata: "0", metadata });
   const out = new Uint8Array(parts.reduce((s, p) => s + p.length, 0));
   let o = 0;
   for (const p of parts) { out.set(p, o); o += p.length; }
