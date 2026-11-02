@@ -1,5 +1,6 @@
 import "./style.css";
 import { PREVIEW_MAX_SIDE } from "../core/maskPreview";
+import { canPickFiles, pickRaster } from "../io/filePick";
 import { openFile } from "../io/geotiffSource";
 import { buildPreview, openRaster } from "../io/pipeline";
 import { readSamInput } from "../io/samImagery";
@@ -43,6 +44,8 @@ const status = initStatus(map, () => (source ? source.meta : null));
 // nav and labels exist before any map event; a held pan key holds tile updates until it settles (spec 027)
 const fullRes = initImagery(map, say, { moving: () => nav.moving(), viewSettled: () => labels.viewSettled() });
 let source: RasterSource | undefined;
+// the open raster's file handle, so Export's Save dialog starts in its folder; null when it came through the input (spec 050)
+let folder: FileSystemFileHandle | null = null;
 // Opens are numbered so that an older open finishing late can't replace the raster a newer one opened
 let opens = 0;
 let opened = 0;
@@ -71,7 +74,7 @@ const labels = initLabels({ map, say, toolChanged: () => queueMicrotask(() => st
 // Spec 031: labels are kept in this browser as they change, and offered back when the raster is opened again
 const persist = initPersist({ labels, open: openSessionStore, state: $("save-state"), win: window, doc: document,
   confirm: (t) => confirm(t), persistStorage: () => { void navigator.storage?.persist?.(); } });
-const seeding = initSeeding({ labels, imagery: () => source, say, error: errorText,
+const seeding = initSeeding({ labels, imagery: () => source, folder: () => folder, say, error: errorText,
   opened: (f) => testHook("labelFile", f), imported: (f) => persist.imported(f) });
 // letters type in text fields and pick options in selects, so WASD leaves them alone (spec 009)
 const nav = createNavigation(map, { typing: (el) => inTextField(el) || el instanceof HTMLSelectElement, stroking: labels.stroking });
@@ -101,15 +104,33 @@ async function run(task: () => Promise<void>, stale = () => false): Promise<void
   }
 }
 
-$<HTMLInputElement>("open-raster").addEventListener("change", (ev) => {
+type Chosen = { file: File; handle: FileSystemFileHandle | null } | null;
+const openInput = $<HTMLInputElement>("open-raster");
+openInput.addEventListener("change", () => {
+  const file = openInput.files?.[0];
+  return openChosen(async () => (file ? { file, handle: null } : null));
+});
+// Spec 050: on Chromium the picker replaces the input's chooser (a label click reaches the input too), so the raster comes with a handle
+openInput.addEventListener("click", (e) => {
+  if (!canPickFiles()) return;
+  e.preventDefault();
+  const picked = pickRaster(); // within the click: the picker needs its user activation, so nothing is awaited first
+  return openChosen(async () => {
+    const handle = await picked; // null when cancelled: nothing opens and nothing shows
+    return handle ? { file: await handle.getFile(), handle } : null;
+  });
+});
+
+/** Opens the raster `choose` gives; its handle replaces `folder` only once the raster replaces `source`. */
+function openChosen(choose: () => Promise<Chosen>): Promise<void> {
   const req = ++opens;
   let s: RasterSource | undefined;
   // until it opens, a newer open that opened supersedes it; once open, any raster opened after it does
   const stale = () => (s ? source !== s : opened > req);
   return run(async () => {
-    const input = ev.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) return;
+    const chosen = await choose();
+    if (!chosen) return;
+    const { file, handle } = chosen;
     say("");
     progress.busy();
     const f = await openFile(file);
@@ -119,9 +140,10 @@ $<HTMLInputElement>("open-raster").addEventListener("change", (ev) => {
     // only a raster that opens can close the labels; Cancel keeps everything. A previous raster's unsaved snapshot
     // asks instead of the close question (specs 031 scope 8, 032 scope 6). Then the old raster's changes are
     // copied, before labels.open switches the labels
-    if (!persist.open(file.name, file.size, f.meta, labels.hasLabels())) { input.value = ""; progress.hide(); return; }
+    if (!persist.open(file.name, file.size, f.meta, labels.hasLabels())) { openInput.value = ""; progress.hide(); return; }
     opened = req;
     source = s = f;
+    folder = handle;
     fullRes.clear();
     previewing?.abort(); // the replaced raster's preview reads stop
     const signal = (previewing = new AbortController()).signal;
@@ -152,5 +174,5 @@ $<HTMLInputElement>("open-raster").addEventListener("change", (ev) => {
     // spec 031: once the preview is drawn; a store that can't open shows on #save-state when a save fails
     persist.offer().then((m) => { if (m && !stale()) say(m); }, () => {});
   }, stale);
-});
+}
 

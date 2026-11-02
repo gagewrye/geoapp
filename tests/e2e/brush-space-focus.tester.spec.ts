@@ -21,6 +21,8 @@ async function setup(page: Page) {
     window.addEventListener("keydown", (e) => { if (e.code === "Space") g.push(e.defaultPrevented); });
   });
 }
+// these tests drive the input's native chooser, which Chromium's open picker replaces (spec 050 criterion 5)
+const nativeChooser = (page: Page) => page.addInitScript(() => { delete (window as { showOpenFilePicker?: unknown }).showOpenFilePicker; });
 const prevented = (page: Page) => page.evaluate(() => (window as any).__space.splice(0) as boolean[]);
 
 /** Hold Space: true if it acted as Pan. Released afterwards. */
@@ -101,6 +103,7 @@ test.describe("Space and focus (F6, tester)", () => {
   });
 
   test("Tab to Open GeoTIFF, Space opens the chooser; after the chooser and the discard confirm, Space still opens it", async ({ page }) => {
+    await nativeChooser(page);
     await setup(page);
     const c = await toScreen(page, [15.005, 45.005]);
     await stroke(page, [c, { x: c.x + 20, y: c.y }]);
@@ -125,6 +128,7 @@ test.describe("Space and focus (F6, tester)", () => {
   });
 
   test("a mouse click on Open GeoTIFF, chooser closed, then Space: Pan, no chooser", async ({ page }) => {
+    await nativeChooser(page);
     await setup(page);
     const chooser = page.waitForEvent("filechooser", { timeout: 3000 });
     await page.click("#open-raster");

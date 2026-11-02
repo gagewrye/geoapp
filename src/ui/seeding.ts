@@ -13,6 +13,8 @@ import type { MessageKind } from "./messages";
 type Deps = {
   labels: ReturnType<typeof initLabels>;
   imagery: () => RasterSource | undefined;
+  /** The open raster's file handle, if it came through the open picker: Export's Save dialog starts in its folder (spec 050). */
+  folder: () => FileSystemHandle | null;
   say: (text: string, kind?: MessageKind) => void;
   /** Shows an error the way main's other actions do. */
   error: (e: unknown) => string;
@@ -33,7 +35,7 @@ export function controlsDisabled(o: { imagery: boolean; seeding: boolean; queued
 /** Import labels and Export labels (spec 004), with the import's progress and Cancel (spec 021), and Apply class map (spec 047). */
 // A run belongs to the imagery it started on: once another raster opens it sets no labels and no
 // message (spec 003's rule for replaced rasters), and the new raster's controls are free at once.
-export function initSeeding({ labels, imagery, say, error, opened, imported }: Deps) {
+export function initSeeding({ labels, imagery, folder, say, error, opened, imported }: Deps) {
   const importInput = $<HTMLInputElement>("import-labels"), classMap = $<HTMLInputElement>("class-map");
   const exportBtn = $<HTMLButtonElement>("export-labels"), cancelBtn = $<HTMLButtonElement>("import-cancel");
   // its own bar, so an open and an import don't hide each other's (spec 021)
@@ -150,7 +152,7 @@ export function initSeeding({ labels, imagery, say, error, opened, imported }: D
     const base = labels.base(); // read only: it changes only on an import or a raster open
     try {
       checkLabelExport(s, list); // before the Save dialog, so a rejected export leaves no empty file
-      const sink = await openSink("labels.tif");
+      const sink = await openSink("labels.tif", folder() ?? undefined);
       say("Exporting labels...");
       try {
         await exportLabels(s, store, list, sink, base);
