@@ -110,8 +110,16 @@ export function encodeClasses(classes: LabelClass[]): string {
   return `<GDALMetadata><Item name="${CLASS_ITEM}">${json.replace(/[&<>"']/g, (ch) => XML[ch]!)}</Item></GDALMetadata>`;
 }
 
-/** Parses an item's raw inner text (geotiff.js doesn't unescape it); throws on bad JSON. */
+const unescapeXml = (s: string) => s.replace(/&(amp|lt|gt|quot|apos);/g, (m) => UNXML[m]!);
+
+/** Parses an item's raw inner text (geotiff.js doesn't unescape it), the app's or GDAL's form; throws on bad JSON. */
+// The app escapes once, so one pass keeps "&amp;lt;" as "&lt;". GDAL escapes twice (spec 051); its text
+// still holds &quot; after one pass wherever the JSON has a string, so it can't parse until a second pass.
 export function decodeClasses(inner: string): unknown {
-  // one pass, so "&amp;lt;" becomes "&lt;", not "<"
-  return JSON.parse(inner.replace(/&(amp|lt|gt|quot|apos);/g, (m) => UNXML[m]!));
+  const once = unescapeXml(inner);
+  try {
+    return JSON.parse(once);
+  } catch {
+    return JSON.parse(unescapeXml(once));
+  }
 }

@@ -37,7 +37,7 @@ seedFromModel(model: Model, tile: Tile, minProb: number, values: number[]): Uint
 mergeTile(old: Uint8Array | undefined, seed: Uint8Array): Uint8Array // old where old > 0, else seed
 putTile(store: LabelStore, w: Window, labels: Uint8Array): "ok" | "full" // replaces w's tile; all-zero deletes it; "full" changes nothing
 encodeClasses(classes: LabelClass[]): string // `<GDALMetadata><Item name="GEOAPP_CLASSES">` + XML-escaped JSON ClassEntry[] (value = index + 1)
-decodeClasses(inner: string): unknown       // unescapes &amp; &lt; &gt; &quot; &apos;, then JSON.parse; throws on bad JSON
+decodeClasses(inner: string): unknown       // unescapes &amp; &lt; &gt; &quot; &apos; once, then JSON.parse; if that throws, unescapes again and parses (GDAL's form, spec 051); throws if both fail
 ```
 
 **Rules.**
