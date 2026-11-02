@@ -1,0 +1,9 @@
+# 0033: No label tile cap; full-resolution overlays are capped instead
+
+**Status:** Accepted (Gage, 2026-11-01), with spec 048. Supersedes ADR 0010's cap (`MAX_LABEL_TILES` = 256); amends ADR 0015 (oversized edits), ADR 0018 (the mask preview also shows edits) and ADR 0019 (overlay memory). Relies on no library behaviour beyond ADR 0019's canvas sources, re-checked in maplibre-gl 6.16.0 (`package.json`).
+
+**Context:** Gage edits whole chunks of 6,500–11,000 px (676–1,849 tiles), and the cap stops him at 256. Overlays, not labels, dominate memory: 512 KiB of canvas plus texture per tile against 64 KiB of labels, so one overlay per tile would reach about 1 GiB and 1,849 map layers at 11,000². Options: (a) drop the cap and keep one overlay per tile; (b) drop the cap and spill saved tiles to IndexedDB (spec 031), loading them async on touch; (c) drop the cap, keep labels in memory, and cap the overlays.
+
+**Decision:** (c). Labels stay sparse 64 KiB tiles in memory, uncapped. At most `LABEL_OVERLAYS` = 256 tiles have overlays: stored tiles in view, centre first, the least recently wanted evicted. Every label also shows on the ≤ 1024 px `mask` preview layer, hidden only under overlays. Undo keeps 32 MiB and 50 steps, but neither the stroke in progress nor the entry just pushed is dropped for bytes.
+
+**Consequences:** No dependency. Label memory is at most 2 B per raster pixel (labels plus one oversized undo entry) plus about 150 MiB (128 of overlays, about 19 of preview): about 230 MiB for a fully edited 6,571² chunk, 380 MiB at 11,000². A fully edited raster's labels are then in memory, which CLAUDE.md forbids for rasters; Gage accepted this for hand-painted labels (spec 048 Q1); (b) is the fallback. With over 256 stored tiles in view, the farthest show at preview resolution, and tiles panned into view get overlays only once the view settles.
