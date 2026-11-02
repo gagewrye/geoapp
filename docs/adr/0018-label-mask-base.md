@@ -1,6 +1,6 @@
 # 0018: An imported label mask is a file-backed base under sparse edit tiles
 
-**Status:** Accepted (Gage, 2026-10-28), with spec 014. Amends ADR 0010 (the store and memory) and ADR 0015 (a null undo entry now means "the mask shows"); ADR 0013's format is unchanged.
+**Status:** Accepted (Gage, 2026-10-28), with spec 014. Amends ADR 0010 (the store and memory) and ADR 0015 (a null undo entry now means "the mask shows"); ADR 0013's format is unchanged. Amended by ADR 0033 (2026-11-01): the mask preview also shows edits, hidden only under overlays.
 
 **Context:** Gage wants to load a label mask, larger than 4096 px, and fine-tune it with the brush. Spec 004 imports into ADR 0010's in-memory store, capped at 256 tiles (16 MiB), so a dense mask larger than about 4096² px fails, and holding it all would break CLAUDE.md's rule against loading full rasters. Checked 2026-10-28: geotiff 3.0.5's `fromBlob` reads on demand (`src/source/filereader.js` at v3.0.5 reads only `file.slice(offset, offset + length)` per range). The W3C File API (editor's draft) fails a read of a changed `File` with `NotReadableError`, and of a deleted one with `NotFoundError`.
 

@@ -1,6 +1,6 @@
 # 046: Smart select
 
-**Status:** Approved by Gage 2026-10-31, with the recommended answers. **ADRs:** 0031 onnxruntime-web, 0032 SAM 2.1 Tiny weights (both Accepted). **Builds on specs 003, 010, 014, 019, 023, 033, 037, 038 and 039.** Amends spec 033 scope 3 (Escape) and takes up ADR 0012 option (i) for one small model. **Amended after merge (Gage, 2026-10-31):** which mask is shown, and a decode log. See Amendment A, which changes scope 6, the Interfaces and criterion 2.
+**Status:** Approved by Gage 2026-10-31, with the recommended answers. **ADRs:** 0031 onnxruntime-web, 0032 SAM 2.1 Tiny weights (both Accepted). **Builds on specs 003, 010, 014, 019, 023, 033, 037, 038 and 039.** Amends spec 033 scope 3 (Escape) and takes up ADR 0012 option (i) for one small model. **Amended after merge (Gage, 2026-10-31):** which mask is shown, and a decode log. See Amendment A, which changes scope 6, the Interfaces and criterion 2. Amended by spec 048 (2026-11-01): there is no tile cap (ADR 0033), so scope 7's cap bullet lapses, and criterion 6's first bullet becomes "a commit touching a new tile with 256 stored labels it".
 
 **Decided (Gage, 2026-10-31):** the recommended answer to each open question. The questions and their alternatives were removed after merge and remain in git history.
 1. SAM 2.1 Tiny.

@@ -7,6 +7,8 @@
 - Spec 017: `BRUSH_SIZES` becomes a 1-127 px odd-size slider, and "−"/"+" and `[`/`]` apply `stepBrush`. Criterion 13 holds as written.
 - Spec 018 (ADR 0019): each stored tile is drawn as raster-aligned quads (`tileQuads`, `paintLabels`) in place of `overlayIndex`/`paintOverlay`. Hover keeps `footprintRing`, and criterion 6 is met by spec 018 criteria 1 and 2.
 
+Amended by spec 048 (2026-11-01): there is no tile cap (ADR 0033). `MAX_LABEL_TILES` and `brush`'s `"full"` are gone, so Storage's "full" sentence, criterion 4's cap clause and criterion 15's last sentence lapse. Display: at most 256 stored tiles in view have overlays, and every label also shows on the preview-resolution `mask` layer (spec 014), hidden only under overlays.
+
 **Decided (Gage)**, besides what Scope and Rules state: polygon code is deleted, not flagged off (2026-10-26). Train's snapshot copies the stored tiles, at most 16 MiB (ADR 0010); the 500 ms post-erase `contextmenu` guard applies on the map only, not the panel; a model loaded while a Train runs is replaced when that Train finishes (2026-10-27).
 
 ## Scope

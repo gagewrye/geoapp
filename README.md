@@ -29,7 +29,7 @@ The globe shows a bundled, low-resolution Natural Earth shaded relief to help yo
 
 Labels are kept in this browser as you work, and still never leave your device. They save about 2 s after your last change and when the tab is hidden; the status bar at the bottom shows when they last saved (with the cursor's position and pixel, the zoom, the brush and the app's messages; errors in red), and the browser asks before you leave with unsaved labels. Open the same file again (even renamed) to be offered them back. An imported mask is copied into the browser's storage too, using about as much disk as the file. A failed save is retried every 30 s; when the browser's storage is full the mask copy is skipped, so a restore then asks you to import the mask again. A saved session goes when you decline the restore, or when it is the oldest of more than 8. Undo history isn't saved.
 
-v1 limits: at most 256 tiles of 256 x 256 px hold painted or edited labels; a stroke needing more says so, and each pointer move of it is applied whole or not at all. An imported mask doesn't count towards this. Labels beyond ±85.05° latitude are kept and exported but aren't drawn. EPSG:4326/3857 rasters crossing 180° are refused. Output is capped at 4 GiB (classic TIFF).
+v1 limits: labels beyond ±85.05° latitude are kept and exported but aren't drawn. EPSG:4326/3857 rasters crossing 180° are refused. Output is capped at 4 GiB (classic TIFF).
 
 ## Develop
 After **Set up**:

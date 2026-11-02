@@ -1,6 +1,6 @@
 # 023: Paint without lag
 
-**Status:** Approved (Gage, 2026-10-30: "apply fixes. optimize for smoothness over storage"). **ADR:** 0021 (Accepted). Written against main 99d363a plus specs 021 and 022.
+**Status:** Approved (Gage, 2026-10-30: "apply fixes. optimize for smoothness over storage"). **ADR:** 0021 (Accepted). Written against main 99d363a plus specs 021 and 022. Amended by spec 048 (2026-11-01): there is no tile cap (ADR 0033), so Decided 2, F6's cap bullet and criterion 2's cap clause lapse; `brushSpans` always applies.
 
 **Request** (Gage, 2026-10-30): "The paint tool has a lot of lag that makes it difficult to use." His imagery: chunks of 6,500 to 11,000 px, RGBA uint8, 1-row strips, uncompressed, with tagged alpha.
 
