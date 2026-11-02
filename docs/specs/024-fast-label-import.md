@@ -1,6 +1,6 @@
 # 024: Label import in one pass over row bands
 
-**Status:** Approved under Gage's 2026-10-30 perf delegation. **ADRs:** none. **Builds on spec 023** (its mask cache and label-file row bands), so it is built after 023 merges.
+**Status:** Approved under Gage's 2026-10-30 perf delegation. **ADRs:** none. **Builds on spec 023** (its mask cache and label-file row bands), so it is built after 023 merges. Amended by spec 047 (2026-11-01): classes are the file's table, then "Class v" for every other value; "too many" comes before the pass only when the table alone has over 255 entries, else after it.
 
 **Goal:** Importing a label file reads each of its strips once and takes seconds, not minutes.
 

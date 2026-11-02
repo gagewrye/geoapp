@@ -1,6 +1,6 @@
 # 035: Three-region layout, collapsible panels, zoom to raster
 
-**Status:** Approved by Gage 2026-10-30, with the draft answers to its questions. **ADRs:** none (CSS grid, no framework). **Builds on specs 032–034.**
+**Status:** Approved by Gage 2026-10-30, with the draft answers to its questions. **ADRs:** none (CSS grid, no framework). **Builds on specs 032–034.** Amended by spec 047 (2026-11-01): the top bar's file actions are Import labels, Apply class map (`#class-map`), Export labels.
 
 **Goal:** The map gets as much of the screen as possible. File actions, tools and classes each have one fixed place, and one key hides the side panels.
 

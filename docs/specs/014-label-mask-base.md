@@ -2,7 +2,7 @@
 
 **Goal:** Import a label mask covering any part of the imagery, however large, edit it with the brush, undo those edits back to the mask, and export the result. Nothing ever holds the whole mask or imagery in memory.
 
-**Status:** Approved (Gage, 2026-10-28). Build after spec 013, which shelves Train and model seeding, so nothing else reads the label store. **ADRs:** 0018 mask base plus sparse edits (Accepted; amends 0010 and 0015). Uses 0002 and 0013. Amended 2026-10-29 by spec 017 (imports always replace, so Merge is gone) and spec 016 (the mask follows Opacity and Show labels, and an import selects Pan); Gage approved both.
+**Status:** Approved (Gage, 2026-10-28). Build after spec 013, which shelves Train and model seeding, so nothing else reads the label store. **ADRs:** 0018 mask base plus sparse edits (Accepted; amends 0010 and 0015). Uses 0002 and 0013. Amended 2026-10-29 by spec 017 (imports always replace, so Merge is gone) and spec 016 (the mask follows Opacity and Show labels, and an import selects Pan); Gage approved both. Amended by spec 047 (2026-11-01): there is no import-time class map, so "use a class map that leaves 0 out" lapses; an untagged file's value 0 is "Class 0", which Apply class map can rename.
 
 **Already built (spec 004 Import labels, ADR 0013), unchanged here:**
 - Formats: a single-band 8-bit unsigned GeoTIFF or COG. Anything else gets "Label files must be single-band 8-bit GeoTIFFs."

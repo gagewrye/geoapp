@@ -1,6 +1,6 @@
 # 021: Progress while labels import, with the old labels cleared first
 
-**Status:** Approved (Gage, 2026-10-30: "approve all"). **ADRs:** none (no dependency, no new architecture).
+**Status:** Approved (Gage, 2026-10-30: "approve all"). **ADRs:** none (no dependency, no new architecture). Amended by spec 047 (2026-11-01): there is no class map; "too many" comes before the pass only when the file's table alone has over 255 entries, else after it.
 
 **Request** (Gage, 2026-10-30): "Loading labels in the web app needs a loading bar", and "remove the current label mask when loading new labels as well". Gage's label files are uint8 GeoTIFFs of 6,500² to 11,000² px at 0.1 m, with `GEOAPP_CLASSES`.
 
