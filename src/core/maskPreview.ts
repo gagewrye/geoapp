@@ -51,6 +51,15 @@ export function fillPreview(values: Uint8Array | Uint16Array, cells: Int32Array,
   }
 }
 
+/** values[p] = base[p], or 0 without a base, for every preview pixel p whose cell lies in the window with origin (x0, y0): fillPreview undone. */
+export function unfillPreview(values: Uint8Array, base: Uint8Array | null, b: CellBuckets, x0: number, y0: number): void {
+  const wi = windowIndex(b, x0, y0);
+  for (let k = b.start[wi]!; k < b.start[wi + 1]!; k++) {
+    const p = b.order[k]!;
+    values[p] = base ? base[p]! : 0;
+  }
+}
+
 /** hidden[p] = on for every preview pixel p whose cell lies in the window with origin (x0, y0). */
 export function hideWindow(hidden: Uint8Array, b: CellBuckets, x0: number, y0: number, on: boolean): void {
   const wi = windowIndex(b, x0, y0);
