@@ -27,7 +27,7 @@ const rgba = (meta: Partial<RasterMeta> = {}, block = strips()) => samplesSource
 
 const queueOf = (source: ImagerySource, cache = new MaskCache(source)) => {
   const store = emptyStore(W, H);
-  const q = new PaintQueue(source, () => store, { applied() {}, full() {}, busy() {}, error: (e) => { throw e; } }, undefined, () => null, cache);
+  const q = new PaintQueue(source, () => store, { applied() {}, busy() {}, error: (e) => { throw e; } }, undefined, () => null, cache);
   return { q, store, cache };
 };
 const strokeOver = async (q: PaintQueue, side = 127, value = 1) => {
@@ -218,7 +218,7 @@ describe("copy-on-touch and label rows (criterion 7)", () => {
     while (!cache.finished) await tick();
     reads.length = 0;
     const store = r.store;
-    const q = new PaintQueue(source, () => store, { applied() {}, full() {}, busy() {}, error: (e) => { throw e; } }, undefined, () => r.base, cache);
+    const q = new PaintQueue(source, () => store, { applied() {}, busy() {}, error: (e) => { throw e; } }, undefined, () => r.base, cache);
     for (const [c, rr, erase] of [[10, 10, true], [400, 10, false], [1050, 750, false]] as const) q.push(cellOp(footprint(GRID, c, rr, 5)!, 2, erase));
     await idle(q);
     expect(reads).toEqual([]);
@@ -265,7 +265,7 @@ describe("an op's masks past MASK_BYTES (review 4)", () => {
     const cache = new MaskCache(source, { maskBytes: 2 * 8192 }); // one band
     const store = emptyStore(S, S);
     const errors: unknown[] = [];
-    const q = new PaintQueue(source, () => store, { applied() {}, full() {}, busy() {}, error: (e) => { errors.push(e); } }, undefined, () => null, cache);
+    const q = new PaintQueue(source, () => store, { applied() {}, busy() {}, error: (e) => { errors.push(e); } }, undefined, () => null, cache);
     q.push(cellOp({ x0: 100, y0: 200, width: 20, height: 100 }, 1, false)); // rows 200-299: keys 0,0 and 0,256
     await idle(q);
     expect(errors).toEqual([]);
@@ -283,7 +283,7 @@ describe("an op's masks past MASK_BYTES (review 4)", () => {
     const cache = { masks: new MaskStore(), get: () => undefined, need: async () => { needs++; } } as unknown as MaskCache;
     const store = emptyStore(S, S);
     const errors: unknown[] = [];
-    const q = new PaintQueue(source, () => store, { applied() {}, full() {}, busy() {}, error: (e) => { errors.push(e); } }, undefined, () => null, cache);
+    const q = new PaintQueue(source, () => store, { applied() {}, busy() {}, error: (e) => { errors.push(e); } }, undefined, () => null, cache);
     q.push(cellOp({ x0: 10, y0: 10, width: 5, height: 5 }, 1, false));
     await idle(q);
     expect(needs).toBe(2);

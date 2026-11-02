@@ -12,6 +12,8 @@ const canRead = (s: RasterSource): s is ImagerySource => Boolean(s.block && s.ov
 type Nav = {
   /** A pan key is held (spec 027): moveend is ignored until the pan settles, and settle() is called then. */
   moving: () => boolean;
+  /** The view settled, as tiles are planned for it (spec 048's overlays follow it), raster or not. */
+  viewSettled?: () => void;
 };
 
 /** Full-resolution imagery over the preview (spec 020): tiles for each view once the map stops moving. */
@@ -23,6 +25,7 @@ export function initImagery(map: MapLibreMap, say: (text: string, kind?: Message
   let reported = false; // a tile read failed for this raster, and the user was told (spec 020 A1)
 
   const update = () => {
+    nav.viewSettled?.();
     if (!open) return;
     const { width, height, epsg, gt } = open.source.meta;
     const b = map.getBounds(), c = map.getContainer();

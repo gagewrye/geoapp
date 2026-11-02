@@ -58,3 +58,27 @@ describe("trimHistory with a redo stack", () => {
     expect([history.length, redo.length]).toEqual([2, 1]);
   });
 });
+
+// Spec 048 criterion 6 (scope 4): the entry just appended or pushed stays, whatever its size.
+describe("trimHistory never drops keep", () => {
+  const many = (n: number) => new Map(Array.from({ length: n }, (_, i) => [`${i * 256},0`, tile(1)] as const)) as Edit;
+  it("keeps an oversized newest history entry and drops every other", () => {
+    const big = many(10), history = [many(1), many(1), big];
+    trimHistory(history, 4 * TILE, 50, [], big);
+    expect(history).toEqual([big]);
+    expect(history[0]).toBe(big);
+  });
+  it("keeps an oversized redo entry, dropping the history and older redo entries", () => {
+    const big = many(10), history = [many(1)], redo = [many(1), big];
+    trimHistory(history, 4 * TILE, 50, redo, big);
+    expect(history).toEqual([]);
+    expect(redo).toHaveLength(1);
+    expect(redo[0]).toBe(big);
+  });
+  it("still drops keep's neighbours for steps, never keep", () => {
+    const k = many(1), history = [many(1), k, many(1)];
+    trimHistory(history, Infinity, 1, [], k);
+    expect(history).toEqual([k]);
+    expect(history[0]).toBe(k);
+  });
+});

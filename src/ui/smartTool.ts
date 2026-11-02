@@ -18,7 +18,7 @@ type Deps = SmartInputs & {
   store: () => LabelStore;
   /** Undo's history, and its buttons' sync once a fill is queued as an ended stroke. */
   undo: { history: UndoHistory; sync(): void };
-  /** Queue a fill (the paint queue: nodata, base tiles and the cap as for Paint). */
+  /** Queue a fill (the paint queue: nodata and base tiles as for Paint). */
   push: (op: PaintOp) => void;
   panel: { classes(): { colour: string }[]; selected(): number };
   locked: () => boolean;

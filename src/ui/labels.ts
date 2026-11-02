@@ -171,8 +171,8 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
     restoreLock: (on: boolean) => lock(on, "restore"),
     /** A restore offer holds the lock (a run's own controls follow the run). */
     restoring: () => holders.has("restore"),
-    /** Paint is offered only once the imagery is drawn (spec 019); Pan stays selected until the user picks Paint. */
-    imageryReady: modes.ready,
+    /** Paint is offered only once the imagery is drawn (spec 019); Pan stays selected until the user picks Paint. Spec 027's settled view moves the overlays (spec 048). */
+    imageryReady: modes.ready, viewSettled: display.settled,
     /** Starts reading every valid mask in the background, from the view's centre band (spec 023 F3; after "Raster opened."). */
     startMasks(): void {
       if (!imagery) return;

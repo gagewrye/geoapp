@@ -2,7 +2,7 @@
 
 **Goal:** The colour a dab paints covers exactly the raster pixels the hover outline marks, in any CRS, at any zoom and display scale.
 
-**Status:** Approved (Gage, 2026-10-29: "yes approve both"), with ADR 0019 (Accepted; supersedes ADR 0016). This is the third revision. The earlier ones, an outline snapped to the overlay cells (`footprintCells`) and a cursor-hotspot fix, were never merged and are dropped. Amends spec 003 Display and criterion 6, and spec 011: criteria 1-5 lapse and criterion 6 holds. Written against main 768e958.
+**Status:** Approved (Gage, 2026-10-29: "yes approve both"), with ADR 0019 (Accepted; supersedes ADR 0016). This is the third revision. The earlier ones, an outline snapped to the overlay cells (`footprintCells`) and a cursor-hotspot fix, were never merged and are dropped. Amends spec 003 Display and criterion 6, and spec 011: criteria 1-5 lapse and criterion 6 holds. Written against main 768e958. Amended by spec 048 (2026-11-01): in criterion 5, "each stored tile" becomes "each stored tile with an overlay" (at most 256, ADR 0033).
 
 **What Gage reported** (testing main, display scale 125%):
 - "The highlight is under the pointer and correct. When it paints it is off. Its weird, the direction of the offset seems to change based on the area selected."

@@ -10,7 +10,7 @@ function fakeEl() {
 describe("message kinds", () => {
   const errors = [
     errorText(new Error("boom")), readErrorMessage(new Error("bad read")), MESSAGES.labelFile, classMapMessage(0, [{ field: "JSON", why: "is not valid JSON" }]).text, MESSAGES.className,
-    MESSAGES.labelLimit, MESSAGES.editLimit, MESSAGES.maskGone, MESSAGES.imageryUnreadable, MESSAGES.largeBlocks(2 ** 25, 2 ** 24),
+    MESSAGES.maskGone, MESSAGES.imageryUnreadable, MESSAGES.largeBlocks(2 ** 25, 2 ** 24),
     MESSAGES.rasterAntimeridian, MESSAGES.tooMany,
   ];
   it("each error sets class error, and the next info message clears it", () => {

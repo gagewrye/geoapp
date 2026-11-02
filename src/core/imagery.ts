@@ -60,6 +60,19 @@ function tilesOver(lw: number, lh: number, kx: number, ky: number, [x0, y0, x1, 
   return out;
 }
 
+/** The ring's bounding box in raster pixels, clipped to the raster; x1, y1 exclusive. */
+function ringBox(full: Grid, ring: [number, number][]): [number, number, number, number] {
+  const xs = ring.map((p) => p[0]), ys = ring.map((p) => p[1]);
+  return [Math.max(0, Math.floor(Math.min(...xs))), Math.max(0, Math.floor(Math.min(...ys))),
+    Math.min(full.width, Math.ceil(Math.max(...xs))), Math.min(full.height, Math.ceil(Math.max(...ys)))];
+}
+
+/** planView's clipped raster-pixel box [x0, y0, x1, y1] for lon/lat bounds [w, s, e, n], x1/y1 exclusive; null when the view doesn't project. */
+export function viewBox(full: Grid, bounds: [number, number, number, number]): [number, number, number, number] | null {
+  const ring = viewRing(full, bounds);
+  return ring.length < 3 ? null : ringBox(full, ring);
+}
+
 /**
  * The level and the tiles (centre first) to draw for a view of cssW x cssH CSS pixels with lon/lat bounds [w, s, e, n];
  * null when no level can show it (the preview alone does).
@@ -72,9 +85,7 @@ export function planView(full: Grid, overviews: Overview[], bounds: [number, num
   // source pixels per CSS pixel, by area so rotation and shear don't inflate it
   const density = Math.sqrt(Math.abs(area) / 2 / (cssW * cssH));
   if (!(density > 0) || !Number.isFinite(density)) return null;
-  const xs = ring.map((p) => p[0]), ys = ring.map((p) => p[1]);
-  const box = [Math.max(0, Math.floor(Math.min(...xs))), Math.max(0, Math.floor(Math.min(...ys))),
-    Math.min(full.width, Math.ceil(Math.max(...xs))), Math.min(full.height, Math.ceil(Math.max(...ys)))];
+  const box = ringBox(full, ring);
   const on = box[0]! < box[2]! && box[1]! < box[3]!;
   // the tolerance keeps an exact power of two from rounding down a level
   for (let s = 2 ** Math.max(0, Math.floor(Math.log2(density) + 1e-9)); ; s *= 2) {

@@ -1,6 +1,6 @@
 # 032: Status bar
 
-**Status:** Approved by Gage 2026-10-30, with the draft answers to its questions. **ADRs:** none. **Builds on spec 031** (`#save-state`).
+**Status:** Approved by Gage 2026-10-30, with the draft answers to its questions. **ADRs:** none. **Builds on spec 031** (`#save-state`). Amended by spec 048 (2026-11-01): the error kinds lose `labelLimit` and `editLimit`, which are gone with the tile cap.
 
 **Goal:** One bottom strip shows where the cursor is, what the brush will do, and what the app is doing. Only errors show in red.
 

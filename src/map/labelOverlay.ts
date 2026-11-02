@@ -9,8 +9,8 @@ type Corners = [[number, number], [number, number], [number, number], [number, n
 type Part = { id: string; canvas: HTMLCanvasElement; dx: number; dy: number; corners: Corners };
 type Overlay = { width: number; height: number; parts: Part[] };
 
-/** Each stored label tile as one canvas per raster-aligned quad, one texel per pixel, pinned at its corners (ADR 0019). */
-// A tile's quads are built once. A redraw repaints its canvases, then play() and pause() re-upload each
+/** Stored label tiles as one canvas per raster-aligned quad, one texel per pixel, pinned at its corners (ADR 0019). */
+// The caller picks which tiles have one, at most LABEL_OVERLAYS (ADR 0033). A tile's quads are built once. A redraw repaints its canvases, then play() and pause() re-upload each
 // once; callers batch redraws per frame, since a repaint walks the whole tile.
 export class LabelOverlays {
   private readonly overlays = new Map<string, Overlay>();
@@ -18,6 +18,19 @@ export class LabelOverlays {
 
   constructor(private readonly map: MapLibreMap, private readonly grid: Grid) {
     this.quads = new QuadCache(grid);
+  }
+
+  /** Tiles with an overlay. */
+  get size(): number { return this.overlays.size; }
+
+  has(key: string): boolean { return this.overlays.has(key); }
+
+  keys(): IterableIterator<string> { return this.overlays.keys(); }
+
+  /** Takes the tile's overlay off the map, if it has one. */
+  drop(key: string): void {
+    const o = this.overlays.get(key);
+    if (o) this.remove(key, o);
   }
 
   /** Computes these tiles' quads in idle time, so drawing them later projects nothing. */

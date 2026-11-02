@@ -28,7 +28,7 @@ function setup(opts: { fail?: (x0: number, y0: number) => boolean; w?: number; h
   const store = emptyStore(W, H);
   const history = new UndoHistory(() => store);
   const errors: unknown[] = [];
-  const q = new PaintQueue(source, () => store, { applied: () => {}, full: () => {}, busy: () => {}, error: (e) => errors.push(e) }, history);
+  const q = new PaintQueue(source, () => store, { applied: () => {}, busy: () => {}, error: (e) => errors.push(e) }, history);
   return { q, history, store, reads, errors, hold() { gate = new Promise((r) => { open = () => { gate = null; r(); }; }); }, release: () => open() };
 }
 type T = ReturnType<typeof setup>;

@@ -9,6 +9,8 @@
 
 Amended by spec 047 (2026-11-01): Import labels takes no class map, and a bad class table never refuses an import. Classes come from the file's table, read leniently, then "Class v" for every other value; skipped entries are named in the success message. `parseClasses` and "The class table is invalid" are gone. The *Class map* input becomes Apply class map, after Import labels, which renames and recolours imported classes by raw value. Criterion 12's class-map clauses and the class-map clauses of the Classes rule and Settled in build lapse.
 
+Amended by spec 048 (2026-11-01): there is no tile cap (ADR 0033). Decided's "the 256-tile cap stays", Out's "raising `MAX_LABEL_TILES`" and criterion 8's cap clause lapse; `putTile` always applies.
+
 **Decided (Gage, 2026-10-26)**, besides what Scope and Rules state: the 256-tile cap stays in v1 (an OPFS store or view-only seeding can follow); spec 001's classification export doesn't write the class table.
 
 ## Scope

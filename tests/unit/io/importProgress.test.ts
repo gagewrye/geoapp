@@ -117,7 +117,7 @@ describe("the imagery read skipped (criterion 9)", () => {
       if (typeof r === "string") throw new Error(r);
       reads.length = 0;
       const store = r.store;
-      const q = new PaintQueue(imagery, () => store, { applied: () => {}, full: () => {}, busy: () => {}, error: (e) => { throw e; } }, undefined, () => r.base);
+      const q = new PaintQueue(imagery, () => store, { applied: () => {}, busy: () => {}, error: (e) => { throw e; } }, undefined, () => r.base);
       q.push(cellOp(footprint(store, 10, 10, 1)!, 1, true));
       await idle(q);
       expect(reads.length).toBe(float ? 1 : 0);

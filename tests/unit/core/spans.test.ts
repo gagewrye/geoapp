@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { tileWindows } from "../../../src/core/grid";
-import { brush, brushSpans, emptyStore, MAX_LABEL_TILES, tileWindow, type LabelStore, type NodataMasks } from "../../../src/core/labelStore";
+import { brush, brushSpans, emptyStore, type LabelStore, type NodataMasks } from "../../../src/core/labelStore";
 import { nodataMask } from "../../../src/core/nodata";
 import { footprint } from "../../../src/core/pixel";
 import { spanKeys, spansBox, sweptSpans, windowSpans, type Span } from "../../../src/core/spans";
@@ -83,8 +83,8 @@ describe("brushSpans (criterion 2)", () => {
         const cells: [number, number][] = [start];
         for (let k = 0; k < 15; k++) { const [c, rr] = cells[cells.length - 1]!; cells.push([c + Math.floor(r() * 9) - 4, rr + Math.floor(r() * 9) - 4]); }
         const swept = clone(per);
-        for (const [c, rr] of cells) { const w = footprint(dims, c, rr, side); if (w) expect(brush(per, masks, w, value, erase)).toBe("ok"); }
-        expect(brushSpans(swept, masks as Map<string, ValidMask>, sweptSpans(cells, side, dims), value, erase)).toBe("ok");
+        for (const [c, rr] of cells) { const w = footprint(dims, c, rr, side); if (w) brush(per, masks, w, value, erase); }
+        brushSpans(swept, masks as Map<string, ValidMask>, sweptSpans(cells, side, dims), value, erase);
         expectSame(swept, per);
       }
     });
@@ -93,25 +93,12 @@ describe("brushSpans (criterion 2)", () => {
   it("uses uniform masks: \"none\" labels nothing and creates no tile, \"all\" labels every pixel", () => {
     const s = emptyStore(600, 300);
     const masks = new Map<string, ValidMask>([["0,0", "none"], ["256,0", "all"]]);
-    expect(brushSpans(s, masks, windowSpans({ x0: 250, y0: 10, width: 12, height: 3 }), 2, false)).toBe("ok");
+    brushSpans(s, masks, windowSpans({ x0: 250, y0: 10, width: 12, height: 3 }), 2, false);
     expect([...s.tiles.keys()]).toEqual(["256,0"]);
     expect(s.tiles.get("256,0")!.filter((v) => v === 2).length).toBe(6 * 3);
   });
 
-  it("returns \"full\" and changes nothing when per-cell brushing would reach the cap; throws on a missing mask", () => {
-    const s = emptyStore(17 * 256, 16 * 256);
-    const masks = masksFor(s, () => false);
-    const wins = tileWindows(s.width, s.height);
-    for (const w of wins.slice(0, MAX_LABEL_TILES - 1)) brush(s, masks, { x0: w.x0 + 3, y0: w.y0 + 3, width: 1, height: 1 }, 1, false);
-    const before = clone(s);
-    // a move across two new tiles: per cell, the first would apply and the second hit the cap
-    const a = wins[MAX_LABEL_TILES]!, b = wins[MAX_LABEL_TILES + 1]!;
-    const cells: [number, number][] = [[a.x0 + 250, a.y0 + 10], [b.x0 + 5, b.y0 + 10]];
-    const per = clone(s);
-    expect(cells.map(([c, r]) => brush(per, masks, footprint(per, c, r, 3)!, 2, false))).toEqual(["ok", "full"]);
-    expect(brushSpans(s, masks as Map<string, ValidMask>, sweptSpans(cells, 3, s), 2, false)).toBe("full");
-    expectSame(s, before);
+  it("throws on a missing mask", () => {
     expect(() => brushSpans(emptyStore(300, 300), new Map(), windowSpans({ x0: 0, y0: 0, width: 2, height: 2 }), 1, false)).toThrow();
-    expect(tileWindow(s, 0, 0).width).toBe(256);
   });
 });

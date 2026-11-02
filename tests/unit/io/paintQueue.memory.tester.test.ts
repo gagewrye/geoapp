@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { footprint, strokeCells } from "../../../src/core/pixel";
-import { MAX_LABEL_TILES, emptyStore, type LabelStore } from "../../../src/core/labelStore";
+import { emptyStore, type LabelStore } from "../../../src/core/labelStore";
 import { TILE_SIZE } from "../../../src/core/types";
 import { tileWindows } from "../../../src/core/grid";
 import { cellOp, PaintQueue } from "../../../src/io/paintQueue";
@@ -35,7 +35,7 @@ function probed(width: number, height: number, nodata: (c: number, r: number) =>
       try { return await inner.readWindow(x0, y0, w, h); } finally { p.inFlight--; }
     },
   };
-  q = new PaintQueue(source, () => store, { applied: check, full() {}, busy() {}, error: (e) => { throw e; } });
+  q = new PaintQueue(source, () => store, { applied: check, busy() {}, error: (e) => { throw e; } });
   return { q, p, get store() { return store; }, set store(s: LabelStore) { store = s; } };
 }
 
@@ -77,19 +77,17 @@ describe("paint reads stay band by band (spec 023 F2, tester)", { timeout: 60_00
     expect(t.q.masks.bytes).toBe(0);
   });
 
-  it(`at the cap (${MAX_LABEL_TILES} stored tiles) a stroke over 40 new tiles stores nothing new`, async () => {
+  it("with 256 stored tiles a stroke over 40 new tiles stores them, 64 KiB each (spec 048)", async () => {
     const W = 256 * 20, H = 256 * 16; // 320 tiles
     const t = probed(W, H, () => false, 1);
-    const cap = tileWindows(W, H).slice(0, MAX_LABEL_TILES);
-    for (const w of cap) t.q.push(cellOp({ x0: w.x0 + 1, y0: w.y0 + 1, width: 1, height: 1 }, 2, false));
+    const first = tileWindows(W, H).slice(0, 256);
+    for (const w of first) t.q.push(cellOp({ x0: w.x0 + 1, y0: w.y0 + 1, width: 1, height: 1 }, 2, false));
     await idle(t.q);
-    expect(t.store.tiles.size).toBe(MAX_LABEL_TILES);
+    expect(t.store.tiles.size).toBe(256);
     push(t.q, t.store, [[0, 256 * 13 + 120], [W - 1, 256 * 15 + 30], [0, 256 * 15 + 200]], 127);
     await idle(t.q);
-    expect(t.store.tiles.size).toBe(MAX_LABEL_TILES);
+    expect(t.store.tiles.size).toBeGreaterThan(256 + 40 - 1);
     expect(t.p.maxMasks).toBeLessThanOrEqual(W / TILE_SIZE * (H / TILE_SIZE));
-    let bytes = 0;
-    for (const v of t.store.tiles.values()) bytes += v.byteLength;
-    expect(bytes).toBeLessThanOrEqual(MAX_LABEL_TILES * 65536);
+    for (const v of t.store.tiles.values()) expect(v.byteLength).toBeLessThanOrEqual(65536);
   });
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { initialClasses } from "../../../src/core/classes";
 import { tileWindows, type Window } from "../../../src/core/grid";
-import { emptyStore, MAX_LABEL_TILES } from "../../../src/core/labelStore";
+import { emptyStore } from "../../../src/core/labelStore";
 import { seedWindows, sourceCells } from "../../../src/core/seed";
 import type { Affine, Grid } from "../../../src/core/types";
 import type { LabelSource } from "../../../src/io/labelFile";
@@ -96,7 +96,6 @@ describe("no label cap on imports (spec 014 supersedes criterion 16's io cap)", 
       expect(store.tiles.get("256,256")).toBe(tile);
       expect(tile.every((v) => v === 2)).toBe(true);
       expect(classes).toEqual(initialClasses());
-      expect(MAX_LABEL_TILES).toBeLessThan(289);
-    });
+      });
   }
 });

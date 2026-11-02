@@ -17,7 +17,7 @@ describe("the base flag (criterion 3)", () => {
     const t = new Uint8Array(65536);
     t[0] = 2; t[300] = 2;
     store.tiles.set("0,0", t);
-    expect(brush(store, noMasks, win(0, 0, 50, 50), 2, true)).toBe("ok");
+    brush(store, noMasks, win(0, 0, 50, 50), 2, true);
     expect(store.tiles.get("0,0")).toBe(t);
     expect(t.every((v) => v === 0)).toBe(true);
   });
@@ -25,11 +25,11 @@ describe("the base flag (criterion 3)", () => {
   it("with base, putTile of zeros keeps the tile (stores it, even when new)", () => {
     const store = { ...emptyStore(300, 300), base: true };
     const zeros = new Uint8Array(65536);
-    expect(putTile(store, win(0, 0), zeros)).toBe("ok");
+    putTile(store, win(0, 0), zeros);
     expect(store.tiles.get("0,0")).toBe(zeros);
     store.tiles.set("256,0", new Uint8Array(44 * 256).fill(1));
     const z2 = new Uint8Array(44 * 256);
-    expect(putTile(store, win(256, 0, 44, 256), z2)).toBe("ok");
+    putTile(store, win(256, 0, 44, 256), z2);
     expect(store.tiles.get("256,0")).toBe(z2);
   });
 

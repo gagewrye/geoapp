@@ -7,7 +7,7 @@ import { HOVER, MaskCache } from "../io/maskCache";
 import { PaintQueue, type PaintOp } from "../io/paintQueue";
 import type { RasterSource } from "../io/source";
 import type { StrokeEdit, UndoHistory } from "../io/undoHistory";
-import { MESSAGES, readErrorMessage } from "./messages";
+import { readErrorMessage } from "./messages";
 import type { MessageKind } from "./messages";
 
 type Deps = {
@@ -51,7 +51,6 @@ export function initPaint(d: Deps) {
       cache = new MaskCache(source, { loaderBusy: d.imageryBusy, paused: d.importing, moving: d.mapMoving });
       queue = new PaintQueue(source, d.store, {
         applied: d.applied,
-        full: () => d.say(d.store().base ? MESSAGES.editLimit : MESSAGES.labelLimit, "error"),
         busy: d.busy,
         error: (e) => d.say(readErrorMessage(e), "error"),
       }, d.history, d.base, cache);

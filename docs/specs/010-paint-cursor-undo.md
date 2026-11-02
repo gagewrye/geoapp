@@ -8,6 +8,8 @@
 
 **Amended by spec 037 (redo):** redo moves in scope. It shares this spec's 32 MiB and 50-step budget (ADR 0015), and this spec's criteria still hold.
 
+Amended by spec 048 (2026-11-01): there is no tile cap (ADR 0033), so a stroke's copies are unbounded ("at most 256, 16 MiB" lapses) and Cap lapses. The entry just appended (or pushed by undo or redo) is never trimmed, so copies stay within max(`UNDO_BYTES`, one edit's copies). In criterion 6, `MAX_LABEL_TILES` becomes 256.
+
 ## Scope
 In: the brush cursor; an "Undo" button in the brush panel; Ctrl+Z / Cmd+Z; multi-step undo of paint and erase strokes.
 Out: redo (since added by spec 037); undoing class edits, imports, seeding or a raster open; persisting history; a custom cursor for Pan mode.

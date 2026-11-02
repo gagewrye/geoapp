@@ -1,6 +1,6 @@
 # 037: Redo
 
-**Status:** Approved by Gage 2026-10-30, with the draft answers to its questions. **ADRs:** none; this extends ADR 0015 within its 32 MiB and 50-step budget. **Builds on spec 010.**
+**Status:** Approved by Gage 2026-10-30, with the draft answers to its questions. **ADRs:** none; this extends ADR 0015 within its 32 MiB and 50-step budget. **Builds on spec 010.** Amended by spec 048 (2026-11-01): trimming never drops the entry just appended or pushed (scope 4), so one edit over `UNDO_BYTES` stays undoable and redoable alone; criterion 4's bound becomes max(`UNDO_BYTES`, that edit's copies).
 
 **Goal:** An undone stroke can be redone with Ctrl+Shift+Z, Ctrl+Y or a Redo button.
 

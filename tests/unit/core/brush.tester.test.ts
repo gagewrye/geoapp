@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { fromLonLat, normalizeLon } from "../../../src/core/crs";
 import { tileWindows } from "../../../src/core/grid";
-import { MAX_LABEL_TILES, brush, emptyStore, tileKeys, tileWindow, type LabelStore, type NodataMasks } from "../../../src/core/labelStore";
+import { brush, emptyStore, tileKeys, tileWindow, type LabelStore, type NodataMasks } from "../../../src/core/labelStore";
 import { maskBit, nodataMask } from "../../../src/core/nodata";
 import { footprint, footprintRing, pixelAt, strokeCells, strokeCellsIn } from "../../../src/core/pixel";
 import type { Grid, Tile } from "../../../src/core/types";
@@ -127,7 +127,7 @@ describe("brush on partial edge tiles and with odd inputs (criterion 4, tester)"
     const nd = (c: number, r: number) => (c + 3 * r) % 11 === 0 || (c >= 280 && r >= 250);
     const m = masks(s, nd);
     const w = footprint(s, 299, 259, 127)!;
-    expect(brush(s, m, w, 4, false)).toBe("ok");
+    brush(s, m, w, 4, false);
     for (let r = 0; r < 260; r++) for (let c = 0; c < 300; c++) {
       const inW = c >= w.x0 && r >= w.y0;
       expect(label(s, c, r)).toBe(inW && !nd(c, r) ? 4 : 0);
@@ -162,7 +162,7 @@ describe("brush on partial edge tiles and with odd inputs (criterion 4, tester)"
     const m = masks(s, () => false);
     brush(s, m, { x0: 250, y0: 10, width: 10, height: 10 }, 1, false);
     const before = new Map([...s.tiles].map(([k, v]) => [k, v.slice()]));
-    expect(brush(s, new Map(), { x0: 0, y0: 0, width: 600, height: 300 }, 2, true)).toBe("ok");
+    brush(s, new Map(), { x0: 0, y0: 0, width: 600, height: 300 }, 2, true);
     expect([...s.tiles.keys()].sort()).toEqual([...before.keys()].sort());
     for (const [k, v] of before) expect(Buffer.from(s.tiles.get(k)!).equals(Buffer.from(v))).toBe(true);
   });
@@ -173,21 +173,5 @@ describe("brush on partial edge tiles and with odd inputs (criterion 4, tester)"
     m.delete("256,0");
     expect(() => brush(s, m, { x0: 250, y0: 0, width: 10, height: 5 }, 1, false)).toThrow(/mask/);
     expect(s.tiles.size).toBe(0);
-  });
-});
-
-describe(`brush at MAX_LABEL_TILES after an erase frees a tile (criterion 4, tester)`, { timeout: 30_000 }, () => {
-  it("full, then erasing a tile's only label lets the same dab create the new tile", () => {
-    const s = emptyStore(17 * 256, 16 * 256); // 272 tiles
-    const all = masks(s, () => false);
-    const wins = tileWindows(s.width, s.height);
-    for (const w of wins.slice(0, MAX_LABEL_TILES)) brush(s, all, { x0: w.x0 + 3, y0: w.y0 + 3, width: 1, height: 1 }, 1, false);
-    const dab = { x0: wins[MAX_LABEL_TILES]!.x0 + 10, y0: wins[MAX_LABEL_TILES]!.y0 + 10, width: 7, height: 7 };
-    expect(brush(s, all, dab, 2, false)).toBe("full");
-    expect(brush(s, new Map(), { x0: 3, y0: 3, width: 1, height: 1 }, 1, true)).toBe("ok");
-    expect(s.tiles.size).toBe(MAX_LABEL_TILES - 1);
-    expect(brush(s, all, dab, 2, false)).toBe("ok");
-    expect(s.tiles.size).toBe(MAX_LABEL_TILES);
-    expect(label(s, dab.x0 + 3, dab.y0 + 3)).toBe(2);
   });
 });

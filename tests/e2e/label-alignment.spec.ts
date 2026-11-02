@@ -142,6 +142,7 @@ for (const [name, grid] of RASTERS.slice(0, 2)) {
     await expect.poll(async () => (await ids()).some((id) => id.startsWith("brush-hover"))).toBe(true);
     const layers = await ids();
     const labelLayers = layers.filter((id) => id.startsWith("label-")), imagery = layers.filter((id) => id.startsWith("imagery-"));
-    expect(layers).toEqual(["background", "basemap", "preview", ...imagery, ...labelLayers, "brush-hover-fill", "brush-hover-line"]);
+    // spec 048 scope 3: a stored tile also adds the preview-resolution mask layer, in its slot under the overlays
+    expect(layers).toEqual(["background", "basemap", "preview", ...imagery, "mask", ...labelLayers, "brush-hover-fill", "brush-hover-line"]);
   });
 }

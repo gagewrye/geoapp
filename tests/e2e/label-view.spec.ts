@@ -151,9 +151,9 @@ test("an Undo while hidden restores the store, and the overlay it recreates is h
   await toggleShow(page);
   await page.click("#undo");
   expect(await storeTiles(page)).toEqual(painted);
-  await expect.poll(() => labelLayers(page)).toEqual({ "label-256,256": [0.6, "none"] });
+  await expect.poll(() => labelLayers(page)).toEqual({ "mask": [0.6, "none"], "label-256,256": [0.6, "none"] });
   await toggleShow(page);
-  expect(await labelLayers(page)).toEqual({ "label-256,256": [0.6, "visible"] });
+  expect(await labelLayers(page)).toEqual({ "mask": [0.6, "visible"], "label-256,256": [0.6, "visible"] });
 });
 
 test("hiding labels in Paint mode selects Pan: a left drag pans, no footprint, no brush or not-allowed cursor, no message (criterion 5)", async ({ page }) => {
@@ -224,7 +224,7 @@ test("clicking Paint while hidden shows the labels, with the brush cursor and fo
   await page.locator("#mode-paint").dispatchEvent("click"); // no pointer move
   await pressed(page, "paint");
   await expect(show(page)).toBeChecked();
-  expect(await labelLayers(page)).toEqual({ "label-256,256": [0.6, "visible"] });
+  expect(await labelLayers(page)).toEqual({ "mask": [0.6, "visible"], "label-256,256": [0.6, "visible"] });
   expect((await cursorAt(page, q)).startsWith('url("data:image/svg+xml')).toBe(true);
   await expect.poll(async () => (await hoverFeatures(page)).length).toBe(1);
 });

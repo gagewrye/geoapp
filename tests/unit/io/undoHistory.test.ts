@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { tileWindows } from "../../../src/core/grid";
-import { MAX_LABEL_TILES, emptyStore, type LabelStore } from "../../../src/core/labelStore";
+import { emptyStore, type LabelStore } from "../../../src/core/labelStore";
 import { footprint } from "../../../src/core/pixel";
 import { TILE_SIZE } from "../../../src/core/types";
 import { UNDO_BYTES, editBytes } from "../../../src/core/undo";
@@ -28,7 +28,7 @@ function setup() {
   const src = gated();
   let store = emptyStore(4096, 4096);
   const history = new UndoHistory(() => store);
-  const q = new PaintQueue(src.source, () => store, { applied: () => {}, full: () => {}, busy: () => {}, error: (e) => { throw e; } }, history);
+  const q = new PaintQueue(src.source, () => store, { applied: () => {}, busy: () => {}, error: (e) => { throw e; } }, history);
   return { src, q, history, store: () => store, reset: () => { store = emptyStore(4096, 4096); } };
 }
 
@@ -83,11 +83,11 @@ describe("UndoHistory with the paint queue (spec 010 What an edit is / Undo)", (
     const t = setup();
     // every tile stored
     const all = tileWindows(4096, 4096);
-    expect(all).toHaveLength(MAX_LABEL_TILES);
+    expect(all).toHaveLength(256);
     strokeAt(t, all.map((w) => [w.x0, w.y0]), 1);
     await idle(t.q);
     t.history.clear();
-    expect(t.store().tiles.size).toBe(MAX_LABEL_TILES);
+    expect(t.store().tiles.size).toBe(256);
     // 24 one-MiB edits: each changes 16 tiles (one tile row)
     const rows = (k: number) => all.filter((w) => w.y0 === (k % 16) * TILE_SIZE);
     for (let k = 0; k < 24; k++) {
@@ -111,7 +111,7 @@ describe("UndoHistory with the paint queue (spec 010 What an edit is / Undo)", (
     const e = t.history.entries();
     expect(e).toHaveLength(17);
     e.slice(0, 16).forEach((x, i) => expect(x).toBe(oldest16[i]));
-    expect(e[16]!.size).toBe(MAX_LABEL_TILES);
+    expect(e[16]!.size).toBe(256);
     expect(editBytes(e[16]!)).toBe(16 * MiB);
   });
 });
