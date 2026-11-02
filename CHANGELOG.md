@@ -2,6 +2,9 @@
 
 One entry per merge to main, newest first. Details are in the named spec.
 
+## 2026-11-02
+- **Spec 049:** In Smart select a right click discards the pending selection (points and preview) without leaving Smart mode, so you can start again quickly; exclude points move to Shift+click. A right drag still rotates the map, and Ctrl+Z still undoes an applied fill.
+
 ## 2026-11-01
 - **Spec 048:** Painting, mask edits and smart-select fills are never refused for a tile limit, so a whole chunk can be labelled; at most 256 tiles nearest the view's centre draw at full resolution, the rest on the preview layer, and the latest edit stays undoable however large.
 - **Spec 047:** Import labels never fails on a class table: bad entries in a file's table are skipped and named in the message, and values it doesn't name import as "Class N". The optional **Apply class map** now comes after Import labels and renames and recolours the loaded classes by value without touching any pixels.
