@@ -31,7 +31,7 @@ trimHistory(history: Edit[], maxBytes: number, maxSteps: number, redo?: Edit[], 
 ```
 
 ## Acceptance criteria
-1. **Unit:** on an 8,192² store with 1,024 tiles, `brush`, `brushSpans` and `putTile` create a 1,025th tile. `src/` contains no `MAX_LABEL_TILES`, `labelLimit` or `editLimit`.
+1. **Unit:** on an 8,192 × 8,448 store (1,056 tile windows) with 1,024 tiles, `brush`, `brushSpans` and `putTile` create a 1,025th tile. `src/` contains no `MAX_LABEL_TILES`, `labelLimit` or `editLimit`.
 2. **Unit, fake sources:** with a base and 300 stored tiles, a move touching a new base tile copies it, applies, and `done` gets `"ok"`.
 3. **Unit:** `overlayKeys` equals a brute-force filter and sort, returns at most `max`, and nothing for a box off the raster. `viewBox` equals the box `planView` uses.
 4. **Unit:** `fillPreview` then `unfillPreview` restores the base values, or zeros without a base.
