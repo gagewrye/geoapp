@@ -40,8 +40,8 @@ window.addEventListener("keydown", (e) => {
 });
 // the status bar's raster fields stay blank until a raster opens (spec 032)
 const status = initStatus(map, () => (source ? source.meta : null));
-// nav exists before any map event; a held pan key holds tile updates until it settles (spec 027)
-const fullRes = initImagery(map, say, { moving: () => nav.moving() });
+// nav and labels exist before any map event; a held pan key holds tile updates until it settles (spec 027)
+const fullRes = initImagery(map, say, { moving: () => nav.moving(), viewSettled: () => labels.viewSettled() });
 let source: RasterSource | undefined;
 // Opens are numbered so that an older open finishing late can't replace the raster a newer one opened
 let opens = 0;

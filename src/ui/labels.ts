@@ -163,16 +163,15 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
     /** Takes the labels off the map for an import (spec 021); the store, classes, base and history stay as they are. */
     hold(): Held { display.hide(); return { store, base }; },
     /** Draws held labels again, history kept; does nothing once a raster open or a replace changed them. */
-    restore(held: Held): void {
-      if (held.store === store && held.base === base) { display.setMask(base?.preview ?? null); redraw(store.tiles.keys()); }
-    },
+    restore(held: Held): void { if (held.store === store && held.base === base) { display.setMask(base?.preview ?? null); redraw(store.tiles.keys()); } },
     lock,
     /** Spec 031 scope 4: held from "Raster opened." until the restore offer settles. */
     restoreLock: (on: boolean) => lock(on, "restore"),
     /** A restore offer holds the lock (a run's own controls follow the run). */
     restoring: () => holders.has("restore"),
-    /** Paint is offered only once the imagery is drawn (spec 019); Pan stays selected until the user picks Paint. */
-    imageryReady: modes.ready,
+    /** Paint is offered only once the imagery is drawn (spec 019), and the label preview's grid is built then; Pan stays selected until the user picks Paint. */
+    imageryReady(on: boolean): void { modes.ready(on); if (on) display.prepare(); },
+    viewSettled: display.settled, // spec 027's signal: the label overlays follow the view (spec 048)
     /** Starts reading every valid mask in the background, from the view's centre band (spec 023 F3; after "Raster opened."). */
     startMasks(): void {
       if (!imagery) return;
