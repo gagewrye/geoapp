@@ -118,7 +118,13 @@ export function initSeeding({ labels, imagery, say, error, opened, imported }: D
     const f = classMap.files?.[0], base = labels.base();
     classMap.value = ""; // the same file may be applied again
     if (!f || classMap.disabled || !base) return;
-    const text = await f.text();
+    let text: string;
+    try {
+      text = await f.text();
+    } catch (e) {
+      say(error(e), "error"); // as Import labels says a failed read (spec 019)
+      return;
+    }
     if (labels.base() !== base || classMap.disabled) return; // an import, export or restore began meanwhile
     let r: { classes: LabelClass[]; applied: number; skipped: Skip[] };
     try {

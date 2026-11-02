@@ -97,6 +97,17 @@ test("a map that isn't JSON says so in red and changes nothing (criterion 9)", a
   expect(await classList(page)).toEqual(before);
 });
 
+test("a map file that can't be read shows the read error in red and changes nothing", async ({ page }) => {
+  await setup(page);
+  await importClasses(page);
+  const before = await classList(page);
+  await page.evaluate(() => { File.prototype.text = () => Promise.reject(new Error("The file could not be read.")); });
+  await applyMap(page, JSON.stringify([{ value: 3, name: "Water" }]));
+  await expect(message(page)).toHaveText("The file could not be read.");
+  await expect(message(page)).toHaveClass(/\berror\b/);
+  expect(await classList(page)).toEqual(before);
+});
+
 test("Apply class map is disabled during an import, an export and a pending restore (criterion 10)", async ({ page }) => {
   test.setTimeout(120_000);
   await page.addInitScript(() => {
