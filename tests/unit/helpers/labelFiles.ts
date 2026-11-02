@@ -36,16 +36,21 @@ export const CLASS_MAP: ClassEntry[] = [{ value: 7, name: "Seven", colour: "#123
 /** CLASS_ITEM fixture entries: GDAL_METADATA from encodeClasses, value = index + 1. */
 export const ITEM_CLASSES = [{ name: "Zero", colour: "#aa0000" }, { name: "Mangrove & <salt>", colour: "#00bb00" }, { name: "Water", colour: "#0000cc" }];
 /** With CLASS_ITEM: values 1, 2, 3 (ITEM_CLASSES) and 0 for unlabelled, nodata "0"; written with ADR 0001's writer, which can write GDAL_METADATA. */
-export async function classItemFile(): Promise<ArrayBuffer> {
+export function classItemFile(): Promise<ArrayBuffer> {
+  const remap: Record<number, number> = { 0: 0, 3: 1, 7: 2, 255: 3 };
+  return itemFile((c, r) => remap[classValue(c, r)]!, ITEM_CLASSES);
+}
+
+/** A file on CLASS_GRID of values f(c, r), nodata "0", whose CLASS_ITEM lists `classes` as values 1..n (an app export's table). */
+export async function itemFile(f: (c: number, r: number) => number, classes: { name: string; colour: string }[]): Promise<ArrayBuffer> {
   const parts: Uint8Array[] = [];
   const g = CLASS_GRID;
   const geo = { GeoKeyDirectory: [1, 1, 0, 3, 1024, 0, 1, 1, 1025, 0, 1, 1, 3072, 0, 1, 32633], ...geoMeta(g) };
-  const remap: Record<number, number> = { 0: 0, 3: 1, 7: 2, 255: 3 };
   await writeTiff({ write: async (d) => { parts.push(d.slice()); }, close: async () => {} }, g.width, g.height, geo, async (w) => {
     const t = new Uint8Array(w.width * w.height);
-    for (let r = 0; r < w.height; r++) for (let c = 0; c < w.width; c++) t[r * w.width + c] = remap[classValue(w.x0 + c, w.y0 + r)]!;
+    for (let r = 0; r < w.height; r++) for (let c = 0; c < w.width; c++) t[r * w.width + c] = f(w.x0 + c, w.y0 + r);
     return t;
-  }, { nodata: "0", metadata: encodeClasses(ITEM_CLASSES) });
+  }, { nodata: "0", metadata: encodeClasses(classes) });
   const out = new Uint8Array(parts.reduce((s, p) => s + p.length, 0));
   let o = 0;
   for (const p of parts) { out.set(p, o); o += p.length; }

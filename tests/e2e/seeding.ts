@@ -115,4 +115,29 @@ export function expectNoNodata(tiles: Map<string, Uint8Array>, width: number, no
   expect(bad).toBe(0);
 }
 
+/** Holds IndexedDB `get` on store sessions and `getAll`/`getAllKeys` on store tiles until each gate opens. */
+export const holdIdb = () => {
+  const w = window as any;
+  const gate = () => { let open!: () => void; const p = new Promise<void>((r) => { open = r; }); return { p, open }; };
+  w.__idb = { get: gate(), tiles: gate() };
+  const wrap = (name: "get" | "getAll" | "getAllKeys", store: string, which: "get" | "tiles") => {
+    const real = IDBObjectStore.prototype[name] as (...a: unknown[]) => IDBRequest;
+    (IDBObjectStore.prototype as any)[name] = function (this: IDBObjectStore, ...a: unknown[]) {
+      const r = real.apply(this, a);
+      if (this.name !== store) return r;
+      return new Proxy(r, {
+        set(t, k, v) {
+          if (k === "onsuccess") (t as any).onsuccess = (e: Event) => { void w.__idb[which].p.then(() => v.call(t, e)); };
+          else (t as any)[k] = v;
+          return true;
+        },
+        get(t, k) { const v = (t as any)[k]; return typeof v === "function" ? v.bind(t) : v; },
+      });
+    };
+  };
+  wrap("get", "sessions", "get");
+  wrap("getAll", "tiles", "tiles");
+  wrap("getAllKeys", "tiles", "tiles");
+};
+
 export type { LabelStore };
