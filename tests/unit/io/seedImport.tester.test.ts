@@ -123,12 +123,15 @@ describe("Import labels: classes and outcomes", () => {
     }
   });
 
-  it("a class map whose values never occur gives \"empty\" and changes nothing", async () => {
+  it("a table whose values never occur keeps its class and adds Class v for the file's values (spec 047); only nodata gives \"empty\" and changes nothing", async () => {
     const { source } = fakeSource({ ...grid, bandCount: 1 }, () => 1);
+    const table: ClassEntry[] = [{ value: 77, name: "never" }];
+    const r = ok(await importLabels(source, fakeLabelSource(grid, () => 3).source, table));
+    expect(r.classes.map((c) => c.name)).toEqual(["never", "Class 3"]);
+    expect(r.classCount).toBe(1);
     const current = fresh(W, H);
     const before = structuredClone(current.classes);
-    const table: ClassEntry[] = [{ value: 77, name: "never" }];
-    expect(await importLabels(source, fakeLabelSource(grid, () => 3).source, table)).toBe("empty");
+    expect(await importLabels(source, fakeLabelSource(grid, () => 3, 3).source, table)).toBe("empty");
     expect(current.classes).toEqual(before);
     expect(current.store.tiles.size).toBe(0);
   });
@@ -151,7 +154,7 @@ describe("Import labels: classes and outcomes", () => {
     const file = await openLabelTiff(await fromArrayBuffer(classFile("7", g, (c) => (c < 50 ? 7 : 8))));
     expect(file.meta.nodata).toBe(7);
     const { source } = fakeSource({ ...grid, bandCount: 1 }, () => 1);
-    const r = ok(await importLabels(source, file, importTable(file)));
+    const r = ok(await importLabels(source, file, importTable(file).table));
     expect(r.classes.map((c) => c.name)).toEqual(["Class 8"]);
     expect(r.pixels).toBe(50 * 100);
   });

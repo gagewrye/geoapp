@@ -193,6 +193,6 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
     /** Pointer moves are waiting for valid masks. */
     busy: () => paint.size() > 0,
     store: () => store,
-    classes: panel.classes,
+    classes: panel.classes, setClasses: panel.setClasses,
   };
 }

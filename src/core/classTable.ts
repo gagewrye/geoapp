@@ -6,34 +6,69 @@ export const CLASS_ITEM = "GEOAPP_CLASSES";
 /** One row of a class table: a source pixel value 0..255, its name and optional "#rrggbb" colour. */
 export type ClassEntry = { value: number; name: string; colour?: string };
 
-/** A bad class table; `field` names the first bad field, e.g. "[2].value". */
-export class ClassTableError extends Error {
-  constructor(readonly field: string, why: string) {
-    super(`Invalid class table: ${field} ${why}`);
-  }
-}
+/** Why part of a class table or class map was skipped; `field` is e.g. "JSON", "table", "[2].value" or "[2].colour". */
+export type Skip = { field: string; why: string };
 
 const COLOUR = /^#[0-9a-f]{6}$/i;
+const NAME = "must be a unique, non-empty string", BYTE = "must be an integer 0..255", BAD_COLOUR = 'must be "#rrggbb"';
+const isEntry = (e: unknown): e is Record<string, unknown> => typeof e === "object" && e !== null && !Array.isArray(e);
+const isByte = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 255;
+/** The lowercased colour; undefined when absent, null when present but not "#rrggbb". */
+const colourOf = (c: unknown): string | undefined | null => (c === undefined ? undefined : typeof c === "string" && COLOUR.test(c) ? c.toLowerCase() : null);
 
-/** Validates a class table (spec 003's name rule, 1..255 entries, unique values, none equal to nodata). */
-export function parseClasses(json: unknown, nodata: number | null): ClassEntry[] {
-  if (!Array.isArray(json)) throw new ClassTableError("table", "must be an array");
-  if (json.length < 1 || json.length > MAX_CLASSES) throw new ClassTableError("entries", `must be 1..${MAX_CLASSES}, got ${json.length}`);
-  const out: ClassEntry[] = [];
+/** A file's class table, read leniently (spec 047): bad entries are skipped and a bad colour dropped, never thrown. */
+// Spec 003's name rule, unique values, none equal to nodata; a table that isn't a non-empty array gives no entries.
+export function readClassTable(json: unknown, nodata: number | null): { entries: ClassEntry[]; skipped: Skip[] } {
+  if (!Array.isArray(json)) return { entries: [], skipped: [{ field: "table", why: "must be an array" }] };
+  if (!json.length) return { entries: [], skipped: [{ field: "table", why: "is empty" }] };
+  const entries: ClassEntry[] = [], skipped: Skip[] = [];
   const values = new Set<number>();
   json.forEach((e: unknown, i) => {
-    if (typeof e !== "object" || e === null || Array.isArray(e)) throw new ClassTableError(`[${i}]`, "must be an object");
-    const { value, name, colour } = e as Record<string, unknown>;
-    if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value > 255) throw new ClassTableError(`[${i}].value`, "must be an integer 0..255");
-    if (values.has(value)) throw new ClassTableError(`[${i}].value`, `duplicates ${value}`);
-    if (value === nodata) throw new ClassTableError(`[${i}].value`, `is the file's nodata ${nodata}`);
-    const n = typeof name === "string" ? checkName(out, -1, name) : null;
-    if (n === null) throw new ClassTableError(`[${i}].name`, "must be a unique, non-empty string");
-    if (colour !== undefined && (typeof colour !== "string" || !COLOUR.test(colour))) throw new ClassTableError(`[${i}].colour`, 'must be "#rrggbb"');
+    const skip = (f: string, why: string) => { skipped.push({ field: `[${i}]${f}`, why }); };
+    if (!isEntry(e)) return skip("", "must be an object");
+    const { value, name, colour } = e;
+    if (!isByte(value)) return skip(".value", BYTE);
+    if (values.has(value)) return skip(".value", `duplicates ${value}`);
+    if (value === nodata) return skip(".value", `is the file's nodata ${nodata}`);
+    const n = typeof name === "string" ? checkName(entries, -1, name) : null;
+    if (n === null) return skip(".name", NAME);
+    const c = colourOf(colour);
+    if (c === null) skip(".colour", BAD_COLOUR);
     values.add(value);
-    out.push(colour === undefined ? { value, name: n } : { value, name: n, colour: colour.toLowerCase() });
+    entries.push(c ? { value, name: n, colour: c } : { value, name: n });
   });
-  return out;
+  return { entries, skipped };
+}
+
+/** The import's entries: the table, then "Class v" for seen values it lacks, ascending, nodata skipped. */
+export function importEntries(table: ClassEntry[], seen: Uint8Array, nodata: number | null): ClassEntry[] {
+  const listed = new Set(table.map((e) => e.value));
+  return [...table, ...classesFromValues(seen, nodata).filter((e) => !listed.has(e.value))];
+}
+
+/** Renames and recolours the classes a class map's raw values reach through the import's lut (spec 047); input not mutated. */
+// One change per class, in entry order, so a map can't rename a class twice; names follow spec 003's rule
+// against the list as it stands.
+export function applyClassMap(classes: LabelClass[], lut: Uint8Array, json: unknown): { classes: LabelClass[]; applied: number; skipped: Skip[] } {
+  const out = classes.map((c) => ({ ...c }));
+  if (!Array.isArray(json)) return { classes: out, applied: 0, skipped: [{ field: "table", why: "must be an array" }] };
+  const changed = new Set<number>(), skipped: Skip[] = [];
+  json.forEach((e: unknown, i) => {
+    const skip = (f: string, why: string) => { skipped.push({ field: `[${i}]${f}`, why }); };
+    if (!isEntry(e)) return skip("", "must be an object");
+    const { value, name, colour } = e;
+    if (!isByte(value)) return skip(".value", BYTE);
+    const k = lut[value]! - 1;
+    if (k < 0 || k >= out.length) return skip(".value", "has no class in these labels");
+    if (changed.has(k)) return skip(".value", "targets a class an earlier entry changed");
+    const n = typeof name === "string" ? checkName(out, k, name) : null;
+    if (n === null) return skip(".name", NAME);
+    const c = colourOf(colour);
+    if (c === null) skip(".colour", BAD_COLOUR);
+    changed.add(k);
+    out[k] = { name: n, colour: c ?? out[k]!.colour };
+  });
+  return { classes: out, applied: changed.size, skipped };
 }
 
 /** "Class v" for every value seen (seen[v] = 1), ascending, nodata skipped. */

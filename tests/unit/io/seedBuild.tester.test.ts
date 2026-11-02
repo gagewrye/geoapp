@@ -46,7 +46,7 @@ describe("the current labels are never written", () => {
     expectUntouched(cur, s);
     expect(r.store).not.toBe(cur.store);
     expect(r.store.tiles).not.toBe(cur.store.tiles);
-    expect(await importLabels(imagery(), file(), [{ value: 9, name: "absent" }])).toBe("empty");
+    expect(await importLabels(imagery(), fakeLabelSource(g, () => 255, 255).source, [{ value: 9, name: "absent" }])).toBe("empty"); // only nodata (spec 047: other values are Class v)
     expectUntouched(cur, s);
     let calls = 0;
     expect(await importLabels(imagery(), file(), table, () => ++calls > 3)).toBe("stale");

@@ -23,11 +23,13 @@ export const at = (c: number, r: number): LngLat => [10 + c * 0.01, 50 - r * 0.0
 
 export const arrayBuffer = (b: Buffer) => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
 
-/** Import a label file, with a class map when given; doesn't wait for the run. */
-export async function importFile(page: Page, file: ReturnType<typeof upload>, classMap?: ReturnType<typeof upload>): Promise<void> {
-  if (classMap) await page.setInputFiles("#class-map", classMap);
+/** Import a label file; doesn't wait for the run. */
+export async function importFile(page: Page, file: ReturnType<typeof upload>): Promise<void> {
   await page.setInputFiles("#import-labels", file);
 }
+
+/** Apply class map with this JSON text (spec 047); doesn't wait for the message. */
+export const applyMap = (page: Page, text: string) => page.setInputFiles("#class-map", upload("map.json", text));
 
 /** The stored tiles through the hook, decoded from base64 in Node. */
 export async function storeTiles(page: Page): Promise<Map<string, Uint8Array>> {

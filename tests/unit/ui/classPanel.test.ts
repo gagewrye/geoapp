@@ -41,6 +41,16 @@ describe("initClassPanel", () => {
     expect(selectedChanged).toHaveBeenCalledTimes(1);
   });
 
+  it("setClasses (spec 047's Apply class map) swaps the list, keeps the selection and is a class edit: recoloured and edited", () => {
+    const { list, panel, recoloured, edited } = setup();
+    panel.select(1);
+    panel.setClasses([{ name: "Sand", colour: "#000000" }, { name: "Water", colour: "#0000ff" }]);
+    expect(panel.classes()).toEqual([{ name: "Sand", colour: "#000000" }, { name: "Water", colour: "#0000ff" }]);
+    expect(panel.selected()).toBe(1);
+    expect(row(list, 1).querySelector(".class-name")!.textContent).toBe("Water");
+    expect([recoloured.mock.calls.length, edited.mock.calls.length]).toEqual([1, 1]);
+  });
+
   it("replace swaps the list and clamps an out-of-range selected to 0", () => {
     const { list, panel } = setup();
     panel.select(1);

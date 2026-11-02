@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { toLonLat } from "../../src/core/crs";
 import { CLASS_GRID, classFile } from "../unit/helpers/labelFiles";
 import { jumpTo, labels, message, openApp, openRaster, paintMode, paintTwoClasses, path, rgbFixture, selectClass, stroke, toScreen, type LngLat } from "./helpers";
-import { classList, download, effectiveTiles, expectNoNodata, importFile, inNodata, noSavePicker, nodataImagery, storeTiles, upload } from "./seeding";
+import { applyMap, classList, download, effectiveTiles, expectNoNodata, importFile, inNodata, noSavePicker, nodataImagery, storeTiles, upload } from "./seeding";
 
 // Spec 004 criteria 18 (edit), 13 (its e2e part) and 19 (privacy).
 
@@ -68,10 +68,11 @@ test("importing and exporting labels make no network requests (criterion 19)", a
   await paintTwoClasses(page);
   const requests: string[] = [];
   page.on("request", (r) => requests.push(r.url()));
-  await page.setInputFiles("#class-map", upload("map.json", JSON.stringify([{ value: 3, name: "three" }])));
   page.once("dialog", (d) => void d.accept()); // "Replace labels?": every import replaces (spec 017)
   await importFile(page, upload("classes.tif", classFile("255")));
   await expect(message(page)).toHaveText(seeded);
+  await applyMap(page, JSON.stringify([{ value: 3, name: "three" }])); // spec 047: applied after the import
+  await expect(message(page)).toHaveText("Class map applied to 1 classes.");
   await download(page, "#export-labels");
   await expect(message(page)).toHaveText("Labels exported.");
   await page.waitForTimeout(300);

@@ -1,11 +1,12 @@
-import { ClassTableError } from "../core/classTable";
+import type { LabelClass } from "../core/classes";
+import { applyClassMap, type Skip } from "../core/classTable";
 import { checkLabelExport, exportLabels } from "../io/labelExport";
 import { LabelFileRefused, maskReadFailed, openLabelFile, type LabelSource } from "../io/labelFile";
 import { importLabels, importTable } from "../io/seeding";
 import { openSink } from "../io/sink";
 import type { RasterSource } from "../io/source";
 import type { Held, initLabels } from "./labels";
-import { MESSAGES, seedMessage } from "./messages";
+import { classMapMessage, MESSAGES, seedMessage } from "./messages";
 import { initProgress } from "./progress";
 import type { MessageKind } from "./messages";
 
@@ -29,7 +30,7 @@ export function controlsDisabled(o: { imagery: boolean; seeding: boolean; queued
   return { importLabels, exportLabels: importLabels || o.exporting };
 }
 
-/** Import labels and Export labels (spec 004), with the import's progress and Cancel (spec 021). */
+/** Import labels and Export labels (spec 004), with the import's progress and Cancel (spec 021), and Apply class map (spec 047). */
 // A run belongs to the imagery it started on: once another raster opens it sets no labels and no
 // message (spec 003's rule for replaced rasters), and the new raster's controls are free at once.
 export function initSeeding({ labels, imagery, say, error, opened, imported }: Deps) {
@@ -53,17 +54,19 @@ export function initSeeding({ labels, imagery, say, error, opened, imported }: D
     const s = imagery(), busy = seeding(), queued = labels.busy();
     if (running && !busy) showRun(false); // its run may still be waiting on a read (spec 021 criterion 7)
     const off = controlsDisabled({ imagery: !!s, seeding: busy, queued, exporting: exporting !== null, locked: labels.restoring() });
-    importInput.disabled = classMap.disabled = off.importLabels;
+    importInput.disabled = off.importLabels;
+    // spec 047: only with an imported mask, under none of spec 004's locks (a run or a restore offer)
+    classMap.disabled = !labels.base() || busy || exporting !== null || labels.restoring();
     exportBtn.disabled = off.exportLabels;
   }
 
   /** Every import replaces (spec 017): true unless labels exist and the user cancels the confirm. */
   const replaceConfirmed = () => !labels.hasLabels() || confirm(MESSAGES.replace);
 
-  // Order (spec 021): header and class-table checks, then the old labels leave the map (held, not
+  // Order (spec 021): header checks, then the old labels leave the map (held, not
   // dropped), then the passes. Only success replaces; a failure, Cancel, "empty" or "too many" restores
   // the held labels with their history. Locks stop any edit to the held state meanwhile.
-  async function runImport(s: RasterSource, tif: File, json: File | undefined): Promise<void> {
+  async function runImport(s: RasterSource, tif: File): Promise<void> {
     cancelled = false;
     const stale = () => imagery() !== s || cancelled;
     running = s;
@@ -72,11 +75,10 @@ export function initSeeding({ labels, imagery, say, error, opened, imported }: D
     say(MESSAGES.importing);
     let held: Held | null = null;
     try {
-      const text = json ? await json.text() : undefined;
       const file = await openLabelFile(tif);
       if (stale()) return;
       opened(file);
-      const table = importTable(file, text);
+      const { table, skipped } = importTable(file); // a bad table never refuses (spec 047)
       held = labels.hold();
       showRun(true);
       const r = await importLabels(s, file, table, stale, (done, total) => { if (!stale()) progress.step(done, total); }, labels.masks() ?? undefined);
@@ -84,12 +86,12 @@ export function initSeeding({ labels, imagery, say, error, opened, imported }: D
       if (cancelled) { labels.restore(held); say(MESSAGES.importCancelled); return; }
       if (typeof r === "string") labels.restore(held);
       else { labels.replace(r.store, r.classes, r.base); imported?.(tif); }
-      say(seedMessage(r) ?? "", r === "too many" ? "error" : "info");
+      say(seedMessage(r, skipped) ?? "", r === "too many" ? "error" : "info");
     } catch (e) {
       if (imagery() !== s) return;
       if (held) labels.restore(held);
       if (cancelled) { say(MESSAGES.importCancelled); return; } // a read in flight at Cancel may still reject
-      say(e instanceof LabelFileRefused ? MESSAGES.labelFile : e instanceof ClassTableError ? MESSAGES.classTable(e.field) : error(e), "error");
+      say(e instanceof LabelFileRefused ? MESSAGES.labelFile : error(e), "error");
     } finally {
       if (running === s) {
         running = null;
@@ -103,13 +105,30 @@ export function initSeeding({ labels, imagery, say, error, opened, imported }: D
   cancelBtn.addEventListener("click", () => { if (seeding()) cancelled = true; });
 
   importInput.addEventListener("change", () => {
-    const tif = importInput.files?.[0], json = classMap.files?.[0];
+    const tif = importInput.files?.[0];
     importInput.value = "";
     const s = imagery();
     if (!tif || importInput.disabled || !s) return;
     if (!replaceConfirmed()) return;
-    classMap.value = ""; // a class map applies to one import
-    void runImport(s, tif, json);
+    void runImport(s, tif);
+  });
+
+  // Renames and recolours by the mask's raw values (base.lut); painted tiles, the mask and history stay
+  classMap.addEventListener("change", async () => {
+    const f = classMap.files?.[0], base = labels.base();
+    classMap.value = ""; // the same file may be applied again
+    if (!f || classMap.disabled || !base) return;
+    const text = await f.text();
+    if (labels.base() !== base || classMap.disabled) return; // an import, export or restore began meanwhile
+    let r: { classes: LabelClass[]; applied: number; skipped: Skip[] };
+    try {
+      r = applyClassMap(labels.classes(), base.lut, JSON.parse(text));
+    } catch {
+      r = { classes: [], applied: 0, skipped: [{ field: "JSON", why: "is not valid JSON" }] };
+    }
+    if (r.applied) labels.setClasses(r.classes);
+    const m = classMapMessage(r.applied, r.skipped);
+    say(m.text, m.kind);
   });
 
   exportBtn.addEventListener("click", async () => {

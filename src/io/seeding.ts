@@ -1,5 +1,5 @@
 import type { LabelClass } from "../core/classes";
-import { classesFromValues, ClassTableError, decodeClasses, mergeClasses, parseClasses, type ClassEntry } from "../core/classTable";
+import { decodeClasses, importEntries, mergeClasses, readClassTable, type ClassEntry, type Skip } from "../core/classTable";
 import type { Window } from "../core/grid";
 import type { LabelStore } from "../core/labelStore";
 import { cellBuckets, fillPreview, PREVIEW_MAX_SIDE, previewCells } from "../core/maskPreview";
@@ -27,34 +27,33 @@ export type Labels = { store: LabelStore; classes: LabelClass[] };
 /** The new labels and mask base, the pixels the import labelled and their class count; or why nothing changed. */
 export type SeedOutcome = (Labels & { base: MaskBase; pixels: number; classCount: number }) | "too many" | "empty" | "stale";
 
-/** The import's class table: the class map's, else the file's CLASS_ITEM, else null (classes from values). */
-// Throws ClassTableError; text that isn't JSON is reported as field "JSON".
-export function importTable(file: LabelSource, classMap?: string): ClassEntry[] | null {
-  const text = classMap ?? file.classItem;
-  if (text === null) return null;
+/** The file's CLASS_ITEM table, read leniently (spec 047), and what was skipped; table null when the file has none. */
+// Never throws: text that isn't JSON is the skip "JSON", and the import names every value "Class v".
+export function importTable(file: LabelSource): { table: ClassEntry[] | null; skipped: Skip[] } {
+  if (file.classItem === null) return { table: null, skipped: [] };
   let json: unknown;
   try {
-    json = classMap !== undefined ? JSON.parse(classMap) : decodeClasses(text);
+    json = decodeClasses(file.classItem);
   } catch {
-    throw new ClassTableError("JSON", "is not valid JSON");
+    return { table: [], skipped: [{ field: "JSON", why: "is not valid JSON" }] };
   }
-  return parseClasses(json, file.meta.nodata);
+  const { entries, skipped } = readClassTable(json, file.meta.nodata);
+  return { table: entries, skipped };
 }
 
 /** Imports a class raster as the mask base, by nearest pixel centre, masked by imagery nodata (specs 004, 014, 024). */
 // One pass over the seedWindows, a row at a time: the file's values come from its row bands (each strip of an
 // equal grid decoded once), imagery validity from the mask cache (the windows the file covers, at stroke priority,
 // left cached for painting), and only raw counts and preview values are kept. Classes and the LUT follow the pass:
-// the class map's, else the file's table, else every value met before masking, as spec 004's first pass found
-// them. The file stays the base, read again on demand (ADR 0018). Every import replaces (spec 017).
+// the file's table, then "Class v" for every other value met before masking, as spec 004's first pass found them
+// (spec 047). The file stays the base, read again on demand (ADR 0018). Every import replaces (spec 017).
 // `stale` turns true when another raster opened or the user cancelled: the run stops and nothing changes.
 // onProgress counts windows whose file values are read (spec 021): a row's masks follow its last window.
 export async function importLabels(imagery: RasterSource, file: LabelSource, table: ClassEntry[] | null,
   stale: () => boolean = () => false, onProgress?: (done: number, total: number) => void,
   cache: MaskCache = new MaskCache(imagery)): Promise<SeedOutcome> {
-  // with a table the classes are known now: "too many" before any read; from values, only after the pass
-  const early = table && mergeClasses([], table);
-  if (early === "too many") return early;
+  // a table alone over 255 classes is "too many" before any read; with the values it adds, only after the pass
+  if (table && mergeClasses([], table) === "too many") return "too many";
   const dst = gridOf(imagery.meta), src = gridOf(file.meta);
   const windows = seedWindows(dst, src);
   const counts = rawCounts(windows.length);
@@ -104,8 +103,8 @@ export async function importLabels(imagery: RasterSource, file: LabelSource, tab
       if (await breathe()) return "stale";
     }
   }
-  const entries = table ?? classesFromValues(counts.seen, file.meta.nodata);
-  const merged = early ?? mergeClasses([], entries);
+  const entries = importEntries(table ?? [], counts.seen, nodata);
+  const merged = mergeClasses([], entries);
   if (merged === "too many") return merged;
   const lut = seedLut(entries, merged.values);
   const r = finishImport(counts, lut, raw);

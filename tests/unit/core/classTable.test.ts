@@ -1,53 +1,101 @@
 import { describe, expect, it } from "vitest";
 import { PALETTE, type LabelClass } from "../../../src/core/classes";
-import { classesFromValues, ClassTableError, decodeClasses, encodeClasses, mergeClasses, parseClasses } from "../../../src/core/classTable";
+import { applyClassMap, classesFromValues, decodeClasses, encodeClasses, importEntries, mergeClasses, readClassTable } from "../../../src/core/classTable";
 
-// Spec 004 criteria 3, 4 (classesFromValues), 6 (mergeClasses) and 9 (encodeClasses / decodeClasses).
+// Spec 047 criteria 1-3 (readClassTable replaced spec 004's parseClasses), spec 004 criteria 4 (classesFromValues), 6 (mergeClasses) and 9 (encodeClasses / decodeClasses).
 
-const field = (json: unknown, nodata: number | null = 255): string => {
-  try {
-    parseClasses(json, nodata);
-  } catch (e) {
-    expect(e).toBeInstanceOf(ClassTableError);
-    return (e as ClassTableError).field;
-  }
-  throw new Error("parseClasses accepted it");
-};
+const fields = (json: unknown, nodata: number | null = 255) => readClassTable(json, nodata).skipped.map((s) => s.field);
+const W = "must be a unique, non-empty string";
 
-describe("parseClasses (criterion 3)", () => {
-  it("accepts a valid table, trimming names, lowercasing colours, keeping order", () => {
-    const t = parseClasses([{ value: 3, name: " Water ", colour: "#00AAFF" }, { value: 0, name: "Land" }, { value: 254, name: "x", extra: 1 }], 255);
-    expect(t).toEqual([{ value: 3, name: "Water", colour: "#00aaff" }, { value: 0, name: "Land" }, { value: 254, name: "x" }]);
-    expect(parseClasses(Array.from({ length: 255 }, (_, i) => ({ value: i + 1, name: `c${i}` })), 0)).toHaveLength(255);
-    expect(parseClasses([{ value: 255, name: "a" }], null)).toEqual([{ value: 255, name: "a" }]);
+describe("readClassTable (spec 047 criterion 1)", () => {
+  it("a valid table gives every entry, trimming names, lowercasing colours, keeping order, and no skips", () => {
+    const t = readClassTable([{ value: 3, name: " Water ", colour: "#00AAFF" }, { value: 0, name: "Land" }, { value: 254, name: "x", extra: 1 }], 255);
+    expect(t).toEqual({ entries: [{ value: 3, name: "Water", colour: "#00aaff" }, { value: 0, name: "Land" }, { value: 254, name: "x" }], skipped: [] });
+    expect(readClassTable(Array.from({ length: 255 }, (_, i) => ({ value: i + 1, name: `c${i}` })), 0).entries).toHaveLength(255);
+    expect(readClassTable([{ value: 255, name: "a" }], null).entries).toEqual([{ value: 255, name: "a" }]);
   });
 
-  it("rejects a non-array, and 0 or 256 entries", () => {
-    expect(field({ value: 1, name: "a" })).toBe("table");
-    expect(field("[]")).toBe("table");
-    expect(field([])).toBe("entries");
-    expect(field(Array.from({ length: 256 }, (_, i) => ({ value: i, name: `c${i}` })), null)).toBe("entries");
+  it("a non-array and [] give no entries and one skip", () => {
+    expect(readClassTable({ value: 1, name: "a" }, 255)).toEqual({ entries: [], skipped: [{ field: "table", why: "must be an array" }] });
+    expect(readClassTable("[]", 255)).toEqual({ entries: [], skipped: [{ field: "table", why: "must be an array" }] });
+    expect(readClassTable([], 255)).toEqual({ entries: [], skipped: [{ field: "table", why: "is empty" }] });
   });
 
-  it("rejects a value that isn't an integer, is outside 0..255, is duplicated or equals nodata", () => {
-    for (const value of [1.5, "3", null, -1, 256, NaN]) expect(field([{ value: 1, name: "a" }, { value, name: "b" }])).toBe("[1].value");
-    expect(field([{ value: 4, name: "a" }, { value: 4, name: "b" }])).toBe("[1].value");
-    expect(field([{ value: 255, name: "a" }], 255)).toBe("[0].value");
-    expect(field([{ value: 0, name: "a" }], 0)).toBe("[0].value");
-    expect(field([{ name: "a" }])).toBe("[0].value");
+  it("keeps only the valid entries, the bad-colour one without its colour, and names each skip in entry order", () => {
+    const t = readClassTable([
+      { value: 1, name: "One" }, 7, { value: 300, name: "Big" }, { value: 1, name: "Again" }, { value: 2, name: "One" },
+      { value: 4, name: "  " }, { value: 255, name: "Nodata" }, { value: 5, name: "Red", colour: "red" }, { value: 6, name: "Six", colour: "#ABCDEF" },
+    ], 255);
+    expect(t.entries).toEqual([{ value: 1, name: "One" }, { value: 5, name: "Red" }, { value: 6, name: "Six", colour: "#abcdef" }]);
+    expect(t.skipped).toEqual([
+      { field: "[1]", why: "must be an object" }, { field: "[2].value", why: "must be an integer 0..255" }, { field: "[3].value", why: "duplicates 1" },
+      { field: "[4].name", why: W }, { field: "[5].name", why: W }, { field: "[6].value", why: "is the file's nodata 255" }, { field: "[7].colour", why: 'must be "#rrggbb"' },
+    ]);
   });
 
-  it("rejects a name that is empty, duplicated or not a string, and an entry that isn't an object", () => {
-    expect(field([{ value: 1, name: "  " }])).toBe("[0].name");
-    expect(field([{ value: 1, name: "a" }, { value: 2, name: " a" }])).toBe("[1].name");
-    expect(field([{ value: 1, name: 5 }])).toBe("[0].name");
-    expect(field([{ value: 1 }])).toBe("[0].name");
-    expect(field([{ value: 1, name: "a" }, 7])).toBe("[1]");
-    expect(field([null])).toBe("[0]");
+  it("skips a value that isn't an integer 0..255, a missing or non-string name, and every bad colour form", () => {
+    for (const value of [1.5, "3", null, -1, 256, NaN, undefined]) expect(fields([{ value: 1, name: "a" }, { value, name: "b" }])).toEqual(["[1].value"]);
+    expect(fields([{ value: 0, name: "a" }], 0)).toEqual(["[0].value"]);
+    expect(fields([{ value: 1, name: 5 }])).toEqual(["[0].name"]);
+    expect(fields([{ value: 1 }])).toEqual(["[0].name"]);
+    expect(fields([null])).toEqual(["[0]"]);
+    for (const colour of ["red", "#fff", "#12345g", "#1234567", 0x123456, "", null]) {
+      expect(readClassTable([{ value: 1, name: "a", colour }], null)).toEqual({ entries: [{ value: 1, name: "a" }], skipped: [{ field: "[0].colour", why: 'must be "#rrggbb"' }] });
+    }
   });
 
-  it("rejects a colour that isn't #rrggbb", () => {
-    for (const colour of ["red", "#fff", "#12345g", "#1234567", 0x123456, ""]) expect(field([{ value: 1, name: "a", colour }])).toBe("[0].colour");
+  it("never throws", () => {
+    for (const json of [undefined, null, 3, "x", [[]], [{}], [Symbol.for("x")]]) expect(() => readClassTable(json, 0)).not.toThrow();
+  });
+});
+
+describe("importEntries (spec 047 criterion 2)", () => {
+  const seen = new Uint8Array(256);
+  for (const v of [0, 3, 7]) seen[v] = 1;
+
+  it("gives the table, then Class v for seen values it lacks, ascending, nodata skipped", () => {
+    expect(importEntries([{ value: 3, name: "Water" }], seen, 255).map((e) => e.name)).toEqual(["Water", "Class 0", "Class 7"]);
+    expect(importEntries([{ value: 3, name: "Water" }], seen, 0).map((e) => e.name)).toEqual(["Water", "Class 7"]);
+    expect(importEntries([{ value: 3, name: "Water" }], seen, 255)).toEqual([{ value: 3, name: "Water" }, { value: 0, name: "Class 0" }, { value: 7, name: "Class 7" }]);
+  });
+
+  it("with an empty table equals classesFromValues", () => {
+    for (const nd of [255, 0, null]) expect(importEntries([], seen, nd)).toEqual(classesFromValues(seen, nd));
+  });
+});
+
+describe("applyClassMap (spec 047 criterion 3)", () => {
+  const A: LabelClass = { name: "A", colour: "#111111" }, B: LabelClass = { name: "B", colour: "#222222" }, C: LabelClass = { name: "C", colour: "#333333" };
+  const lut = new Uint8Array(256);
+  lut[3] = 1; lut[5] = 2; lut[7] = 3;
+
+  it("renames and recolours by value through the lut, skipping in entry order", () => {
+    const classes = [A, B, C], before = structuredClone(classes);
+    const r = applyClassMap(classes, lut, [{ value: 5, name: "Mangrove", colour: "#00ff00" }, { value: 0, name: "X" }, { value: 7, name: "A" }, { value: 3, name: "Q" }, { value: 3, name: "R" }, { value: 9, name: "Z" }]);
+    expect(r.classes).toEqual([{ name: "Q", colour: "#111111" }, { name: "Mangrove", colour: "#00ff00" }, C]);
+    expect(r.applied).toBe(2);
+    expect(r.skipped).toEqual([
+      { field: "[1].value", why: "has no class in these labels" }, { field: "[2].name", why: W },
+      { field: "[4].value", why: "targets a class an earlier entry changed" }, { field: "[5].value", why: "has no class in these labels" },
+    ]);
+    expect(classes).toEqual(before);
+  });
+
+  it("skips non-objects and bad values; a bad colour keeps the class's colour; a non-array matches nothing", () => {
+    const r = applyClassMap([A, B, C], lut, [null, { value: 3.5, name: "x" }, { value: 256, name: "x" }, { value: 3, name: " Sea ", colour: "blue" }, { value: 7, name: "Sea" }]);
+    expect(r.classes).toEqual([{ name: "Sea", colour: "#111111" }, B, C]);
+    expect(r.applied).toBe(1);
+    expect(r.skipped.map((s) => s.field)).toEqual(["[0]", "[1].value", "[2].value", "[3].colour", "[4].name"]);
+    expect(r.skipped.slice(0, 2).map((s) => s.why)).toEqual(["must be an object", "must be an integer 0..255"]);
+    expect(applyClassMap([A], lut, { value: 3, name: "x" })).toEqual({ classes: [A], applied: 0, skipped: [{ field: "table", why: "must be an array" }] });
+    expect(applyClassMap([A], lut, [])).toEqual({ classes: [A], applied: 0, skipped: [] });
+  });
+
+  it("a class may keep its own name, and swaps check against the list as it stands", () => {
+    expect(applyClassMap([A, B, C], lut, [{ value: 3, name: "A", colour: "#abcdef" }]).classes[0]).toEqual({ name: "A", colour: "#abcdef" });
+    const r = applyClassMap([A, B, C], lut, [{ value: 3, name: "B" }, { value: 5, name: "A" }]);
+    expect(r.skipped.map((s) => s.field)).toEqual(["[0].name", "[1].name"]); // B and A are both still taken
+    expect(r.classes.map((c) => c.name)).toEqual(["A", "B", "C"]);
   });
 });
 
