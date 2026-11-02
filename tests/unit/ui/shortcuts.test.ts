@@ -25,8 +25,10 @@ describe("SHORTCUTS and KEYMAP", () => {
     const entry = (action: string) => SHORTCUTS.find((s) => s.action === action)?.keys;
     expect(entry("Smart select")).toEqual(["m"]);
     expect(entry("Apply smart selection")).toEqual(["Enter"]);
-    expect(entry("Include / exclude a point")).toEqual(["Click", "Right click"]);
-    expect(entry("Discard the selection")).toEqual(["Escape"]);
+    // as amended by spec 049 scope 5
+    expect(entry("Include / exclude a point")).toEqual(["Click", "Shift+click"]);
+    expect(entry("Discard the selection")).toEqual(["Escape", "Right click"]);
+    expect(keyLabel("Shift+click")).toBe("Shift+click");
     expect(isSingleKey("Click")).toBe(false);
     expect([...new Set(SHORTCUTS.map((s) => s.section))]).toEqual(["Tools", "Brush", "Classes", "View", "Navigation", "Edit"]);
     expect(SHORTCUTS.length).toBeGreaterThanOrEqual(19);
