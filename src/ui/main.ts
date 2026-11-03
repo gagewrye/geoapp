@@ -44,7 +44,7 @@ const status = initStatus(map, () => (source ? source.meta : null));
 // nav and labels exist before any map event; a held pan key holds tile updates until it settles (spec 027)
 const fullRes = initImagery(map, say, { moving: () => nav.moving(), viewSettled: () => labels.viewSettled() });
 let source: RasterSource | undefined;
-// the open raster's file handle, so Export's Save dialog starts in its folder; null when it came through the input (spec 050)
+// the open raster's file handle, so Export's Save dialog and Import labels' picker start in its folder; null when it came through the input (specs 050, 053)
 let folder: FileSystemFileHandle | null = null;
 // Opens are numbered so that an older open finishing late can't replace the raster a newer one opened
 let opens = 0;

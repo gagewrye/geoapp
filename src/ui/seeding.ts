@@ -14,7 +14,7 @@ import type { MessageKind } from "./messages";
 type Deps = {
   labels: ReturnType<typeof initLabels>;
   imagery: () => RasterSource | undefined;
-  /** The open raster's file handle, if it came through the open picker: Export's Save dialog starts in its folder (spec 050). */
+  /** The open raster's file handle, if it came through the open picker: Export's Save dialog and Import labels' picker start in its folder (specs 050, 053). */
   folder: () => FileSystemHandle | null;
   say: (text: string, kind?: MessageKind) => void;
   /** Shows an error the way main's other actions do. */
