@@ -31,23 +31,34 @@ function rotatedFixture() {
 
 const lonLat = (c: number, r: number) => toLonLat(32618, ...applyAffine(GT, c, r)) as LngLat;
 
-/** RGBA of every device pixel of the map canvas, read in one render frame; rows top down. */
-const frame = (page: Page) => page.evaluate(() => {
+/** Device pixels per CSS pixel of the map canvas. */
+const deviceScale = (page: Page) => page.evaluate(() => { const c: HTMLCanvasElement = (window as any).__geoapp.map.getCanvas(); return c.width / c.getBoundingClientRect().width; });
+type Win = { x0: number; y0: number; w: number; h: number };
+/** RGBA of a window of the map canvas in device px, read in one render frame; only the sampled window, so a poll stays cheap (spec 052). */
+const frame = (page: Page, win: Win) => page.evaluate((win) => {
   const { map } = (window as any).__geoapp;
   const canvas: HTMLCanvasElement = map.getCanvas();
-  return new Promise<{ w: number; h: number; px: number[]; scale: number }>((resolve) => {
+  return new Promise<Win & { px: number[] }>((resolve) => {
     map.once("render", () => {
       const gl = (canvas.getContext("webgl2") ?? canvas.getContext("webgl")) as WebGLRenderingContext;
-      const w = canvas.width, h = canvas.height, buf = new Uint8Array(4 * w * h);
-      gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
-      const out = new Array<number>(4 * w * h);
-      for (let y = 0; y < h; y++) for (let x = 0; x < 4 * w; x++) out[4 * w * y + x] = buf[4 * w * (h - 1 - y) + x]!;
-      resolve({ w, h, px: out, scale: w / canvas.getBoundingClientRect().width });
+      const x0 = Math.max(0, win.x0), y0 = Math.max(0, win.y0);
+      const w = Math.min(canvas.width, win.x0 + win.w) - x0, h = Math.min(canvas.height, win.y0 + win.h) - y0;
+      const buf = new Uint8Array(4 * w * h);
+      gl.readPixels(x0, canvas.height - y0 - h, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+      const px = new Array<number>(4 * w * h); // rows top down
+      for (let y = 0; y < h; y++) for (let x = 0; x < 4 * w; x++) px[4 * w * y + x] = buf[4 * w * (h - 1 - y) + x]!;
+      resolve({ x0, y0, w, h, px });
     });
     map.triggerRepaint();
   });
-});
+}, win);
 type Frame = Awaited<ReturnType<typeof frame>>;
+/** RGB at canvas device pixel (x, y), or null outside the window read. */
+const at = (f: Frame, x: number, y: number) => {
+  if (x < f.x0 || y < f.y0 || x >= f.x0 + f.w || y >= f.y0 + f.h) return null;
+  const i = 4 * ((y - f.y0) * f.w + x - f.x0);
+  return f.px.slice(i, i + 3);
+};
 
 const canvasOrigin = (page: Page) => page.evaluate(() => { const r = (window as any).__geoapp.map.getCanvas().getBoundingClientRect(); return { x: r.left, y: r.top }; });
 const imagerySources = (page: Page) => page.evaluate(() => Object.keys((window as any).__geoapp.map.getStyle().sources).filter((id) => id.startsWith("imagery-")).length);
@@ -69,16 +80,19 @@ async function openRotated(page: Page): Promise<void> {
 test("rotated UTM at 45N: screen samples at pixel centres match the source, from the tiles alone", async ({ page }) => {
   await openRotated(page);
   await zoomTo(page, 350.5, 350.5, 10);
-  const o = await canvasOrigin(page);
-  const pts: { c: number; r: number; at: { x: number; y: number } }[] = [];
-  for (let r = 340; r < 362; r++) for (let c = 330; c < 372; c++) pts.push({ c, r, at: await toScreen(page, lonLat(c + 0.5, r + 0.5)) });
+  const o = await canvasOrigin(page), scale = await deviceScale(page);
+  const pts: { c: number; r: number; x: number; y: number }[] = [];
+  for (let r = 340; r < 362; r++) for (let c = 330; c < 372; c++) {
+    const p = await toScreen(page, lonLat(c + 0.5, r + 0.5));
+    pts.push({ c, r, x: Math.floor((p.x - o.x) * scale), y: Math.floor((p.y - o.y) * scale) });
+  }
+  const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
+  const win = { x0: Math.min(...xs), y0: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs) + 1, h: Math.max(...ys) - Math.min(...ys) + 1 };
   const wrong = async () => {
-    const f = await frame(page);
-    return pts.filter(({ c, r, at }) => {
-      const x = Math.floor((at.x - o.x) * f.scale), y = Math.floor((at.y - o.y) * f.scale);
-      if (x < 0 || y < 0 || x >= f.w || y >= f.h) return false;
-      const i = 4 * (y * f.w + x);
-      return [0, 1, 2].some((k) => Math.abs(f.px[i + k]! - value(k, c, r)) > 1);
+    const f = await frame(page, win);
+    return pts.filter(({ c, r, x, y }) => {
+      const rgb = at(f, x, y);
+      return rgb !== null && [0, 1, 2].some((k) => Math.abs(rgb[k]! - value(k, c, r)) > 1);
     }).length;
   };
   await expect.poll(wrong, { timeout: 30_000 }).toBe(0);
@@ -92,27 +106,26 @@ test("rotated UTM at 45N: a painted pixel's colour edges fall on the imagery's p
   const [c, r] = [420, 300];
   await zoomTo(page, c + 0.5, r + 0.5, 14);
   const centre = await toScreen(page, lonLat(c + 0.5, r + 0.5));
-  const o = await canvasOrigin(page);
-  const at = (f: Frame, x: number, y: number) => f.px.slice(4 * (y * f.w + x), 4 * (y * f.w + x) + 3);
+  const o = await canvasOrigin(page), scale = await deviceScale(page);
+  const cx = Math.floor((centre.x - o.x) * scale), cy = Math.floor((centre.y - o.y) * scale);
+  const span = Math.round(40 * scale);
+  const win = { x0: cx - span - 1, y0: cy - span - 1, w: 2 * span + 3, h: 2 * span + 3 };
   await expect.poll(async () => {
-    const f = await frame(page);
-    const cx = Math.floor((centre.x - o.x) * f.scale), cy = Math.floor((centre.y - o.y) * f.scale);
-    return [0, 1, 2].every((k) => Math.abs(at(f, cx, cy)[k]! - value(k, c, r)) <= 1);
+    const rgb = at(await frame(page, { x0: cx, y0: cy, w: 1, h: 1 }), cx, cy)!;
+    return [0, 1, 2].every((k) => Math.abs(rgb[k]! - value(k, c, r)) <= 1);
   }, { timeout: 30_000 }).toBe(true);
   const panel = (await page.locator("#panel").boundingBox())!;
   await page.mouse.move(panel.x + panel.width / 2, panel.y + 10);
-  const before = await frame(page);
+  const before = await frame(page, win);
   await clickAt(page, centre);
   await settled(page);
   await page.mouse.move(panel.x + panel.width / 2, panel.y + 10); // no hover outline over the samples
   await expect.poll(() => page.evaluate(() => (window as any).__geoapp.labels.store.tiles.size)).toBe(1);
   await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))));
-  const after = await frame(page);
-  const cx = Math.floor((centre.x - o.x) * before.scale), cy = Math.floor((centre.y - o.y) * before.scale);
+  const after = await frame(page, win);
   const differs = (a: number[], b: number[]) => a.some((v, k) => Math.abs(v - b[k]!) > 8);
   for (const [dx, dy] of [[1, 0], [0, 1], [1, 1]] as const) {
-    const line = (f: Frame, i: number) => at(f, cx + dx * i, cy + dy * i);
-    const span = Math.round(40 * before.scale);
+    const line = (f: Frame, i: number) => at(f, cx + dx * i, cy + dy * i)!;
     const edges: number[] = [];
     for (let i = -span; i < span; i++) if (differs(line(before, i), line(before, i + 1))) edges.push(i + 0.5);
     const painted: number[] = [];

@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { fromArrayBuffer } from "geotiff";
 import { uint8Tiff } from "../unit/helpers/tiffFixtures";
 import { jumpTo, labels, message, openApp, openRaster, paintMode, path, stroke, toScreen } from "./helpers";
-import { arrayBuffer, at, download, importFile, maskFile, maskValue, noSavePicker } from "./seeding";
+import { arrayBuffer, at, download, effectiveTiles, importFile, labelAt, maskFile, maskValue, noSavePicker } from "./seeding";
 
 // Spec 022 criterion 6: on RGBA imagery, transparent pixels (alpha 0) take no label from a stroke, an import or an export.
 
@@ -33,11 +33,14 @@ test("a stroke across the transparent edge, an import over it and its export lab
   page.once("dialog", (d) => void d.accept()); // Replace labels?
   await importFile(page, maskFile());
   await expect(message(page)).toHaveText(seeded);
-  const imported = await labels(page);
-  expect([...imported.keys()].filter((k) => col(k) < EDGE)).toEqual([]);
+  // effective tile bytes, not labels(): a 750k-entry map per call is slow (spec 052)
+  const imported = await effectiveTiles(page);
+  let westLabelled = 0;
+  for (let r = 0; r < 1000; r++) for (let c = 0; c < EDGE; c++) if (labelAt(imported, 1000, c, r)) westLabelled++;
+  expect(westLabelled).toBe(0);
   // every opaque pixel keeps the mask's value
   let bad = 0;
-  for (let r = 0; r < 1000; r += 7) for (let c = EDGE; c < 1000; c += 7) if ((imported.get(`${c},${r}`) ?? 0) !== maskValue(c, r)) bad++;
+  for (let r = 0; r < 1000; r += 7) for (let c = EDGE; c < 1000; c += 7) if (labelAt(imported, 1000, c, r) !== maskValue(c, r)) bad++;
   expect(bad).toBe(0);
 
   const file = await download(page, "#export-labels");

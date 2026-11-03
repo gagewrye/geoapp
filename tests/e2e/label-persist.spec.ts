@@ -1,8 +1,8 @@
 import { expect, test, type Dialog, type Page } from "@playwright/test";
 import {
-  anotherRaster, jumpTo, labels, message, openApp, openRaster, paintMode, paintTwoClasses, path, rgbFixture, selectClass, stroke, tileKeysStored, toScreen,
+  anotherRaster, jumpTo, message, openApp, openRaster, paintMode, paintTwoClasses, path, rgbFixture, selectClass, stroke, tileKeysStored, toScreen,
 } from "./helpers";
-import { at, classList, download, importFile, maskFile, noSavePicker, storeTiles } from "./seeding";
+import { at, classList, download, effectiveTiles, importFile, maskFile, noSavePicker, storeTiles, tileDiff } from "./seeding";
 
 // Spec 031 criteria 6-9: labels survive a reload in this browser.
 
@@ -86,7 +86,7 @@ test("an imported mask plus a stroke: after the restore the mask and the stroke 
   await selectClass(page, 2);
   await stroke(page, path(await toScreen(page, at(380.5, 400.5)), await toScreen(page, at(420.5, 410.5)), 8));
   await saved(page);
-  const before = await labels(page);
+  const before = await effectiveTiles(page);
   const exported = await download(page, "#export-labels");
   await expect(message(page)).toHaveText("Labels exported.");
 
@@ -95,9 +95,7 @@ test("an imported mask plus a stroke: after the restore the mask and the stroke 
   await expect(message(page)).toHaveText("Labels restored.");
   expect(log.filter((l) => l.startsWith("beforeunload"))).toEqual([]);
   await expect.poll(() => page.evaluate(() => (window as any).__geoapp.map.getLayer("mask") !== undefined)).toBe(true);
-  const back = await labels(page);
-  expect(back.size).toBe(before.size);
-  expect([...before].filter(([k, v]) => back.get(k) !== v)).toEqual([]);
+  expect(tileDiff(await effectiveTiles(page), before)).toEqual([]);
   const again = await download(page, "#export-labels");
   await expect(message(page)).toHaveText("Labels exported.");
   expect(again.equals(exported)).toBe(true);

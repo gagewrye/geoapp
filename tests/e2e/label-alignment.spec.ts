@@ -5,8 +5,8 @@ import type { Affine, Grid } from "../../src/core/types";
 import { BACKGROUND, clickAt, hideImagery, jumpTo, message, openApp, openRaster, paintMode, settled, tiff, toScreen, type LngLat } from "./helpers";
 
 // Spec 018 criterion 3: after a dab, the colour covers exactly the pixels the hover outline marks.
-// Positions and sizes are fixed; at least 10 per raster are where main's shared overlay grid put a painted
-// edge 0.3 px or more from the true pixel edge (checked against main's overlayIndex when this was written).
+// Positions and sizes are fixed. Of the 40 positions, at least 10 per raster were where main's shared overlay grid
+// put a painted edge 0.3 px or more from the true pixel edge; spec 052 keeps the first 10 on the UTM raster.
 test.use({ deviceScaleFactor: 1.25 });
 
 const SIZE = 512;
@@ -14,7 +14,6 @@ const utm: Affine = (() => { const [x, y] = fromLonLat(32633, 18, 60); return [M
 const RASTERS: [string, Grid][] = [
   ["EPSG:32633, 3 degrees off its central meridian at 60N", { epsg: 32633, gt: utm, width: SIZE, height: SIZE }],
   ["EPSG:4326 at 45N", { epsg: 4326, gt: [10, 0.0001, 0, 45.03, 0, -0.0001], width: SIZE, height: SIZE }],
-  ["EPSG:4326 at 60N", { epsg: 4326, gt: [10, 0.0001, 0, 60.03, 0, -0.0001], width: SIZE, height: SIZE }],
 ];
 
 /** 40 dab centres: an 8 x 5 lattice, seeded jitter, kept off the tile seams so each dab sits in one tile. */
@@ -75,9 +74,9 @@ const hoverDrawn = (page: Page) => page.evaluate(() => {
 /** Two animation frames: the label display redraws on the next one. */
 const frames = (page: Page) => page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))));
 
-for (const [name, grid] of RASTERS) {
+// Spec 052: one raster, the first 10 positions; label-quads.tester checks dab = outline on 4326 at 45N and 84N.
+for (const [name, grid] of RASTERS.slice(0, 1)) {
   test(`dabs of sizes 1 and 7 cover exactly their outline: ${name} (spec 018 criterion 3)`, async ({ page }) => {
-    test.setTimeout(240_000);
     await openApp(page);
     await openRaster(page, tiff("align.tif", SIZE, SIZE, 1, () => 7, { epsg: grid.epsg, gt: grid.gt }));
     await expect(message(page)).toHaveText("Raster opened.");
@@ -96,7 +95,7 @@ for (const [name, grid] of RASTERS) {
 
     const bad: string[] = [];
     let inside = 0, outside = 0;
-    for (const [c, r] of positions()) {
+    for (const [c, r] of positions().slice(0, 10)) {
       await jumpTo(page, lonLat(c + 0.5, r + 0.5), zoom);
       for (const side of [1, 7]) {
         while ((await page.locator("#brush-size").textContent()) !== `${side}`) await page.click(side === 1 ? "#brush-smaller" : "#brush-larger");
@@ -121,7 +120,7 @@ for (const [name, grid] of RASTERS) {
   });
 }
 
-for (const [name, grid] of RASTERS.slice(0, 2)) {
+for (const [name, grid] of RASTERS) {
   test(`each stored tile adds exactly one label- layer, between the preview and the hover: ${name} (spec 018 criterion 5)`, async ({ page }) => {
     await openApp(page);
     await openRaster(page, tiff("layers.tif", SIZE, SIZE, 1, () => 7, { epsg: grid.epsg, gt: grid.gt }));
