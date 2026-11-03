@@ -3,6 +3,7 @@
 One entry per merge to main, newest first. Details are in the named spec.
 
 ## 2026-11-03
+- **Spec 053:** On Chrome and Edge, Import labels opens its chooser in the imagery's folder (when the imagery came through Open GeoTIFF's picker) instead of the last folder used; the import itself, its replace confirm and other browsers are unchanged.
 - **Spec 052:** The e2e suite is pruned and shrunk: 60 redundant or obsolete tests are removed (361 → 301) and the slowest ones compare stored tile bytes or read only the pixels they check, so a run takes about a third less time and no test takes over 30 s. No app behaviour changes.
 
 ## 2026-11-02
