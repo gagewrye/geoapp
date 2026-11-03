@@ -4,6 +4,8 @@
 
 **Status:** Approved (Gage, 2026-10-29: "yes to all"). The request, verbatim: "Remove the seed mode option. Make the brush a slider instead of fixed sizes. Keep the cap though." **ADRs:** none (no new dependency or architecture change). **Build after spec 014 merges.** This spec amends specs 003, 004, 009, 010 and 014 (see Amendments). Amended by spec 047 (2026-11-01): there is no import-time class map, so "Cancel keeps the chosen class map" (scope and criterion 5) lapses.
 
+**Amended by spec 052 (2026-11-02):** `nav-select.tester.spec.ts` (Amendments, spec 009 criterion 6 line) is removed; the class-name cases in `navigation.spec.ts` and `nav-undo.tester.spec.ts` take the same `typing()` path.
+
 **Decided (Gage, 2026-10-29):**
 - Every import replaces, with spec 004's `confirm("Replace labels?")` when any label or mask exists. Always Merge was rejected: spec 014 refuses Merge onto a loaded mask, so a second mask could never load.
 - "−" and "+" stay beside the slider, as coarse steps. `[` and `]` halve or double the size (`stepBrush`), which from 7 gives today's sizes exactly.

@@ -2,6 +2,8 @@
 
 **Status:** Approved (Gage, 2026-10-29: "approve all"). The cache was raised to 512 tiles ("yes increase cache"). Amendment A1 (the tester's B1–B3, F1), with the 16 MiB `MAX_BLOCK_BYTES`, was approved (Gage, 2026-10-29: "approve all"). Builds on spec 019. ADR 0020.
 
+**Amended by spec 052 (2026-11-02):** criterion 4's e2e checks run on the rotated UTM grid only (`imagery.tester.spec.ts`), not the 4326 checkerboard. Criterion 8's cap is checked by unit tests only (`map/imagery`); the e2e test checks that opening another raster removes every `imagery-` source.
+
 **Request** (Gage, 2026-10-29): "If you are labelling, you want that full resolution when you zoom in to see the details."
 
 **Decided:**
