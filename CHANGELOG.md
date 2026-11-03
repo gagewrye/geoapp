@@ -2,6 +2,9 @@
 
 One entry per merge to main, newest first. Details are in the named spec.
 
+## 2026-11-03
+- **Spec 052:** The e2e suite is pruned and shrunk: 60 redundant or obsolete tests are removed (361 → 301) and the slowest ones compare stored tile bytes or read only the pixels they check, so a run takes about a third less time and no test takes over 30 s. No app behaviour changes.
+
 ## 2026-11-02
 - **Spec 051:** Import labels reads class tables written by GDAL or rasterio (which escape the XML twice), so pseudo-labels made in Python import with their class names and colours instead of "Class N"; files the app exported read as before.
 - **Spec 050:** On Chrome and Edge, Open GeoTIFF uses the browser's file picker, so Export labels opens its Save dialog in the imagery's own folder (suggesting `labels.tif`) instead of the last folder used; other browsers are unchanged (ADR 0034).
