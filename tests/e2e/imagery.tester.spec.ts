@@ -86,16 +86,19 @@ test("rotated UTM at 45N: screen samples at pixel centres match the source, from
     const p = await toScreen(page, lonLat(c + 0.5, r + 0.5));
     pts.push({ c, r, x: Math.floor((p.x - o.x) * scale), y: Math.floor((p.y - o.y) * scale) });
   }
-  const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
-  const win = { x0: Math.min(...xs), y0: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs) + 1, h: Math.max(...ys) - Math.min(...ys) + 1 };
-  const wrong = async () => {
-    const f = await frame(page, win);
-    return pts.filter(({ c, r, x, y }) => {
-      const rgb = at(f, x, y);
-      return rgb !== null && [0, 1, 2].some((k) => Math.abs(rgb[k]! - value(k, c, r)) > 1);
-    }).length;
+  const off = (f: Frame, { c, r, x, y }: (typeof pts)[number]) => {
+    const rgb = at(f, x, y);
+    return rgb !== null && [0, 1, 2].some((k) => Math.abs(rgb[k]! - value(k, c, r)) > 1);
   };
-  await expect.poll(wrong, { timeout: 30_000 }).toBe(0);
+  // poll 1 px reads at the grid's corners and centre until the tiles show there, then read the whole box once (spec 052)
+  const probes = [0, 41, 21 * 42 + 0, 21 * 42 + 41, 10 * 42 + 21].map((i) => pts[i]!);
+  await expect.poll(async () => {
+    for (const p of probes) if (off(await frame(page, { x0: p.x, y0: p.y, w: 1, h: 1 }), p)) return false;
+    return true;
+  }, { timeout: 30_000 }).toBe(true);
+  const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
+  const box = await frame(page, { x0: Math.min(...xs), y0: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs) + 1, h: Math.max(...ys) - Math.min(...ys) + 1 });
+  expect(pts.filter((p) => off(box, p)).length).toBe(0);
   expect(await imagerySources(page)).toBeGreaterThan(0);
 });
 
