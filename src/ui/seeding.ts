@@ -1,5 +1,6 @@
 import type { LabelClass } from "../core/classes";
 import { applyClassMap, type Skip } from "../core/classTable";
+import { canPickFiles, pickRaster } from "../io/filePick";
 import { checkLabelExport, exportLabels } from "../io/labelExport";
 import { LabelFileRefused, maskReadFailed, openLabelFile, type LabelSource } from "../io/labelFile";
 import { importLabels, importTable } from "../io/seeding";
@@ -106,13 +107,37 @@ export function initSeeding({ labels, imagery, folder, say, error, opened, impor
 
   cancelBtn.addEventListener("click", () => { if (seeding()) cancelled = true; });
 
-  importInput.addEventListener("change", () => {
-    const tif = importInput.files?.[0];
-    importInput.value = "";
+  /** A chosen label file, from the input or the picker: the checks, spec 017's confirm, then the import. */
+  function chosen(tif: File | undefined): void {
     const s = imagery();
     if (!tif || importInput.disabled || !s) return;
     if (!replaceConfirmed()) return;
     void runImport(s, tif);
+  }
+
+  importInput.addEventListener("change", () => {
+    const tif = importInput.files?.[0];
+    importInput.value = "";
+    chosen(tif);
+  });
+  // Spec 053: with the imagery's handle on Chromium, the picker replaces the input's chooser so it opens in the imagery's folder
+  importInput.addEventListener("click", (e) => {
+    const start = folder();
+    if (!canPickFiles() || !start) return;
+    e.preventDefault();
+    const picked = pickRaster(start); // within the click: the picker needs its user activation, so nothing is awaited first
+    void (async () => {
+      let tif: File;
+      try {
+        const handle = await picked;
+        if (!handle) return; // cancelled: nothing and no message
+        tif = await handle.getFile();
+      } catch (err) {
+        say(error(err), "error"); // as a failed import read is said
+        return;
+      }
+      chosen(tif);
+    })();
   });
 
   // Renames and recolours by the mask's raw values (base.lut); painted tiles, the mask and history stay
