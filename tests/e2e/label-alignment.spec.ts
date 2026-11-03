@@ -5,8 +5,8 @@ import type { Affine, Grid } from "../../src/core/types";
 import { BACKGROUND, clickAt, hideImagery, jumpTo, message, openApp, openRaster, paintMode, settled, tiff, toScreen, type LngLat } from "./helpers";
 
 // Spec 018 criterion 3: after a dab, the colour covers exactly the pixels the hover outline marks.
-// Positions and sizes are fixed. Of the 40 positions, at least 10 per raster were where main's shared overlay grid
-// put a painted edge 0.3 px or more from the true pixel edge; spec 052 keeps the first 10 on the UTM raster.
+// Positions and sizes are fixed. On the UTM raster, the shared overlay grid before ADR 0019 (4d6b003^ overlayIndex) put
+// a painted edge 0.43-0.49 px from the true pixel edge at each of the first 10 positions, the ones spec 052 keeps.
 test.use({ deviceScaleFactor: 1.25 });
 
 const SIZE = 512;

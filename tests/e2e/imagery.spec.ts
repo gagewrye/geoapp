@@ -7,7 +7,7 @@ import { jumpTo, message, openApp, openRaster, paintMode, rgbFixture, toScreen, 
 const upload = (name: string, images: FixtureImage[], gt: Affine) =>
   ({ name, mimeType: "image/tiff", buffer: Buffer.from(uint8Tiff(images, { epsg: 4326, gt })) });
 
-/** Checkerboard, 1500 px square, tiled: the 1024 px preview samples every other pixel, so it can't show the checks. Two 8 px blocks hold 0 and 255, so every band's stretch is 0..255. */
+/** A tiled 1500 px checkerboard: imagery tiles for the removal test and the held-reads Paint test. */
 const CHECK_GT: Affine = [10, 0.0001, 0, 45.1, 0, -0.0001];
 const check = (k: number, c: number, r: number) => {
   if (r < 8 && c < 8) return 0;
