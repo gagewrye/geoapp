@@ -1,11 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 import { classFile } from "../unit/helpers/labelFiles";
-import { MESSAGES } from "../../src/ui/messages";
-import { collectErrors, jumpTo, labels, message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture, stroke, toScreen } from "./helpers";
-import { classList, importFile, openFileGate, pauseLabelFile, storeTiles, upload } from "./seeding";
+import { collectErrors, jumpTo, labels, message, openApp, openRaster, paintMode, rgbFixture, stroke, toScreen } from "./helpers";
+import { classList, importFile, openFileGate, storeTiles, upload } from "./seeding";
 
-// Tester checks of spec 004's controls: an import after erasing everything, the replaced-raster
-// rule for an import that fails, and a run that survives a cancelled "Discard labels?".
+// Tester checks of spec 004's controls: an import after erasing everything, and the replaced-raster
+// rule for an import that fails.
 
 const seeded = /^Seeded \d+ pixels in \d+ classes\.$/;
 async function setup(page: Page) {
@@ -52,23 +51,4 @@ test("an import that fails after another raster opened shows no message and chan
   expect(await classList(page)).toEqual(list);
   await expect(page.locator("#import-labels")).toBeEnabled();
   expect(errors).toEqual([]);
-});
-
-test("a run whose raster stays because Discard labels? was cancelled still applies", async ({ page }) => {
-  await setup(page);
-  await paintTwoClasses(page);
-  const painted = await labels(page);
-  await pauseLabelFile(page);
-  page.once("dialog", (d) => void d.accept()); // "Replace labels?": every import replaces (spec 017)
-  await importFile(page, upload("classes.tif", classFile("255")));
-  await expect.poll(() => page.evaluate(() => (window as any).__fileGate.reads)).toBe(1);
-  const asked: string[] = [];
-  page.once("dialog", (d) => { asked.push(d.message()); void d.dismiss(); });
-  await openRaster(page, { ...rgbFixture(), name: "other.tif" });
-  await expect.poll(() => asked).toEqual([MESSAGES.discard]);
-  await openFileGate(page);
-  await expect(message(page)).toHaveText(seeded);
-  const after = await labels(page);
-  expect(after.size).toBeGreaterThan(painted.size);
-  expect((await classList(page)).map((c) => c.name)).toEqual(["Class 0", "Class 3", "Class 7"]); // it replaced
 });

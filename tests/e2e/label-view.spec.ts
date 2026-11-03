@@ -92,19 +92,23 @@ test("opacity 30 sets 0.3 on every overlay and the mask, and on a later tile; a 
   await expect.poll(async () => (await labelLayers(page))["label-0,0"]).toEqual([0.3, "visible"]);
 });
 
-test("the opacity is kept when another raster opens, and a reload resets it to 60 (criterion 3)", async ({ page }) => {
+test("the opacity and the brush size (spec 017) are kept when another raster opens, and a reload resets the opacity to 60 (criterion 3)", async ({ page }) => {
   await setup(page);
   await opacity(page).fill("30");
   await paintMode(page);
   await jumpTo(page, [15, 45], 9);
   await clickAt(page, await toScreen(page, [15.005, 45.005]));
   await expect.poll(() => tileKeysStored(page)).toEqual(["256,256"]);
+  await page.locator("#brush-size-range").fill("41");
+  await expect(page.locator("#brush-size")).toHaveText("41");
   page.once("dialog", (d) => void d.accept()); // "Discard labels?"
   await openRaster(page, { ...rgbFixture(), name: "other.tif" });
   await expect(page.locator("#raster-info")).toContainText("other.tif");
   await expect(message(page)).toHaveText("Raster opened.");
   await expect(opacity(page)).toHaveValue("30");
   await expect(opacityText(page)).toHaveText("30%");
+  await expect(page.locator("#brush-size")).toHaveText("41");
+  await expect(page.locator("#brush-size-range")).toHaveValue("41");
   await paintMode(page);
   await jumpTo(page, [15, 45], 9);
   await clickAt(page, await toScreen(page, [15.005, 45.005]));

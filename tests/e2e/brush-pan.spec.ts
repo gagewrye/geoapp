@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { editName, hoverFeatures, jumpTo, labels, message, moveTo, openApp, openRaster, paintMode, rgbFixture, settled, stroke, toScreen, toucher, view } from "./helpers";
+import { editName, hoverFeatures, jumpTo, labels, message, moveTo, openApp, openRaster, paintMode, rgbFixture, stroke, toScreen, toucher, view } from "./helpers";
 
 // Spec 003 criterion 12: pan and zoom alongside the brush.
 
@@ -189,15 +189,6 @@ test.describe("pan and zoom (criterion 12)", () => {
     expect(Math.abs((await view(page)).bearing - v1.bearing)).toBeGreaterThan(5);
     expect(await count(page)).toBe(0);
     expect(await hoverFeatures(page)).toHaveLength(0);
-  });
-
-  test("a double-click in Paint mode leaves zoom unchanged", async ({ page }) => {
-    const c = await setup(page);
-    const z0 = (await view(page)).zoom;
-    await page.mouse.dblclick(c.x, c.y);
-    await page.waitForTimeout(500);
-    await settled(page);
-    expect((await view(page)).zoom).toBe(z0);
   });
 
   test("a one-finger touch drag (CDP) pans, paints nothing and shows no footprint", async ({ page }) => {

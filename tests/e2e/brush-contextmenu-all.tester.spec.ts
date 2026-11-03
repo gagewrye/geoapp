@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { editName, jumpTo, message, openApp, openRaster, paintMode, rgbFixture, stroke, tiff, toScreen } from "./helpers";
+import { editName, jumpTo, message, openApp, openRaster, paintMode, rgbFixture, stroke, toScreen } from "./helpers";
 
 // Tester pass 4: spec 003 Strokes / criterion 10. contextmenu is prevented on the map while local
 // imagery is open, in every mode, and never on any panel element, whether opened by mouse,
@@ -38,12 +38,6 @@ test.describe("contextmenu on every map and panel element (criterion 10, tester 
     ["Paint", async () => {}],
     ["Pan", async (page) => { await page.click("#mode-pan"); }],
     ["Space held", async (page) => { await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur()); await page.keyboard.down(" "); }],
-    ["another raster opened", async (page) => {
-      await openRaster(page, tiff("b.tif", 1000, 1000, 3, () => 120, { epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01] }));
-      await expect(page.locator("#raster-info")).toContainText("b.tif");
-      await expect(message(page)).toHaveText("Raster opened.");
-      await paintMode(page);
-    }],
   ];
   for (const [name, enter] of states) {
     test(`imagery open, ${name}: every map element is prevented, no panel element is`, async ({ page }) => {

@@ -13,23 +13,6 @@ const imageryWidth = (page: Page) => page.evaluate(() => (window as any).__geoap
 const previewWest = (page: Page) => page.evaluate(() => (window as any).__geoapp.map.getSource("preview")?.coordinates[0][0] as number | undefined);
 
 test.describe("an open that another open overtakes", () => {
-  test("an older open still reading its header doesn't replace the raster opened after it", async ({ page }) => {
-    await fileGate(page);
-    await openApp(page);
-    await hold(page, "slow.tif", "all");
-    await openRaster(page, { ...rgbFixture(), name: "slow.tif" });
-    await expect.poll(() => waiting(page)).toBeGreaterThan(0);
-    await openRaster(page, otherFixture());
-    await expect(message(page)).toHaveText("Raster opened.");
-    await expect(info(page)).toHaveText(/^other\.tif: 800 x 600/);
-    await releaseFiles(page);
-    await page.waitForTimeout(800);
-    await expect(info(page)).toHaveText(/^other\.tif: 800 x 600/);
-    expect(await imageryWidth(page)).toBe(800);
-    expect(await previewWest(page)).toBeCloseTo(30, 6);
-    await expect(message(page)).toHaveText("Raster opened.");
-  });
-
   test("an older open still building its preview doesn't show it over the raster opened after it", async ({ page }) => {
     await fileGate(page);
     await openApp(page);

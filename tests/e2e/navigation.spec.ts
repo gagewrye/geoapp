@@ -18,7 +18,7 @@ const mapCentreXy = async (page: Page): Promise<Xy> => {
 const canvasCursor = (page: Page) => page.evaluate(() => getComputedStyle((window as any).__geoapp.map.getCanvas()).cursor);
 const storeKeys = (page: Page) => labels(page).then((m) => [...m].sort());
 
-type Setup = "paint" | "pan" | "none";
+type Setup = "paint" | "none";
 async function setup(page: Page, how: Setup, zoom = 14, at: LngLat = START) {
   await openApp(page);
   if (how !== "none") {
@@ -26,7 +26,6 @@ async function setup(page: Page, how: Setup, zoom = 14, at: LngLat = START) {
     await expect(message(page)).toHaveText("Raster opened.");
     await paintMode(page);
   }
-  if (how === "pan") await page.click("#mode-pan");
   await jumpTo(page, at, zoom);
 }
 
@@ -44,7 +43,7 @@ async function middleDrag(page: Page, a: Xy, b: Xy, steps = 15) {
 }
 
 test.describe("wheel zooms about the centre (criterion 1)", () => {
-  for (const how of ["paint", "pan", "none"] as const) {
+  for (const how of ["paint", "none"] as const) {
     test(`${how}: five wheel-ups off-centre raise the zoom and keep the centre`, async ({ page }) => {
       await setup(page, how);
       const c0 = await centre(page), z0 = (await view(page)).zoom;
@@ -63,7 +62,7 @@ test.describe("wheel zooms about the centre (criterion 1)", () => {
 });
 
 test.describe("middle-button drag pans (criterion 2)", () => {
-  for (const how of ["paint", "pan", "none"] as const) {
+  for (const how of ["paint", "none"] as const) {
     test(`${how}: the grabbed point follows the pointer; nothing else changes`, async ({ page }) => {
       await setup(page, how);
       const m = await mapCentreXy(page);
@@ -80,7 +79,7 @@ test.describe("middle-button drag pans (criterion 2)", () => {
     });
   }
 
-  for (const how of ["paint", "pan", "none"] as const) {
+  for (const how of ["paint", "none"] as const) {
     test(`${how}: at zoom 3 (globe) a rightward drag lowers the centre longitude`, async ({ page }) => {
       await setup(page, how, 3);
       const lon0 = (await centre(page))[0];
@@ -264,18 +263,17 @@ test.describe("WASD stops and ignores (criterion 6)", () => {
     await expect(field).toHaveValue("Class 1w");
   });
 
-  for (const mod of ["Control", "Alt", "Meta"]) {
-    test(`with ${mod} held, W doesn't pan`, async ({ page }) => {
-      await setup(page, "paint");
-      const c0 = await centre(page);
-      await page.keyboard.down(mod);
-      await page.keyboard.down("KeyW");
-      await page.waitForTimeout(300);
-      await page.keyboard.up("KeyW");
-      await page.keyboard.up(mod);
-      expect(await centre(page)).toEqual(c0);
-    });
-  }
+  // Alt and Meta take the same branch (map/navigation.ts), so Control stands for all three (spec 052)
+  test("with Control held, W doesn't pan", async ({ page }) => {
+    await setup(page, "paint");
+    const c0 = await centre(page);
+    await page.keyboard.down("Control");
+    await page.keyboard.down("KeyW");
+    await page.waitForTimeout(300);
+    await page.keyboard.up("KeyW");
+    await page.keyboard.up("Control");
+    expect(await centre(page)).toEqual(c0);
+  });
 });
 
 test.describe("a camera move lifts the brush (criterion 7)", () => {

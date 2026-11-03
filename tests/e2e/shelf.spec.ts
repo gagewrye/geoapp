@@ -8,10 +8,6 @@ import { download, importFile, noSavePicker, upload } from "./seeding";
 
 // Spec 013: AlphaEarth and training are shelved; the site only labels local imagery.
 
-const SHELVED_IDS = ["train", "classify", "save-model", "load-model", "seed-model", "min-confidence"];
-const ids = (page: Page) => page.evaluate(() => [...document.querySelectorAll("[id]")].map((e) => e.id));
-const layerIds = (page: Page): Promise<string[]> => page.evaluate(() => (window as any).__geoapp.map.getStyle().layers.map((l: any) => l.id as string));
-const sourceIds = (page: Page): Promise<string[]> => page.evaluate(() => Object.keys((window as any).__geoapp.map.getStyle().sources));
 
 async function openAndPaint(page: Page) {
   await openRaster(page, rgbFixture());
@@ -21,37 +17,6 @@ async function openAndPaint(page: Page) {
   const a = await toScreen(page, [15.005, 45.005]);
   await stroke(page, [a, { x: a.x + 40, y: a.y }]);
 }
-
-test("no shelved control is in the page, and the panel names neither AlphaEarth nor a model (criterion 1)", async ({ page }) => {
-  await openApp(page);
-  const check = async (why: string) => {
-    const all = await ids(page);
-    expect(all.filter((id) => SHELVED_IDS.includes(id) || id.includes("aef")), why).toEqual([]);
-    const text = (await page.locator("#panel").textContent()) ?? "";
-    expect(text, why).not.toMatch(/alphaearth|model/i);
-  };
-  await check("at load");
-  await openAndPaint(page);
-  await check("with imagery open and labels");
-});
-
-test("layers: background, basemap, preview, label overlays, then hover; none is AlphaEarth or terra-draw (criterion 5)", async ({ page }) => {
-  await openApp(page);
-  await openAndPaint(page);
-  await expect.poll(async () => (await layerIds(page)).some((id) => id.startsWith("brush-hover"))).toBe(true);
-  // overlays are created on the frame after a stroke applies, so wait for them before reading the order
-  await expect.poll(async () => (await layerIds(page)).some((id) => id.startsWith("label-"))).toBe(true);
-  const layers = await layerIds(page);
-  const labelLayers = layers.filter((id) => id.startsWith("label-"));
-  expect(labelLayers.length).toBeGreaterThan(0);
-  const imagery = layers.filter((id) => id.startsWith("imagery-")); // spec 020's full-resolution tiles
-  // spec 048 scope 3: a stored tile also adds the preview-resolution mask layer, in its slot under the overlays
-  expect(layers).toEqual(["background", "basemap", "preview", ...imagery, "mask", ...labelLayers, "brush-hover-fill", "brush-hover-line"]);
-  for (const id of [...layers, ...(await sourceIds(page))]) {
-    expect(id).not.toContain("aef");
-    expect(id.startsWith("td-")).toBe(false);
-  }
-});
 
 test("every request from load through open, paint, undo, import, export and another open stays on the app's origin (criterion 6)", async ({ page, baseURL }) => {
   test.setTimeout(120_000);

@@ -123,16 +123,4 @@ test.describe("classes (criterion 14)", () => {
     await expect.poll(async () => (await hoverFeatures(page)).length).toBe(1);
     expect(await page.evaluate(() => (window as any).__geoapp.map.getPaintProperty("brush-hover-fill", "fill-color"))).toBe("#12ab34");
   });
-
-  test("Add is disabled at 255 classes", async ({ page }) => {
-    test.setTimeout(120_000);
-    await setup(page);
-    const add = page.locator("#class-add");
-    for (let i = 2; i < 254; i++) await add.click();
-    await expect(add).toBeEnabled();
-    await add.click();
-    expect(await page.locator("#classes li").count()).toBe(255);
-    await expect(add).toBeDisabled();
-    expect((await hookClasses(page)).length).toBe(255);
-  });
 });

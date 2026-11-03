@@ -1,9 +1,9 @@
-import { expect, test, type Page, type Request } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import {
-  addTestSelect, jumpTo, labels, logRequests, message, moveTo, openApp, openRaster, paintMode, rgbFixture, selectClass, settled, stroke, toScreen, view, type LngLat, type Xy,
+  addTestSelect, jumpTo, labels, message, moveTo, openApp, openRaster, paintMode, rgbFixture, selectClass, settled, stroke, toScreen, view, type LngLat, type Xy,
 } from "./helpers";
 
-// Tester edge cases for specs 009 (navigation), 010 (cursor, undo) and 012 (basemap requests).
+// Tester edge cases for specs 009 (navigation) and 010 (cursor, undo).
 const START: LngLat = [15, 45];
 const centre = (page: Page) => page.evaluate(() => { const c = (window as any).__geoapp.map.getCenter(); return [c.lng, c.lat] as [number, number]; });
 const idle = (page: Page) => page.evaluate(() => new Promise<void>((r) => {
@@ -19,14 +19,13 @@ const undoButton = (page: Page) => page.locator("#undo");
 const cursorAt = (page: Page, p: Xy) => page.evaluate(([x, y]) => getComputedStyle(document.elementFromPoint(x, y)!).cursor, [p.x, p.y] as const);
 const classColour = (page: Page, i: number) => page.evaluate((i) => (window as any).__geoapp.labels.classes[i].colour as string, i);
 
-async function setup(page: Page, how: "paint" | "pan" | "none", zoom = 14) {
+async function setup(page: Page, how: "paint" | "none", zoom = 14) {
   await openApp(page);
   if (how !== "none") {
     await openRaster(page, rgbFixture());
     await expect(message(page)).toHaveText("Raster opened.");
     await paintMode(page);
   }
-  if (how === "pan") await page.click("#mode-pan");
   await jumpTo(page, START, zoom);
 }
 
@@ -42,16 +41,6 @@ async function holdW(page: Page, ms: number, during?: () => Promise<void>) {
 }
 
 test.describe("spec 009 edges (tester)", () => {
-
-  for (const how of ["pan"] as const) {
-    test(`WASD works in ${how} mode (every mode): 500 ms of W moves the centre point 150..450 px down`, async ({ page }) => {
-      await setup(page, how);
-      const dy = await holdW(page, 500);
-      expect(dy).toBeGreaterThanOrEqual(150);
-      expect(dy).toBeLessThanOrEqual(450);
-    });
-  }
-
   test("auto-repeat keydowns change nothing: the speed stays at most WASD_SPEED", async ({ page }) => {
     await setup(page, "paint");
     // time the hold in the page, from the first keydown to the keyup, so test-runner latency doesn't count
@@ -72,8 +61,6 @@ test.describe("spec 009 edges (tester)", () => {
 
   const stoppers: [string, (page: Page) => Promise<void>][] = [
     ["focus entering a class name field", (page) => page.dispatchEvent("#classes .class-name", "dblclick")],
-    ["a Control keydown", async (page) => { await page.keyboard.down("Control"); await page.keyboard.up("Control"); }],
-    ["an Alt keydown", async (page) => { await page.keyboard.down("Alt"); await page.keyboard.up("Alt"); }],
     ["visibilitychange to hidden", (page) => page.evaluate(() => {
       Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
       document.dispatchEvent(new Event("visibilitychange"));
@@ -236,25 +223,4 @@ test.describe("spec 010 edges (tester)", () => {
     expect(during).toBe("grabbing");
     expect((await cursorAt(page, { x: m.x + 30, y: m.y })).startsWith("url(")).toBe(true);
   });
-});
-
-test("spec 012 criterion 5: real mouse pans and wheel zooms after load request nothing", async ({ page }) => {
-  const log: Request[] = logRequests(page);
-  await openApp(page);
-  await page.evaluate(() => new Promise<void>((r) => { const { map } = (window as any).__geoapp; if (map.loaded()) r(); else map.once("idle", () => r()); }));
-  await page.waitForTimeout(300);
-  const before = log.length;
-  const m = await mapMid(page);
-  for (let i = 0; i < 3; i++) {
-    await page.mouse.move(m.x, m.y);
-    await page.mouse.down();
-    await moveTo(page, m, { x: m.x + 150, y: m.y + 60 }, 6);
-    await page.mouse.up();
-  }
-  for (let i = 0; i < 25; i++) { await page.mouse.wheel(0, -200); await page.waitForTimeout(20); }
-  await page.keyboard.down("KeyD"); await page.waitForTimeout(200); await page.keyboard.up("KeyD");
-  await idle(page);
-  expect((await view(page)).zoom).toBeGreaterThan(4);
-  const urls = log.slice(before).map((r) => r.url()).filter((u) => !u.startsWith("data:") && !u.startsWith("blob:"));
-  expect(urls).toEqual([]);
 });

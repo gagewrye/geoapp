@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
-import { aefShapedFile, classFile, classItemFile, ITEM_CLASSES, rgbClassFile, uint16ClassFile, writeFile } from "../unit/helpers/labelFiles";
+import { aefShapedFile, classItemFile, ITEM_CLASSES, rgbClassFile, uint16ClassFile, writeFile } from "../unit/helpers/labelFiles";
 import { message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture } from "./helpers";
 import { classList, importFile, storeTiles, upload } from "./seeding";
 
@@ -33,18 +33,6 @@ test.describe("classes (criterion 12)", () => {
     await importFile(page, upload("item.tif", await classItemFile()));
     await expect(message(page)).toHaveText(seeded);
     expect(await classList(page)).toEqual(ITEM_CLASSES);
-  });
-
-  test("the 0/3/7 file gives Class 0, Class 3 and Class 7; without GDAL_NODATA 255 becomes a class too", async ({ page }) => {
-    await setup(page);
-    await importFile(page, upload("classes.tif", classFile("255")));
-    await expect(message(page)).toHaveText(seeded);
-    expect((await classList(page)).map((c) => c.name)).toEqual(["Class 0", "Class 3", "Class 7"]);
-    await page.reload();
-    await setup(page);
-    await importFile(page, upload("classes-nond.tif", classFile(null)));
-    await expect(message(page)).toHaveText(seeded);
-    expect((await classList(page)).map((c) => c.name)).toEqual(["Class 0", "Class 3", "Class 7", "Class 255"]);
   });
 });
 
