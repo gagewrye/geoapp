@@ -14,6 +14,21 @@ describe("pickRaster and canPickFiles", () => {
     expect(calls).toEqual([{ types: [{ description: "GeoTIFF", accept: { "image/tiff": [".tif", ".tiff"] } }] }]);
   });
 
+  // Spec 053 criterion 1: startIn only when given, and never an id.
+  it("passes startIn when given, and no startIn or id key otherwise", async () => {
+    const h = { kind: "file", name: "a.tif" } as unknown as FileSystemHandle;
+    const calls: Record<string, unknown>[] = [];
+    vi.stubGlobal("showOpenFilePicker", (o: Record<string, unknown>) => { calls.push(o); return Promise.resolve([]); });
+    await pickRaster(h);
+    await pickRaster();
+    const types = [{ description: "GeoTIFF", accept: { "image/tiff": [".tif", ".tiff"] } }];
+    expect(calls[0]).toEqual({ types, startIn: h });
+    expect(calls[0]!.startIn).toBe(h);
+    expect(calls[1]).toEqual({ types });
+    expect("startIn" in calls[1]!).toBe(false);
+    expect(calls.some((o) => "id" in o)).toBe(false);
+  });
+
   it("resolves null when the picker is cancelled (AbortError)", async () => {
     vi.stubGlobal("showOpenFilePicker", () => Promise.reject(new DOMException("The user aborted a request.", "AbortError")));
     expect(await pickRaster()).toBeNull();
