@@ -4,7 +4,6 @@ import { uint8Tiff } from "../unit/helpers/tiffFixtures";
 import type { Affine, Grid } from "../../src/core/types";
 
 export type LngLat = [number, number];
-export type Ring = LngLat[];
 export type Xy = { x: number; y: number };
 
 /** Fixture GeoTIFF as a Playwright upload payload. */
@@ -131,22 +130,10 @@ export async function clickAt(page: Page, p: Xy): Promise<void> {
   await page.waitForTimeout(80);
 }
 
-export async function dragFromTo(page: Page, a: Xy, b: Xy): Promise<void> {
-  await page.mouse.move(a.x, a.y);
-  await page.mouse.down();
-  for (let i = 1; i <= 10; i++) await page.mouse.move(a.x + ((b.x - a.x) * i) / 10, a.y + ((b.y - a.y) * i) / 10);
-  await page.mouse.up();
-  await page.waitForTimeout(80);
-}
-
-/** Longitude difference reduced to (-180, 180]. */
-export const lonDiff = (a: number, b: number) => { const d = (((a - b) % 360) + 540) % 360 - 180; return d === -180 ? 180 : d; };
-
 export const message = (page: Page) => page.locator("#message");
 
 export const lerp = (a: Xy, b: Xy, t: number): Xy => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
 
-export const dragPanEnabled = (page: Page) => page.evaluate(() => (window as any).__geoapp.map.dragPan.isEnabled() as boolean);
 
 /** Uncaught page errors, collected from now on. */
 export function collectErrors(page: Page): string[] {

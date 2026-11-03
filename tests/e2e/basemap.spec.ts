@@ -114,30 +114,3 @@ test("privacy: one request for the basemap, under assets/, the same in two sessi
   }
   expect(urls[0]).toBe(urls[1]);
 });
-
-test("not hideable: no control names it, and it stays visible, opaque and second through a session (criterion 6)", async ({ page }) => {
-  await openApp(page);
-  const named = await page.evaluate(() => [...document.querySelectorAll("button, input, select, label, a, [role], [aria-label], [title]")]
-    .map((el) => [el.id, el.textContent, el.getAttribute("aria-label"), el.getAttribute("title"), el.getAttribute("name")].join(" "))
-    .filter((s) => /base\s*-?\s*map/i.test(s)));
-  expect(named).toEqual([]);
-  page.on("dialog", (d) => void d.accept());
-  await openRaster(page, rgbFixture());
-  await expect(message(page)).toHaveText("Raster opened.");
-  await paintMode(page);
-  await jumpTo(page, [15, 45], 9);
-  const a = await toScreen(page, [15.005, 45.005]);
-  await stroke(page, [a, { x: a.x + 40, y: a.y }]);
-  await page.click("#mode-pan");
-  await page.click("#mode-paint");
-  await openRaster(page, rgbFixture());
-  await expect(message(page)).toHaveText("Raster opened.");
-  await paintMode(page);
-  const state = await page.evaluate(() => {
-    const { map } = (window as any).__geoapp;
-    return { vis: map.getLayoutProperty("basemap", "visibility"), opacity: map.getPaintProperty("basemap", "raster-opacity") };
-  });
-  expect(state.vis).not.toBe("none");
-  expect(state.opacity === undefined || state.opacity === 1).toBe(true);
-  expect((await ids(page))[1]).toBe("basemap");
-});

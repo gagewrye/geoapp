@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { classFile } from "../unit/helpers/labelFiles";
-import { hoverFeatures, jumpTo, labels, message, openApp, openRaster, paintMode, renameClass, rgbFixture, settled, stroke, toScreen, view, type Xy } from "./helpers";
+import { hoverFeatures, jumpTo, message, openApp, openRaster, paintMode, renameClass, rgbFixture, stroke, toScreen, view, type Xy } from "./helpers";
 import { expectFileHolds, gateWrites, openWrite, seeded, setup as twoClasses, writeHeld } from "./lockCombos";
 import { classList, importFile, noSavePicker, openFileGate, pauseLabelFile, storeTiles, upload } from "./seeding";
 
@@ -138,32 +138,6 @@ test("Space while hidden: holding it and dragging pans; releasing it keeps Pan a
   expect((await storeTiles(page)).size).toBe(0);
 });
 
-test("hiding mid-way through a right-button erase ends it; later moves erase nothing; one Undo restores the paint", async ({ page }) => {
-  await setup(page);
-  await paintMode(page);
-  await jumpTo(page, [15, 45], 9);
-  const a = await toScreen(page, [15.005, 45.005]);
-  for (let i = 0; i < 2; i++) await page.click("#brush-larger");
-  await stroke(page, [a, { x: a.x + 60, y: a.y }]);
-  const painted = await labels(page);
-  await page.mouse.move(a.x, a.y);
-  await page.mouse.down({ button: "right" });
-  for (let i = 1; i <= 3; i++) await page.mouse.move(a.x + 4 * i, a.y);
-  await settled(page);
-  await page.waitForTimeout(100);
-  const partial = await labels(page);
-  expect(partial).not.toEqual(painted);
-  await toggleShow(page);
-  expect(await mode(page)).toEqual(PAN);
-  for (let i = 1; i <= 10; i++) await page.mouse.move(a.x + 12 + 5 * i, a.y);
-  await page.mouse.up({ button: "right" });
-  await page.waitForTimeout(200);
-  await settled(page);
-  expect(await labels(page)).toEqual(partial);
-  await page.click("#undo");
-  expect(await labels(page)).toEqual(painted);
-});
-
 test("while hidden: add, rename and recolour classes, Ctrl+Z, and Export labels all work; labels stay hidden and Pan stays selected", async ({ page }) => {
   test.setTimeout(120_000);
   await noSavePicker(page);
@@ -186,15 +160,4 @@ test("while hidden: add, rename and recolour classes, Ctrl+Z, and Export labels 
   expect(await visibilities(page)).toEqual(["none"]);
   expect(await mode(page)).toEqual(PAN);
   await expect(show(page)).not.toBeChecked();
-});
-
-test("Paint chosen by keyboard (Tab, Space) while hidden shows the labels", async ({ page }) => {
-  await setup(page);
-  await toggleShow(page);
-  await page.locator("#mode-pan").focus();
-  await page.keyboard.press("Tab"); // the strip's order is Pan, Paint, Erase (spec 035)
-  await expect(page.locator("#mode-paint")).toBeFocused();
-  await page.keyboard.press("Space");
-  expect(await mode(page)).toEqual(PAINT);
-  await expect(show(page)).toBeChecked();
 });

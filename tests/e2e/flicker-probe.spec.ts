@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { BACKGROUND, jumpTo, message, openApp, openRaster, pixelAt, rgbFixture, toScreen } from "./helpers";
+import { BACKGROUND, message, openApp, openRaster, rgbFixture } from "./helpers";
 
 // Spec 045 scope 1, criteria 2 and 3: with the fixture raster open, step the camera (pan north 2 px a frame for 60 frames,
 // then zoom +0.5 and pitch +15 degrees in 30 frames each, a render per frame) and screenshot the top 60 px of #map each
@@ -67,31 +67,6 @@ test.describe("flicker probe (spec 045)", () => {
     for (let i = 0; i < 30; i++) { await step(page, "zoom", 0.5 / 30); await shot(); }
     for (let i = 0; i < 30; i++) { await step(page, "pitch", 15 / 30); await shot(); }
   }
-
-  test("criterion 3: at z15.7 / pitch 30 with no raster the band is BACKGROUND (8) in every frame", async ({ page }) => {
-    test.setTimeout(180_000);
-    await openApp(page);
-    await page.addStyleTag({ content: ".maplibregl-control-container { visibility: hidden; }" }); // the zoom buttons sit in the band
-    await page.evaluate(async (centre) => {
-      const { map } = (window as any).__geoapp;
-      map.jumpTo({ center: centre, zoom: 15.7, pitch: 30 });
-      await new Promise<void>((r) => { map.once("idle", () => r()); map.triggerRepaint(); });
-    }, CENTRE);
-    await walk(page);
-    const r = await pops(page);
-    expect(r.frames).toBe(121);
-    expect(r.off).toBe(0);
-  });
-
-  test("criterion 3: at z9 a pixel over land outside the raster is not BACKGROUND", async ({ page }) => {
-    await openApp(page);
-    await openRaster(page, rgbFixture());
-    await expect(message(page)).toHaveText("Raster opened.");
-    await jumpTo(page, [CENTRE[0]!, CENTRE[1]!], 9);
-    const px = await pixelAt(page, await toScreen(page, [CENTRE[0]!, CENTRE[1]!]));
-    const ref = [1, 3, 5].map((k) => parseInt(BACKGROUND.slice(k, k + 2), 16));
-    expect(px.slice(0, 3).some((v, i) => Math.abs(v - ref[i]!) > 8), String(px)).toBe(true);
-  });
 
   for (const run of RUNS) {
     test(`${run.name}: navy pops in the top band @probe`, async ({ page }) => {

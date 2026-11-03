@@ -4,12 +4,13 @@ import { toLonLat } from "../../src/core/crs";
 import { footprint, pixelAt, strokeCells } from "../../src/core/pixel";
 import { CLASS_GRID, classFile } from "../unit/helpers/labelFiles";
 import {
-  anotherRaster, clickAt, hideBasemap, jumpTo, labels, logRequests, message, openApp, openRaster, paintMode, path, pixelAt as screenPixel, renameClass, RGB_GRID, rgbFixture,
+  anotherRaster, clickAt, hideBasemap, jumpTo, message, openApp, openRaster, paintMode, path, pixelAt as screenPixel, RGB_GRID, rgbFixture,
   selectClass, stroke, tileKeysStored, toLngLat, toScreen, type LngLat, type Xy,
 } from "./helpers";
-import { arrayBuffer, at, classList, download, importFile, maskFile, maskValue, noSavePicker, upload } from "./seeding";
+import { at, classList, effectiveTiles, importFile, labelAt, maskFile, maskValue, tileDiff, upload } from "./seeding";
 
-// Spec 014 criteria 6 (fine-tune), 7 (undo), 9 (round trip), 10 (Replace), 11 (display), 13 (raster open, privacy) and 14 (classes).
+// Spec 014 criteria 6 (fine-tune), 7 (undo), 10 (Replace), 11 (display), 13 (raster open) and 14 (classes). Criterion 9 (round trip):
+// label-roundtrip and unit io/maskExport (spec 052).
 
 const seeded = /^Seeded \d+ pixels in \d+ classes\.$/;
 const undoButton = (page: Page) => page.locator("#undo");
@@ -40,13 +41,13 @@ async function covered(page: Page, pts: Xy[]): Promise<Set<string>> {
   return out;
 }
 
-/** Pixels of the given tiles whose effective label differs from want(c, r). */
-function mismatches(got: Map<string, number>, keys: string[], want: (c: number, r: number) => number): string[] {
+/** Pixels of the given tiles whose effective label (effectiveTiles' bytes) differs from want(c, r). */
+function mismatches(got: Map<string, Uint8Array>, keys: string[], want: (c: number, r: number) => number): string[] {
   const bad: string[] = [];
   for (const key of keys) {
     const [x0, y0] = key.split(",").map(Number) as [number, number];
     for (let r = y0; r < Math.min(y0 + 256, 1000); r++) for (let c = x0; c < Math.min(x0 + 256, 1000); c++) {
-      if ((got.get(`${c},${r}`) ?? 0) !== want(c, r)) bad.push(`${c},${r}`);
+      if (labelAt(got, 1000, c, r) !== want(c, r)) bad.push(`${c},${r}`);
     }
   }
   return bad;
@@ -58,7 +59,7 @@ test("fine-tune: a paint stroke across a base tile corner, a right drag, then tw
   await setup(page);
   await importMask(page);
   expect(await tileKeysStored(page)).toEqual([]);
-  const base = await labels(page);
+  const base = await effectiveTiles(page);
   expect(mismatches(base, ALL, maskValue)).toEqual([]);
 
   await jumpTo(page, at(256, 256), 10);
@@ -68,7 +69,7 @@ test("fine-tune: a paint stroke across a base tile corner, a right drag, then tw
   const painted = await covered(page, paint);
   const corner = ["0,0", "256,0", "0,256", "256,256"];
   expect(await tileKeysStored(page)).toEqual([...corner].sort());
-  const afterPaint = await labels(page);
+  const afterPaint = await effectiveTiles(page);
   expect(mismatches(afterPaint, ALL, (c, r) => (painted.has(`${c},${r}`) ? 2 : maskValue(c, r)))).toEqual([]);
 
   // erase class 1 over a part of the mask no stroke has touched
@@ -79,7 +80,7 @@ test("fine-tune: a paint stroke across a base tile corner, a right drag, then tw
   const erased = await covered(page, erase);
   expect([...erased].some((k) => { const [c, r] = k.split(",").map(Number) as [number, number]; return maskValue(c, r) === 1; })).toBe(true);
   expect(await tileKeysStored(page)).toEqual([...corner, "512,512"].sort());
-  const afterErase = await labels(page);
+  const afterErase = await effectiveTiles(page);
   expect(mismatches(afterErase, ALL, (c, r) => {
     const v = painted.has(`${c},${r}`) ? 2 : maskValue(c, r);
     return erased.has(`${c},${r}`) && v === 1 ? 0 : v;
@@ -88,46 +89,9 @@ test("fine-tune: a paint stroke across a base tile corner, a right drag, then tw
   // criterion 7
   await undoButton(page).click();
   await undoButton(page).click();
-  expect(mismatches(await labels(page), ALL, maskValue)).toEqual([]);
+  expect(mismatches(await effectiveTiles(page), ALL, maskValue)).toEqual([]);
   expect(await tileKeysStored(page)).toEqual([]);
   await expect(undoButton(page)).toBeDisabled();
-});
-
-test("export, reopen and import the export with Replace restores every tile and the class list; no network requests (criteria 9 and 13)", async ({ page }) => {
-  test.setTimeout(180_000);
-  await noSavePicker(page);
-  await setup(page);
-  const requests = logRequests(page);
-  await importMask(page);
-  await jumpTo(page, at(400, 400), 10);
-  await selectClass(page, 2);
-  await stroke(page, path(await toScreen(page, at(380.5, 400.5)), await toScreen(page, at(420.5, 410.5)), 8));
-  await selectClass(page, 0);
-  await stroke(page, path(await toScreen(page, at(380.5, 420.5)), await toScreen(page, at(420.5, 420.5)), 8), "right");
-  await renameClass(page, 0, "Mangrove & <salt>");
-  await page.locator("#classes .class-colour").nth(1).fill("#12ab34");
-  const before = await labels(page);
-  const list = await classList(page);
-  expect(list.map((c) => c.name)).toEqual(["Mangrove & <salt>", "Class 2", "Class 3"]);
-  const file = await download(page, "#export-labels");
-  await expect(message(page)).toHaveText("Labels exported.");
-  await page.waitForTimeout(300);
-  expect(requests.map((r) => r.url())).toEqual([]);
-
-  page.once("dialog", (d) => { expect(d.message()).toBe("Close these labels? They stay saved in this browser."); void d.accept(); });
-  await openRaster(page, { ...rgbFixture(), name: "again.tif" });
-  await expect(message(page)).toHaveText("Raster opened.");
-  await paintMode(page);
-  // criterion 13: no labels and no mask layer
-  expect(await page.evaluate(() => (window as any).__geoapp.map.getLayer("mask"))).toBeUndefined();
-  expect((await labels(page)).size).toBe(0);
-  page.on("dialog", (d) => { throw new Error(`unexpected dialog ${d.message()}`); });
-  await importFile(page, upload("labels.tif", arrayBuffer(file)));
-  await expect(message(page)).toHaveText(seeded);
-  const back = await labels(page);
-  expect(back.size).toBe(before.size);
-  expect([...before].filter(([k, v]) => back.get(k) !== v)).toEqual([]);
-  expect(await classList(page)).toEqual(list);
 });
 
 test("opening another raster after an import (OK on the confirm) leaves no labels and no mask layer (criterion 13)", async ({ page }) => {
@@ -149,20 +113,20 @@ test("with only a mask loaded an import asks to replace: Cancel keeps the mask a
   await setup(page);
   await importMask(page, false);
   expect(await tileKeysStored(page)).toEqual([]);
-  const before = { labels: await labels(page), list: await classList(page) };
+  const before = { labels: await effectiveTiles(page), list: await classList(page) };
   const asked: string[] = [];
   page.once("dialog", (d) => { asked.push(d.message()); void d.dismiss(); });
   await importFile(page, upload("classes.tif", classFile("255")));
   await expect.poll(() => asked).toEqual(["Replace labels?"]);
   await page.waitForTimeout(300);
-  expect(await labels(page)).toEqual(before.labels);
+  expect(tileDiff(await effectiveTiles(page), before.labels)).toEqual([]);
   expect(await classList(page)).toEqual(before.list);
   page.once("dialog", (d) => { asked.push(d.message()); void d.accept(); });
   await importFile(page, upload("classes.tif", classFile("255")));
   await expect(message(page)).toHaveText(seeded);
   expect(asked).toEqual(["Replace labels?", "Replace labels?"]);
   expect((await classList(page)).map((c) => c.name)).toEqual(["Class 0", "Class 3", "Class 7"]);
-  expect(await labels(page)).not.toEqual(before.labels);
+  expect(tileDiff(await effectiveTiles(page), before.labels)).not.toEqual([]);
   expect(await tileKeysStored(page)).toEqual([]);
   await expect(page.locator("#mode-pan")).toHaveAttribute("aria-pressed", "true");
 });

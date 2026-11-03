@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { jumpTo, labels, message, moveTo, openRaster, paintMode, rgbFixture, tiff, toScreen } from "./helpers";
+import { jumpTo, message, moveTo, openRaster, paintMode, rgbFixture, tiff, toScreen } from "./helpers";
 
 // Helpers for brush-handler-matrix.tester.spec.ts: MapLibre handler flags and the gestures they gate.
 
@@ -72,4 +72,3 @@ export async function openOther(page: Page): Promise<void> {
   await jumpTo(page, CENTRE, 7);
 }
 export const blurFocus = (page: Page) => page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-export const anyLabels = async (page: Page) => (await labels(page)).size > 0;

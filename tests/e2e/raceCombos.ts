@@ -3,7 +3,7 @@ import { jumpTo, message, openRaster, paintMode, rgbFixture, selectClass, stroke
 
 // Helpers for race-opens.tester.spec.ts: overlapping raster opens, held at the file read.
 
-export const W_A: [number, number] = [13.005, 45.005], E_B: [number, number] = [17.005, 44.505];
+const W_A: [number, number] = [13.005, 45.005], E_B: [number, number] = [17.005, 44.505];
 export const info = (page: Page) => page.locator("#raster-info");
 
 /** Two short strokes at zoom 6: `first` at 13E, `second` at 17E. */

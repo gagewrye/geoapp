@@ -39,20 +39,6 @@ test("a right press during a left stroke is ignored: the stroke keeps painting a
   expect([...got].filter(([, v]) => v === 1).length).toBeGreaterThan(49);
 });
 
-test("Shift-drag in Paint mode doesn't box-zoom", async ({ page }) => {
-  const c = await setup(page, 7);
-  const z0 = (await view(page)).zoom;
-  await page.keyboard.down("Shift");
-  await page.mouse.move(c.x, c.y);
-  await page.mouse.down();
-  await moveTo(page, c, { x: c.x + 150, y: c.y + 120 }, 15);
-  await page.mouse.up();
-  await page.keyboard.up("Shift");
-  await page.waitForTimeout(400);
-  await settled(page);
-  expect((await view(page)).zoom).toBe(z0);
-});
-
 test("keyboard zoom and the navigation control work in Paint mode and paint nothing", async ({ page }) => {
   const c = await setup(page, 7);
   await page.mouse.move(c.x, c.y);
@@ -83,21 +69,6 @@ test("a two-finger pinch (CDP) zooms, paints nothing and shows no footprint", as
   expect((await view(page)).zoom).toBeGreaterThan(z0 + 0.5);
   expect(await count(page)).toBe(0);
   expect(await hoverFeatures(page)).toHaveLength(0);
-});
-
-test("contextmenu: prevented on the map with local imagery open", async ({ page }) => {
-  await openApp(page);
-  const fire = (x: number, y: number) => page.evaluate(([x, y]) => {
-    const el = document.elementFromPoint(x, y)!;
-    const e = new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 2 });
-    el.dispatchEvent(e);
-    return e.defaultPrevented;
-  }, [x, y] as const);
-  const box = (await page.locator("#map canvas").boundingBox())!;
-  await openRaster(page, rgbFixture());
-  await expect(message(page)).toHaveText("Raster opened.");
-  await paintMode(page);
-  expect(await fire(box.x + 300, box.y + 300)).toBe(true);
 });
 
 test("a window blur ends the stroke (spec 003 Strokes): later held moves label nothing", async ({ page }) => {

@@ -6,6 +6,8 @@
 - the basemap is hidden from `BASEMAP_MAXZOOM` (draft 12) up, to stop a flicker band in pitched views, so "always shown" now means below that zoom;
 - criterion 3's "zoom 12 Mercator" check runs at `BASEMAP_MAXZOOM − 0.1` (z11.9), the end of the globe-to-Mercator morph.
 
+**Amended by spec 052 (2026-11-02):** criterion 6 (not hideable) is dropped with its e2e test: it named the AlphaEarth preview and the area tool, which are gone. Layer order stays in `basemap.spec.ts` (criterion 4) and `label-alignment.spec.ts` (spec 018 criterion 5).
+
 ## Scope
 In: one bundled Web Mercator image as the bottom map layer, always shown; its provenance file; adapting existing pixel tests.
 Out: vector or labelled basemaps, borders, place names; fetched tiles; higher resolutions; anything beyond ±`MAX_LAT` (ADR 0004); any user control to hide, dim or swap it.

@@ -4,6 +4,8 @@
 
 **Status:** Approved (Gage, 2026-10-28). Build after spec 013, which shelves Train and model seeding, so nothing else reads the label store. **ADRs:** 0018 mask base plus sparse edits (Accepted; amends 0010 and 0015). Uses 0002 and 0013. Amended 2026-10-29 by spec 017 (imports always replace, so Merge is gone) and spec 016 (the mask follows Opacity and Show labels, and an import selects Pan); Gage approved both. Amended by spec 047 (2026-11-01): there is no import-time class map, so "use a class map that leaves 0 out" lapses; an untagged file's value 0 is "Class 0", which Apply class map can rename. Amended by spec 048 (2026-11-01): there is no tile cap (ADR 0033), so copy-on-touch's cap bullet lapses and criterion 8 becomes spec 048 criterion 2. Display: the `mask` layer shows every label (the base's values overwritten by each stored tile's) and hides only the pixels of tiles with an overlay, at most 256 stored tiles in view.
 
+**Amended by spec 052 (2026-11-02):** criterion 9 (round trip) loses its `label-mask.spec.ts` test. It is covered by `label-roundtrip.spec.ts` (byte-equal tiles and class list), `label-edit.spec.ts` (no requests) and the unit `io/maskExport` (the export equals the effective tiles).
+
 **Already built (spec 004 Import labels, ADR 0013), unchanged here:**
 - Formats: a single-band 8-bit unsigned GeoTIFF or COG. Anything else gets "Label files must be single-band 8-bit GeoTIFFs."
 - CRS: any ADR 0002 CRS, resampled onto the imagery grid by nearest pixel centre. On an equal grid this is the identity.

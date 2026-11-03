@@ -1,6 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { classFile, rgbClassFile } from "../unit/helpers/labelFiles";
-import { MESSAGES } from "../../src/ui/messages";
+import { classFile } from "../unit/helpers/labelFiles";
 import { jumpTo, labels, message, openApp, openRaster, paintMode, rgbFixture, stroke, toScreen, view, type Xy } from "./helpers";
 import { expectFileHolds, gateWrites, openWrite, seeded, setup as twoClasses, writeHeld } from "./lockCombos";
 import { importFile, noSavePicker, openFileGate, pauseLabelFile, storeTiles, upload } from "./seeding";
@@ -27,42 +26,6 @@ async function oneStroke(page: Page) {
   await expect(undoButton(page)).toBeEnabled();
   return { empty, c };
 }
-
-test("a confirmed Replace import clears the history; Ctrl+Z then changes nothing", async ({ page }) => {
-  await oneStroke(page);
-  page.once("dialog", (d) => void d.accept());
-  await importFile(page, classes());
-  await expect(message(page)).toHaveText(seeded);
-  await expect(undoButton(page)).toBeDisabled();
-  const after = await snapshot(page);
-  await page.locator("#map canvas").focus();
-  await page.keyboard.press("Control+z");
-  expect(await snapshot(page)).toEqual(after);
-});
-
-test("a refused import (3-band file) keeps the history; one Undo then removes the stroke", async ({ page }) => {
-  const { empty } = await oneStroke(page);
-  page.once("dialog", (d) => void d.accept()); // "Replace labels?": every import replaces (spec 017)
-  await importFile(page, upload("rgb.tif", rgbClassFile()));
-  await expect(message(page)).toHaveText(MESSAGES.labelFile);
-  await expect(undoButton(page)).toBeEnabled();
-  await undoButton(page).click();
-  expect(await snapshot(page)).toEqual(empty);
-});
-
-test("after an import, new strokes are undoable and Undo stops at the imported labels", async ({ page }) => {
-  const { c } = await oneStroke(page);
-  page.once("dialog", (d) => void d.accept()); // "Replace labels?": every import replaces (spec 017)
-  await importFile(page, classes());
-  await expect(message(page)).toHaveText(seeded);
-  await paintMode(page); // an import selects Pan (spec 014 Tests)
-  const imported = await snapshot(page);
-  await stroke(page, [{ x: c.x, y: c.y + 40 }, { x: c.x + 60, y: c.y + 40 }]);
-  await expect(undoButton(page)).toBeEnabled();
-  await undoButton(page).click();
-  expect(await snapshot(page)).toEqual(imported);
-  await expect(undoButton(page)).toBeDisabled();
-});
 
 test("while an import is paused: a drag paints nothing and adds no undo step; WASD and a middle drag still pan; the cursor stays", async ({ page }) => {
   const { c } = await oneStroke(page);

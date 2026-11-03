@@ -1,14 +1,13 @@
 import { expect, test, type Page } from "@playwright/test";
-import { editName, jumpTo, message, openApp, openRaster, paintMode, rgbFixture } from "./helpers";
+import { editName, message, openApp, openRaster, paintMode, rgbFixture } from "./helpers";
 
-// Spec 036 criteria 5, 6 and 9.
+// Spec 036 criteria 5 and 6. Criterion 9 (Home in the slider): redo and layout (spec 052).
 async function setup(page: Page) {
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
 }
 const selected = (page: Page) => page.locator("#classes li").evaluateAll((els) => els.findIndex((e) => e.getAttribute("aria-selected") === "true"));
-const bounds = (page: Page) => page.evaluate(() => (window as any).__geoapp.map.getBounds().toArray().flat() as number[]);
 
 test("typing b2e] while renaming goes into the name and changes no mode, class or brush size (criterion 5)", async ({ page }) => {
   await setup(page);
@@ -48,19 +47,4 @@ test("with 40 classes the list is taller than 40vh, and the 9th class selected b
     return li.top >= r.top - 0.5 && li.bottom <= r.bottom + 0.5;
   });
   expect(inList).toBe(true);
-});
-
-test("Home in the opacity slider moves the slider, not the map; on the map it fits the raster (criterion 9)", async ({ page }) => {
-  await setup(page);
-  const fitted = await bounds(page);
-  await jumpTo(page, [40, 10], 9);
-  const away = await bounds(page);
-  await page.locator("#label-opacity").focus();
-  await page.keyboard.press("Home");
-  await expect(page.locator("#label-opacity")).toHaveValue("0");
-  await page.waitForTimeout(100);
-  (await bounds(page)).forEach((v, i) => expect(Math.abs(v - away[i]!)).toBeLessThanOrEqual(1e-6));
-  await page.locator("#map canvas").focus();
-  await page.keyboard.press("Home");
-  await expect.poll(async () => (await bounds(page)).every((v, i) => Math.abs(v - fitted[i]!) <= 1e-6)).toBe(true);
 });

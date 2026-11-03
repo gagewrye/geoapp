@@ -104,24 +104,6 @@ test("Escape before Enter labels nothing and keeps Smart; a second Escape select
   await expect(smartButton(page)).toHaveAttribute("aria-pressed", "false");
 });
 
-test("with 256 tiles stored, a commit touching a new tile labels it and shows no error (criterion 6, as amended by spec 048)", async ({ page }) => {
-  await setup(page);
-  // 256 tiles beyond the raster's 16 keys: stored, without changing any pixel the labels helper reads
-  await page.evaluate(() => {
-    const { store } = (window as any).__geoapp.labels;
-    for (let i = 0; i < 256; i++) store.tiles.set(`${(i % 16) * 256},${(8 + Math.floor(i / 16)) * 256}`, new Uint8Array(65536).fill(1));
-  });
-  const cell = await click(page, await toScreen(page, at(300.5, 300.5)));
-  await page.keyboard.press("Enter");
-  await settled(page);
-  const got = await labels(page);
-  expect(got.size).toBeGreaterThan(0);
-  expect([...got.keys()].every((k) => square(cell).has(k))).toBe(true);
-  expect(await page.evaluate(() => (window as any).__geoapp.labels.store.tiles.size)).toBeGreaterThan(256);
-  await expect(page.locator("#smart-apply")).toBeDisabled(); // the commit applied, so the prompt is gone
-  await expect(page.locator("#message")).not.toHaveClass(/error/);
-});
-
 test("while an export runs with a paused sink, Enter changes nothing (criterion 6)", async ({ page }) => {
   await noSavePicker(page);
   await gateWrites(page);

@@ -1,21 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
-import { message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture, tiff } from "./helpers";
+import { message, openApp, openRaster, tiff } from "./helpers";
 
-test("open and paint with no outside requests (criterion 1)", async ({ page, baseURL }) => {
-  const requests: string[] = [];
-  page.on("request", (r) => requests.push(r.url()));
-  await openApp(page);
-  await openRaster(page, rgbFixture());
-  await expect(message(page)).toHaveText("Raster opened.");
-  await paintMode(page);
-  await paintTwoClasses(page); // spec 003's brush replaces spec 001's polygons
-
-  const outside = requests.filter((u) => !u.startsWith(baseURL!) && !u.startsWith("blob:") && !u.startsWith("data:"));
-  expect(outside).toEqual([]);
-  expect(requests.length).toBeGreaterThan(0);
-});
-
+// Criterion 1 (no outside requests): shelf.spec.ts covers it (spec 052).
 // Criterion 2 (draw polygons and name them) is superseded by spec 003 criteria 10 and 14 (brush-paint, brush-panel).
 
 test.describe("rasters at 180 degrees (criterion 16)", () => {

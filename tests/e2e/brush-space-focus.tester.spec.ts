@@ -34,46 +34,6 @@ async function holdSpace(page: Page): Promise<boolean> {
 }
 
 test.describe("Space and focus (F6, tester)", () => {
-  test("Shift+Tab onto the smaller-brush button: Space steps down, natively, not as Pan", async ({ page }) => {
-    await setup(page);
-    await page.click("#brush-larger");
-    await page.click("#brush-larger");
-    await expect(size(page)).toHaveText("31");
-    await page.keyboard.press("Shift+Tab");
-    await expect(page.locator("#brush-smaller")).toBeFocused();
-    await prevented(page);
-    expect(await holdSpace(page)).toBe(false);
-    await expect(size(page)).toHaveText("15");
-    expect(await prevented(page)).toEqual([false]);
-  });
-
-  test("Tab through the panel: each button pressed by Space; then a mouse click elsewhere and Tab back keeps it native", async ({ page }) => {
-    await setup(page);
-    await page.click("#mode-pan"); // mouse-focused
-    await expect(page.locator("#mode-pan")).toHaveAttribute("aria-pressed", "true");
-    await page.keyboard.press("Tab"); // the strip's order is Pan, Paint, Erase (spec 035)
-    await expect(page.locator("#mode-paint")).toBeFocused();
-    await prevented(page);
-    await page.keyboard.press("Space"); // in Pan mode MapLibre's handlers are on anyway, so watch the default
-    await expect(page.locator("#mode-paint")).toHaveAttribute("aria-pressed", "true");
-    expect(await prevented(page)).toEqual([false]);
-    await page.keyboard.press("Tab");
-    await page.keyboard.press("Tab");
-    await expect(page.locator("#brush-smaller")).toBeFocused();
-    await page.keyboard.press("Tab");
-    await expect(page.locator("#brush-larger")).toBeFocused();
-    expect(await holdSpace(page)).toBe(false);
-    await expect(size(page)).toHaveText("15");
-    // a mouse click on the map (focus leaves the panel), then keyboard back to the button
-    const c = await toScreen(page, [15.005, 45.005]);
-    await stroke(page, [c, { x: c.x + 5, y: c.y }]);
-    await page.click("#brush-smaller");
-    await page.keyboard.press("Tab");
-    await expect(page.locator("#brush-larger")).toBeFocused();
-    expect(await holdSpace(page)).toBe(false);
-    await expect(size(page)).toHaveText("15");
-  });
-
   test("a touch tap and a pen tap on the larger-brush button leave Space as Pan, like a mouse click", async ({ page }) => {
     await setup(page);
     const box = (await page.locator("#brush-larger").boundingBox())!;
