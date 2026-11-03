@@ -1,12 +1,8 @@
 # 052: Prune and shrink the e2e suite
 
-**Status:** Draft, for Gage (it removes e2e coverage that specs 012-050 named). **ADRs:** none (no dependency, no architecture change). **Baseline (2026-11-02, 12 workers):** 361 tests, 3,335 test-seconds, 5.1 min wall. The wall time is throughput-bound (3,335 / 12 = 278 s), so test-seconds are what to cut.
+**Status:** Approved (Gage, 2026-11-02: "approved, and yes check the brush-scope flake"). All amended criteria are accepted; none are kept. The brush-scope check: the tester ran `brush-scope.tester.spec.ts:38` 4 times (once in the full suite, then 3 with `--repeat-each`), and all 4 passed, so the test stays. It may still be fragile under load: it sets its read gate after a fixed `waitForTimeout(1000)`, then asserts `__gate.reads` is exactly 1, so a late imagery read could fail it. A fix would be a follow-up, outside this spec. **ADRs:** none (no dependency, no architecture change). **Baseline (2026-11-02, 12 workers):** 361 tests, 3,335 test-seconds, 5.1 min wall. The wall time is throughput-bound (3,335 / 12 = 278 s), so test-seconds are what to cut.
 
 **Goal:** `npm run e2e` runs in about 3 minutes, and no core flow loses its last e2e test.
-
-## Open questions for Gage
-1. **Amended criteria.** Criteria below lose their e2e test or shrink. Each one is either covered by the test or unit test named, or gone with its feature. Accept all of them, or name the ones to keep.
-2. **`brush-scope.tester.spec.ts:38`** failed once in the baseline run. This spec keeps it. Should the tester check whether it is flaky (3 runs) as part of this change?
 
 ## Delete (60 tests). R = redundant, N = no longer necessary, S = slow, low importance
 | File: test (line) | | Why, and what still covers it |
