@@ -40,6 +40,12 @@ export const MESSAGES = {
   // spec 046
   noWebGpu: "Smart select needs WebGPU.",
   smartDownload: "Smart select downloads an 80 MB model once. Download it?",
+  // spec 054
+  filled: (px: number) => `Filled ${px.toLocaleString("en-US")} px.`,
+  fillClipped: (px: number) => `Filled ${px.toLocaleString("en-US")} px, out to one fill's reach (about 1000 px from the click). If part is left, click it to go on.`,
+  fillSame: "This area already has the selected class.",
+  fillNodata: "There is no imagery to label here.",
+  polygonTooLarge: "A polygon can span 2048 px at most. Fill this one first, or zoom in.",
 } as const;
 
 /** The first skip, and how many more: "[0].value has no class in these labels (+2 more)." (spec 047). */

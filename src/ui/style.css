@@ -84,4 +84,5 @@ body.collapsed #tools, body.collapsed #side { display: none; }
 /* !important beats MapLibre's canvas cursor rules; the middle pan comes last so it wins (specs 009, 010) */
 #map .maplibregl-canvas-container.brush-cursor .maplibregl-canvas { cursor: var(--brush-cursor) !important; }
 #map .maplibregl-canvas-container.locked-cursor .maplibregl-canvas { cursor: not-allowed !important; }
+#map .maplibregl-canvas-container.click-cursor .maplibregl-canvas { cursor: crosshair !important; }
 #map .maplibregl-canvas-container.middle-pan .maplibregl-canvas { cursor: grabbing !important; }

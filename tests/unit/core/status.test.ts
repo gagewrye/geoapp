@@ -14,6 +14,10 @@ describe("status formats", () => {
     expect(formatTool("erase", "Water", 7)).toBe("Erase · Water · 7 px"); // spec 033 scope 6
     expect(formatTool("smart", "Water", 7)).toBe("Smart · Water"); // spec 046 scope 8: no brush
     expect(formatTool("smart", "Water", 7, true)).toBe("Smart · Water · reading…");
+    // spec 054 criterion 9: no brush either
+    expect(formatTool("fill", "Water", 7)).toBe("Fill · Water");
+    expect(formatTool("fill", "Water", 7, true)).toBe("Fill · Water · reading…");
+    expect(formatTool("polygon", "Water", 7)).toBe("Polygon · Water");
   });
 
   it("the pixel only on the raster, and the zoom to one decimal", () => {

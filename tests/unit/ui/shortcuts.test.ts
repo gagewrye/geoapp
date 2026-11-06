@@ -29,6 +29,13 @@ describe("SHORTCUTS and KEYMAP", () => {
     expect(entry("Include / exclude a point")).toEqual(["Click", "Shift+click"]);
     expect(entry("Discard the selection")).toEqual(["Escape", "Right click"]);
     expect(keyLabel("Shift+click")).toBe("Shift+click");
+    // spec 054 criterion 9
+    expect(entry("Fill")).toEqual(["f"]);
+    expect(entry("Polygon")).toEqual(["l"]);
+    expect(entry("Fill the polygon")).toEqual(["Enter", "Double click"]);
+    expect(entry("Remove the last corner")).toEqual(["Backspace", "Right click"]);
+    expect(entry("Discard the polygon")).toEqual(["Escape"]);
+    expect(isSingleKey("Double click")).toBe(false);
     expect(isSingleKey("Click")).toBe(false);
     expect([...new Set(SHORTCUTS.map((s) => s.section))]).toEqual(["Tools", "Brush", "Classes", "View", "Navigation", "Edit"]);
     expect(SHORTCUTS.length).toBeGreaterThanOrEqual(19);
@@ -48,13 +55,13 @@ describe("buttons named by SHORTCUTS", () => {
     const doc = new FakeDocument();
     const els = new Map<string, FakeElement>(ids.map((id) => [id, doc.createElement("button")]));
     labelButtons((id) => (els.get(id) ?? null) as unknown as HTMLElement | null);
-    expect(els.get("mode-paint")!.title).toBe("Paint (B)");
+    expect(els.get("mode-paint")!.title.split("\n")[0]).toBe("Paint (B)");
     expect(els.get("mode-paint")!.getAttribute("aria-keyshortcuts")).toBe("B");
     expect(els.get("mode-pan")!.getAttribute("aria-keyshortcuts")).toBe("P Escape");
-    expect(els.get("redo")!.title).toBe("Redo (Ctrl+Shift+Z)");
+    expect(els.get("redo")!.title.split("\n")[0]).toBe("Redo (Ctrl+Shift+Z)");
     expect(els.get("redo")!.getAttribute("aria-keyshortcuts")).toBe("Control+Shift+Z Control+Y");
     for (const id of ids) {
-      expect(els.get(id)!.title, id).toMatch(/ \(.+\)$/);
+      expect(els.get(id)!.title.split("\n")[0], id).toMatch(/ \(.+\)$/);
       expect(els.get(id)!.getAttribute("aria-keyshortcuts"), id).toBeTruthy();
     }
   });

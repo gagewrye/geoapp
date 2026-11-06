@@ -2,7 +2,8 @@ import type { BrushMode, createBrush } from "../map/brush";
 import { deferMode } from "./deferMode";
 import type { initLabelView } from "./labelView";
 
-const MODES: BrushMode[] = ["paint", "erase", "pan", "smart"];
+const MODES: BrushMode[] = ["paint", "erase", "pan", "smart", "fill", "polygon"];
+const PAINTS: BrushMode[] = ["paint", "erase", "fill", "polygon"]; // offered together (specs 019, 054)
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 type Deps = {
@@ -14,7 +15,7 @@ type Deps = {
   smart: () => void;
 };
 
-/** The Pan, Paint, Erase and Smart buttons, mode keys held to a stroke's end, and the peek's brush block (specs 016, 033, 034, 046). */
+/** The Pan, Paint, Erase, Fill, Polygon and Smart buttons, mode keys held to a stroke's end, and the peek's brush block (specs 016, 033, 034, 046, 054). */
 export function initModes({ brush, view, toolChanged, smart }: Deps) {
   let mode: BrushMode = "pan";
   let noSmart = false; // no WebGPU: Smart stays off for this page's life
@@ -25,7 +26,7 @@ export function initModes({ brush, view, toolChanged, smart }: Deps) {
     toolChanged();
     for (const b of MODES) $(`mode-${b}`).setAttribute("aria-pressed", String(m === b));
   };
-  // Paint, Erase and Smart never apply to labels you can't see (specs 016, 033, 046): hiding selects Pan, and each shows them first
+  // No tool but Pan applies to labels you can't see (specs 016, 033, 046, 054): hiding selects Pan, and each shows them first
   const choose = (m: BrushMode) => { if (m !== "pan") view.show(); setMode(m); };
   const keyed = deferMode(() => brush.stroking(), choose);
   for (const m of MODES) $(`mode-${m}`).addEventListener("click", () => (m === "smart" ? smart() : choose(m)));
@@ -39,9 +40,9 @@ export function initModes({ brush, view, toolChanged, smart }: Deps) {
     strokeEnded: keyed.strokeEnded,
     /** Drops a queued mode key (a raster opening ends the stroke it waits for: spec 034). */
     clearQueued: keyed.clear,
-    /** Paint, Erase and Smart are offered only once the imagery is drawn (spec 019). */
+    /** Every tool but Pan is offered only once the imagery is drawn (spec 019). */
     ready(on: boolean): void {
-      $<HTMLButtonElement>("mode-paint").disabled = $<HTMLButtonElement>("mode-erase").disabled = !on;
+      for (const m of PAINTS) $<HTMLButtonElement>(`mode-${m}`).disabled = !on;
       smartButton.disabled = !on || noSmart;
     },
     canPaint: () => !$<HTMLButtonElement>("mode-paint").disabled,
