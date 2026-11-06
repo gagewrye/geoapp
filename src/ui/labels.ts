@@ -2,7 +2,7 @@ import type { Map as MapLibreMap } from "maplibre-gl";
 import type { LabelClass } from "../core/classes";
 import { emptyStore, tileWindow, type LabelStore } from "../core/labelStore";
 import { pixelAt } from "../core/pixel";
-import { baseTile, type MaskBase } from "../io/maskBase";
+import { ownTile, type MaskBase } from "../io/maskBase";
 import type { PaintOp } from "../io/paintQueue";
 import type { RasterSource } from "../io/source";
 import { createBrush } from "../map/brush";
@@ -70,9 +70,9 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
   /** The effective tile at key (stored, else the mask's); null when neither exists. Reads the mask file for an unstored key. */
   async function tile(key: string): Promise<Uint8Array | null> {
     const stored = store.tiles.get(key), [x0, y0] = key.split(",").map(Number) as [number, number];
-    return stored || !base || !imagery ? stored?.slice() ?? null : (await baseTile(imagery, base, tileWindow(store, x0, y0))).labels;
+    return stored || !base || !imagery ? stored?.slice() ?? null : ownTile(imagery, base, tileWindow(store, x0, y0), paint.masks()?.get(key));
   }
-  const display = labelDisplay(map, () => store, () => panel.classes().map((c) => c.colour));
+  const display = labelDisplay(map, () => store, () => panel.classes().map((c) => c.colour), tile); // tile: local change, for full-resolution mask overlays
   const redraw = display.redraw;
   // Paint undo and redo (specs 010, 037): one entry per stroke; opening a raster or replacing the store clears it
   const undo = initUndo({

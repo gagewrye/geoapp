@@ -21,3 +21,17 @@ export function overlayKeys(keys: Iterable<string>, box: [number, number, number
   hits.sort((a, b) => a.d - b.d || a.y - b.y || a.x - b.x);
   return hits.slice(0, max).map((h) => h.key);
 }
+
+/**
+ * Local change (not upstream): below this many raster pixels per CSS pixel, the density where spec 020 draws the
+ * imagery at full resolution, unedited mask tiles in view get an overlay too, so an imported mask shows pixel for pixel.
+ */
+export const BASE_OVERLAY_DENSITY = 2;
+
+/** Keys of every tile window meeting box [x0, y0, x1, y1] (raster px, x1/y1 exclusive), row-major. */
+export function boxKeys([x0, y0, x1, y1]: [number, number, number, number]): string[] {
+  const out: string[] = [];
+  for (let y = Math.floor(y0 / TILE_SIZE) * TILE_SIZE; y < y1; y += TILE_SIZE)
+    for (let x = Math.floor(x0 / TILE_SIZE) * TILE_SIZE; x < x1; x += TILE_SIZE) out.push(`${x},${y}`);
+  return out;
+}

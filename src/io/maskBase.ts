@@ -81,6 +81,10 @@ export async function maskedBaseTile(imagery: RasterSource, base: MaskBase, w: W
   return labels;
 }
 
+/** The mask's tile for window w, masked by `valid` (the paint cache's mask, which saves the imagery read) when given. Local change (not upstream). */
+export const ownTile = async (imagery: RasterSource, base: MaskBase, w: Window, valid?: ValidMask): Promise<Uint8Array> =>
+  (valid ? maskedBaseTile(imagery, base, w, valid) : (await baseTile(imagery, base, w)).labels);
+
 /** The labels window w shows: its stored tile, else the mask's tile, else zeros. */
 export async function effectiveTile(imagery: RasterSource, store: LabelStore, base: MaskBase | null, w: Window): Promise<Uint8Array> {
   const stored = store.tiles.get(`${w.x0},${w.y0}`);
