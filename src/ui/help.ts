@@ -1,12 +1,12 @@
 import { actionOf, inTextField } from "./labelKeys";
 import { SHORTCUTS, ariaKey, keyLabel, keysLabel } from "./shortcuts";
 
-/** Gives each button SHORTCUTS names its title and aria-keyshortcuts, such as "Paint (B)" and "B" (spec 039). */
+/** Gives each button SHORTCUTS names its title and aria-keyshortcuts, such as "Paint (B)" and "B" (spec 039), with the hint as a second line (local change). */
 export function labelButtons(byId: (id: string) => HTMLElement | null): void {
   for (const s of SHORTCUTS) {
     const el = s.button ? byId(s.button) : null;
     if (!el) continue;
-    el.title = `${s.action} (${keyLabel(s.keys[0]!)})`;
+    el.title = `${s.action} (${keyLabel(s.keys[0]!)})${s.hint ? `\n${s.hint}` : ""}`;
     el.setAttribute("aria-keyshortcuts", s.keys.map((k) => ariaKey(k)).join(" "));
   }
 }
