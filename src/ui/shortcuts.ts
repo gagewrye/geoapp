@@ -11,7 +11,7 @@ export const IS_MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test
 
 const DIGITS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
-/** Every keyboard and mouse shortcut, by section (specs 003-049). */
+/** Every keyboard and mouse shortcut, by section (specs 003-054). */
 export const SHORTCUTS: readonly Shortcut[] = [
   { id: "paint", section: "Tools", keys: ["b"], action: "Paint", button: "mode-paint" },
   { id: "erase", section: "Tools", keys: ["e"], action: "Erase", button: "mode-erase" },
@@ -21,6 +21,8 @@ export const SHORTCUTS: readonly Shortcut[] = [
   { id: "smart-point", section: "Tools", keys: ["Click", "Shift+click"], action: "Include / exclude a point" },
   { id: "smart-apply", section: "Tools", keys: ["Enter"], action: "Apply smart selection", button: "smart-apply" },
   { id: "smart-discard", section: "Tools", keys: ["Escape", "Right click"], action: "Discard the selection" },
+  { id: "fill", section: "Tools", keys: ["f"], action: "Fill", button: "mode-fill" },
+  { id: "fill-click", section: "Tools", keys: ["Click"], action: "Fill the area under the pointer" },
   { id: "brush-smaller", section: "Brush", keys: ["["], action: "Smaller brush", button: "brush-smaller" },
   { id: "brush-larger", section: "Brush", keys: ["]"], action: "Larger brush", button: "brush-larger" },
   { id: "right-erase", section: "Brush", keys: ["Right drag"], action: "Erase the selected class (Paint mode)" },

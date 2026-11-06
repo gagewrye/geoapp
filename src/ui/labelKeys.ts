@@ -38,14 +38,15 @@ export const KEYMAP: Record<string, string> = {
   Backslash: "collapse", Home: "home", "?": "help",
   KeyW: "move", KeyA: "move", KeyS: "move", KeyD: "move",
   m: "smart", Enter: "smart-apply", // spec 046; Escape discards a smart prompt before it selects Pan
+  f: "fill", // spec 054
 };
 /** The SHORTCUTS id of a key event: by its key first (so letters follow the layout), else by its code. */
 export const actionOf = (e: Pick<KeyboardEvent, "key" | "code">): string | undefined =>
   KEYMAP[e.key.length === 1 ? e.key.toLowerCase() : e.key] ?? KEYMAP[e.code];
 
-const MODES: Record<string, BrushMode> = { paint: "paint", erase: "erase", pan: "pan" };
+const MODES: Record<string, BrushMode> = { paint: "paint", erase: "erase", pan: "pan", fill: "fill" };
 
-/** Labelling shortcuts (specs 003, 009, 033, 034, 046): Space holds Pan, [ ] size, 1-9 class, B E P M Escape mode, H Show labels, ` held peeks, I picks, Enter applies; keys looked up in KEYMAP. */
+/** Labelling shortcuts (specs 003, 009, 033, 034, 046, 054): Space holds Pan, [ ] size, 1-9 class, B E P M F Escape mode, H Show labels, ` held peeks, I picks, Enter applies; keys looked up in KEYMAP. */
 export function initLabelKeys(d: Deps): void {
   // Chromium marks the focused element :focus-visible on any keydown, so how it got focus is read when focus arrives
   let keyFocused = false;

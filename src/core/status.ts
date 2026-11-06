@@ -4,10 +4,10 @@
 export const formatLonLat = (lon: number, lat: number): string =>
   `${Math.abs(lat).toFixed(5)} ${lat < 0 ? "S" : "N"} ${Math.abs(lon).toFixed(5)} ${lon < 0 ? "W" : "E"}`;
 
-const TOOL = { paint: "Paint", erase: "Erase", pan: "Pan", smart: "Smart" } as const;
-/** `Paint · Water · 7 px`, from the brush mode, the selected class's name and the brush side; Smart has no brush, and says when it reads (spec 046). */
+const TOOL = { paint: "Paint", erase: "Erase", pan: "Pan", smart: "Smart", fill: "Fill" } as const;
+/** `Paint · Water · 7 px`, from the brush mode, the selected class's name and the brush side; Smart and Fill have no brush, and say when they read (specs 046, 054). */
 export const formatTool = (mode: keyof typeof TOOL, className: string, side: number, reading = false): string =>
-  mode === "smart" ? `Smart · ${className}${reading ? " · reading…" : ""}` : `${TOOL[mode]} · ${className} · ${side} px`;
+  mode === "smart" || mode === "fill" ? `${TOOL[mode]} · ${className}${reading ? " · reading…" : ""}` : `${TOOL[mode]} · ${className} · ${side} px`;
 
 /** `px col, row` for a pixel on the raster, else blank. */
 export const formatPixel = (dims: { width: number; height: number }, [c, r]: [number, number]): string =>

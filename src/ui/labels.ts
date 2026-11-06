@@ -14,7 +14,7 @@ import { initLabelView } from "./labelView";
 import { initModes } from "./modes";
 import { initPaint } from "./paint";
 import { initPicker } from "./picker";
-import { initSmartTool, type SmartInputs } from "./smartTool";
+import { initClickTools, type SmartInputs } from "./clickTools";
 import { initUndo } from "./undo";
 import type { MessageKind } from "./messages";
 
@@ -36,7 +36,7 @@ type Deps = {
   mapMoving?: () => boolean;
   /** What spec 031 saves: changed tile keys, record edits (classes, selection, view), replaces and stroke ends. */
   edits?: Edits;
-  /** e2e hooks (spec 023): F6 off when false, and each paint op pushed. Smart select's model loader and imagery read (spec 046). */
+  /** e2e hooks (spec 023): F6 off when false, and each paint op pushed. Smart select's model loader and imagery read (spec 046); without them the click tools have no Smart. */
   sweep?: () => boolean;
   op?: (op: PaintOp) => void; smart?: SmartInputs;
 };
@@ -62,8 +62,8 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
   // the Classes section (spec 036)
   const panel = initClassPanel({
     list: $("classes"), add: $<HTMLButtonElement>("class-add"), say, locked: () => locked,
-    recoloured: () => { edits.record(); redraw(store.tiles.keys(), true); brush.refresh(); smart?.redraw(); },
-    selectedChanged: () => { edits.record(); brush.refresh(); smart?.redraw(); toolChanged(); },
+    recoloured: () => { edits.record(); redraw(store.tiles.keys(), true); brush.refresh(); tools.redraw(); },
+    selectedChanged: () => { edits.record(); brush.refresh(); tools.redraw(); toolChanged(); },
     edited: () => { edits.record(); toolChanged(); },
   });
   const picker = initPicker({ tile, dims: () => store, classes: panel.classes, select: panel.select, say }); // Alt+click or I (spec 038)
@@ -77,7 +77,7 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
   // Paint undo and redo (specs 010, 037): one entry per stroke; opening a raster or replacing the store clears it
   const undo = initUndo({
     button: $<HTMLButtonElement>("undo"), redoButton: $<HTMLButtonElement>("redo"), store: () => store,
-    blocked: () => locked || brush.stroking() || paint.size() > 0, shortcut: () => open && !inTextField(document.activeElement),
+    blocked: () => locked || brush.stroking() || paint.size() > 0 || tools.filling(), shortcut: () => open && !inTextField(document.activeElement),
     undone: (keys) => { keys = [...keys]; edits.tiles(keys); redraw(keys); onChange(); }, // Import and Export follow the store (spec 004)
   });
 
@@ -90,15 +90,15 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
   const brush = createBrush(map, {
     side: () => size.side(), colour: () => panel.classes()[panel.selected()]!.colour, cells: paint.cells, hovered: paint.hovered,
     onStroke: (active) => { undo.stroke(active); if (!active) { edits.strokeEnded(); modes.strokeEnded(); } }, panning, pick: picker.pick,
-    click: (cell, include) => smart?.click(cell, include), discard: () => void smart?.discard() }); // Smart mode's clicks (specs 046, 049)
+    click: (cell, include) => tools.click(cell, include), discard: () => tools.rightClick() }); // Smart and Fill's clicks (specs 046, 049, 054)
 
   const view = initLabelView(map, (visible) => { if (!visible) modes.setMode("pan"); }, () => edits.record()); // hiding labels selects Pan (spec 016)
-  const modes = initModes({ brush, view, toolChanged: () => { if (modes.mode() !== "smart") smart?.discard(); toolChanged(); }, smart: () => void smart?.choose() }); // leaving Smart drops its prompt
-  const smart = smartDeps && initSmartTool({ map, store: () => store, undo, push: paint.push, panel, locked: () => locked, say, modes, toolChanged, edits, ...smartDeps });
+  const modes = initModes({ brush, view, toolChanged: () => { tools.modeChanged(); toolChanged(); }, smart: () => tools.chooseSmart() }); // a tool that is left drops what it had pending
+  const tools = initClickTools({ map, store: () => store, imagery: () => imagery, base: () => base, masks: paint.masks, undo, push: paint.push, panel, locked: () => locked, say, modes, toolChanged, edits, smart: smartDeps, onBusy, pending: () => paint.size() > 0 });
   const size = initBrushSize(() => { brush.refresh(); toolChanged(); });
   initLabelKeys({
     open: () => open, brush, size, select: panel.select, classCount: () => panel.classes().length, pick: () => picker.pick(brush.hoverCell()),
-    setMode: modes.request, canPaint: modes.canPaint, stroking: brush.stroking, view: { toggle: view.toggle, peek: modes.peek }, smart: smart?.keys,
+    setMode: modes.request, canPaint: modes.canPaint, stroking: brush.stroking, view: { toggle: view.toggle, peek: modes.peek }, ...tools.keys,
   });
 
   /** While seeding or exporting labels ("run") or a restore offer settles: the brush, the class list's edits and Undo are off; selecting still works. */
@@ -130,7 +130,7 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
       view.reset();
       display.open(grid);
       open = true;
-      brush.setImagery(grid); smart?.open(grid);
+      brush.setImagery(grid); tools.open(grid);
       modes.setMode("pan");
       modes.ready(false); // until main draws its preview (spec 019)
       onChange();
@@ -158,7 +158,7 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
     },
     selected: panel.selected,
     /** The status bar's tool: mode, selected class name and brush side. */
-    tool: () => ({ mode: modes.mode(), className: panel.classes()[panel.selected()]?.name ?? "", side: size.side(), reading: smart?.reading() ?? false }),
+    tool: () => ({ mode: modes.mode(), className: panel.classes()[panel.selected()]?.name ?? "", side: size.side(), reading: tools.reading() }),
     view: () => view.get(),
     /** Takes the labels off the map for an import (spec 021); the store, classes, base and history stay as they are. */
     hold(): Held { display.hide(); return { store, base }; },
@@ -190,8 +190,8 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
     stroking: brush.stroking,
     /** True when a tile is stored or a mask with labelled pixels is loaded. */
     hasLabels: () => store.tiles.size > 0 || (base?.count ?? 0) > 0,
-    /** Pointer moves are waiting for valid masks. */
-    busy: () => paint.size() > 0,
+    /** Pointer moves are waiting for valid masks, or a fill is being read. */
+    busy: () => paint.size() > 0 || tools.filling(),
     store: () => store,
     classes: panel.classes, setClasses: panel.setClasses,
   };

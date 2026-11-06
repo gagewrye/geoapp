@@ -29,6 +29,9 @@ describe("SHORTCUTS and KEYMAP", () => {
     expect(entry("Include / exclude a point")).toEqual(["Click", "Shift+click"]);
     expect(entry("Discard the selection")).toEqual(["Escape", "Right click"]);
     expect(keyLabel("Shift+click")).toBe("Shift+click");
+    // spec 054 criterion 8
+    expect(entry("Fill")).toEqual(["f"]);
+    expect(entry("Fill the area under the pointer")).toEqual(["Click"]);
     expect(isSingleKey("Click")).toBe(false);
     expect([...new Set(SHORTCUTS.map((s) => s.section))]).toEqual(["Tools", "Brush", "Classes", "View", "Navigation", "Edit"]);
     expect(SHORTCUTS.length).toBeGreaterThanOrEqual(19);
