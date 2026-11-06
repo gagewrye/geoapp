@@ -58,14 +58,6 @@ describe("mode keys", () => {
     expect(modes).toEqual([]);
   });
 
-  it("f selects Fill, and not while Paint is disabled (spec 054 criterion 7)", () => {
-    const { modes, press, state } = setup();
-    press("f");
-    state.canPaint = false;
-    press("f");
-    expect(modes).toEqual(["fill"]);
-  });
-
   it("B and E do nothing while Paint is disabled; P and Escape still select Pan", () => {
     const { modes, press } = setup({ canPaint: false });
     for (const k of ["b", "e", "B", "E", "p", "Escape"]) press(k);

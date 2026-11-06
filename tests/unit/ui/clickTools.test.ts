@@ -10,8 +10,9 @@ import { UndoHistory } from "../../../src/io/undoHistory";
 import type { BrushMode } from "../../../src/map/brush";
 import { initClickTools } from "../../../src/ui/clickTools";
 
-// Spec 054 scope 2's wiring: which tool a click reaches, and what leaving a tool or opening a raster drops.
+// Spec 054 scope 2 and 3's wiring: which tool a click reaches, and what leaving a tool or opening a raster drops.
 const { read } = vi.hoisted(() => ({ read: { gate: null as null | (() => void), calls: 0 } }));
+vi.mock("../../../src/map/polygonLayer", () => ({ polygonLayer: () => ({ open() {}, show() {}, near: (a: number[], b: number[]) => Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!) <= 3 }) }));
 vi.mock("../../../src/io/fill", async (original) => ({
   ...(await original<typeof import("../../../src/io/fill")>()),
   // every tile unlabelled and valid; each read waits for read.gate
@@ -34,19 +35,23 @@ function setup() {
   const settle = () => new Promise((r) => setTimeout(r, 0));
   return { tools, ops, log, state, to, settle };
 }
+const TRI: [number, number][] = [[10, 10], [60, 10], [30, 50]];
 
 describe("the click tools", () => {
-  it("a click goes to the selected tool only: none in Pan, Paint or Smart (without a model), a fill in Fill", async () => {
+  it("a click goes to the selected tool only: none in Pan or Paint, a fill in Fill, a corner in Polygon", async () => {
     const t = setup();
     for (const m of ["pan", "paint", "smart"] as BrushMode[]) { t.to(m); t.tools.click([5, 5], true); }
     expect([read.calls, t.tools.filling()]).toEqual([0, false]);
+    t.to("polygon");
+    for (const p of TRI) t.tools.click(p, true);
+    expect(read.calls).toBe(0);
+    expect(t.tools.keys.polygon.apply()).toBe(true);
+    expect(t.ops).toHaveLength(1);
+    expect(t.log.slice(-2)).toEqual(["undo.sync", "saved"]); // one ended stroke: Undo's buttons and the autosave follow
+    t.ops[0]!.done!("ok");
     t.to("fill");
     t.tools.click([5, 5], false); // Shift means nothing to Fill
     expect([read.calls, t.tools.filling(), t.tools.reading()]).toEqual([1, true, true]);
-    read.gate!();
-    await t.settle();
-    expect(t.ops).toHaveLength(1);
-    expect(t.log.slice(-2)).toEqual(["undo.sync", "saved"]); // one ended stroke: Undo's buttons and the autosave follow
   });
 
   it("while a fill is read Undo, Import and Export are told to wait, and again once it lands", async () => {
@@ -90,14 +95,29 @@ describe("the click tools", () => {
     expect([read.calls, t.tools.filling()]).toEqual([0, false]);
   });
 
-  it("the status reads only for the selected tool: a fill landing after Fill was left doesn't mark Pan as reading", async () => {
+  it("a right click steps a polygon back; leaving Polygon or opening a raster discards its outline", () => {
+    const t = setup();
+    t.to("polygon");
+    for (const p of TRI) t.tools.click(p, true);
+    t.tools.rightClick();
+    expect(t.tools.keys.polygon.apply()).toBe(false); // 2 corners left
+    t.tools.click(TRI[2]!, true);
+    t.to("paint");
+    t.to("polygon");
+    expect(t.tools.keys.polygon.discard()).toBe(false); // nothing left to discard
+    for (const p of TRI) t.tools.click(p, true);
+    t.tools.open({ width: 200, height: 200, epsg: 4326, gt: [0, 1, 0, 0, 0, -1] });
+    expect(t.tools.keys.polygon.back()).toBe(false);
+  });
+
+  it("the status reads only for the selected tool: a fill landing after Fill was left doesn't mark Polygon as reading", async () => {
     const t = setup();
     t.to("fill");
     t.tools.click([5, 5], true);
     read.gate!();
     await t.settle();
     expect(t.tools.reading()).toBe(true);
-    t.state.mode = "pan"; // the mode as the status bar reads it, before modeChanged
+    t.state.mode = "polygon"; // the mode as the status bar reads it, before modeChanged
     expect(t.tools.reading()).toBe(false);
   });
 });

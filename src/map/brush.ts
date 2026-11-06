@@ -5,7 +5,7 @@ import type { Grid } from "../core/types";
 import { brushCursor } from "./cursor";
 import { showHover } from "./hover";
 
-export type BrushMode = "paint" | "erase" | "pan" | "smart" | "fill";
+export type BrushMode = "paint" | "erase" | "pan" | "smart" | "fill" | "polygon";
 type Deps = {
   side: () => number;
   colour: () => string;
@@ -19,9 +19,9 @@ type Deps = {
   panning: () => boolean;
   /** An Alt+left press on a raster cell, in any mode: pick its class instead of painting or panning (spec 038). */
   pick?: (cell: [number, number]) => void;
-  /** Smart and Fill modes (specs 046, 049, 054): a left (include) or Shift+left (exclude) click on a raster cell, pressed and released within 4 px. */
+  /** Smart, Fill and Polygon modes (specs 046, 049, 054): a left (include) or Shift+left (exclude) click on a raster cell, pressed and released within 4 px. */
   click?: (cell: [number, number], include: boolean) => void;
-  /** The same modes: a right click anywhere on the map canvas (spec 049: discards the selection). */
+  /** The same modes: a right click anywhere on the map canvas (spec 049 discards the selection; spec 054 steps a polygon back). */
   discard?: () => void;
 };
 type Stroke = { pointerId: number; erase: boolean; prev: [number, number] | null };
@@ -37,13 +37,13 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
   let space = false;
   let stroke: Stroke | null = null;
   let locked = false; // while seeding (spec 004): no strokes and no footprint; Paint mode's handlers stay
-  let blocked = false; // while peeking (spec 034): no stroke or fill starts, and the cursor shows locked; the footprint stays
+  let blocked = false; // while peeking (spec 034): no stroke, fill or polygon corner starts, and the cursor shows locked; the footprint stays
   let lastType = "mouse";
   let pointer: { x: number; y: number; target: EventTarget | null } | null = null; // last mouse or pen position
   let press: { pointerId: number; button: number; shift: boolean; x: number; y: number } | null = null; // a click in progress
   const painting = () => grid !== null && (mode === "paint" || mode === "erase") && !space; // Paint or Erase (spec 033)
-  const clicking = () => grid !== null && (mode === "smart" || mode === "fill") && !space; // these take clicks, and drags pan
-  const filling = () => clicking() && mode === "fill"; // spec 054: a crosshair, and a double click fills once instead of zooming
+  const clicking = () => grid !== null && (mode === "smart" || mode === "fill" || mode === "polygon") && !space; // these take clicks, and drags pan
+  const shaping = () => clicking() && mode !== "smart"; // Fill or Polygon (spec 054): a crosshair, and a double click closes a polygon instead of zooming
 
   // The brush cursor (spec 010) is a class plus a variable, which style.css applies to the canvas over MapLibre's cursors.
   // Locked, a left drag neither paints nor pans, so neither the brush nor MapLibre's grab would be true.
@@ -51,7 +51,7 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
   const syncCursor = () => {
     container.classList.toggle("brush-cursor", painting() && !locked && !blocked);
     container.classList.toggle("locked-cursor", painting() && (locked || blocked));
-    container.classList.toggle("click-cursor", filling());
+    container.classList.toggle("click-cursor", shaping());
     const c = brushCursor(deps.colour());
     if (c !== cursor) container.style.setProperty("--brush-cursor", cursor = c);
   };
@@ -60,7 +60,7 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
   const handlers = [map.dragRotate, map.doubleClickZoom, map.boxZoom];
   let owned: typeof handlers = [];
   const syncHandlers = () => {
-    const off = painting() ? handlers : filling() ? [map.doubleClickZoom] : [];
+    const off = painting() ? handlers : shaping() ? [map.doubleClickZoom] : [];
     for (const h of owned) if (!off.includes(h)) h.enable();
     for (const h of off) h.disable();
     owned = off;
@@ -118,7 +118,7 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
     lastType = e.pointerType;
     if (e.pointerType === "touch") { pointer = null; hover(); return; }
     if (!stroke && !deps.panning() && picks(e)) { deps.pick!(rasterCell(e.clientX, e.clientY, e.target)!); return; }
-    if (clicking() && !(blocked && filling()) && !e.altKey && (e.button === 0 || e.button === 2)) press = { pointerId: e.pointerId, button: e.button, shift: e.shiftKey, x: e.clientX, y: e.clientY };
+    if (clicking() && !(blocked && shaping()) && !e.altKey && (e.button === 0 || e.button === 2)) press = { pointerId: e.pointerId, button: e.button, shift: e.shiftKey, x: e.clientX, y: e.clientY };
     if (!painting() || stroke || deps.panning() || (e.button !== 0 && e.button !== 2)) return;
     if (locked || blocked) return;
     stroke = { pointerId: e.pointerId, erase: mode === "erase" || e.button === 2, prev: null };

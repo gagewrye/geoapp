@@ -2,8 +2,8 @@ import type { BrushMode, createBrush } from "../map/brush";
 import { deferMode } from "./deferMode";
 import type { initLabelView } from "./labelView";
 
-const MODES: BrushMode[] = ["paint", "erase", "pan", "smart", "fill"];
-const PAINTS: BrushMode[] = ["paint", "erase", "fill"]; // offered together (specs 019, 054)
+const MODES: BrushMode[] = ["paint", "erase", "pan", "smart", "fill", "polygon"];
+const PAINTS: BrushMode[] = ["paint", "erase", "fill", "polygon"]; // offered together (specs 019, 054)
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 type Deps = {
@@ -15,7 +15,7 @@ type Deps = {
   smart: () => void;
 };
 
-/** The Pan, Paint, Erase, Fill and Smart buttons, mode keys held to a stroke's end, and the peek's brush block (specs 016, 033, 034, 046, 054). */
+/** The Pan, Paint, Erase, Fill, Polygon and Smart buttons, mode keys held to a stroke's end, and the peek's brush block (specs 016, 033, 034, 046, 054). */
 export function initModes({ brush, view, toolChanged, smart }: Deps) {
   let mode: BrushMode = "pan";
   let noSmart = false; // no WebGPU: Smart stays off for this page's life

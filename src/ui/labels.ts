@@ -90,7 +90,7 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
   const brush = createBrush(map, {
     side: () => size.side(), colour: () => panel.classes()[panel.selected()]!.colour, cells: paint.cells, hovered: paint.hovered,
     onStroke: (active) => { undo.stroke(active); if (!active) { edits.strokeEnded(); modes.strokeEnded(); } }, panning, pick: picker.pick,
-    click: (cell, include) => tools.click(cell, include), discard: () => tools.rightClick() }); // Smart and Fill's clicks (specs 046, 049, 054)
+    click: (cell, include) => tools.click(cell, include), discard: () => tools.rightClick() }); // Smart, Fill and Polygon's clicks (specs 046, 049, 054)
 
   const view = initLabelView(map, (visible) => { if (!visible) modes.setMode("pan"); }, () => edits.record()); // hiding labels selects Pan (spec 016)
   const modes = initModes({ brush, view, toolChanged: () => { tools.modeChanged(); toolChanged(); }, smart: () => tools.chooseSmart() }); // a tool that is left drops what it had pending

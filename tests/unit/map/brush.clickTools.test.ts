@@ -6,7 +6,7 @@ vi.mock("maplibre-gl", () => ({ Point: class { constructor(readonly x: number, r
 vi.mock("../../../src/map/hover", () => ({ showHover: () => {} }));
 afterEach(() => { vi.unstubAllGlobals(); });
 
-// Spec 054 criterion 6: Fill takes clicks as Smart does, and only it turns double-click zoom off.
+// Spec 054 criterion 7: Fill and Polygon take clicks as Smart does, and only they turn double-click zoom off.
 function setup(mode: BrushMode) {
   const { map, pointer } = fakeBrushMap(vi.stubGlobal);
   const off = new Set<string>();
@@ -33,8 +33,8 @@ function setup(mode: BrushMode) {
   return { brush, click, clicks, cells, rights: () => rights, off, classes, shiftStopped };
 }
 
-describe("Fill mode on the brush", () => {
-  for (const mode of ["fill"] as BrushMode[]) {
+describe("Fill and Polygon modes on the brush", () => {
+  for (const mode of ["fill", "polygon"] as BrushMode[]) {
     it(`${mode}: a left click on the raster calls click with its cell, a drag doesn't, and nothing paints`, () => {
       const t = setup(mode);
       t.click(10, 20);
@@ -69,7 +69,7 @@ describe("Fill mode on the brush", () => {
   it("Paint still turns all three off, Smart none, and moving between them leaves only what the new mode turns off", () => {
     const t = setup("paint");
     expect([...t.off].sort()).toEqual(["box", "dblclick", "rotate"]);
-    t.brush.setMode("fill");
+    t.brush.setMode("polygon");
     expect([...t.off]).toEqual(["dblclick"]);
     t.brush.setMode("smart");
     expect([...t.off]).toEqual([]);
@@ -79,8 +79,8 @@ describe("Fill mode on the brush", () => {
     expect([...t.off].sort()).toEqual(["box", "dblclick", "rotate"]);
   });
 
-  it("a peek hides the labels, so Fill takes no click under it; Smart's clicks are as before", () => {
-    for (const mode of ["fill"] as BrushMode[]) {
+  it("a peek hides the labels, so Fill and Polygon take no click under it; Smart's clicks are as before", () => {
+    for (const mode of ["fill", "polygon"] as BrushMode[]) {
       const t = setup(mode);
       t.brush.setBlocked(true);
       t.click(10, 20);

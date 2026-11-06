@@ -29,9 +29,13 @@ describe("SHORTCUTS and KEYMAP", () => {
     expect(entry("Include / exclude a point")).toEqual(["Click", "Shift+click"]);
     expect(entry("Discard the selection")).toEqual(["Escape", "Right click"]);
     expect(keyLabel("Shift+click")).toBe("Shift+click");
-    // spec 054 criterion 8
+    // spec 054 criterion 9
     expect(entry("Fill")).toEqual(["f"]);
-    expect(entry("Fill the area under the pointer")).toEqual(["Click"]);
+    expect(entry("Polygon")).toEqual(["l"]);
+    expect(entry("Fill the polygon")).toEqual(["Enter", "Double click"]);
+    expect(entry("Remove the last corner")).toEqual(["Backspace", "Right click"]);
+    expect(entry("Discard the polygon")).toEqual(["Escape"]);
+    expect(isSingleKey("Double click")).toBe(false);
     expect(isSingleKey("Click")).toBe(false);
     expect([...new Set(SHORTCUTS.map((s) => s.section))]).toEqual(["Tools", "Brush", "Classes", "View", "Navigation", "Edit"]);
     expect(SHORTCUTS.length).toBeGreaterThanOrEqual(19);

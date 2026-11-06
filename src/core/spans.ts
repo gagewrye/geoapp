@@ -18,6 +18,11 @@ export function sweptSpans(cells: [number, number][], side: number, dims: { widt
       list.push([x0, x1]);
     }
   }
+  return mergeRows(rows);
+}
+
+/** Each row's [x0, x1) intervals merged into disjoint spans, sorted by row then x0 (the lists are sorted in place). */
+export function mergeRows(rows: Map<number, [number, number][]>): Span[] {
   const out: Span[] = [];
   for (const row of [...rows.keys()].sort((a, b) => a - b)) {
     const list = rows.get(row)!.sort((a, b) => a[0] - b[0]);
