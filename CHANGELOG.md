@@ -3,6 +3,7 @@
 One entry per merge to main, newest first. Details are in the named spec.
 
 ## 2026-11-11
+- **Spec 055:** Smart select needs no setup step: choosing it downloads the 78 MB model from Hugging Face once (after a confirm) and keeps it in the browser's cache. A wrong or failed download is never cached, and any load failure shows one popup, "Smart select isn't available on this device.", with the cause in the browser console. `npm run fetch-model` is removed.
 - **Spec 057:** `npm run check` passes on main again: the README tests keep only what the shortened README still says, Undo and Redo tooltips are tested for both Mac and other platforms, and e2e undo presses use Cmd on macOS. Tool tooltips show what the button does under its key, with new Paint, Erase, Smart select and Fill texts. E2E was run on the 10 affected files (62 passed); the full suite is to run in CI (spec 060).
 
 ## 2026-11-03
@@ -20,7 +21,7 @@ One entry per merge to main, newest first. Details are in the named spec.
 - **Spec 046 Amendment A:** Smart select no longer shows low-confidence masks that flood the area: it picks the most confident mask among those with stable edges, and logs each mask's scores to the browser console.
 
 ## 2026-10-31
-- **Spec 046:** Smart select (M): click points on the imagery and SAM 2.1 Tiny, running locally on WebGPU, proposes a mask to fill with the selected class; Enter applies it, Escape discards it. Fetch the model once with `npm run fetch-model`.
+- **Spec 046:** Smart select (M): click points on the imagery and SAM 2.1 Tiny, running locally on WebGPU, proposes a mask to fill with the selected class; Enter applies it, Escape discards it. Fetch the model once with `npm run fetch-model` (replaced by spec 055: the model now downloads from Hugging Face on first use).
 - **Spec 045:** The top of a zoomed, tilted map no longer flickers navy: the basemap stops drawing from zoom 12, leaving plain navy ground outside the raster. Holding ? no longer flickers the help list, macOS tooltips say Cmd, and Ctrl+Shift+Z also redoes on macOS.
 
 ## 2026-10-30

@@ -38,8 +38,8 @@ export const MESSAGES = {
   noLabel: "No label here.",
   noClass: (v: number) => `No class for value ${v}.`, // spec 039
   // spec 046
-  noWebGpu: "Smart select needs WebGPU.",
-  smartDownload: "Smart select downloads an 80 MB model once. Download it?",
+  smartUnavailable: "Smart select isn't available on this device.", // spec 055
+  smartDownload: "Smart select downloads an 80 MB model from Hugging Face once. Download it?", // spec 055
   // spec 054
   filled: (px: number) => `Filled ${px.toLocaleString("en-US")} px.`,
   fillClipped: (px: number) => `Filled ${px.toLocaleString("en-US")} px, out to one fill's reach (about 1000 px from the click). If part is left, click it to go on.`,

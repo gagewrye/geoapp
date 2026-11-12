@@ -158,21 +158,23 @@ test("the Smart button, M, Escape, the status bar and the help list (criterion 7
   }
 });
 
-test("without navigator.gpu, M shows the WebGPU message, keeps the mode and requests no model file (criterion 7)", async ({ page }) => {
+test("without navigator.gpu, M shows the unavailable popup, keeps the mode and requests no model file (criterion 7, as amended by spec 055 criterion 8)", async ({ page }) => {
   await page.addInitScript(() => { delete (Navigator.prototype as any).gpu; delete (navigator as any).gpu; });
   const log = logRequests(page);
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
   await unfocus(page);
+  const dialogs: string[] = [];
+  page.on("dialog", (d) => { dialogs.push(`${d.type()}: ${d.message()}`); void d.accept(); }); // an alert blocks the key press until handled
   await page.keyboard.press("m");
-  await expect(message(page)).toHaveText(MESSAGES.noWebGpu);
-  await expect(message(page)).not.toHaveClass(/error/);
+  await expect.poll(() => dialogs).toEqual([`alert: ${MESSAGES.smartUnavailable}`]);
   await expect(page.locator("#mode-pan")).toHaveAttribute("aria-pressed", "true");
   await expect(smartButton(page)).toBeDisabled();
-  await expect(smartButton(page)).toHaveAttribute("title", MESSAGES.noWebGpu);
+  await expect(smartButton(page)).toHaveAttribute("title", MESSAGES.smartUnavailable);
+  await expect(message(page)).not.toHaveClass(/error/);
   await page.waitForTimeout(200);
-  expect(log.map((r) => r.url()).filter((u) => u.includes("models/"))).toEqual([]);
+  expect(log.map((r) => r.url()).filter((u) => u.includes("models/") || new URL(u).hostname.endsWith("huggingface.co"))).toEqual([]);
 });
 
 test("the entry chunk has no onnxruntime, and load through a commit requests only same-origin files (criterion 8)", async ({ page, baseURL }) => {

@@ -37,8 +37,7 @@ npm run check        # lint + typecheck + unit tests (Vitest)
 npx playwright install chromium
 npm run e2e          # builds, serves on :4173, runs Playwright (without the @probe tests)
 npm run e2e:probe    # the slow flicker probe (spec 045)
-npm run fetch-model  # Smart select's weights (78 MB, kept out of git) into public/models/; run it before dev or a deploy
 ```
-Smart select runs SAM 2.1 Hiera Tiny (Meta, Apache-2.0; its licence ships with the weights in `public/models/sam2.1-hiera-tiny/LICENSE`) with onnxruntime-web (Microsoft, MIT). The tests use a fake model.
+Smart select runs SAM 2.1 Hiera Tiny (Meta, Apache-2.0; its licence is in `public/models/sam2.1-hiera-tiny/LICENSE`) with onnxruntime-web (Microsoft, MIT). Its 78 MB of weights come from Hugging Face the first time Smart select is chosen, after a confirm, and stay in the browser's cache (ADR 0035). The tests use a fake model.
 `shelf/` holds shelved code that the app doesn't use and `npm run check` doesn't see (ADR 0017; see `shelf/README.md`).
 Layout and rules: see `CLAUDE.md`. Features are specified in `docs/specs/` and decisions in `docs/adr/`.

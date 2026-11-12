@@ -1,4 +1,4 @@
-import { cachedAll, fetchCached } from "./modelCache";
+import { cachedAll, fetchCached, pruneCache, type ModelFile } from "./modelCache";
 
 /** A decode's masks: n masks of side² logits each over the encoder's SAM_SIDE², and one score per mask. */
 export type Masks = { masks: Float32Array; scores: Float32Array; side: number };
@@ -12,13 +12,15 @@ export interface Segmenter {
   decode(points: Float32Array, labels: Uint8Array): Promise<Masks>;
 }
 
-/** The fp16 files of ADR 0032, which `npm run fetch-model` puts under public/, with their sizes in bytes. */
+/** The fp16 files of ADR 0032, with their sizes in bytes. */
 const FILES = [
   ["vision_encoder_fp16.onnx", 314925], ["vision_encoder_fp16.onnx_data", 67005504],
   ["prompt_encoder_mask_decoder_fp16.onnx", 229799], ["prompt_encoder_mask_decoder_fp16.onnx_data", 10454016],
 ] as const;
-const MODEL_DIR = `${import.meta.env.BASE_URL}models/sam2.1-hiera-tiny/`;
-export const MODEL_URLS = FILES.map(([name]) => MODEL_DIR + name);
+/** ADR 0035: the pinned Hugging Face revision of ADR 0032's sha. */
+const MODEL_DIR = "https://huggingface.co/onnx-community/sam2.1-hiera-tiny-ONNX/resolve/814a066640debee5a91e70aa401fb8e17e030503/onnx/";
+export const MODEL_FILES: ModelFile[] = FILES.map(([name, bytes]) => ({ url: MODEL_DIR + name, bytes }));
+export const MODEL_URLS = MODEL_FILES.map((f) => f.url);
 
 type Gpu = { requestAdapter(): Promise<{ features: { has(f: string): boolean } } | null> };
 
@@ -29,19 +31,20 @@ export async function hasWebGpu(gpu = (globalThis.navigator as { gpu?: Gpu } | u
 }
 
 /** The model files are all in Cache Storage, so a load fetches nothing. */
-export const modelCached = () => cachedAll(MODEL_URLS).catch(() => false);
+export const modelCached = () => cachedAll(MODEL_FILES).catch(() => false);
 
 type Reply = { id: number; ok: true; value: unknown } | { id: number; ok: false; error: string };
 
 /** Downloads (or reads from the cache) the model, then loads it in the ORT worker; progress counts bytes of all four files. */
 export async function loadSegmenter(onProgress: (done: number, total: number) => void, signal: AbortSignal): Promise<Segmenter | "no-webgpu"> {
   // smartLoad's ensure() checked WebGPU before asking to download; the worker checks again where ORT runs
-  const total = FILES.reduce((n, [, bytes]) => n + bytes, 0);
+  const total = MODEL_FILES.reduce((n, f) => n + f.bytes, 0);
+  await pruneCache(MODEL_FILES);
   const files: Uint8Array[] = [];
   let before = 0;
-  for (const [i, url] of MODEL_URLS.entries()) {
-    files.push(await fetchCached(url, (done) => onProgress(Math.min(before + done, total), total), signal));
-    before += FILES[i]![1];
+  for (const f of MODEL_FILES) {
+    files.push(await fetchCached(f, (done) => onProgress(Math.min(before + done, total), total), signal));
+    before += f.bytes;
   }
   signal.throwIfAborted();
   onProgress(total, total);
