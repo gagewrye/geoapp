@@ -11,6 +11,7 @@ const exported = async (page: Page) => {
 const bounds = (page: Page) => page.evaluate(() => (window as any).__geoapp.map.getBounds().toArray().flat() as number[]);
 
 test("3 strokes, 3 undos and 3 redos export the same file as the 3 strokes; Redo is then disabled (criterion 6)", async ({ page }) => {
+  expect(1, "deliberate failure: spec 060 criterion 8 probe, never merge").toBe(2);
   await noSavePicker(page);
   await openApp(page);
   await openRaster(page, rgbFixture());
