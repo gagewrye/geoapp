@@ -268,8 +268,10 @@ export const nextFrames = (page: Page, n: number) => page.evaluate((n) => new Pr
 }), n);
 
 /**
- * Holds keys for at least ms and at least frames animation frames, sampling the start centre's screen position each frame.
+ * Holds keys for at least ms and until at least frames held frames have moved the map, sampling the start centre's screen position each frame.
  * budget is the pan the app's WASD rule allows over the frames that ran while held, so checks hold at any frame rate (spec 060).
+ * Moves are counted, not frames, because a frame can pan nothing (the first one's timestamp often precedes the keydown),
+ * so samples hold at least frames distinct positions however slow the frames are.
  */
 export async function holdKeys(page: Page, keys: string[], opts: { ms: number; frames: number; during?: () => Promise<void> }) {
   await page.evaluate(([speed, maxDt, codes]) => {
@@ -277,7 +279,8 @@ export async function holdKeys(page: Page, keys: string[], opts: { ms: number; f
     const { map } = w.__geoapp;
     const c = map.getCenter();
     const p = map.project(c);
-    const h: any = { start: [p.x, p.y], samples: [] as number[][], budget: 0, frames: 0, down: 0, up: 0, prev: 0, held: new Set<string>(), raf: 0, c };
+    const key = (x: number, y: number) => `${x.toFixed(3)},${y.toFixed(3)}`; // as the tests' distinct() rounds
+    const h: any = { start: [p.x, p.y], samples: [] as number[][], budget: 0, moves: 0, last: key(p.x, p.y), down: 0, up: 0, prev: 0, held: new Set<string>(), raf: 0, c };
     w.__hold = h;
     // listeners and the sampler start before the keydown, so each frame is sampled before the app's own step pans it
     h.onDown = (e: KeyboardEvent) => {
@@ -291,10 +294,12 @@ export async function holdKeys(page: Page, keys: string[], opts: { ms: number; f
     const frame = (t: number) => {
       const q = map.project(h.c);
       h.samples.push([q.x, q.y]);
+      const k = key(q.x, q.y);
+      if (h.down && k !== h.last) h.moves++;
+      h.last = k;
       if (h.down && !h.up) {
         h.budget += (speed * Math.min(Math.max(0, t - h.prev), maxDt)) / 1000;
         h.prev = t;
-        h.frames++;
       }
       h.raf = requestAnimationFrame(frame);
     };
@@ -304,7 +309,7 @@ export async function holdKeys(page: Page, keys: string[], opts: { ms: number; f
   if (opts.during) await opts.during();
   await page.waitForFunction(({ ms, frames }) => {
     const h = (window as any).__hold;
-    return h.frames >= frames && performance.now() - h.down >= ms;
+    return h.moves >= frames && performance.now() - h.down >= ms;
   }, { ms: opts.ms, frames: opts.frames }, { timeout: 15_000 });
   for (const k of keys) await page.keyboard.up(k);
   return page.evaluate(() => {
