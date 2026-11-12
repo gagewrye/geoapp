@@ -23,8 +23,8 @@ const DX = [-1, 1, 0, 0], DY = [0, 0, -1, 1];
 // A patch of at most 2 px is P alone (all 4 sides in R) or P plus one side Q whose other 3 sides are in R; so the test is local.
 export function holePixels(t: Window, view: RegionView, value: number): number[] {
   const out: number[] = [];
-  /** The sides of (x, y) not in R, stopping past the first; the last one seen goes in q. */
   const q: [number, number] = [0, 0];
+  /** Counts the sides of (x, y) not in R, other than `skip`, stopping at 2; the last one found is left in q. */
   const outside = (x: number, y: number, skip: number): number => {
     let n = 0;
     for (let s = 0; s < 4; s++) {
