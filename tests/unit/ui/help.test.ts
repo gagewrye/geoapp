@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { initHelp } from "../../../src/ui/help";
+import { SHORTCUTS } from "../../../src/ui/shortcuts";
 
 // Spec 045 criterion 4. Node has no DOM: a dialog, a stub document and the window as an EventTarget.
 class Dialog { open = false; showModal() { this.open = true; } close() { this.open = false; } }
@@ -40,5 +41,25 @@ describe("holding ?", () => {
     expect(other).not.toHaveBeenCalled();
     press(false);
     expect(dialog.open).toBe(false);
+  });
+});
+
+// Spec 057 criterion 9: the list shows keys and actions, never a hint
+describe("the #help list", () => {
+  it("contains none of the hints", () => {
+    const texts: string[] = [];
+    const node = (): Record<string, unknown> => {
+      const n: Record<string, unknown> = {
+        append() {}, setAttribute() {}, replaceChildren() {}, addEventListener() {},
+        insertRow: () => ({ insertCell: () => node() }),
+      };
+      Object.defineProperty(n, "textContent", { set: (t: string) => texts.push(t), get: () => "" });
+      return n;
+    };
+    vi.stubGlobal("document", { activeElement: null, createElement: () => node(), getElementById: () => null });
+    initHelp({ dialog: new Dialog() as unknown as HTMLDialogElement, button: node() as unknown as HTMLButtonElement, list: node() as unknown as HTMLElement });
+    const text = texts.join("\n");
+    expect(text).toContain("Smart select");
+    for (const s of SHORTCUTS) if (s.hint) expect(text, s.id).not.toContain(s.hint);
   });
 });

@@ -2,7 +2,7 @@
  * One shortcut (specs 039, 045). Single keys are written as labelKeys' KEYMAP keys: a KeyboardEvent.key, or a code for
  * keys read by position (Space, Backquote, Backslash, KeyW...). Chords use "+", with "Mod" for Cmd on Mac and Ctrl
  * elsewhere, and mouse actions a space ("Right drag"), or are "Click". The id is what KEYMAP maps to and the handlers branch on; the
- * action is the text the help shows, and a button's title; the hint (spec 057) is a second title line saying what the button does.
+ * action is the text the help shows, and a button's title; the hint (spec 057) is the title's lines after the key, saying what the button does.
  */
 export type Shortcut = { id: string; section: string; keys: string[]; action: string; button?: string; hint?: string };
 
@@ -13,15 +13,15 @@ const DIGITS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
 /** Every keyboard and mouse shortcut, by section (specs 003-054). */
 export const SHORTCUTS: readonly Shortcut[] = [
-  { id: "paint", section: "Tools", keys: ["b"], action: "Paint", button: "mode-paint", hint: "Left drag paints the selected class over anything; right drag erases it." },
-  { id: "erase", section: "Tools", keys: ["e"], action: "Erase", button: "mode-erase", hint: "Left drag erases the selected class only; other classes stay." },
+  { id: "paint", section: "Tools", keys: ["b"], action: "Paint", button: "mode-paint", hint: "Left Drag: paints the selected class\nRight Drag: removes the selected class" },
+  { id: "erase", section: "Tools", keys: ["e"], action: "Erase", button: "mode-erase", hint: "Removes the selected class" },
   { id: "pan", section: "Tools", keys: ["p", "Escape"], action: "Pan", button: "mode-pan", hint: "Drag to move the map. A middle drag or WASD pans in any mode." },
   { id: "hold-pan", section: "Tools", keys: ["Space"], action: "Pan while held" },
-  { id: "smart", section: "Tools", keys: ["m"], action: "Smart select", button: "mode-smart", hint: "Click an object to preview a mask of it (SAM, on your GPU). More clicks add to it, Shift+click excludes, Enter applies." },
+  { id: "smart", section: "Tools", keys: ["m"], action: "Smart select", button: "mode-smart", hint: "Click an object to create an AI-generated mask. More clicks add to it, Shift+click excludes, Enter applies." },
   { id: "smart-point", section: "Tools", keys: ["Click", "Shift+click"], action: "Include / exclude a point" },
   { id: "smart-apply", section: "Tools", keys: ["Enter"], action: "Apply smart selection", button: "smart-apply", hint: "Paints the previewed mask as the selected class." },
   { id: "smart-discard", section: "Tools", keys: ["Escape", "Right click"], action: "Discard the selection" },
-  { id: "fill", section: "Tools", keys: ["f"], action: "Fill", button: "mode-fill", hint: "Click an area: every connected pixel with the same label (or none) takes the selected class, up to about 1000 px away and never across missing imagery." },
+  { id: "fill", section: "Tools", keys: ["f"], action: "Fill", button: "mode-fill", hint: "Click an area to change every connected pixel of the same class to the selected class." },
   { id: "fill-click", section: "Tools", keys: ["Click"], action: "Fill the area under the pointer" },
   { id: "polygon", section: "Tools", keys: ["l"], action: "Polygon", button: "mode-polygon", hint: "Click corners around a region; Enter, a double click or a click on the first corner fills it. Backspace or right click removes a corner, Escape discards." },
   { id: "polygon-corner", section: "Tools", keys: ["Click"], action: "Add a polygon corner" },

@@ -94,6 +94,41 @@ describe("buttons named by SHORTCUTS", () => {
   });
 });
 
+// Spec 057 criterion 9: Gage's four hint texts; every other hint as on main
+describe("hints", () => {
+  const hint = (id: string) => SHORTCUTS.find((s) => s.id === id)?.hint;
+
+  it("paint, erase, smart and fill read as Gage set them", () => {
+    expect(hint("paint")).toBe("Left Drag: paints the selected class\nRight Drag: removes the selected class");
+    expect(hint("erase")).toBe("Removes the selected class");
+    expect(hint("smart")).toBe("Click an object to create an AI-generated mask. More clicks add to it, Shift+click excludes, Enter applies.");
+    expect(hint("fill")).toBe("Click an area to change every connected pixel of the same class to the selected class.");
+  });
+
+  it("#mode-paint's title is the key line, then one line per hint line", () => {
+    const el = new FakeDocument().createElement("button");
+    labelButtons((id) => (id === "mode-paint" ? el : null) as unknown as HTMLElement | null, false);
+    expect(el.title.split("\n")).toEqual(["Paint (B)", "Left Drag: paints the selected class", "Right Drag: removes the selected class"]);
+  });
+
+  it("no hint has a space beside a line break, and the others are unchanged", () => {
+    for (const s of SHORTCUTS) if (s.hint) expect(s.hint, s.id).not.toMatch(/ \n|\n /);
+    const others: Record<string, string> = {
+      pan: "Drag to move the map. A middle drag or WASD pans in any mode.",
+      "smart-apply": "Paints the previewed mask as the selected class.",
+      polygon: "Click corners around a region; Enter, a double click or a click on the first corner fills it. Backspace or right click removes a corner, Escape discards.",
+      "brush-smaller": "Halves the brush (in raster pixels).",
+      "brush-larger": "Doubles the brush (in raster pixels).",
+      help: "Lists every keyboard and mouse shortcut.",
+      undo: "Takes back the last stroke, fill or applied selection.",
+      redo: "Puts back what you undid.",
+    };
+    const changed = ["paint", "erase", "smart", "fill"];
+    expect(SHORTCUTS.filter((s) => s.hint && !changed.includes(s.id)).map((s) => s.id).sort()).toEqual(Object.keys(others).sort());
+    for (const [id, h] of Object.entries(others)) expect(hint(id), id).toBe(h);
+  });
+});
+
 // Spec 045 criteria 5 and 6.
 describe("Mac modifiers and stable ids", () => {
   it("Mod reads Cmd on Mac and Ctrl elsewhere; aria writes Meta or Control; Ctrl stays Ctrl", () => {

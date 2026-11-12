@@ -1,7 +1,7 @@
 import { actionOf, inTextField } from "./labelKeys";
 import { IS_MAC, SHORTCUTS, ariaKey, keyLabel, keysLabel } from "./shortcuts";
 
-/** Gives each button SHORTCUTS names its title and aria-keyshortcuts, such as "Paint (B)" and "B" (spec 039), with the hint as a second line (spec 057). */
+/** Gives each button SHORTCUTS names its title and aria-keyshortcuts, such as "Paint (B)" and "B" (spec 039), with the hint as the lines after the key (spec 057). */
 export function labelButtons(byId: (id: string) => HTMLElement | null, mac = IS_MAC): void {
   for (const s of SHORTCUTS) {
     const el = s.button ? byId(s.button) : null;
