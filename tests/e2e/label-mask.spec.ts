@@ -94,6 +94,26 @@ test("fine-tune: a paint stroke across a base tile corner, a right drag, then tw
   await expect(undoButton(page)).toBeDisabled();
 });
 
+// Spec 058 criterion 6: an Erase drag over the mask zeroes imported pixels of every class; Undo shows the mask again.
+test("an Erase drag zeroes imported pixels of two classes, and Undo shows the mask again (spec 058 criterion 6)", async ({ page }) => {
+  test.setTimeout(180_000);
+  await setup(page);
+  await importMask(page, false);
+  await page.click("#mode-erase");
+  await jumpTo(page, at(606, 600), 10);
+  await selectClass(page, 0);
+  const erase = path(await toScreen(page, at(584.5, 600.5)), await toScreen(page, at(596.5, 600.5)), 8); // blocks of 1 and 2
+  await stroke(page, erase);
+  const erased = await covered(page, erase);
+  const classes = new Set([...erased].map((k) => { const [c, r] = k.split(",").map(Number) as [number, number]; return maskValue(c, r); }));
+  expect(classes.has(1) && classes.has(2)).toBe(true);
+  expect(mismatches(await effectiveTiles(page), ALL, (c, r) => (erased.has(`${c},${r}`) ? 0 : maskValue(c, r)))).toEqual([]);
+
+  await undoButton(page).click();
+  expect(mismatches(await effectiveTiles(page), ALL, maskValue)).toEqual([]);
+  expect(await tileKeysStored(page)).toEqual([]);
+});
+
 test("opening another raster after an import (OK on the confirm) leaves no labels and no mask layer (criterion 13)", async ({ page }) => {
   await setup(page);
   await importMask(page);

@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { jumpTo, labels, message, openApp, openRaster, paintMode, rgbFixture, selectClass, stroke, toScreen } from "./helpers";
 
-// Spec 033 criteria 4-6.
+// Spec 033 criteria 5-6, and spec 058 criterion 4 in place of spec 033 criterion 4.
 const pressed = (page: Page, id: string) => page.locator(`#mode-${id}`);
 const tool = (page: Page) => page.locator("#status-tool");
 /** Keys are shortcuts only outside text fields: take focus off the panel as a user clicking the map would, without painting. */
@@ -19,30 +19,33 @@ async function expectMode(page: Page, mode: "paint" | "erase" | "pan", label: st
   await expect(tool(page)).toHaveText(mode === "erase" ? "Erase · 7 px" : `${label} · Class 1 · 7 px`);
 }
 
-test("E then a left drag erases class 1 only; Ctrl+Z restores it (criterion 4)", async ({ page }) => {
-  await setup(page);
-  await jumpTo(page, [15, 45], 10);
-  await paintMode(page);
-  const c = await toScreen(page, [15.005, 45.005]);
-  await selectClass(page, 1);
-  await stroke(page, [{ x: c.x + 120, y: c.y }, { x: c.x + 180, y: c.y }]);
-  await selectClass(page, 0);
-  await stroke(page, [c, { x: c.x + 60, y: c.y }]);
-  const before = await labels(page);
-  const values = [...before.values()];
-  expect(values.filter((v) => v === 1).length).toBeGreaterThan(0);
-  expect(values.filter((v) => v === 2).length).toBeGreaterThan(0);
+// Spec 058 criterion 4 (replaces spec 033 criterion 4): Erase removes any label, by left or right drag.
+for (const button of ["left", "right"] as const) {
+  test(`E then a ${button} drag erases both classes; Ctrl+Z restores them (spec 058 criterion 4)`, async ({ page }) => {
+    await setup(page);
+    await jumpTo(page, [15, 45], 10);
+    await paintMode(page);
+    const c = await toScreen(page, [15.005, 45.005]);
+    await selectClass(page, 1);
+    await stroke(page, [{ x: c.x + 120, y: c.y }, { x: c.x + 180, y: c.y }]);
+    await selectClass(page, 0);
+    await stroke(page, [c, { x: c.x + 60, y: c.y }]);
+    const before = await labels(page);
+    const values = [...before.values()];
+    expect(values.filter((v) => v === 1).length).toBeGreaterThan(0);
+    expect(values.filter((v) => v === 2).length).toBeGreaterThan(0);
 
-  await unfocus(page);
-  await page.keyboard.press("e");
-  await expect(pressed(page, "erase")).toHaveAttribute("aria-pressed", "true");
-  await stroke(page, [c, { x: c.x + 60, y: c.y }, { x: c.x + 180, y: c.y }]);
-  const after = await labels(page);
-  expect(after).toEqual(new Map([...before].filter(([, v]) => v === 2)));
+    await unfocus(page);
+    await page.keyboard.press("e");
+    await expect(pressed(page, "erase")).toHaveAttribute("aria-pressed", "true");
+    // the drag runs over both strokes with the same brush, so every label lies under it
+    await stroke(page, [c, { x: c.x + 60, y: c.y }, { x: c.x + 180, y: c.y }], button);
+    expect(await labels(page)).toEqual(new Map());
 
-  await page.keyboard.press("ControlOrMeta+z");
-  await expect.poll(() => labels(page)).toEqual(before);
-});
+    await page.keyboard.press("ControlOrMeta+z");
+    await expect.poll(() => labels(page)).toEqual(before);
+  });
+}
 
 test("with labels hidden E shows them and selects Erase; hiding them in Erase selects Pan (criterion 5)", async ({ page }) => {
   await setup(page);
