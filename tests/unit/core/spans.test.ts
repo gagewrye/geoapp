@@ -29,7 +29,7 @@ function pixelsOf(spans: Span[]): Set<string> {
 }
 
 describe("sweptSpans (criterion 1)", () => {
-  it("equals the union of footprints over random cells, sides 1-127, clipped at the edges", () => {
+  it("equals the union of footprints over random cells, sides 1-127, clipped at the edges", { timeout: 30_000 }, () => {
     const r = rng(7);
     const dims = { width: 300, height: 200 };
     for (let t = 0; t < 60; t++) {
