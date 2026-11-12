@@ -268,7 +268,8 @@ export const nextFrames = (page: Page, n: number) => page.evaluate((n) => new Pr
  * Moves are counted, not frames, because a frame can pan nothing (the first one's timestamp often precedes the keydown),
  * so samples hold at least frames distinct positions however slow the frames are.
  */
-export async function holdKeys(page: Page, keys: string[], opts: { ms: number; frames: number; during?: () => Promise<void> }) {
+/** during runs just after the keydown; beforeUp runs once the hold is long enough, with the keys still down. */
+export async function holdKeys(page: Page, keys: string[], opts: { ms: number; frames: number; during?: () => Promise<void>; beforeUp?: () => Promise<void> }) {
   await page.evaluate(([speed, maxDt, codes]) => {
     const w = window as any;
     const { map } = w.__geoapp;
@@ -306,6 +307,7 @@ export async function holdKeys(page: Page, keys: string[], opts: { ms: number; f
     const h = (window as any).__hold;
     return h.moves >= frames && performance.now() - h.down >= ms;
   }, { ms: opts.ms, frames: opts.frames }, { timeout: 15_000 });
+  if (opts.beforeUp) await opts.beforeUp();
   for (const k of keys) await page.keyboard.up(k);
   return page.evaluate(() => {
     const w = window as any;

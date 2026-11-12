@@ -1,9 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { Affine } from "../../src/core/types";
 import { uint8Tiff } from "../unit/helpers/tiffFixtures";
-import { jumpTo, message, openApp, openRaster, toScreen, type LngLat } from "./helpers";
+import { holdKeys, jumpTo, message, openApp, openRaster, toScreen, type LngLat } from "./helpers";
 
-// Spec 027 criterion 3: after a held D the visible full-resolution tiles are drawn within 1 s of release, and none load mid-pan.
+// Spec 027 criterion 3: after a held D the visible full-resolution tiles are drawn once it is released, and none load mid-pan
+// (spec 060 dropped the 1 s bound: it measured the machine).
 const GT: Affine = [10, 0.0001, 0, 45.1, 0, -0.0001];
 /** A checkerboard the 1024 px preview can't show: only full-resolution tiles draw its checks. Two 8 px blocks hold 0 and 255, so the stretch is 0..255. */
 const check = (k: number, c: number, r: number) => (r < 8 && c < 16 ? (c < 8 ? 0 : 255) : (c + r) % 2 === 1 ? [230, 120, 60][k]! : [30, 40, 180][k]!);
@@ -38,7 +39,7 @@ const wrongPixels = (page: Page) => page.evaluate(async () => {
   return wrong;
 });
 
-test("after a 1 s held D at full resolution the visible tiles are drawn within 1 s of release (criterion 3)", async ({ page }) => {
+test("after a 1 s held D at full resolution the visible tiles are drawn after release, and none load mid-pan (criterion 3)", async ({ page }) => {
   await openApp(page);
   await openRaster(page, checkerboard());
   await expect(message(page)).toHaveText("Raster opened.");
@@ -49,12 +50,10 @@ test("after a 1 s held D at full resolution the visible tiles are drawn within 1
   await expect.poll(() => wrongPixels(page), { timeout: 20_000 }).toBe(0);
   const before = await imagerySources(page);
   await page.locator("#map canvas").first().focus().catch(() => {});
-  await page.keyboard.down("d");
-  await page.waitForTimeout(1000);
-  expect(await imagerySources(page)).toBe(before); // nothing loads mid-pan
-  expect(await wrongPixels(page)).toBeGreaterThan(0); // the pan reached space the tiles drawn before don't cover
-  await page.keyboard.up("d");
-  const released = Date.now();
-  await expect.poll(() => wrongPixels(page), { timeout: 1000, intervals: [50] }).toBe(0);
-  expect(Date.now() - released).toBeLessThanOrEqual(1000);
+  // 20 frames that moved, so the pan reaches undrawn ground at any frame rate (spec 060 criterion 14)
+  await holdKeys(page, ["KeyD"], { ms: 1000, frames: 20, beforeUp: async () => {
+    expect(await imagerySources(page)).toBe(before); // nothing loads mid-pan
+    expect(await wrongPixels(page)).toBeGreaterThan(0); // the pan reached space the tiles drawn before don't cover
+  } });
+  await expect.poll(() => wrongPixels(page), { intervals: [50] }).toBe(0);
 });
