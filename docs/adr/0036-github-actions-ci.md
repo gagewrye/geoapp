@@ -12,4 +12,4 @@
 - **CI is Linux-only:** the macOS key paths aren't run there.
 - **Merges are slower:** a merge waits about 10 to 15 minutes for CI, and a red CI blocks it.
 - **Depends on GitHub's service** and on its free tier.
-- **The gate is branch protection plus the orchestrator's rule:** since 2026-11-12, main requires a PR and the `ci` check (not strict, admins can bypass, no force-push or deletion).
+- **The gate is branch protection:** since 2026-11-12, main requires a PR and the `ci` check (not strict, admins can bypass, no force-push or deletion).

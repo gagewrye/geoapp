@@ -1,6 +1,6 @@
 # 027: Keyboard panning without reads
 
-**Status:** Approved under Gage's 2026-10-30 perf delegation. **ADRs:** none. **Builds on spec 023:** it amends 023's F3, so background mask reads also wait while the map moves. It touches `map/navigation.ts`, `ui/imagery.ts` and `io/maskCache.ts`'s start condition.
+**Status:** Approved under Gage's 2026-10-30 perf delegation. Criterion 3's 1 s bound is no longer tested end to end (spec 060 c14, 2026-11-12): it measured the machine. **ADRs:** none. **Builds on spec 023:** it amends 023's F3, so background mask reads also wait while the map moves. It touches `map/navigation.ts`, `ui/imagery.ts` and `io/maskCache.ts`'s start condition.
 
 **Goal:** Holding W, A, S or D pans as smoothly as a mouse drag; tiles load once the pan stops.
 
