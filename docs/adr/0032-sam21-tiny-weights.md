@@ -11,6 +11,6 @@
 - **Latency:** no browser benchmark was found for SAM 2.1 Tiny. One ONNX card (SharpAI) claims 2–3 s per encode on Chrome WebGPU, without naming the hardware.
 - SAM's own `export_onnx_model.py` exports only the decoder, so the encoders come from the Optimum and transformers.js conversions or from samexporter.
 
-**Decision:** Use the onnx-community fp16 files at that sha. `npm run fetch-model` downloads them into the gitignored `public/models/sam2.1-hiera-tiny/` and checks their sha256 values, recorded in the script. They also ship with the upstream LICENSE. The browser fetches them from our origin once and keeps them in Cache Storage, under a cache name that holds the sha.
+**Decision:** Use the onnx-community fp16 files at that sha. `npm run fetch-model` downloads them into the gitignored `public/models/sam2.1-hiera-tiny/` and checks their sha256 values, recorded in the script. They also ship with the upstream LICENSE. The browser fetches them from our origin once and keeps them in Cache Storage, under a cache name that holds the sha. Superseded by ADR 0035 for hosting: the files now come from the pinned Hugging Face revision, and `npm run fetch-model` is gone.
 
 **Consequences:** A first use downloads about 78 MB plus the ORT wasm. Each file is under GitHub's 100 MB limit. Deploy must run the fetch first (spec 041). At the peak, memory adds about 12 MiB for the input tensor, about 16 MiB for the fp32 embedding in the worker, and about 80 MB of GPU weights. A model swap changes only the fetch script and `samInput`'s constants.
