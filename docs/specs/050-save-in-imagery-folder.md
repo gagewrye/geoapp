@@ -2,6 +2,8 @@
 
 **Status:** Approved (Gage waived review, 2026-11-02, as relayed by the orchestrator), with the recommended answers. **ADRs:** 0034 (Accepted). **Builds on specs 004 and 019, and ADR 0001.** Draft spec 044 calls `openSink` with no folder and is unaffected. A raster opened by draft spec 040 (remote) has no folder.
 
+**Amended by spec 057 (2026-11-11):** criterion 8 no longer requires the README to describe the Save dialog; Gage shortened the README. The ADR 0001 Status check stands.
+
 **Request** (Gage, 2026-11-02): "There is an issue where the web app opens a different folder than the one you pulled the tif from. I might have saved a label_final there on accident." Each chunk has its own folder (`ChunkX_Y.tif`, `labels.tif`, `labels_final.tif`).
 
 ## Decided (2026-11-02, recommended options)

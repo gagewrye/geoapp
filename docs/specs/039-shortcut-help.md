@@ -2,6 +2,8 @@
 
 **Status:** Approved by Gage 2026-10-30, with the draft answers to its questions. **ADRs:** none (native `<dialog>`). **Builds on specs 031–038.** It goes last because it lists their keys.
 
+**Amended by spec 057 (2026-11-11):** in scope 4, a button whose entry has a `hint` gets it as a second title line, `<action> (<key>)\n<hint>`; the platform for Cmd or Ctrl is passed to `labelButtons`.
+
 **Goal:** The user can see every shortcut in one place, and each button shows its shortcut on hover.
 
 ## Scope
