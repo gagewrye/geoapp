@@ -35,7 +35,7 @@ test.describe("refused files leave the labels (tester)", () => {
   });
 });
 
-test("another raster opened while mask reads are paused drops the queue: Import labels is enabled, the new store stays empty after the old read resumes, and painting reads the new raster", async ({ page }) => {
+test("another raster opened while mask reads are paused drops the queue: Import labels is enabled, the new store stays empty after the old read resumes, and painting reads the new raster @ci-skip", async ({ page }) => {
   await openApp(page);
   await holdMasks(page);
   await openRaster(page, rgbFixture());

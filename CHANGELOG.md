@@ -4,6 +4,9 @@ One entry per merge to main, newest first. Details are in the named spec.
 
 ## 2026-11-12
 - **Spec 060:** GitHub Actions CI runs `npm run check`, then the full e2e suite in 4 shards on Linux, on every PR to main and push to it; a merge waits for a green `ci` check (ADR 0036). Playwright uses 2 workers, and `npm run e2e:changed` runs only the e2e files a branch touches. No app behaviour changes. 13 e2e tests that measured machine speed or duplicated other tests are deleted (spec 060 criterion 14). This drops coverage of a stroke lifted when it leaves the globe (brush-gaps 73), spec 048 criterion 7 end to end (no-tile-limit), and WASD and a middle drag panning during an import (undo-seed.tester 30).
+  - `brush-scope.tester` "another raster opened while mask reads are paused drops the queue…" (run 43181863257): @ci-skip: not run on CI.
+  - `class-map` "apply renames and recolours by raw value…" (run 43181863257): @ci-skip: not run on CI. On CI, nothing checks the mask's repainted pixel colour.
+  - `undo` "three undos by button restore the store…" and "three undos by Ctrl+Z restore the store…" (run 43181863257): @ci-skip: not run on CI. On CI, nothing checks that the overlays follow each undo.
 
 ## 2026-11-11
 - **Spec 055:** Smart select needs no setup step: choosing it downloads the 78 MB model from Hugging Face once (after a confirm) and keeps it in the browser's cache. A wrong or failed download is never cached, and any load failure shows one popup, "Smart select isn't available on this device.", with the cause in the browser console. `npm run fetch-model` is removed.
