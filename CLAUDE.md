@@ -22,7 +22,7 @@ docs/
 ```
 
 ## Workflow
-spec (architect) → **Gage approves spec + ADRs** → code + tests (implementer) → verify (tester) → review (reviewer) → merge.
+spec (architect) → **Gage approves spec + ADRs** → code + tests (implementer) → verify (tester) → review (reviewer) → CI green → merge.
 No step is skipped. Reviewer has final say on code; Gage has final say on scope.
 
 ## Orchestrator (main session)
@@ -34,6 +34,7 @@ The main session routes work between agents. It does not write specs, source, te
   - reviewer: spec path + `git diff main...HEAD` + tester's report. Never the implementer's reasoning.
 - Failure loops: tester FAIL or reviewer CHANGES REQUESTED → back to implementer with that report verbatim. Spec wrong → back to architect.
 - Escalate to Gage: open questions, ADRs, scope changes, anything after 2 failed loops.
+- Merge only through a GitHub PR, with `gh`, and only once `gh pr checks <PR> --watch` exits 0. Branch protection is off, so this rule is the gate. If a later CI run on `main` fails, escalate to Gage.
 
 ## Code rules
 - `core/` is pure and fully unit-tested. Math lives here, nowhere else.
