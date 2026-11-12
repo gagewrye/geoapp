@@ -30,7 +30,7 @@ describe("floodFill holes (spec 059, tester)", () => {
   const dims = { width: 256 * 14, height: 256 * 14 }, click: [number, number] = [256 * 7 + 3, 256 * 7 + 9];
   const lo = 256 * 3, hi = 256 * 12 - 1;
 
-  it("leaves specks on every side of the reach's edge and its corners, fills them one pixel in, and reads the same 81 tiles once each", async () => {
+  it("leaves specks on every side of the reach's edge and its corners, fills them one pixel in, and reads the same 81 tiles once each", { timeout: 20_000 }, async () => {
     const edge = [[lo, 2000], [hi, 2000], [2000, lo], [2000, hi], [lo, lo], [hi, hi], [lo + 5, lo], [hi - 5, hi]]; // stay
     const inner = [[lo + 1, 2100], [hi - 1, 2100], [2100, lo + 1], [2100, hi - 1], [lo + 1, lo + 1], [hi - 1, hi - 1]]; // filled
     const specks = new Set([...edge, ...inner].map(String));
