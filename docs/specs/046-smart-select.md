@@ -2,6 +2,8 @@
 
 **Status:** Approved by Gage 2026-10-31, with the recommended answers. **ADRs:** 0031 onnxruntime-web, 0032 SAM 2.1 Tiny weights (both Accepted). **Builds on specs 003, 010, 014, 019, 023, 033, 037, 038 and 039.** Amends spec 033 scope 3 (Escape) and takes up ADR 0012 option (i) for one small model. **Amended after merge (Gage, 2026-10-31):** which mask is shown, and a decode log. See Amendment A, which changes scope 6, the Interfaces and criterion 2. Amended by spec 048 (2026-11-01): there is no tile cap (ADR 0033), so scope 7's cap bullet lapses, and criterion 6's first bullet becomes "a commit touching a new tile with 256 stored labels it".
 
+**Amended by spec 055 (2026-11-11):** the weights come from Hugging Face (ADR 0035), not `npm run fetch-model`, so decision 6, scope 1 and 2, and criteria 4, 7, 8 and 11 change as spec 055 says; a load failure is one popup, `smartUnavailable`.
+
 **Amended by spec 057 (2026-11-11):** criterion 7's test checks `#mode-smart`'s whole title: `Smart select (M)` followed by `\n` and the entry's hint (spec 039 as amended by spec 057).
 
 **Amended by spec 052 (2026-11-02):** criterion 6's first bullet (256 stored tiles) loses its `smart-select.spec.ts` test; spec 048 criterion 7's test (`no-tile-limit.spec.ts`, 323 stored tiles) covers it.

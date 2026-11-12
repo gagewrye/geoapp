@@ -2,7 +2,7 @@
 
 **Goal:** The site does only local-imagery labelling: open, preview, brush, classes, undo, import and export labels, navigation and basemap. The AlphaEarth and training code moves, unused, to `shelf/`, outside the app's import graph.
 
-**Status:** Approved (Gage, 2026-10-28). Build on `feat/009-012-nav-undo-seams-basemap` (specs 009-012), after it merges. **ADRs:** 0017 shelf (Accepted).
+**Status:** Approved (Gage, 2026-10-28). Build on `feat/009-012-nav-undo-seams-basemap` (specs 009-012), after it merges. **ADRs:** 0017 shelf (Accepted). **Amended by spec 055 (2026-11-11):** criterion 6 allows Smart select's four Hugging Face model GETs, once Smart is chosen (ADR 0035).
 
 **Amended by spec 052 (2026-11-02):** criteria 1 and 5 lose their e2e tests. Criterion 1 is guarded by the unit `shelf` test; criterion 5's layer order by `label-alignment.spec.ts` (spec 018 criterion 5).
 

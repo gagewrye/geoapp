@@ -1,6 +1,6 @@
 # 0032: SAM 2.1 Hiera Tiny (fp16 ONNX), served same-origin and cached in Cache Storage
 
-**Status:** Accepted (Gage, 2026-10-31), with spec 046.
+**Status:** Accepted (Gage, 2026-10-31), with spec 046. Its hosting (same-origin files from `npm run fetch-model`) is superseded by ADR 0035 (spec 055); the model and the Cache Storage use stand.
 
 **Context:** Smart select needs a promptable SAM-family model whose weights we can host as static files. Checked 2026-10-31:
 - **SAM 2.1 Tiny:** about 38.9M parameters. Code and checkpoints are Apache-2.0 ([sam2](https://github.com/facebookresearch/sam2)). [onnx-community/sam2.1-hiera-tiny-ONNX](https://huggingface.co/onnx-community/sam2.1-hiera-tiny-ONNX) at sha 814a066 has separate encoder and decoder files: `vision_encoder_fp16` at 67 MB and `prompt_encoder_mask_decoder_fp16` at 10.5 MB, with fp32 at 134 MB. It takes a 1024² input with ImageNet mean and std, returns 256² masks, and gives 3 multimask outputs. The repo shows no licence, so the upstream one applies.
