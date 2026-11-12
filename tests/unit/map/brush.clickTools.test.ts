@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { Erase } from "../../../src/core/labelStore";
 import { createBrush, type BrushMode } from "../../../src/map/brush";
 import { BRUSH_GRID, FakeEl, fakeBrushMap } from "../helpers/fakeBrushMap";
 
 vi.mock("maplibre-gl", () => ({ Point: class { constructor(readonly x: number, readonly y: number) {} } }));
-vi.mock("../../../src/map/hover", () => ({ showHover: () => {} }));
+vi.mock("../../../src/map/hover", () => ({ ERASE_COLOUR: "#ffffff", showHover: () => {} }));
 afterEach(() => { vi.unstubAllGlobals(); });
 
 // Spec 054 criterion 7: Fill and Polygon take clicks as Smart does, and only they turn double-click zoom off.
@@ -12,7 +13,7 @@ function setup(mode: BrushMode) {
   const off = new Set<string>();
   const handler = (name: string) => ({ enable: () => { off.delete(name); }, disable: () => { off.add(name); } });
   Object.assign(map, { dragRotate: handler("rotate"), doubleClickZoom: handler("dblclick"), boxZoom: handler("box") });
-  const clicks: [number, number][] = [], cells: boolean[] = [], classes = new Map<string, boolean>();
+  const clicks: [number, number][] = [], cells: Erase[] = [], classes = new Map<string, boolean>();
   let rights = 0;
   (map.getCanvasContainer() as unknown as FakeEl).classList = { toggle: (c: string, on: boolean) => { classes.set(c, on); } } as never;
   const brush = createBrush(map, {

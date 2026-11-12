@@ -1,16 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { Erase } from "../../../src/core/labelStore";
 import { createBrush, type BrushMode } from "../../../src/map/brush";
 import { deferMode } from "../../../src/ui/deferMode";
 import { BRUSH_GRID, fakeBrushMap } from "../helpers/fakeBrushMap";
 
 vi.mock("maplibre-gl", () => ({ Point: class { constructor(readonly x: number, readonly y: number) {} } }));
-vi.mock("../../../src/map/hover", () => ({ showHover: () => {} }));
+vi.mock("../../../src/map/hover", () => ({ ERASE_COLOUR: "#ffffff", showHover: () => {} }));
 afterEach(() => { vi.unstubAllGlobals(); });
 
 // deferMode wired to a real brush, as labels.ts wires it (moved from tests/unit/map/brush.test.ts by spec 034).
 function setup(mode: BrushMode, onStroke: (active: boolean) => void = () => {}) {
   const { map, pointer } = fakeBrushMap(vi.stubGlobal);
-  const calls: boolean[] = [];
+  const calls: Erase[] = [];
   const brush = createBrush(map, {
     side: () => 1, colour: () => "#ff0000", cells: (_c, _s, erase) => { calls.push(erase); }, onStroke: (a) => onStroke(a), panning: () => false,
   });

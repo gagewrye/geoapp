@@ -1,16 +1,17 @@
 import { Point, type Map as MapLibreMap } from "maplibre-gl";
 import type { Window } from "../core/grid";
+import type { Erase } from "../core/labelStore";
 import { footprint, footprintRing, pixelAt, strokeCellsIn } from "../core/pixel";
 import type { Grid } from "../core/types";
-import { brushCursor } from "./cursor";
-import { showHover } from "./hover";
+import { brushCursor, eraserCursor } from "./cursor";
+import { ERASE_COLOUR, showHover } from "./hover";
 
 export type BrushMode = "paint" | "erase" | "pan" | "smart" | "fill" | "polygon";
 type Deps = {
   side: () => number;
   colour: () => string;
   /** The stroke cells one pointer move reaches, in order, all on or overlapping the raster, with the brush side (spec 023 F6). */
-  cells: (cells: [number, number][], side: number, erase: boolean) => void;
+  cells: (cells: [number, number][], side: number, erase: Erase) => void;
   /** The Paint hover's footprint, or null when none shows (spec 023 F3, F5). */
   hovered?: (w: Window | null) => void;
   /** A stroke began (before its first cells) or ended. */
@@ -24,7 +25,7 @@ type Deps = {
   /** The same modes: a right click anywhere on the map canvas (spec 049 discards the selection; spec 054 steps a polygon back). */
   discard?: () => void;
 };
-type Stroke = { pointerId: number; erase: boolean; prev: [number, number] | null };
+type Stroke = { pointerId: number; erase: Erase; prev: [number, number] | null };
 
 /** The paint brush on the map (spec 003, ADR 0009): mouse and pen paint and erase; touch never paints. */
 // In Paint and Erase modes mouse and pen mousedowns never reach MapLibre, so drags don't move the map while touch
@@ -52,7 +53,7 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
     container.classList.toggle("brush-cursor", painting() && !locked && !blocked);
     container.classList.toggle("locked-cursor", painting() && (locked || blocked));
     container.classList.toggle("click-cursor", shaping());
-    const c = brushCursor(deps.colour());
+    const c = mode === "erase" ? eraserCursor() : brushCursor(deps.colour());
     if (c !== cursor) container.style.setProperty("--brush-cursor", cursor = c);
   };
 
@@ -90,7 +91,7 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
   const hover = () => {
     const cell = pointer && painting() && !locked ? cellAt(pointer.x, pointer.y, pointer.target) : null;
     const w = cell && footprint(grid!, cell[0], cell[1], deps.side());
-    showHover(map, w ? footprintRing(grid!, w) : null, deps.colour(), mode === "erase");
+    showHover(map, w ? footprintRing(grid!, w) : null, mode === "erase" ? ERASE_COLOUR : deps.colour(), mode === "erase");
     deps.hovered?.(w);
   };
 
@@ -121,7 +122,8 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
     if (clicking() && !(blocked && shaping()) && !e.altKey && (e.button === 0 || e.button === 2)) press = { pointerId: e.pointerId, button: e.button, shift: e.shiftKey, x: e.clientX, y: e.clientY };
     if (!painting() || stroke || deps.panning() || (e.button !== 0 && e.button !== 2)) return;
     if (locked || blocked) return;
-    stroke = { pointerId: e.pointerId, erase: mode === "erase" || e.button === 2, prev: null };
+    // Erase mode removes any label; Paint's right or pen barrel drag removes the selected class only (spec 058)
+    stroke = { pointerId: e.pointerId, erase: mode === "erase" ? "any" : e.button === 2, prev: null };
     deps.onStroke(true);
     apply(stroke, e);
   });

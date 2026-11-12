@@ -1,15 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { Erase } from "../../../src/core/labelStore";
 import { createBrush, type BrushMode } from "../../../src/map/brush";
 import { BRUSH_GRID, FakeEl, fakeBrushMap } from "../helpers/fakeBrushMap";
 
 vi.mock("maplibre-gl", () => ({ Point: class { constructor(readonly x: number, readonly y: number) {} } }));
-vi.mock("../../../src/map/hover", () => ({ showHover: () => {} }));
+vi.mock("../../../src/map/hover", () => ({ ERASE_COLOUR: "#ffffff", showHover: () => {} }));
 afterEach(() => { vi.unstubAllGlobals(); });
 
 // Spec 049 edge cases (tester): scope 4's pen and touch rules, release targets, the 4 px boundary, other modes.
 function setup(mode: BrushMode = "smart", imagery = true) {
   const { map } = fakeBrushMap(vi.stubGlobal);
-  const clicks: [[number, number], boolean][] = [], cells: boolean[] = [];
+  const clicks: [[number, number], boolean][] = [], cells: Erase[] = [];
   let discards = 0;
   const brush = createBrush(map, {
     side: () => 1, colour: () => "#ff0000", cells: (_c, _s, erase) => { cells.push(erase); }, onStroke: () => {}, panning: () => false,
