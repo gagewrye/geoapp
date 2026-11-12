@@ -29,7 +29,7 @@ async function undoBlocked(page: Page, why: string) {
   await expect(undoButton(page), why).toBeDisabled();
   const before = await snapshot(page);
   await page.locator("#map canvas").focus();
-  await page.keyboard.press("Control+z");
+  await page.keyboard.press("ControlOrMeta+z");
   expect(await snapshot(page), why).toEqual(before);
 }
 

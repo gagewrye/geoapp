@@ -39,7 +39,7 @@ test("E then a left drag erases class 1 only; Ctrl+Z restores it (criterion 4)",
   const after = await labels(page);
   expect(after).toEqual(new Map([...before].filter(([, v]) => v === 2)));
 
-  await page.keyboard.press("Control+z");
+  await page.keyboard.press("ControlOrMeta+z");
   await expect.poll(() => labels(page)).toEqual(before);
 });
 

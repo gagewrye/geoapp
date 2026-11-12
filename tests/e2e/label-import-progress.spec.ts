@@ -213,7 +213,7 @@ test("during an import edits are disabled or ignored, and Opacity and Show label
   expect(await tileKeysStored(page)).toEqual(keys);
   for (const id of ["#undo", "#import-labels", "#class-map", "#export-labels", "#class-add"]) await expect(page.locator(id)).toBeDisabled();
   await expect(page.locator("#classes .class-rename").first()).toBeDisabled();
-  await page.keyboard.press("Control+z");
+  await page.keyboard.press("ControlOrMeta+z");
   expect(await tileKeysStored(page)).toEqual(keys);
   expect(await classList(page)).toEqual(classes);
   // the view controls work, and apply to the layers drawn after the import

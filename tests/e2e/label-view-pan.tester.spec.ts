@@ -155,7 +155,7 @@ test("while hidden: add, rename and recolour classes, Ctrl+Z, and Export labels 
   await expect(message(page)).toHaveText("Labels exported.");
   await expectFileHolds((await dl.path())!, tiles, ["left", "right", "third"]);
   await page.locator("#mode-pan").focus();
-  await page.keyboard.press("Control+z");
+  await page.keyboard.press("ControlOrMeta+z");
   expect(await storeTiles(page)).not.toEqual(tiles);
   expect(await visibilities(page)).toEqual(["none"]);
   expect(await mode(page)).toEqual(PAN);
