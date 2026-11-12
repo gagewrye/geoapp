@@ -63,8 +63,8 @@ const testHook = (name: string, arg: unknown) => {
 const hookValue = (name: string) => (window as unknown as { __geoapp?: Record<string, unknown> }).__geoapp?.[name];
 // Smart select (spec 046) reads the imagery in the preview's colours, so the model sees what the user sees
 let ranges: [number, number][] = [];
-const smartLoad = initSmartLoad({ hook: () => (hookValue("segmenter") as Segmenter | null | undefined) ?? null, confirm: (t) => confirm(t), say, progress,
-  cancel: $<HTMLButtonElement>("smart-cancel") });
+const smartLoad = initSmartLoad({ hook: () => (hookValue("segmenter") as Segmenter | null | undefined) ?? null, confirm: (t) => confirm(t),
+  alert: (t) => alert(t), log: (e) => console.error("Smart select:", e), progress, cancel: $<HTMLButtonElement>("smart-cancel") });
 const labels = initLabels({ map, say, toolChanged: () => queueMicrotask(() => status.tool(labels.tool())), // deferred: initLabels calls it before `labels` is assigned
   onBusy: () => seeding.sync(), onChange: () => seeding.sync(), panning: () => nav.panning(),
   imageryBusy: fullRes.busy, mapMoving: fullRes.moving, importing: () => seeding.seeding() || hookValue("pauseMasks") === true,
