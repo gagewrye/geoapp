@@ -12,6 +12,9 @@ export type LabelStore = { width: number; height: number; tiles: Map<string, Uin
 /** Imagery-nodata masks (nodataMask) by LabelStore key. */
 export type NodataMasks = Map<string, Uint8Array>;
 
+/** An erase kind: false paints, true erases the given value only, "any" erases every label (spec 058). */
+export type Erase = boolean | "any";
+
 export const emptyStore = (width: number, height: number): LabelStore => ({ width, height, tiles: new Map(), base: false });
 
 /** The tileWindows() window whose origin is (x0, y0), clipped to the raster. */
@@ -54,8 +57,8 @@ function isEmpty(tile: Uint8Array): boolean {
   return true;
 }
 
-/** Paint w (mask bit 0 pixels only; throws on a missing mask) or erase value in w (an emptied tile goes unless store.base). */
-export function brush(store: LabelStore, masks: NodataMasks, w: Window, value: number, erase: boolean): void {
+/** Paint w (mask bit 0 pixels only; throws on a missing mask) or erase value, or any label, in w (an emptied tile goes unless store.base). */
+export function brush(store: LabelStore, masks: NodataMasks, w: Window, value: number, erase: Erase): void {
   if (!Number.isInteger(value) || value < 1 || value > 255) throw new Error(`brush: label value ${value} is not 1..255`);
   const keys = tileKeys(w);
   if (erase) {
@@ -63,7 +66,8 @@ export function brush(store: LabelStore, masks: NodataMasks, w: Window, value: n
       const tile = store.tiles.get(key);
       if (!tile) continue;
       let cleared = false;
-      eachPixel(tileWindow(store, ...origin(key)), w, (i) => { if (tile[i] === value) { tile[i] = 0; cleared = true; } });
+      const any = erase === "any";
+      eachPixel(tileWindow(store, ...origin(key)), w, (i) => { if (tile[i] && (any || tile[i] === value)) { tile[i] = 0; cleared = true; } });
       if (cleared && !store.base && isEmpty(tile)) store.tiles.delete(key);
     }
     return;
@@ -104,7 +108,7 @@ function spansByTile(store: LabelStore, spans: Span[]): Map<string, { t: Window;
 }
 
 /** brush over spans (spec 023 F6): the result of brushing each cell in turn. */
-export function brushSpans(store: LabelStore, masks: MaskLookup, spans: Span[], value: number, erase: boolean): void {
+export function brushSpans(store: LabelStore, masks: MaskLookup, spans: Span[], value: number, erase: Erase): void {
   if (!Number.isInteger(value) || value < 1 || value > 255) throw new Error(`brushSpans: label value ${value} is not 1..255`);
   const byTile = spansByTile(store, spans);
   if (erase) {
@@ -112,7 +116,8 @@ export function brushSpans(store: LabelStore, masks: MaskLookup, spans: Span[], 
       const tile = store.tiles.get(key);
       if (!tile) continue;
       let cleared = false;
-      for (const [r, a, b] of runs) for (let i = r * t.width + a, e = r * t.width + b; i < e; i++) if (tile[i] === value) { tile[i] = 0; cleared = true; }
+      const any = erase === "any";
+      for (const [r, a, b] of runs) for (let i = r * t.width + a, e = r * t.width + b; i < e; i++) if (tile[i] && (any || tile[i] === value)) { tile[i] = 0; cleared = true; }
       if (cleared && !store.base && isEmpty(tile)) store.tiles.delete(key);
     }
     return;
