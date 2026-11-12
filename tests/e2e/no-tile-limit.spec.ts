@@ -39,7 +39,7 @@ const fakeSegmenter = (page: Page) => page.evaluate(() => {
 });
 
 test("323 stored tiles: a stroke and a smart commit label the last tile; an un-overlaid tile shows on the preview, then gets its overlay (criterion 7)", async ({ page }) => {
-  test.setTimeout(240_000);
+  test.setTimeout(360_000);
   await openApp(page);
   await fakeSegmenter(page);
   await openRaster(page, fixture());
@@ -84,7 +84,8 @@ test("323 stored tiles: a stroke and a smart commit label the last tile; an un-o
   // fitted: 256 overlays, none on tile 0,0, whose pixels show on the preview
   await page.keyboard.press("Escape");
   await page.keyboard.press("Home");
-  await expect.poll(() => overlays(page).then((o) => o.length), { timeout: 60_000 }).toBe(256);
+  // a slow runner was still adding overlays at 60 s (spec 060 criterion 13)
+  await expect.poll(() => overlays(page).then((o) => o.length), { timeout: 150_000 }).toBe(256);
   expect(await overlays(page)).not.toContain("0,0");
   await expect.poll(async () => near(await pixelAt(page, await toScreen(page, probe)), blend(RED, under))).toBe(true);
 
