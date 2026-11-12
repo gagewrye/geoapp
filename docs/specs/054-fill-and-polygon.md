@@ -1,6 +1,6 @@
 # 054: Fill and Polygon tools
 
-**Status:** Proposed by Rahual (2026-11-05); not yet approved. The code is in the same pull request so the tools can be tried, and the answers below are implemented as recommended. Scope and answers are Gage's to change. **ADRs:** none (no dependency; ADR 0009's hand-rolled brush pattern is followed). **Builds on specs 003, 014, 023, 033, 037, 046 and 049.** Reverses part of ADR 0009's Context ("no polygon labelling is left"): polygons come back as a way to fill pixels, not as vector labels.
+**Status:** Accepted (2026-11-11). Proposed by Rahual (2026-11-05); Gage accepted it as built, with the answers below as implemented. **Amended by spec 059:** a fill also fills the holes of at most 2 px its region encloses, so scope 2's region and criterion 3's `floodFill` are no longer a plain flood fill. **ADRs:** none (no dependency; ADR 0009's hand-rolled brush pattern is followed). **Builds on specs 003, 014, 023, 033, 037, 046 and 049.** Reverses part of ADR 0009's Context ("no polygon labelling is left"): polygons come back as a way to fill pixels, not as vector labels.
 
 **Request** (Rahual, 2026-11-05, correcting the 8-class pseudo-labels on the drone chunks): "add fill tool and polygon tool". Correcting a mask means recolouring whole blobs and outlining large regions; with the brush alone both are slow.
 
