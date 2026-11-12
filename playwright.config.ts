@@ -5,6 +5,10 @@ export default defineConfig({
   // the flicker probe takes about a minute, so only npm run e2e:probe runs it (spec 045) (a CLI --grep can't undo grepInvert)
   grepInvert: process.env.npm_lifecycle_event === "e2e:probe" ? undefined : /@probe/,
   timeout: 60_000,
+  // 2 workers per CI shard (4 vCPU, ADR 0036) and locally, where more overloaded Gage's laptop (spec 060)
+  workers: 2,
+  // on CI a flake fails the run instead of hiding behind a retry (spec 060)
+  ...(process.env.CI ? { forbidOnly: true, retries: 0, globalTimeout: 25 * 60_000, reporter: [["dot"], ["html", { open: "never" }]] } : {}),
   use: {
     baseURL: "http://localhost:4173",
     ...devices["Desktop Chrome"],
