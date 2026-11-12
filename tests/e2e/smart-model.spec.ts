@@ -49,3 +49,21 @@ test("an HTML 200 for the model: one popup, a console error, the mode kept, noth
     expect(h["cookie"], r.url()).toBeUndefined();
   }
 });
+
+test("after a failed model load, the mode is kept and Apply stays hidden (spec 056 criterion 5)", async ({ page }) => {
+  await stubGpu(page);
+  for (const url of MODEL_URLS) {
+    await page.route(url, (r) => r.fulfill({ status: 200, contentType: "text/html", body: "x".repeat(4271), headers: { "access-control-allow-origin": "*" } }));
+  }
+  const dialogs: string[] = [];
+  page.on("dialog", (d) => { dialogs.push(d.type()); void d.accept(); });
+  await openApp(page);
+  await openRaster(page, rgbFixture());
+  await expect(message(page)).toHaveText("Raster opened.");
+  await expect(page.locator("#smart-apply")).toBeHidden();
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press("m");
+  await expect.poll(() => dialogs).toEqual(["confirm", "alert"]);
+  await expect(page.locator("#mode-pan")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#smart-apply")).toBeHidden();
+});

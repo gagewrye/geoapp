@@ -132,7 +132,7 @@ test.describe("pan and zoom (criterion 12)", () => {
 
     await page.click("#brush-smaller");
     await expect(size).toHaveText("7");
-    await page.keyboard.press("Tab");
+    await page.keyboard.press("Shift+Tab");
     await expect(page.locator("#brush-larger")).toBeFocused();
     await prevented(page);
     await page.keyboard.down("Space");
