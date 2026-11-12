@@ -1,13 +1,13 @@
 # 057: `npm run check` and the e2e suite pass on main again
 
 **Status:** Accepted (2026-11-11). Gage approved fixing this before spec 055 is reviewed, and answered its questions on 2026-11-11 (below). **ADRs:** none (no dependency or architecture change). **Branches from `main` (e32d961).** It amends:
-
-**Amended by spec 058 (2026-11-11):** the `erase` hint in scope 3 and criterion 9 is now "Removes any label under the brush".
 - spec 036 criterion 10, spec 037 criterion 9 and spec 050 criterion 8 (README wording);
 - spec 039 scope 4 (a title may have a hint line);
 - spec 046 criterion 7 (its title test).
 
 Spec 055's branch rebases on this. Spec 056 criterion 10 assumes this has merged.
+
+**Amended by spec 058 (2026-11-11):** the `erase` hint in scope 3 and criterion 9 is now "Removes any label under the brush".
 
 ## Decided by Gage (2026-11-11)
 1. **README.** Gage deliberately shortened the README in 5594d74 ("Update README.md", 2026-11-03, "Reduced AI verbosity"), which removed "clear **Show** (H)", "**Redo**" and the Save dialog sentence. `git log -S`, checked by the orchestrator, confirms this; PR #1 did not remove them. The short README stays, and the tests change.
