@@ -1,7 +1,7 @@
 import { expect, test, type CDPSession, type Page } from "@playwright/test";
 import { pixelAt as cellOf, strokeCells } from "../../src/core/pixel";
 import {
-  editName, paintMode, RGB_GRID, jumpTo, labels, message, moveTo, openApp, openRaster, rgbFixture, settled, toLngLat, toScreen, view, type LngLat, type Xy,
+  editName, holdKeys, nextFrames, paintMode, RGB_GRID, jumpTo, labels, message, moveTo, openApp, openRaster, rgbFixture, settled, toLngLat, toScreen, view, type LngLat, type Xy,
 } from "./helpers";
 
 // Spec 009: centre wheel zoom, middle-button pan, smooth WASD, and lifting the brush on a camera move.
@@ -175,27 +175,6 @@ test.describe("middle-button details (criterion 3)", () => {
   }
 });
 
-/** Hold keys for ms while sampling the screen position of the start centre every 25 ms in the page. */
-async function hold(page: Page, keys: string[], ms: number) {
-  await page.evaluate(() => {
-    const { map } = (window as any).__geoapp;
-    const c = map.getCenter();
-    const w = window as any;
-    w.__samples = [];
-    w.__sampler = setInterval(() => { const p = map.project(c); w.__samples.push([p.x, p.y]); }, 25);
-    const p = map.project(c);
-    w.__start = [p.x, p.y];
-  });
-  for (const k of keys) await page.keyboard.down(k);
-  await page.waitForTimeout(ms);
-  for (const k of keys) await page.keyboard.up(k);
-  return page.evaluate(() => {
-    const w = window as any;
-    clearInterval(w.__sampler);
-    const { map } = w.__geoapp;
-    return { start: w.__start as [number, number], samples: w.__samples as [number, number][], view: { zoom: map.getZoom(), bearing: map.getBearing(), pitch: map.getPitch() } };
-  });
-}
 const distinct = (s: [number, number][]) => new Set(s.map(([x, y]) => `${x.toFixed(3)},${y.toFixed(3)}`)).size;
 
 test.describe("WASD pans smoothly while held (criterion 5)", () => {
@@ -204,22 +183,24 @@ test.describe("WASD pans smoothly while held (criterion 5)", () => {
       await setup(page, how === "plus" ? "paint" : how);
       if (how === "plus") await page.focus("#brush-larger");
       const v0 = await view(page);
-      const w = await hold(page, ["KeyW"], 500);
+      const w = await holdKeys(page, ["KeyW"], { ms: 500, frames: 10 });
+      const v1 = await view(page);
       const last = w.samples.at(-1)!;
       const dy = last[1] - w.start[1];
-      expect(dy).toBeGreaterThanOrEqual(150);
-      expect(dy).toBeLessThanOrEqual(450);
+      // budget is what the app's rule allows at this run's frame rate (spec 060 criterion 12)
+      expect(dy).toBeGreaterThanOrEqual(0.75 * w.budget);
+      expect(dy).toBeLessThanOrEqual(1.25 * w.budget);
       expect(Math.abs(last[0] - w.start[0])).toBeLessThan(2);
       expect(distinct(w.samples)).toBeGreaterThanOrEqual(10);
-      expect([w.view.zoom, w.view.bearing, w.view.pitch]).toEqual([v0.zoom, v0.bearing, v0.pitch]);
+      expect([v1.zoom, v1.bearing, v1.pitch]).toEqual([v0.zoom, v0.bearing, v0.pitch]);
       const after = await centre(page);
       await page.waitForTimeout(300);
       expect(await centre(page)).toEqual(after);
 
-      const wd = await hold(page, ["KeyW", "KeyD"], 500);
+      const wd = await holdKeys(page, ["KeyW", "KeyD"], { ms: 500, frames: 10 });
       const e = wd.samples.at(-1)!;
       const down = e[1] - wd.start[1], left = wd.start[0] - e[0];
-      expect(down).toBeGreaterThan(100);
+      expect(down).toBeGreaterThan((0.75 * wd.budget) / Math.SQRT2);
       expect(Math.abs(down - left) / down).toBeLessThan(0.1);
       if (how === "plus") await expect(page.locator("#brush-size")).toHaveText("7");
     });
@@ -229,7 +210,7 @@ test.describe("WASD pans smoothly while held (criterion 5)", () => {
 test.describe("WASD stops and ignores (criterion 6)", () => {
   async function stillWhileHeld(page: Page, start: () => Promise<void>) {
     await page.keyboard.down("KeyW");
-    await page.waitForTimeout(150);
+    await nextFrames(page, 3);
     await start();
     await page.waitForTimeout(50);
     const c = await centre(page);

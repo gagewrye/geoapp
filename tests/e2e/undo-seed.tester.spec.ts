@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { classFile } from "../unit/helpers/labelFiles";
-import { jumpTo, labels, message, openApp, openRaster, paintMode, rgbFixture, stroke, toScreen, view, type Xy } from "./helpers";
+import { holdKeys, jumpTo, labels, message, openApp, openRaster, paintMode, rgbFixture, stroke, toScreen, view, type Xy } from "./helpers";
 import { expectFileHolds, gateWrites, openWrite, seeded, setup as twoClasses, writeHeld } from "./lockCombos";
 import { importFile, noSavePicker, openFileGate, pauseLabelFile, storeTiles, upload } from "./seeding";
 
@@ -41,7 +41,7 @@ test("while an import is paused: a drag paints nothing and adds no undo step; WA
   expect(await snapshot(page)).toEqual(before);
   await expect(undoButton(page)).toBeDisabled();
   const v0 = await view(page);
-  await page.keyboard.down("KeyW"); await page.waitForTimeout(200); await page.keyboard.up("KeyW");
+  await holdKeys(page, ["KeyW"], { ms: 200, frames: 3 });
   const v1 = await view(page);
   expect(v1.lat).toBeGreaterThan(v0.lat);
   const m = await mapMid(page);

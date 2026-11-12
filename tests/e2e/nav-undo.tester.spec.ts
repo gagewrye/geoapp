@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
-  addTestSelect, jumpTo, labels, message, moveTo, openApp, openRaster, paintMode, rgbFixture, selectClass, settled, stroke, toScreen, view, type LngLat, type Xy,
+  addTestSelect, holdKeys, jumpTo, labels, message, moveTo, nextFrames, openApp, openRaster, paintMode, rgbFixture, selectClass, settled, stroke, toScreen, view, type LngLat, type Xy,
 } from "./helpers";
 
 // Tester edge cases for specs 009 (navigation) and 010 (cursor, undo).
@@ -29,17 +29,6 @@ async function setup(page: Page, how: "paint" | "none", zoom = 14) {
   await jumpTo(page, START, zoom);
 }
 
-/** Screen y of the start centre after holding W for ms (positive = the view moved north). */
-async function holdW(page: Page, ms: number, during?: () => Promise<void>) {
-  const c = await page.evaluate(() => { const { map } = (window as any).__geoapp; return map.getCenter().toArray(); });
-  const y0 = await page.evaluate((c) => (window as any).__geoapp.map.project(c).y as number, c);
-  await page.keyboard.down("KeyW");
-  if (during) await during();
-  await page.waitForTimeout(ms);
-  await page.keyboard.up("KeyW");
-  return (await page.evaluate((c) => (window as any).__geoapp.map.project(c).y as number, c)) - y0;
-}
-
 test.describe("spec 009 edges (tester)", () => {
   test("auto-repeat keydowns change nothing: the speed stays at most WASD_SPEED", async ({ page }) => {
     await setup(page, "paint");
@@ -50,12 +39,13 @@ test.describe("spec 009 edges (tester)", () => {
       window.addEventListener("keydown", (e) => { if (e.code === "KeyW" && !e.repeat) w.__t[0] = performance.now(); });
       window.addEventListener("keyup", (e) => { if (e.code === "KeyW") w.__t[1] = performance.now(); });
     });
-    const dy = await holdW(page, 500, async () => {
+    const w = await holdKeys(page, ["KeyW"], { ms: 500, frames: 10, during: async () => {
       for (let i = 0; i < 10; i++) { await page.keyboard.down("KeyW"); await page.waitForTimeout(20); } // repeat: true
-    });
+    } });
+    const dy = w.samples.at(-1)![1] - w.start[1];
     const [t0, t1] = await page.evaluate(() => (window as any).__t as number[]);
     const pxPerS = (dy / (t1! - t0!)) * 1000;
-    expect(pxPerS).toBeGreaterThan(200);
+    expect(dy).toBeGreaterThanOrEqual(0.75 * w.budget); // budget: the app's rule at this run's frame rate (spec 060)
     expect(pxPerS).toBeLessThanOrEqual(600 * 1.05); // one rAF frame of slack
   });
 
@@ -71,7 +61,7 @@ test.describe("spec 009 edges (tester)", () => {
       await setup(page, "paint");
       const c0 = await centre(page);
       await page.keyboard.down("KeyW");
-      await page.waitForTimeout(150);
+      await nextFrames(page, 3);
       await stop(page);
       await page.waitForTimeout(50);
       const c = await centre(page);
@@ -89,8 +79,8 @@ test.describe("spec 009 edges (tester)", () => {
     await page.keyboard.down("Shift");
     await page.keyboard.up("Shift");
     await page.keyboard.up("KeyW");
-    const dy = await holdW(page, 500);
-    expect(dy).toBeGreaterThanOrEqual(150);
+    const w = await holdKeys(page, ["KeyW"], { ms: 500, frames: 10 });
+    expect(w.samples.at(-1)![1] - w.start[1]).toBeGreaterThanOrEqual(0.75 * w.budget);
   });
 
   test("a middle drag starting on the panel doesn't pan the map", async ({ page }) => {
