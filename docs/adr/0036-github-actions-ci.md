@@ -6,7 +6,7 @@
 - **Playwright 1.64.1 docs:** `--only-changed` runs changed tests and the test files that import changed files; `--shard` splits by file unless `fullyParallel` is set; caching browsers is "not recommended".
 - **GitHub docs:** `ubuntu-latest` (Ubuntu 24.04) has 4 vCPU and 16 GB for public repos (2 vCPU and 8 GB for private ones), and standard runners are free for public repos.
 
-**Decision:** Add `.github/workflows/ci.yml`. It runs `check`, then e2e in 4 shards with 2 workers each, on SwiftShader on `ubuntu-latest`, then a `ci` summary job. It caches npm but not browsers, and it pins the GitHub-maintained actions `checkout@v6`, `setup-node@v6` and `upload-artifact@v5` by major tag. The orchestrator merges only after `gh pr checks` is green.
+**Decision:** Add `.github/workflows/ci.yml`. It runs `check`, then e2e in 4 shards with 2 workers each, on SwiftShader on `ubuntu-latest`, then a `ci` summary job. It caches npm but not browsers, and it pins the GitHub-maintained actions `checkout@v6`, `setup-node@v6` and `upload-artifact@v5` by major tag. Merges go through a PR, gated by branch protection's required `ci` check.
 
 **Consequences:**
 - **CI is Linux-only:** the macOS key paths aren't run there.
