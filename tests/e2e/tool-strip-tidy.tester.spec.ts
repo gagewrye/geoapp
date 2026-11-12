@@ -47,13 +47,13 @@ test("an import in Smart selects Pan and hides Apply", async ({ page }) => {
   await expect(apply(page)).toBeHidden();
 });
 
-test("opening another raster keeps Apply's visibility in step with the Smart button", async ({ page }) => {
+test("opening another raster in Smart selects Pan and hides Apply", async ({ page }) => {
   await smart(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
-  const pressed = await page.locator("#mode-smart").getAttribute("aria-pressed");
-  if (pressed === "true") await expect(apply(page)).toBeVisible();
-  else await expect(apply(page)).toBeHidden();
+  await expect(page.locator("#mode-pan")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#mode-smart")).toHaveAttribute("aria-pressed", "false");
+  await expect(apply(page)).toBeHidden();
 });
 
 test("in Pan the hidden Apply is skipped by Tab: Smart's button tabs straight to +", async ({ page }) => {
