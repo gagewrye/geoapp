@@ -2,7 +2,7 @@
  * One shortcut (specs 039, 045). Single keys are written as labelKeys' KEYMAP keys: a KeyboardEvent.key, or a code for
  * keys read by position (Space, Backquote, Backslash, KeyW...). Chords use "+", with "Mod" for Cmd on Mac and Ctrl
  * elsewhere, and mouse actions a space ("Right drag"), or are "Click". The id is what KEYMAP maps to and the handlers branch on; the
- * action is the text the help shows, and a button's title; the hint (local change) is a second title line saying what the button does.
+ * action is the text the help shows, and a button's title; the hint (spec 057) is a second title line saying what the button does.
  */
 export type Shortcut = { id: string; section: string; keys: string[]; action: string; button?: string; hint?: string };
 

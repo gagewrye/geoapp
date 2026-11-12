@@ -51,18 +51,45 @@ describe("buttons named by SHORTCUTS", () => {
     for (const id of ids) expect(html, id).toContain(`id="${id}"`);
   });
 
-  it("get a title ending in (<key>) and aria-keyshortcuts", () => {
+  const label = (mac: boolean) => {
     const doc = new FakeDocument();
     const els = new Map<string, FakeElement>(ids.map((id) => [id, doc.createElement("button")]));
-    labelButtons((id) => (els.get(id) ?? null) as unknown as HTMLElement | null);
+    labelButtons((id) => (els.get(id) ?? null) as unknown as HTMLElement | null, mac);
+    return els;
+  };
+
+  it("get a title ending in (<key>) and aria-keyshortcuts", () => {
+    const els = label(false);
     expect(els.get("mode-paint")!.title.split("\n")[0]).toBe("Paint (B)");
     expect(els.get("mode-paint")!.getAttribute("aria-keyshortcuts")).toBe("B");
     expect(els.get("mode-pan")!.getAttribute("aria-keyshortcuts")).toBe("P Escape");
-    expect(els.get("redo")!.title.split("\n")[0]).toBe("Redo (Ctrl+Shift+Z)");
-    expect(els.get("redo")!.getAttribute("aria-keyshortcuts")).toBe("Control+Shift+Z Control+Y");
     for (const id of ids) {
       expect(els.get(id)!.title.split("\n")[0], id).toMatch(/ \(.+\)$/);
       expect(els.get(id)!.getAttribute("aria-keyshortcuts"), id).toBeTruthy();
+    }
+  });
+
+  // Spec 057 criterion 2: the platform is passed in, never read from the host
+  it("Undo and Redo read Ctrl off Mac and Cmd on Mac", () => {
+    const off = label(false);
+    expect(off.get("redo")!.title.split("\n")[0]).toBe("Redo (Ctrl+Shift+Z)");
+    expect(off.get("redo")!.getAttribute("aria-keyshortcuts")).toBe("Control+Shift+Z Control+Y");
+    expect(off.get("undo")!.title.split("\n")[0]).toBe("Undo (Ctrl+Z)");
+    const on = label(true);
+    expect(on.get("redo")!.title.split("\n")[0]).toBe("Redo (Cmd+Shift+Z)");
+    expect(on.get("redo")!.getAttribute("aria-keyshortcuts")).toBe("Meta+Shift+Z Control+Y");
+    expect(on.get("undo")!.title.split("\n")[0]).toBe("Undo (Cmd+Z)");
+  });
+
+  // Spec 057 criterion 3
+  it("a title is <action> (<first key>), then a newline and the hint only when there is one", () => {
+    for (const mac of [false, true]) {
+      const els = label(mac);
+      for (const s of SHORTCUTS.filter((x) => x.button)) {
+        const title = els.get(s.button!)!.title;
+        expect(title, s.id).toBe(`${s.action} (${keyLabel(s.keys[0]!, mac)})${s.hint ? `\n${s.hint}` : ""}`);
+        if (!s.hint) expect(title, s.id).not.toContain("\n");
+      }
     }
   });
 });
