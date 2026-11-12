@@ -7,6 +7,7 @@ One entry per merge to main, newest first. Details are in the named spec.
   - `brush-scope.tester` "another raster opened while mask reads are paused drops the queue…" (run 43181863257): @ci-skip: not run on CI.
   - `class-map` "apply renames and recolours by raw value…" (run 43181863257): @ci-skip: not run on CI. On CI, nothing checks the mask's repainted pixel colour.
   - `undo` "three undos by button restore the store…" and "three undos by Ctrl+Z restore the store…" (run 43181863257): @ci-skip: not run on CI. On CI, nothing checks that the overlays follow each undo.
+  - Branch protection on main (set by Gage, 2026-11-12): a PR and the `ci` check are required, admins can bypass, and force-push and deletion are off.
 
 ## 2026-11-11
 - **Spec 055:** Smart select needs no setup step: choosing it downloads the 78 MB model from Hugging Face once (after a confirm) and keeps it in the browser's cache. A wrong or failed download is never cached, and any load failure shows one popup, "Smart select isn't available on this device.", with the cause in the browser console. `npm run fetch-model` is removed.
