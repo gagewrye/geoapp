@@ -15,3 +15,9 @@ describe("docs (spec 050 criterion 8)", () => {
     expect(status).toContain("ADR 0034");
   });
 });
+
+describe("README (spec 058 criterion 9)", () => {
+  it("step 2 says Erase removes any label", () => {
+    expect(readFileSync("README.md", "utf8")).toContain("**Erase** (`E`) removes any label under the brush.");
+  });
+});

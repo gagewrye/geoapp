@@ -94,13 +94,13 @@ describe("buttons named by SHORTCUTS", () => {
   });
 });
 
-// Spec 057 criterion 9: Gage's four hint texts; every other hint as on main
+// Spec 057 criterion 9: Gage's four hint texts; every other hint as on main. Spec 058 criterion 9 supersedes the erase hint.
 describe("hints", () => {
   const hint = (id: string) => SHORTCUTS.find((s) => s.id === id)?.hint;
 
   it("paint, erase, smart and fill read as Gage set them", () => {
     expect(hint("paint")).toBe("Left Drag: paints the selected class\nRight Drag: removes the selected class");
-    expect(hint("erase")).toBe("Removes the selected class");
+    expect(hint("erase")).toBe("Removes any label under the brush");
     expect(hint("smart")).toBe("Click an object to create an AI-generated mask. More clicks add to it, Shift+click excludes, Enter applies.");
     expect(hint("fill")).toBe("Click an area to change every connected pixel of the same class to the selected class.");
   });
