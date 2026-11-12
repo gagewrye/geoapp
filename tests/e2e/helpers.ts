@@ -2,9 +2,13 @@ import { expect, type CDPSession, type Page, type Request } from "@playwright/te
 import { geotiffBuffer, type Value } from "../unit/helpers/sources";
 import { uint8Tiff } from "../unit/helpers/tiffFixtures";
 import type { Affine, Grid } from "../../src/core/types";
+import { SHORTCUTS } from "../../src/ui/shortcuts";
 
 export type LngLat = [number, number];
 export type Xy = { x: number; y: number };
+
+/** The hint line SHORTCUTS gives a button's title (spec 057). */
+export const hintOf = (id: string) => SHORTCUTS.find((s) => s.id === id)!.hint!;
 
 /** Fixture GeoTIFF as a Playwright upload payload. */
 export function tiff(name: string, width: number, height: number, nb: number, f: Value, geo: { epsg: number; gt: Affine; nodata?: string }) {
