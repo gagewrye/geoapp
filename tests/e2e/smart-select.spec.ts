@@ -265,3 +265,55 @@ test("a Shift+left release 3 px from its press adds an exclude point and doesn't
   await page.waitForTimeout(300); // a box zoom would ease
   expect((await view(page)).zoom).toBe(before.zoom);
 });
+
+const apply = (page: Page) => page.locator("#smart-apply");
+
+test("Apply shows only in Smart: hidden in Pan, disabled until a mask, hidden by every other tool and by Escape (spec 056 criterion 4)", async ({ page }) => {
+  await openApp(page);
+  await fakeSegmenter(page);
+  await openRaster(page, nodataImagery());
+  await expect(message(page)).toHaveText("Raster opened.");
+  await jumpTo(page, at(300, 300), 9);
+  await expect(page.locator("#mode-pan")).toHaveAttribute("aria-pressed", "true");
+  await expect(apply(page)).toBeHidden();
+  await unfocus(page);
+  await page.keyboard.press("m");
+  await expect(smartButton(page)).toHaveAttribute("aria-pressed", "true");
+  await expect(apply(page)).toBeVisible();
+  await expect(apply(page)).toBeDisabled();
+  await click(page, await toScreen(page, at(300.5, 300.5)));
+  await expect(apply(page)).toBeVisible();
+  await expect(apply(page)).toBeEnabled();
+
+  for (const [m, key] of [["pan", "p"], ["paint", "b"], ["erase", "e"], ["fill", "f"], ["polygon", "l"]] as const) {
+    for (const how of ["button", "key"]) {
+      await unfocus(page);
+      await page.keyboard.press("m");
+      await expect(smartButton(page)).toHaveAttribute("aria-pressed", "true");
+      await expect(apply(page), `Smart before ${m} by ${how}`).toBeVisible();
+      if (how === "button") { await page.click(`#mode-${m}`); await unfocus(page); } else await page.keyboard.press(key);
+      await expect(page.locator(`#mode-${m}`)).toHaveAttribute("aria-pressed", "true");
+      await expect(apply(page), `${m} by ${how}`).toBeHidden();
+    }
+  }
+  await page.keyboard.press("m");
+  await expect(apply(page)).toBeVisible();
+  await page.keyboard.press("Escape"); // no prompt: Pan
+  await expect(page.locator("#mode-pan")).toHaveAttribute("aria-pressed", "true");
+  await expect(apply(page)).toBeHidden();
+  await smartButton(page).click();
+  await expect(smartButton(page)).toHaveAttribute("aria-pressed", "true");
+  await expect(apply(page)).toBeVisible();
+});
+
+test("a click on the visible Apply labels the mask, as Enter does (spec 056 criterion 6)", async ({ page }) => {
+  await setup(page, [430, 425]);
+  const cell = await click(page, await toScreen(page, at(430.5, 425.5)));
+  await expect(apply(page)).toBeVisible();
+  await apply(page).click();
+  await settled(page);
+  await expect(apply(page)).toBeDisabled();
+  await expect(apply(page)).toBeVisible(); // still Smart
+  const want = [...square(cell)].filter((k) => { const [c, r] = k.split(",").map(Number) as [number, number]; return !inNodata(c, r); });
+  expect(new Set((await labels(page)).keys())).toEqual(new Set(want));
+});

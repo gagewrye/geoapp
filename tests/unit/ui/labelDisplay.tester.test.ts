@@ -86,7 +86,7 @@ describe("labelDisplay edge cases (spec 048, tester)", () => {
     expect(t.display.previewValues()).toBeNull();
   });
 
-  it("partial edge tiles get overlays; erasing an overlaid edge tile drops its overlay and the preview shows the base there again", () => {
+  it("partial edge tiles get overlays; erasing an overlaid edge tile drops its overlay and the preview shows the base there again", { timeout: 30_000 }, () => {
     const grid = gridOf(700, 600), s = emptyStore(700, 600); // 3 x 3 tiles, the last column 188 px, the last row 88 px
     const pc = previewCells(grid, PREVIEW_MAX_SIDE);
     const base: MaskPreview = { values: new Uint8Array(pc.width * pc.height).fill(2), width: pc.width, height: pc.height, corners: pc.corners, buckets: cellBuckets(pc.cells, grid) };

@@ -105,7 +105,7 @@ test.describe("Space and focus (F6, tester)", () => {
   test("keyboard focus kept on a button while the page is hidden and shown again stays native", async ({ page, context }) => {
     await setup(page);
     await page.click("#brush-smaller");
-    await page.keyboard.press("Tab");
+    await page.keyboard.press("Shift+Tab");
     await expect(page.locator("#brush-larger")).toBeFocused();
     const other = await context.newPage();
     await other.bringToFront();

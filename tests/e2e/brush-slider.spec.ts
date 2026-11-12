@@ -75,7 +75,7 @@ test("Space after a mouse click on the slider pans and keeps the size; after Tab
   expect((await labels(page)).size).toBe(0);
   await expectSize(page, Number(size));
 
-  await page.click("#brush-larger");
+  await page.click("#brush-smaller");
   await page.keyboard.press("Tab");
   await expect(range(page)).toBeFocused();
   await page.evaluate(() => {

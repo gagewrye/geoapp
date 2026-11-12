@@ -25,6 +25,7 @@ export function initModes({ brush, view, toolChanged, smart }: Deps) {
     brush.setMode(m);
     toolChanged();
     for (const b of MODES) $(`mode-${b}`).setAttribute("aria-pressed", String(m === b));
+    $("smart-apply").hidden = m !== "smart"; // Apply is Smart's alone (spec 056)
   };
   // No tool but Pan applies to labels you can't see (specs 016, 033, 046, 054): hiding selects Pan, and each shows them first
   const choose = (m: BrushMode) => { if (m !== "pan") view.show(); setMode(m); };

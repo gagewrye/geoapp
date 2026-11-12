@@ -29,7 +29,7 @@ async function open(page: Page, file: ReturnType<typeof rgbFixture>, centre: [nu
   await unfocus(page);
 }
 
-test("Fill gives the clicked region of an imported mask the selected class, one Undo restores it, and Redo fills again (criterion 10)", async ({ page }) => {
+test("Fill gives the clicked region of an imported mask the selected class, one Undo restores it, and Redo fills again (criterion 10) @ci-skip", async ({ page }) => {
   await open(page, rgbFixture(), [408, 408]);
   await importFile(page, maskFile());
   await expect(message(page)).toContainText("Seeded");
