@@ -34,7 +34,9 @@ The main session routes work between agents. It does not write specs, source, te
   - reviewer: spec path + `git diff main...HEAD` + tester's report. Never the implementer's reasoning.
 - Failure loops: tester FAIL or reviewer CHANGES REQUESTED → back to implementer with that report verbatim. Spec wrong → back to architect.
 - Escalate to Gage: open questions, ADRs, scope changes, anything after 2 failed loops.
-- Merge only through a GitHub PR, with `gh`, and only once `gh pr checks <PR> --watch` exits 0. Branch protection is off, so this rule is the gate. If a later CI run on `main` fails, escalate to Gage.
+- Branch protection on main requires a PR and the `ci` check (admins can bypass).
+- If an e2e test fails on CI with a timeout (the test timeout, or an `expect`, `expect.poll` or locator timeout) and the PR doesn't change what that test covers, the orchestrator sends it to the implementer. The implementer appends ` @ci-skip` to its title and adds a CHANGELOG line naming the test and the run. Then CI is re-run.
+- A test that fails by assertion rather than timeout goes back to the implementer as a normal failure, and so does a timeout in a test the PR's change touches. When it's unclear whether the PR touches the test, assume it does.
 
 ## Code rules
 - `core/` is pure and fully unit-tested. Math lives here, nowhere else.
