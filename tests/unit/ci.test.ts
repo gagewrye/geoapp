@@ -50,6 +50,7 @@ describe("ci.yml jobs (spec 060 criterion 2)", () => {
     expect(e2e).toContain("needs: check");
     expect(e2e).toContain("runs-on: ubuntu-latest");
     expect(e2e).toContain("shard: [1, 2, 3, 4]");
+    expect(e2e).toMatch(/strategy:\n(?: {6}#.*\n)? {6}fail-fast: false\n/); // a failing shard doesn't cancel the others
     expect(e2e).toContain("timeout-minutes: 30");
     expect(e2e).toContain("run: npx playwright install --with-deps chromium");
     expect(e2e).toContain("run: npx playwright test --shard=${{ matrix.shard }}/4");

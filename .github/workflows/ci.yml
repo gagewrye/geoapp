@@ -31,6 +31,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
+      # every shard finishes, so one red run lists all the failures (spec 060 amendment)
+      fail-fast: false
       matrix:
         shard: [1, 2, 3, 4]
     steps:
