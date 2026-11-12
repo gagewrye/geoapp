@@ -1,5 +1,5 @@
 import type { Window } from "../core/grid";
-import { brushSpans, tileWindow, type LabelStore } from "../core/labelStore";
+import { brushSpans, tileWindow, type Erase, type LabelStore } from "../core/labelStore";
 import { spanKeys, windowSpans, type Span } from "../core/spans";
 import { anyNonZero, maskedBaseTile, type MaskBase } from "./maskBase";
 import type { ValidMask } from "../core/validMask";
@@ -9,10 +9,10 @@ import type { StrokeEdit, UndoHistory } from "./undoHistory";
 
 /** One pointer move (spec 023 F6): the union of its footprints as spans, their bounding box, label value, paint or erase, and the stroke's undo edit. */
 // done hears how the op ended: applied, or dropped with the queue (spec 046's commit).
-export type PaintOp = { spans: Span[]; box: Window; value: number; erase: boolean; stroke?: StrokeEdit; done?: (r: "ok" | "dropped") => void };
+export type PaintOp = { spans: Span[]; box: Window; value: number; erase: Erase; stroke?: StrokeEdit; done?: (r: "ok" | "dropped") => void };
 
 /** A single footprint as a PaintOp. */
-export const cellOp = (w: Window, value: number, erase: boolean, stroke?: StrokeEdit): PaintOp => ({ spans: windowSpans(w), box: w, value, erase, stroke });
+export const cellOp = (w: Window, value: number, erase: Erase, stroke?: StrokeEdit): PaintOp => ({ spans: windowSpans(w), box: w, value, erase, stroke });
 
 type Events = {
   /** A move was applied to the store (it may have changed nothing); keys are the tiles its spans meet. */

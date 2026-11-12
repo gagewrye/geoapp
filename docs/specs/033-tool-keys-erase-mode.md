@@ -2,6 +2,8 @@
 
 **Status:** Approved by Gage 2026-10-30, with the draft answers to its questions. **ADRs:** none. **Builds on specs 003, 016, 019 and 032.**
 
+**Amended by spec 058 (2026-11-11):** Erase mode removes any label, by left or right drag, not the selected class only (scope 1, criteria 1 and 4; "an eraser that clears every class" is no longer out of scope). The status bar reads `Erase · 7 px` (scope 6). Paint's right drag still removes the selected class only.
+
 **Goal:** One key picks each tool, and users without a right button (trackpads) can erase.
 
 ## Scope

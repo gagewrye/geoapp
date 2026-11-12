@@ -14,7 +14,7 @@ const DIGITS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 /** Every keyboard and mouse shortcut, by section (specs 003-054). */
 export const SHORTCUTS: readonly Shortcut[] = [
   { id: "paint", section: "Tools", keys: ["b"], action: "Paint", button: "mode-paint", hint: "Left Drag: paints the selected class\nRight Drag: removes the selected class" },
-  { id: "erase", section: "Tools", keys: ["e"], action: "Erase", button: "mode-erase", hint: "Removes the selected class" },
+  { id: "erase", section: "Tools", keys: ["e"], action: "Erase", button: "mode-erase", hint: "Removes any label under the brush" },
   { id: "pan", section: "Tools", keys: ["p", "Escape"], action: "Pan", button: "mode-pan", hint: "Drag to move the map. A middle drag or WASD pans in any mode." },
   { id: "hold-pan", section: "Tools", keys: ["Space"], action: "Pan while held" },
   { id: "smart", section: "Tools", keys: ["m"], action: "Smart select", button: "mode-smart", hint: "Click an object to create an AI-generated mask. More clicks add to it, Shift+click excludes, Enter applies." },
