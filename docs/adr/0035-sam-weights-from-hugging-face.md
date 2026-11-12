@@ -4,7 +4,7 @@
 
 **Context:** Gage, 2026-11-11: "I don't want to have to run npm to get the tool", and the tool "only downloads the model when selected". Checked 2026-11-11:
 - **Browser downloads from the Hub:** transformers.js defaults to them (its `env` docs: `remoteHost` is the Hub, and `allowLocalModels` is false in browsers), so a plain browser GET to `/resolve/` works.
-- **Range requests:** these fail on the Xet redirect to `cas-bridge.xethub.hf.co` (forum, 2026-01-02). We send none.
+- **Range requests:** these fail on the CDN redirect (forum, 2026-01-02, for `cas-bridge.xethub.hf.co`; seen 2026-11-11: `us.aws.cdn.hf.co`). We send none.
 - **Alternatives:** a `predev`/`prebuild` hook would download 78 MB on every fresh checkout whether or not Smart is used.
 - **CSP:** the repo has none.
 
