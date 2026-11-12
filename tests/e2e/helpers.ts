@@ -132,7 +132,7 @@ export async function clickAt(page: Page, p: Xy): Promise<void> {
 
 export const message = (page: Page) => page.locator("#message");
 
-export const lerp = (a: Xy, b: Xy, t: number): Xy => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+const lerp = (a: Xy, b: Xy, t: number): Xy => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
 
 
 /** Uncaught page errors, collected from now on. */

@@ -8,6 +8,8 @@
 
 **Amended by spec 052 (2026-11-02):** criterion 6's first bullet (256 stored tiles) loses its `smart-select.spec.ts` test; spec 048 criterion 7's test (`no-tile-limit.spec.ts`, 323 stored tiles) covers it.
 
+**Amended by spec 060 (2026-11-12):** `no-tile-limit.spec.ts` is deleted (spec 060 criterion 14), so criterion 6's first bullet has no e2e test: dropped coverage.
+
 **Decided (Gage, 2026-10-31):** the recommended answer to each open question. The questions and their alternatives were removed after merge and remain in git history.
 1. SAM 2.1 Tiny.
 2. A 1024² window of native pixels.
