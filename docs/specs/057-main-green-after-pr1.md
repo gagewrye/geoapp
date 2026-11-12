@@ -1,6 +1,8 @@
 # 057: `npm run check` and the e2e suite pass on main again
 
 **Status:** Accepted (2026-11-11). Gage approved fixing this before spec 055 is reviewed, and answered its questions on 2026-11-11 (below). **ADRs:** none (no dependency or architecture change). **Branches from `main` (e32d961).** It amends:
+
+**Amended by spec 058 (2026-11-11):** the `erase` hint in scope 3 and criterion 9 is now "Removes any label under the brush".
 - spec 036 criterion 10, spec 037 criterion 9 and spec 050 criterion 8 (README wording);
 - spec 039 scope 4 (a title may have a hint line);
 - spec 046 criterion 7 (its title test).

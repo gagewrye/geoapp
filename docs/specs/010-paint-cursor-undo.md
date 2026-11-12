@@ -10,6 +10,8 @@
 
 Amended by spec 048 (2026-11-01): there is no tile cap (ADR 0033), so a stroke's copies are unbounded ("at most 256, 16 MiB" lapses) and Cap lapses. The entry just appended (or pushed by undo or redo) is never trimmed, so copies stay within max(`UNDO_BYTES`, one edit's copies). In criterion 6, `MAX_LABEL_TILES` becomes 256.
 
+**Amended by spec 058 (2026-11-11):** in Erase mode the canvas cursor is `eraserCursor()`, a block eraser that ignores the class colour, instead of the brush. The locked cursor, Space held and Pan are unchanged.
+
 ## Scope
 In: the brush cursor; an "Undo" button in the brush panel; Ctrl+Z / Cmd+Z; multi-step undo of paint and erase strokes.
 Out: redo (since added by spec 037); undoing class edits, imports, seeding or a raster open; persisting history; a custom cursor for Pan mode.
