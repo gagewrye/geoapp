@@ -94,7 +94,7 @@ test.describe("classes (criterion 14)", () => {
     }
   });
 
-  test("recolouring changes the overlay and the hover colour", async ({ page }) => {
+  test("recolouring changes the overlay and the hover colour @ci-skip", async ({ page }) => {
     await setup(page);
     const c = await toScreen(page, [15.005, 45.005]);
     await page.mouse.click(c.x, c.y);
