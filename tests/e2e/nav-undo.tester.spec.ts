@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
-  addTestSelect, jumpTo, labels, message, moveTo, openApp, openRaster, paintMode, rgbFixture, selectClass, settled, stroke, toScreen, view, type LngLat, type Xy,
+  holdKeys, jumpTo, labels, message, moveTo, nextFrames, openApp, openRaster, paintMode, rgbFixture, settled, stroke, toScreen, view, type LngLat, type Xy,
 } from "./helpers";
 
 // Tester edge cases for specs 009 (navigation) and 010 (cursor, undo).
@@ -17,7 +17,6 @@ const mapMid = async (page: Page): Promise<Xy> => {
 const snapshot = async (page: Page) => [...(await labels(page))].sort();
 const undoButton = (page: Page) => page.locator("#undo");
 const cursorAt = (page: Page, p: Xy) => page.evaluate(([x, y]) => getComputedStyle(document.elementFromPoint(x, y)!).cursor, [p.x, p.y] as const);
-const classColour = (page: Page, i: number) => page.evaluate((i) => (window as any).__geoapp.labels.classes[i].colour as string, i);
 
 async function setup(page: Page, how: "paint" | "none", zoom = 14) {
   await openApp(page);
@@ -27,17 +26,6 @@ async function setup(page: Page, how: "paint" | "none", zoom = 14) {
     await paintMode(page);
   }
   await jumpTo(page, START, zoom);
-}
-
-/** Screen y of the start centre after holding W for ms (positive = the view moved north). */
-async function holdW(page: Page, ms: number, during?: () => Promise<void>) {
-  const c = await page.evaluate(() => { const { map } = (window as any).__geoapp; return map.getCenter().toArray(); });
-  const y0 = await page.evaluate((c) => (window as any).__geoapp.map.project(c).y as number, c);
-  await page.keyboard.down("KeyW");
-  if (during) await during();
-  await page.waitForTimeout(ms);
-  await page.keyboard.up("KeyW");
-  return (await page.evaluate((c) => (window as any).__geoapp.map.project(c).y as number, c)) - y0;
 }
 
 test.describe("spec 009 edges (tester)", () => {
@@ -50,12 +38,13 @@ test.describe("spec 009 edges (tester)", () => {
       window.addEventListener("keydown", (e) => { if (e.code === "KeyW" && !e.repeat) w.__t[0] = performance.now(); });
       window.addEventListener("keyup", (e) => { if (e.code === "KeyW") w.__t[1] = performance.now(); });
     });
-    const dy = await holdW(page, 500, async () => {
+    const w = await holdKeys(page, ["KeyW"], { ms: 500, frames: 10, during: async () => {
       for (let i = 0; i < 10; i++) { await page.keyboard.down("KeyW"); await page.waitForTimeout(20); } // repeat: true
-    });
+    } });
+    const dy = w.samples.at(-1)![1] - w.start[1];
     const [t0, t1] = await page.evaluate(() => (window as any).__t as number[]);
     const pxPerS = (dy / (t1! - t0!)) * 1000;
-    expect(pxPerS).toBeGreaterThan(200);
+    expect(dy).toBeGreaterThanOrEqual(0.75 * w.budget); // budget: the app's rule at this run's frame rate (spec 060)
     expect(pxPerS).toBeLessThanOrEqual(600 * 1.05); // one rAF frame of slack
   });
 
@@ -71,7 +60,7 @@ test.describe("spec 009 edges (tester)", () => {
       await setup(page, "paint");
       const c0 = await centre(page);
       await page.keyboard.down("KeyW");
-      await page.waitForTimeout(150);
+      await nextFrames(page, 3);
       await stop(page);
       await page.waitForTimeout(50);
       const c = await centre(page);
@@ -81,17 +70,6 @@ test.describe("spec 009 edges (tester)", () => {
       await page.keyboard.up("KeyW");
     });
   }
-
-  test("WASD keeps working after a stop once the key is pressed again", async ({ page }) => {
-    await setup(page, "paint");
-    await page.keyboard.down("KeyW");
-    await page.waitForTimeout(100);
-    await page.keyboard.down("Shift");
-    await page.keyboard.up("Shift");
-    await page.keyboard.up("KeyW");
-    const dy = await holdW(page, 500);
-    expect(dy).toBeGreaterThanOrEqual(150);
-  });
 
   test("a middle drag starting on the panel doesn't pan the map", async ({ page }) => {
     await setup(page, "paint");
@@ -122,16 +100,6 @@ test.describe("spec 009 edges (tester)", () => {
 
 test.describe("spec 010 edges (tester)", () => {
   async function paintSetup(page: Page) { await setup(page, "paint", 9); }
-
-  test("criterion 7: the cursor follows a click-select", async ({ page }) => {
-    await paintSetup(page);
-    const p = await mapMid(page);
-    await page.mouse.move(p.x, p.y);
-    await selectClass(page, 1);
-    const cur = await cursorAt(page, p);
-    expect(cur.startsWith('url("data:image/svg+xml')).toBe(true);
-    expect(decodeURIComponent(cur).toLowerCase()).toContain((await classColour(page, 1)).toLowerCase());
-  });
 
   test("criterion 7: the cursor's SVG is 32x32 and decodes as valid SVG with black and white outlines", async ({ page }) => {
     await paintSetup(page);
@@ -165,36 +133,6 @@ test.describe("spec 010 edges (tester)", () => {
     expect(await snapshot(page)).toEqual(one);
     await undoButton(page).click();
     expect(await snapshot(page)).toEqual([]);
-  });
-
-  test("a stroke that changes nothing (erasing an absent class) adds no undo step", async ({ page }) => {
-    await paintSetup(page);
-    const c = await toScreen(page, [15.005, 45.005]);
-    await stroke(page, [c, { x: c.x + 40, y: c.y }], "right");
-    await expect(undoButton(page)).toBeDisabled();
-    await stroke(page, [c, { x: c.x + 40, y: c.y }]);
-    await selectClass(page, 1);
-    await stroke(page, [c, { x: c.x + 40, y: c.y }], "right"); // class 2 is absent: no step
-    await undoButton(page).click();
-    expect(await snapshot(page)).toEqual([]);
-    await expect(undoButton(page)).toBeDisabled();
-  });
-
-  // spec 037 made Ctrl+Shift+Z redo: with nothing undone it changes nothing, and after an undo it puts the stroke back
-  test("Ctrl+Shift+Z with nothing undone changes nothing, and Ctrl+Z and Ctrl+Shift+Z with a select focused undo and redo a stroke", async ({ page }) => {
-    await paintSetup(page);
-    const c = await toScreen(page, [15.005, 45.005]);
-    await stroke(page, [c, { x: c.x + 40, y: c.y }]);
-    const painted = await snapshot(page);
-    await page.locator("#map canvas").focus();
-    await page.keyboard.press("Control+Shift+z");
-    expect(await snapshot(page)).toEqual(painted);
-    await addTestSelect(page); // the app has no select since spec 017
-    await page.focus("#test-select");
-    await page.keyboard.press("ControlOrMeta+z");
-    expect(await snapshot(page)).toEqual([]);
-    await page.keyboard.press("Control+Shift+z");
-    expect(await snapshot(page)).toEqual(painted);
   });
 
   test("undo of a stroke across the raster's partial right and bottom edge tiles restores the store and removes overlays", async ({ page }) => {

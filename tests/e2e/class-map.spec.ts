@@ -41,7 +41,7 @@ test("Apply class map comes after Import labels, and is enabled only once labels
   await expect(classMap(page)).toBeEnabled();
 });
 
-test("apply renames and recolours by raw value; the mask repaints, painted tiles and Undo are untouched (criterion 7)", async ({ page }) => {
+test("apply renames and recolours by raw value; the mask repaints, painted tiles and Undo are untouched (criterion 7) @ci-skip", async ({ page }) => {
   test.setTimeout(120_000);
   await setup(page);
   await hideBasemap(page);

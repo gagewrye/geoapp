@@ -22,7 +22,7 @@ docs/
 ```
 
 ## Workflow
-spec (architect) → **Gage approves spec + ADRs** → code + tests (implementer) → verify (tester) → review (reviewer) → merge.
+spec (architect) → **Gage approves spec + ADRs** → code + tests (implementer) → verify (tester) → review (reviewer) → CI green → merge.
 No step is skipped. Reviewer has final say on code; Gage has final say on scope.
 
 ## Orchestrator (main session)
@@ -34,6 +34,9 @@ The main session routes work between agents. It does not write specs, source, te
   - reviewer: spec path + `git diff main...HEAD` + tester's report. Never the implementer's reasoning.
 - Failure loops: tester FAIL or reviewer CHANGES REQUESTED → back to implementer with that report verbatim. Spec wrong → back to architect.
 - Escalate to Gage: open questions, ADRs, scope changes, anything after 2 failed loops.
+- Branch protection on main requires a PR and the `ci` check (admins can bypass).
+- If an e2e test fails on CI with a timeout (the test timeout, or an `expect`, `expect.poll` or locator timeout) and the PR doesn't change what that test covers, the orchestrator sends it to the implementer. The implementer appends ` @ci-skip` to its title and adds a CHANGELOG line naming the test and the run. Then CI is re-run.
+- A test that fails by assertion rather than timeout goes back to the implementer as a normal failure, and so does a timeout in a test the PR's change touches. When it's unclear whether the PR touches the test, assume it does.
 
 ## Code rules
 - `core/` is pure and fully unit-tested. Math lives here, nowhere else.

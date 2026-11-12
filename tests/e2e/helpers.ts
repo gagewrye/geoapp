@@ -3,6 +3,7 @@ import { geotiffBuffer, type Value } from "../unit/helpers/sources";
 import { uint8Tiff } from "../unit/helpers/tiffFixtures";
 import type { Affine, Grid } from "../../src/core/types";
 import { SHORTCUTS } from "../../src/ui/shortcuts";
+import { WASD_MAX_DT, WASD_SPEED } from "../../src/core/wasd";
 
 export type LngLat = [number, number];
 export type Xy = { x: number; y: number };
@@ -64,11 +65,6 @@ export async function hideImagery(page: Page): Promise<void> {
       add(l.id.startsWith("imagery-") ? { ...l, layout: { ...l.layout, visibility: "none" } } : l, before);
   });
 }
-
-/** Adds `<select id="test-select">` (options a, b) to #panel: the app has no select since spec 017, but specs 003 and 009 keep select rules. */
-export const addTestSelect = (page: Page) => page.evaluate(() => {
-  document.getElementById("panel")!.insertAdjacentHTML("beforeend", `<select id="test-select"><option value="a">A</option><option value="b">B</option></select>`);
-});
 
 /** Select Paint: an open or a successful import selects Pan (spec 016 Tests), so tests that paint after one call this. */
 export async function paintMode(page: Page): Promise<void> {
@@ -136,7 +132,7 @@ export async function clickAt(page: Page, p: Xy): Promise<void> {
 
 export const message = (page: Page) => page.locator("#message");
 
-export const lerp = (a: Xy, b: Xy, t: number): Xy => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+const lerp = (a: Xy, b: Xy, t: number): Xy => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
 
 
 /** Uncaught page errors, collected from now on. */
@@ -258,4 +254,66 @@ export async function paintTwoClasses(page: Page, names = ["left", "right"]): Pr
     const a = await toScreen(page, [lon, 45.005]);
     await stroke(page, [a, { x: a.x + 30, y: a.y + 20 }, { x: a.x + 60, y: a.y }]);
   }
+}
+
+/** Resolves after the page has run n animation frames. */
+export const nextFrames = (page: Page, n: number) => page.evaluate((n) => new Promise<void>((r) => {
+  const f = () => (--n > 0 ? requestAnimationFrame(f) : r());
+  requestAnimationFrame(f);
+}), n);
+
+/** Holds keys for at least ms and frames map moves; returns the samples and the app's per-frame pan budget (spec 060 c12). */
+export async function holdKeys(page: Page, keys: string[], opts: { ms: number; frames: number; during?: () => Promise<void>; beforeUp?: () => Promise<void> }) {
+  await page.evaluate(([speed, maxDt, codes]) => {
+    const w = window as any;
+    const { map } = w.__geoapp;
+    const c = map.getCenter();
+    const p = map.project(c);
+    const key = (x: number, y: number) => `${x.toFixed(3)},${y.toFixed(3)}`; // as the tests' distinct() rounds
+    const h: any = { start: [p.x, p.y], samples: [] as number[][], budget: 0, moves: 0, last: key(p.x, p.y), down: 0, up: 0, prev: 0, held: new Set<string>(), raf: 0, c };
+    w.__hold = h;
+    // listeners and the sampler start before the keydown, so each frame is sampled before the app's own step pans it
+    h.onDown = (e: KeyboardEvent) => {
+      if (!codes.includes(e.code)) return;
+      if (!h.held.size && !h.down) h.down = h.prev = performance.now();
+      h.held.add(e.code);
+    };
+    h.onUp = (e: KeyboardEvent) => { if (h.held.delete(e.code) && !h.held.size) h.up = performance.now(); };
+    window.addEventListener("keydown", h.onDown);
+    window.addEventListener("keyup", h.onUp);
+    const frame = (t: number) => {
+      const q = map.project(h.c);
+      h.samples.push([q.x, q.y]);
+      const k = key(q.x, q.y);
+      if (h.down && k !== h.last) h.moves++;
+      h.last = k;
+      if (h.down && !h.up) {
+        h.budget += (speed * Math.min(Math.max(0, t - h.prev), maxDt)) / 1000;
+        h.prev = t;
+      }
+      h.raf = requestAnimationFrame(frame);
+    };
+    h.raf = requestAnimationFrame(frame);
+  }, [WASD_SPEED, WASD_MAX_DT, keys] as const);
+  for (const k of keys) await page.keyboard.down(k);
+  // during runs just after the keydown; beforeUp runs once the hold is long enough, with the keys still down
+  if (opts.during) await opts.during();
+  // moves are counted, not frames: a frame can pan nothing (the first one's timestamp often precedes the keydown),
+  // so the samples hold at least frames distinct positions however slow the frames are; budget makes the checks frame-rate free
+  await page.waitForFunction(({ ms, frames }) => {
+    const h = (window as any).__hold;
+    return h.moves >= frames && performance.now() - h.down >= ms;
+  }, { ms: opts.ms, frames: opts.frames }, { timeout: 15_000 });
+  if (opts.beforeUp) await opts.beforeUp();
+  for (const k of keys) await page.keyboard.up(k);
+  return page.evaluate(() => {
+    const w = window as any;
+    const h = w.__hold;
+    cancelAnimationFrame(h.raf);
+    window.removeEventListener("keydown", h.onDown);
+    window.removeEventListener("keyup", h.onUp);
+    const q = w.__geoapp.map.project(h.c);
+    h.samples.push([q.x, q.y]); // the last held frame's pan lands after that frame's sample
+    return { start: h.start as [number, number], samples: h.samples as [number, number][], budget: h.budget as number };
+  });
 }

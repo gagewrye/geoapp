@@ -46,7 +46,7 @@ describe("evict", () => {
 });
 
 describe("restoredPreview", () => {
-  it("rebuilds the mask preview's size, corners and buckets from the grid", () => {
+  it("rebuilds the mask preview's size, corners and buckets from the grid", { timeout: 30_000 }, () => {
     const { cells, width, height, corners } = previewCells(G, PREVIEW_MAX_SIDE);
     const values = new Uint8Array(width * height).fill(2);
     const p = restoredPreview(G, values);

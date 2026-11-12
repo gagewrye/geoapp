@@ -12,6 +12,7 @@
     "test": "vitest run",
     "check": "npm run lint && npm run typecheck && npm run test",
     "e2e": "playwright test",
+    "e2e:changed": "playwright test --only-changed=main --pass-with-no-tests",
     "e2e:probe": "playwright test flicker-probe --grep @probe"
   },
   "dependencies": {

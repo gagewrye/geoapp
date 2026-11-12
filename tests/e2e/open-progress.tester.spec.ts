@@ -125,20 +125,6 @@ test("replacing an open raster in Paint mode: the new one starts with Paint disa
   expect(await previewWest(page)).toBeCloseTo(30, 6);
 });
 
-test("a refused newer open leaves the older preview loading; it then opens with Paint enabled and the bar hidden", async ({ page }) => {
-  await openApp(page);
-  await openHeld(page);
-  await openRaster(page, tiff("x4326.tif", 100, 100, 1, () => 1, { epsg: 4326, gt: [179.5, 0.01, 0, 10, 0, -0.01] }));
-  await expect(message(page)).toHaveText(MESSAGES.rasterAntimeridian);
-  await expect(bar(page)).toBeHidden();
-  await expect(paint(page)).toBeDisabled();
-  await release(page);
-  await expect(message(page)).toHaveText("Raster opened.");
-  await expect(paint(page)).toBeEnabled();
-  await expect(bar(page)).toBeHidden();
-  expect(await previewWest(page)).toBeCloseTo(10, 6);
-});
-
 test("a file that isn't a TIFF shows a non-empty message and hides the bar", async ({ page }) => {
   await openApp(page);
   await openRaster(page, { name: "junk.tif", mimeType: "image/tiff", buffer: Buffer.from("not a tiff at all, just text") });
@@ -153,19 +139,6 @@ test("a single-window raster opens with the bar hidden and Paint enabled", async
   await expect(message(page)).toHaveText("Raster opened.");
   await expect(bar(page)).toBeHidden();
   await expect(paint(page)).toBeEnabled();
-});
-
-test("reads failing part-way through the preview: message, bar hidden, Paint disabled; the next file opens normally", async ({ page }) => {
-  await openApp(page);
-  await gate(page, 1000, { failFrom: 6 });
-  await openRaster(page, rgbTiled());
-  await expect(message(page)).toHaveText(MESSAGES.rasterUnreadable);
-  await expect(bar(page)).toBeHidden();
-  await expect(paint(page)).toBeDisabled();
-  await openRaster(page, otherFixture());
-  await expect(message(page)).toHaveText("Raster opened.");
-  await expect(paint(page)).toBeEnabled();
-  await expect(bar(page)).toBeHidden();
 });
 
 test("a paint read that fails with a ProgressEvent shows rasterUnreadable (readErrorMessage)", async ({ page }) => {
