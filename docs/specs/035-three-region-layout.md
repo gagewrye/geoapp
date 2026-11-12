@@ -1,6 +1,6 @@
 # 035: Three-region layout, collapsible panels, zoom to raster
 
-**Status:** Approved by Gage 2026-10-30, with the draft answers to its questions. **ADRs:** none (CSS grid, no framework). **Builds on specs 032–034.** Amended by spec 047 (2026-11-01): the top bar's file actions are Import labels, Apply class map (`#class-map`), Export labels.
+**Status:** Approved by Gage 2026-10-30, with the draft answers to its questions. **ADRs:** none (CSS grid, no framework). **Builds on specs 032–034.** Amended by spec 047 (2026-11-01): the top bar's file actions are Import labels, Apply class map (`#class-map`), Export labels. Amended by spec 056 (2026-11-11): the brush order in scope 3 is +, size, −.
 
 **Goal:** The map gets as much of the screen as possible. File actions, tools and classes each have one fixed place, and one key hides the side panels.
 
@@ -19,7 +19,7 @@
    - Class map, Import labels and Export labels, shown once a raster opens.
 3. **Left tool strip `#tools`:**
    - Pan, Paint, Erase (spec 033), drawn as icon or letter buttons with `aria-label` and `title` such as `Paint (B)`;
-   - brush −, `#brush-size` showing only the number, then +;
+   - brush +, `#brush-size` showing only the number, then −;
    - `#brush-size-range`, vertical;
    - Undo.
 4. **Right panel `#side`:**

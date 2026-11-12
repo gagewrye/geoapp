@@ -12,6 +12,7 @@ One entry per merge to main, newest first. Details are in the named spec.
   - Branch protection on main (set by Gage, 2026-11-12): a PR and the `ci` check are required, admins can bypass, and force-push and deletion are off.
 
 ## 2026-11-11
+- **Spec 056:** The brush strip reads +, size, −, then the slider, so + sits above the end of the slider that means larger. The ✓ Apply button shows only in Smart select. The three file buttons in the top bar show no "No file chosen" text beside them.
 - **Spec 055:** Smart select needs no setup step: choosing it downloads the 78 MB model from Hugging Face once (after a confirm) and keeps it in the browser's cache. A wrong or failed download is never cached, and any load failure shows one popup, "Smart select isn't available on this device.", with the cause in the browser console. `npm run fetch-model` is removed.
 - **Spec 057:** `npm run check` passes on main again: the README tests keep only what the shortened README still says, Undo and Redo tooltips are tested for both Mac and other platforms, and e2e undo presses use Cmd on macOS. Tool tooltips show what the button does under its key, with new Paint, Erase, Smart select and Fill texts. E2E was run on the 10 affected files (62 passed); the full suite is to run in CI (spec 060).
 

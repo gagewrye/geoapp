@@ -4,6 +4,8 @@
 
 **Amended by spec 055 (2026-11-11):** the weights come from Hugging Face (ADR 0035), not `npm run fetch-model`, so decision 6, scope 1 and 2, and criteria 4, 7, 8 and 11 change as spec 055 says; a load failure is one popup, `smartUnavailable`.
 
+**Amended by spec 056 (2026-11-11):** `#smart-apply` is hidden unless the mode is Smart; its `disabled` rule and Enter are unchanged.
+
 **Amended by spec 057 (2026-11-11):** criterion 7's test checks `#mode-smart`'s whole title: `Smart select (M)` followed by `\n` and the entry's hint (spec 039 as amended by spec 057).
 
 **Amended by spec 052 (2026-11-02):** criterion 6's first bullet (256 stored tiles) loses its `smart-select.spec.ts` test; spec 048 criterion 7's test (`no-tile-limit.spec.ts`, 323 stored tiles) covers it.
