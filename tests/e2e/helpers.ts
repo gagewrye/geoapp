@@ -262,13 +262,7 @@ export const nextFrames = (page: Page, n: number) => page.evaluate((n) => new Pr
   requestAnimationFrame(f);
 }), n);
 
-/**
- * Holds keys for at least ms and until at least frames held frames have moved the map, sampling the start centre's screen position each frame.
- * budget is the pan the app's WASD rule allows over the frames that ran while held, so checks hold at any frame rate (spec 060).
- * Moves are counted, not frames, because a frame can pan nothing (the first one's timestamp often precedes the keydown),
- * so samples hold at least frames distinct positions however slow the frames are.
- */
-/** during runs just after the keydown; beforeUp runs once the hold is long enough, with the keys still down. */
+/** Holds keys for at least ms and frames map moves; returns the samples and the app's per-frame pan budget (spec 060 c12). */
 export async function holdKeys(page: Page, keys: string[], opts: { ms: number; frames: number; during?: () => Promise<void>; beforeUp?: () => Promise<void> }) {
   await page.evaluate(([speed, maxDt, codes]) => {
     const w = window as any;
@@ -302,7 +296,10 @@ export async function holdKeys(page: Page, keys: string[], opts: { ms: number; f
     h.raf = requestAnimationFrame(frame);
   }, [WASD_SPEED, WASD_MAX_DT, keys] as const);
   for (const k of keys) await page.keyboard.down(k);
+  // during runs just after the keydown; beforeUp runs once the hold is long enough, with the keys still down
   if (opts.during) await opts.during();
+  // moves are counted, not frames: a frame can pan nothing (the first one's timestamp often precedes the keydown),
+  // so the samples hold at least frames distinct positions however slow the frames are; budget makes the checks frame-rate free
   await page.waitForFunction(({ ms, frames }) => {
     const h = (window as any).__hold;
     return h.moves >= frames && performance.now() - h.down >= ms;
