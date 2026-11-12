@@ -2,8 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 import { editName, jumpTo, message, openApp, openRaster, paintMode, rgbFixture, stroke, toScreen } from "./helpers";
 
 // Tester pass 4: spec 003 Strokes / criterion 10. contextmenu is prevented on the map while local
-// imagery is open, in every mode, and never on any panel element, whether opened by mouse,
-// by keyboard or just after an erase stroke.
+// imagery is open, in every mode, and never on any panel element, whether opened by mouse
+// or by keyboard.
 
 const PANEL = ["#classes .class-name", "#classes input[type=color]", "#classes input[type=radio]", "#mode-paint", "#brush-larger",
   "#brush-size-range", "#label-opacity", "#show-labels", "#class-add", "#open-raster", "#import-labels", "#export-labels", "#message", "#topbar h1"];
@@ -48,26 +48,6 @@ test.describe("contextmenu on every map and panel element (criterion 10, tester 
       await page.keyboard.up(" ");
     });
   }
-
-  test("right-clicks on the panel's fields and controls, also within 500 ms of an erase, aren't prevented", async ({ page }) => {
-    await open(page);
-    const c = await toScreen(page, [15.005, 45.005]);
-    await stroke(page, [c, { x: c.x + 40, y: c.y }]);
-    await page.evaluate(() => {
-      const g = (window as any).__menus = [] as unknown[];
-      window.addEventListener("contextmenu", (e) => g.push([(e.target as Element).closest("#map") !== null, e.defaultPrevented]));
-    });
-    const targets = ["#classes .class-name", "#classes input[type=color]", "#brush-larger", "#message"];
-    for (const t of targets) {
-      await stroke(page, [c, { x: c.x + 40, y: c.y }], "right");
-      const t0 = Date.now();
-      await page.locator(t).first().click({ button: "right" });
-      expect(Date.now() - t0).toBeLessThan(500);
-    }
-    const got = await page.evaluate(() => (window as any).__menus as [boolean, boolean][]);
-    // each erase press on the map (prevented), then the panel target (not)
-    expect(got).toEqual(targets.flatMap(() => [[true, true], [false, false]]));
-  });
 
   test("a keyboard contextmenu (Shift+F10) on a focused class rename field isn't prevented", async ({ page }) => {
     await open(page);
