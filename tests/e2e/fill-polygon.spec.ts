@@ -61,6 +61,54 @@ test("Fill gives the clicked region of an imported mask the selected class, one 
   expect((await labels(page)).get("408,408")).toBe(3);
 });
 
+// Spec 059 criteria 6 and 7: specks in the value-2 block at 400..415 and in the unlabelled block at 400..415 x 432..447.
+const SPECKS = new Map<string, number>([
+  ["403,403", 1], ["407,403", 0], ["408,403", 0], // a 1 px class-1 speck and a 2 px unlabelled pair
+  ["403,407", 0], ["404,408", 0], ["405,409", 0], // a diagonal line of three 0s
+  ["410,410", 0], ["411,410", 0], ["412,410", 0], ["408,400", 0], // a 3 px line, and a notch on the block's top edge
+  ["410,440", 1], // in the unlabelled block
+]);
+const specked = (c: number, r: number) => SPECKS.get(`${c},${r}`) ?? maskValue(c, r);
+const KEPT = ["410,410", "411,410", "412,410", "408,400"];
+
+test("Fill also fills the specks of up to 2 px its region encloses, in one undoable edit (spec 059 criterion 6)", async ({ page }) => {
+  await open(page, rgbFixture(), [408, 408]);
+  await importFile(page, maskFile(specked));
+  await expect(message(page)).toContainText("Seeded");
+  await page.keyboard.press("f");
+  await page.keyboard.press("3");
+  await clickCell(page, 406, 413);
+  await expect(message(page)).toHaveText(MESSAGES.filled(256 - KEPT.length));
+  const inBlock = (c: number, r: number) => c >= 400 && c < 416 && r >= 400 && r < 416;
+  const check = async (filled: boolean) => {
+    const got = await labels(page);
+    for (let r = 384; r < 432; r++) for (let c = 384; c < 432; c++) {
+      const want = filled && inBlock(c, r) && !KEPT.includes(`${c},${r}`) ? 3 : specked(c, r);
+      expect(got.get(`${c},${r}`) ?? 0, `${c},${r}`).toBe(want);
+    }
+  };
+  await check(true);
+  await page.click("#undo");
+  await expect(page.locator("#undo")).toBeDisabled();
+  await check(false);
+  await page.click("#redo");
+  await settled(page);
+  await check(true);
+});
+
+test("Fill on an unlabelled block gives a 1 px class-1 speck in it the selected class (spec 059 criterion 7)", async ({ page }) => {
+  await open(page, rgbFixture(), [408, 440]);
+  await importFile(page, maskFile(specked));
+  await expect(message(page)).toContainText("Seeded");
+  await page.keyboard.press("f");
+  await page.keyboard.press("3");
+  expect(specked(404, 436)).toBe(0);
+  await clickCell(page, 404, 436);
+  await expect(message(page)).toHaveText(MESSAGES.filled(256));
+  const got = await labels(page);
+  expect([got.get("410,440"), got.get("404,436"), got.get("409,440")]).toEqual([3, 3, 3]);
+});
+
 test("Fill stops at imagery nodata, and a click on nodata fills nothing (criterion 11)", async ({ page }) => {
   await open(page, nodataImagery(), [430, 425]);
   await page.click("#mode-fill");
