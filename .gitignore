@@ -7,6 +7,3 @@ blob-report/
 playwright/.cache/
 *.log
 .vite/
-# SAM 2.1 weights from npm run fetch-model (ADR 0032); their LICENSE is kept
-public/models/**/*.onnx
-public/models/**/*.onnx_data
