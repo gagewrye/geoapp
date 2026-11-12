@@ -15,7 +15,8 @@ async function setup(page: Page) {
 
 async function expectMode(page: Page, mode: "paint" | "erase" | "pan", label: string) {
   for (const m of ["paint", "erase", "pan"]) await expect(pressed(page, m)).toHaveAttribute("aria-pressed", String(m === mode));
-  await expect(tool(page)).toHaveText(`${label} · Class 1 · 7 px`);
+  // spec 058 question 4: Erase names no class
+  await expect(tool(page)).toHaveText(mode === "erase" ? "Erase · 7 px" : `${label} · Class 1 · 7 px`);
 }
 
 test("E then a left drag erases class 1 only; Ctrl+Z restores it (criterion 4)", async ({ page }) => {
