@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { pixelAt as cellAt } from "../../src/core/pixel";
 import { maskBits, maskSpans, promptPoints, samWindow } from "../../src/core/smart";
 import { MESSAGES } from "../../src/ui/messages";
-import { jumpTo, labels, logRequests, message, openApp, openRaster, rgbFixture, settled, toLngLat, toScreen, view, type Xy } from "./helpers";
+import { hintOf, jumpTo, labels, logRequests, message, openApp, openRaster, rgbFixture, settled, toLngLat, toScreen, view, type Xy } from "./helpers";
 import { gateWrites, openWrite, writeHeld } from "./lockCombos";
 import { at, inNodata, ND_GRID, noSavePicker, nodataImagery } from "./seeding";
 
@@ -83,7 +83,7 @@ test("a click then Enter labels the square except imagery nodata; one Ctrl+Z res
   expect(new Set(got.keys())).toEqual(new Set(want));
   expect(new Set(got.values())).toEqual(new Set([1]));
 
-  await page.keyboard.press("Control+z");
+  await page.keyboard.press("ControlOrMeta+z");
   expect((await labels(page)).size).toBe(0);
   expect(await page.evaluate(() => (window as any).__geoapp.labels.store.tiles.size)).toBe(0);
   await page.keyboard.press("Control+y");
@@ -128,7 +128,7 @@ test("the Smart button, M, Escape, the status bar and the help list (criterion 7
   await openRaster(page, nodataImagery());
   await expect(message(page)).toHaveText("Raster opened.");
   await expect(smartButton(page)).toHaveAttribute("aria-pressed", "false");
-  await expect(smartButton(page)).toHaveAttribute("title", "Smart select (M)");
+  await expect(smartButton(page)).toHaveAttribute("title", `Smart select (M)\n${hintOf("smart")}`);
   await page.click("#show-labels"); // hidden labels: choosing Smart shows them
   await expect(page.locator("#show-labels")).not.toBeChecked();
   await unfocus(page);
@@ -231,7 +231,7 @@ test("a right click right after Enter leaves the fill, and one Ctrl+Z removes it
   await settled(page);
   await expect(page.locator("#smart-apply")).toBeDisabled();
   expect((await labels(page)).size).toBeGreaterThan(0);
-  await page.keyboard.press("Control+z");
+  await page.keyboard.press("ControlOrMeta+z");
   expect((await labels(page)).size).toBe(0);
   await expect(page.locator("#undo")).toBeDisabled();
   expect(await menus(page)).toEqual([true]);

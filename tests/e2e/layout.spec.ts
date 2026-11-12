@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { editName, jumpTo, message, openApp, openRaster, rgbFixture } from "./helpers";
+import { editName, hintOf, jumpTo, message, openApp, openRaster, rgbFixture } from "./helpers";
 
 // Spec 035 criteria 1-5, at 1280x720.
 test.use({ viewport: { width: 1280, height: 720 } });
@@ -41,7 +41,7 @@ test("before open the side columns are hidden and the map is full width; after o
   await expect(page.locator("#topbar #export-labels")).toBeVisible();
   await expect(page.locator("#topbar #class-map")).toBeVisible();
   for (const m of ["pan", "paint", "erase"]) await expect(page.locator(`#tools #mode-${m}`)).toBeVisible();
-  await expect(page.locator("#tools #mode-paint")).toHaveAttribute("title", "Paint (B)");
+  await expect(page.locator("#tools #mode-paint")).toHaveAttribute("title", `Paint (B)\n${hintOf("paint")}`);
   await expect(page.locator("#tools #undo")).toBeVisible();
   await expect(page.locator("#brush-size")).toHaveText("7");
   await expect(page.locator("#label-opacity-text")).toHaveText("60%");

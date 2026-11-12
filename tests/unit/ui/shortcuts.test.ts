@@ -51,19 +51,81 @@ describe("buttons named by SHORTCUTS", () => {
     for (const id of ids) expect(html, id).toContain(`id="${id}"`);
   });
 
-  it("get a title ending in (<key>) and aria-keyshortcuts", () => {
+  const label = (mac: boolean) => {
     const doc = new FakeDocument();
     const els = new Map<string, FakeElement>(ids.map((id) => [id, doc.createElement("button")]));
-    labelButtons((id) => (els.get(id) ?? null) as unknown as HTMLElement | null);
+    labelButtons((id) => (els.get(id) ?? null) as unknown as HTMLElement | null, mac);
+    return els;
+  };
+
+  it("get a title ending in (<key>) and aria-keyshortcuts", () => {
+    const els = label(false);
     expect(els.get("mode-paint")!.title.split("\n")[0]).toBe("Paint (B)");
     expect(els.get("mode-paint")!.getAttribute("aria-keyshortcuts")).toBe("B");
     expect(els.get("mode-pan")!.getAttribute("aria-keyshortcuts")).toBe("P Escape");
-    expect(els.get("redo")!.title.split("\n")[0]).toBe("Redo (Ctrl+Shift+Z)");
-    expect(els.get("redo")!.getAttribute("aria-keyshortcuts")).toBe("Control+Shift+Z Control+Y");
     for (const id of ids) {
       expect(els.get(id)!.title.split("\n")[0], id).toMatch(/ \(.+\)$/);
       expect(els.get(id)!.getAttribute("aria-keyshortcuts"), id).toBeTruthy();
     }
+  });
+
+  // Spec 057 criterion 2: the platform is passed in, never read from the host
+  it("Undo and Redo read Ctrl off Mac and Cmd on Mac", () => {
+    const off = label(false);
+    expect(off.get("redo")!.title.split("\n")[0]).toBe("Redo (Ctrl+Shift+Z)");
+    expect(off.get("redo")!.getAttribute("aria-keyshortcuts")).toBe("Control+Shift+Z Control+Y");
+    expect(off.get("undo")!.title.split("\n")[0]).toBe("Undo (Ctrl+Z)");
+    const on = label(true);
+    expect(on.get("redo")!.title.split("\n")[0]).toBe("Redo (Cmd+Shift+Z)");
+    expect(on.get("redo")!.getAttribute("aria-keyshortcuts")).toBe("Meta+Shift+Z Control+Y");
+    expect(on.get("undo")!.title.split("\n")[0]).toBe("Undo (Cmd+Z)");
+  });
+
+  // Spec 057 criterion 3
+  it("a title is <action> (<first key>), then a newline and the hint only when there is one", () => {
+    for (const mac of [false, true]) {
+      const els = label(mac);
+      for (const s of SHORTCUTS.filter((x) => x.button)) {
+        const title = els.get(s.button!)!.title;
+        expect(title, s.id).toBe(`${s.action} (${keyLabel(s.keys[0]!, mac)})${s.hint ? `\n${s.hint}` : ""}`);
+        if (!s.hint) expect(title, s.id).not.toContain("\n");
+      }
+    }
+  });
+});
+
+// Spec 057 criterion 9: Gage's four hint texts; every other hint as on main
+describe("hints", () => {
+  const hint = (id: string) => SHORTCUTS.find((s) => s.id === id)?.hint;
+
+  it("paint, erase, smart and fill read as Gage set them", () => {
+    expect(hint("paint")).toBe("Left Drag: paints the selected class\nRight Drag: removes the selected class");
+    expect(hint("erase")).toBe("Removes the selected class");
+    expect(hint("smart")).toBe("Click an object to create an AI-generated mask. More clicks add to it, Shift+click excludes, Enter applies.");
+    expect(hint("fill")).toBe("Click an area to change every connected pixel of the same class to the selected class.");
+  });
+
+  it("#mode-paint's title is the key line, then one line per hint line", () => {
+    const el = new FakeDocument().createElement("button");
+    labelButtons((id) => (id === "mode-paint" ? el : null) as unknown as HTMLElement | null, false);
+    expect(el.title.split("\n")).toEqual(["Paint (B)", "Left Drag: paints the selected class", "Right Drag: removes the selected class"]);
+  });
+
+  it("no hint has a space beside a line break, and the others are unchanged", () => {
+    for (const s of SHORTCUTS) if (s.hint) expect(s.hint, s.id).not.toMatch(/ \n|\n /);
+    const others: Record<string, string> = {
+      pan: "Drag to move the map. A middle drag or WASD pans in any mode.",
+      "smart-apply": "Paints the previewed mask as the selected class.",
+      polygon: "Click corners around a region; Enter, a double click or a click on the first corner fills it. Backspace or right click removes a corner, Escape discards.",
+      "brush-smaller": "Halves the brush (in raster pixels).",
+      "brush-larger": "Doubles the brush (in raster pixels).",
+      help: "Lists every keyboard and mouse shortcut.",
+      undo: "Takes back the last stroke, fill or applied selection.",
+      redo: "Puts back what you undid.",
+    };
+    const changed = ["paint", "erase", "smart", "fill"];
+    expect(SHORTCUTS.filter((s) => s.hint && !changed.includes(s.id)).map((s) => s.id).sort()).toEqual(Object.keys(others).sort());
+    for (const [id, h] of Object.entries(others)) expect(hint(id), id).toBe(h);
   });
 });
 

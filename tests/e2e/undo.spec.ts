@@ -65,7 +65,7 @@ for (const how of ["button", "Ctrl+Z"] as const) {
     await expect(undoButton(page)).toBeEnabled();
     for (let i = 2; i >= 0; i--) {
       if (how === "button") await undoButton(page).click();
-      else { await page.locator("#map canvas").focus(); await page.keyboard.press("Control+z"); }
+      else { await page.locator("#map canvas").focus(); await page.keyboard.press("ControlOrMeta+z"); }
       expect(await snapshot(page)).toEqual(before[i]);
       await expect.poll(() => overlaysMatch(page)).toBe("ok");
     }
@@ -82,7 +82,7 @@ test("Ctrl+Z in a class name field undoes the typing, not a stroke (criterion 3)
   await field.press("End");
   await page.keyboard.type("xy");
   await expect(field).toHaveValue("Class 1xy");
-  await page.keyboard.press("Control+z");
+  await page.keyboard.press("ControlOrMeta+z");
   await expect(field).not.toHaveValue("Class 1xy");
   expect(await snapshot(page)).toEqual(painted);
   await expect(undoButton(page)).toBeEnabled();
@@ -135,7 +135,7 @@ test("opening another raster clears the history (criterion 5)", async ({ page })
   await expect(message(page)).toHaveText("Raster opened.");
   await paintMode(page);
   await expect(undoButton(page)).toBeDisabled();
-  await page.keyboard.press("Control+z");
+  await page.keyboard.press("ControlOrMeta+z");
   expect(await snapshot(page)).toEqual([]);
 });
 

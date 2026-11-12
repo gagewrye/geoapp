@@ -154,7 +154,7 @@ test.describe("spec 010 edges (tester)", () => {
     await page.mouse.down();
     await page.mouse.move(c.x + 40, c.y + 40);
     await expect(undoButton(page)).toBeDisabled();
-    await page.keyboard.press("Control+z");
+    await page.keyboard.press("ControlOrMeta+z");
     await page.mouse.move(c.x + 80, c.y + 40);
     await page.mouse.up();
     await settled(page);
@@ -191,7 +191,7 @@ test.describe("spec 010 edges (tester)", () => {
     expect(await snapshot(page)).toEqual(painted);
     await addTestSelect(page); // the app has no select since spec 017
     await page.focus("#test-select");
-    await page.keyboard.press("Control+z");
+    await page.keyboard.press("ControlOrMeta+z");
     expect(await snapshot(page)).toEqual([]);
     await page.keyboard.press("Control+Shift+z");
     expect(await snapshot(page)).toEqual(painted);

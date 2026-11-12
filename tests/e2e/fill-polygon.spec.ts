@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { polygonSpans } from "../../src/core/polygon";
 import { MESSAGES } from "../../src/ui/messages";
-import { jumpTo, labels, message, openApp, openRaster, rgbFixture, settled, toScreen, view } from "./helpers";
+import { hintOf, jumpTo, labels, message, openApp, openRaster, rgbFixture, settled, toScreen, view } from "./helpers";
 import { at, importFile, inNodata, maskFile, maskValue, ND_GRID, nodataImagery } from "./seeding";
 
 // Spec 054 criteria 10-13. Undo and Redo go through their buttons, whose key differs by platform (spec 045).
@@ -123,8 +123,8 @@ test("F and L select the tools, Escape discards an outline before it selects Pan
   await expect(message(page)).toHaveText("Raster opened.");
   await jumpTo(page, at(408, 408), 9);
   await unfocus(page);
-  await expect(page.locator("#mode-fill")).toHaveAttribute("title", "Fill (F)");
-  await expect(page.locator("#mode-polygon")).toHaveAttribute("title", "Polygon (L)");
+  await expect(page.locator("#mode-fill")).toHaveAttribute("title", `Fill (F)\n${hintOf("fill")}`);
+  await expect(page.locator("#mode-polygon")).toHaveAttribute("title", `Polygon (L)\n${hintOf("polygon")}`);
   await page.keyboard.press("f");
   await pressed(page, "fill");
   await page.keyboard.press("l");
