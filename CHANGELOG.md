@@ -10,7 +10,7 @@ One entry per merge to main, newest first. Details are in the named spec.
   - label view (`label-view.tester`, `label-view-pan.tester`): hidden labels combined with import and export locks; a size change mid-stroke.
   - open progress (`open-progress.tester`, two `race-opens.tester` cases): navigation and import while the preview loads; out-of-order held opens.
   - alpha (`alpha.tester`): the transparency render.
-  - label import (`label-import-progress.tester`, `label-overlay.tester`): the next import not pre-cancelled.
+  - label import (`label-import-progress.tester`, `label-overlay.tester`): the next import not pre-cancelled; restored labels taking settings changed mid-import.
   - space (`space.tester`, `space` at zoom 12): contrast over the stars; a pitched horizon.
   - `label-quads.tester` globe tests (×2): dab = hover on the globe on EPSG:4326, which spec 052 relied on; spec 018 criterion 3 is now checked on UTM only.
   - Kept (6 tests, Gage 2026-11-12; criterion 7 held them back because spec 004 changed after 2026-10-31): `undo-seed.tester`, `label-controls.tester` and `label-lock-export.tester` 55, 75 and 99.

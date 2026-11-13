@@ -1,5 +1,5 @@
-import { expect, type Page } from "@playwright/test";
-import { message, openRaster, paintMode, rgbFixture, tiff } from "./helpers";
+import type { Page } from "@playwright/test";
+import { tiff } from "./helpers";
 
 // Helpers for race-opens.tester.spec.ts: overlapping raster opens, held at the file read.
 
@@ -44,9 +44,3 @@ export const releaseFiles = (page: Page) => page.evaluate(() => {
 /** 800 x 600, 3 bands, at 30..38E, 40..46N; band 1 is 200 west of 34E and 120 east of it. */
 export const otherFixture = () => tiff("other.tif", 800, 600, 3, (b, c) => (b === 0 ? (c < 400 ? 200 : 120) : 150),
   { epsg: 4326, gt: [30, 0.01, 0, 46, 0, -0.01] });
-
-export async function openRgb(page: Page) {
-  await openRaster(page, rgbFixture());
-  await expect(message(page)).toHaveText("Raster opened.");
-  await paintMode(page);
-}
