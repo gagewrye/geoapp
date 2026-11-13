@@ -4,7 +4,7 @@ import { brush, emptyStore, type LabelStore, type NodataMasks } from "../../../s
 import { nodataMask } from "../../../src/core/nodata";
 import { footprint } from "../../../src/core/pixel";
 import { TILE_SIZE } from "../../../src/core/types";
-import { UNDO_BYTES, UNDO_STEPS, editBytes, finishEdit, recordTiles, swapEdit, trimHistory, type Edit } from "../../../src/core/undo";
+import { UNDO_BYTES, UNDO_STEPS, editBytes, finishEdit, recordTiles, swapEdit, trimHistory, type Edit, type Entry } from "../../../src/core/undo";
 import { makeTile } from "../helpers/tiles";
 
 // Tester edge cases for spec 010's core undo: partial edge tiles, empty edits, the tile cap, and trimming bounds.
@@ -69,9 +69,10 @@ describe("recordTiles / finishEdit / swapEdit edges (spec 010 criterion 1, teste
 });
 
 describe("trimHistory edges (spec 010 criterion 2, tester)", () => {
-  const edit = (tiles: number): Edit => new Map(Array.from({ length: tiles }, (_, i) => [`${i * 256},0`, new Uint8Array(TILE)] as const));
+  // trimHistory takes whole entries (spec 063); these hold tiles only
+  const edit = (tiles: number): Entry => ({ tiles: new Map(Array.from({ length: tiles }, (_, i) => [`${i * 256},0`, new Uint8Array(TILE)] as const)), boxes: new Map() });
   it("does nothing to an empty history or one within bounds", () => {
-    const h: Edit[] = [];
+    const h: Entry[] = [];
     trimHistory(h, UNDO_BYTES, UNDO_STEPS);
     expect(h).toEqual([]);
     const h2 = [edit(1), edit(2)];
@@ -80,7 +81,7 @@ describe("trimHistory edges (spec 010 criterion 2, tester)", () => {
     expect(h2).toEqual(keep);
   });
   it("a non-positive byte budget drops every entry holding bytes; all-null entries survive it", () => {
-    const nulls: Edit = new Map([["0,0", null]]);
+    const nulls: Entry = { tiles: new Map([["0,0", null]]), boxes: new Map() };
     const h = [edit(1), nulls];
     trimHistory(h, 0, UNDO_STEPS);
     expect(h).toEqual([nulls]);
@@ -92,7 +93,7 @@ describe("trimHistory edges (spec 010 criterion 2, tester)", () => {
     const h = [edit(256), edit(256)];
     trimHistory(h, UNDO_BYTES, UNDO_STEPS);
     expect(h).toHaveLength(2);
-    expect(h.reduce((n, e) => n + editBytes(e), 0)).toBe(UNDO_BYTES);
+    expect(h.reduce((n, e) => n + editBytes(e.tiles), 0)).toBe(UNDO_BYTES);
   });
   it("maxSteps 0 empties the history", () => {
     const h = [edit(1)];

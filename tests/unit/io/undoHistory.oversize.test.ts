@@ -45,11 +45,11 @@ describe("an oversized edit (spec 048 criterion 6)", () => {
     expect(h.bytes()).toBe(limit);
     const after = snapshot(s, big);
 
-    expect(h.undo()).toHaveLength(600);
+    expect(h.undo()!.tiles).toHaveLength(600);
     expect(h.bytes()).toBeLessThanOrEqual(limit);
     expect(big.every((k) => same(s.tiles.get(k), before.get(k)))).toBe(true);
     expect(h.redoSize).toBe(1);
-    expect(h.redo()).toHaveLength(600);
+    expect(h.redo()!.tiles).toHaveLength(600);
     expect(h.bytes()).toBeLessThanOrEqual(limit);
     expect(big.every((k) => same(s.tiles.get(k), after.get(k)))).toBe(true);
     expect(h.size).toBe(1);
