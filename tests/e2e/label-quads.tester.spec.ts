@@ -10,13 +10,11 @@ import {
 import { importFile, upload } from "./seeding";
 
 // Tester: spec 018 on tiles drawn as several quads: layers per quad, dabs on band edges, the raster edge,
-// the globe, undo, a new raster, and a tile copied from an imported mask.
+// undo, a new raster, and a tile copied from an imported mask.
 test.use({ deviceScaleFactor: 1.25 });
 
 /** 0.05 deg EPSG:4326 from 84N: coarse and far north, so each tile is 128 quads of 2 rows. */
 const COARSE: Grid = { epsg: 4326, gt: [10, 0.05, 0, 84, 0, -0.05], width: 512, height: 256 };
-/** 0.01 deg EPSG:4326 at 45N, as rgbFixture: 8 quads per tile. */
-const MID: Grid = { epsg: 4326, gt: [10, 0.01, 0, 45.5, 0, -0.01], width: 512, height: 256 };
 const hex = (c: string) => [1, 3, 5].map((k) => parseInt(c.slice(k, k + 2), 16));
 const near = (p: number[], t: number[]) => p.every((v, k) => Math.abs(v - t[k]!) <= 3);
 const layerIds = (page: Page) => page.evaluate(() => (window as any).__geoapp.map.getStyle().layers.map((l: { id: string }) => l.id) as string[]);
@@ -26,10 +24,6 @@ const hideAll = async (page: Page) => {
   await page.evaluate(() => (window as any).__geoapp.map.setLayoutProperty("basemap", "visibility", "none"));
   await hideImagery(page); // the preview and spec 020's imagery tiles
 };
-const setLabelsVisible = (page: Page, on: boolean) => page.evaluate((on) => {
-  const { map } = (window as any).__geoapp;
-  for (const l of map.getStyle().layers) if (l.id.startsWith("label-")) map.setLayoutProperty(l.id, "visibility", on ? "visible" : "none");
-}, on);
 const frames = (page: Page) => page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))));
 const offMap = async (page: Page) => { const b = (await page.locator("#panel").boundingBox())!; await page.mouse.move(b.x + b.width / 2, b.y + 10); };
 const classColour = (page: Page): Promise<string> => page.evaluate(() => (window as any).__geoapp.labels.classes[0].colour);
@@ -89,7 +83,7 @@ test("a 128-quad tile: one layer per quad; size-7 dabs on the raster's top edge,
   expect(quads.length).toBe(128);
   const lonLat = await openAt(page, COARSE, 100, 100);
   // MapLibre's globe is not flat at this zoom, and map.project there disagrees with what it draws; Mercator
-  // isolates the quads (the globe is checked against the hover below)
+  // isolates the quads
   await page.evaluate(() => (window as any).__geoapp.map.setProjection({ type: "mercator" }));
   const colour = await classColour(page);
   const bg = hex(BACKGROUND), want = hex(colour).map((v, k) => 0.6 * v + 0.4 * bg[k]!);
@@ -125,39 +119,6 @@ test("a 128-quad tile: one layer per quad; size-7 dabs on the raster's top edge,
   expect(await labelSources(page)).toEqual([]);
   expect(errors).toEqual([]);
 });
-
-for (const [name, grid] of [["0.05 deg at 84N, 128 quads", COARSE], ["0.01 deg at 45N, 8 quads", MID]] as const) {
-  test(`on the globe (default projection), the paint of a size-7 dab matches its hover outline: ${name}`, async ({ page }) => {
-    test.setTimeout(120_000);
-    const lonLat = await openAt(page, grid, 100, 101);
-    const at = await toScreen(page, lonLat(100.5, 101.5));
-    await clickAt(page, at);
-    await settled(page);
-    await offMap(page);
-    await frames(page);
-    const ring = footprintRing(grid, footprint(grid, 100, 101, 7)!) as LngLat[];
-    const painted = (await samples(page, ring)).map((p) => near(p.px, hex(BACKGROUND)) ? 0 : 1);
-    // now the outline alone: hover on, labels hidden
-    await page.mouse.move(at.x, at.y);
-    await setLabelsVisible(page, false);
-    await frames(page);
-    const hs = await samples(page, ring);
-    const hover = hs.map((p) => (near(p.px, hex(BACKGROUND)) ? 0 : 1));
-    expect(hover.some((v) => v) && painted.some((v) => v)).toBe(true);
-    // index grid of the samples, to find hover edges
-    const xs = [...new Set(hs.map((p) => p.x))];
-    const H = (i: number, j: number) => hover[j * xs.length + i] ?? -1;
-    const bad: string[] = [];
-    hs.forEach((p, k) => {
-      if (painted[k] === hover[k]) return;
-      const i = k % xs.length, j = Math.floor(k / xs.length);
-      // a disagreement is allowed only next to the hover's edge (one 2-px sample: its line and rounding)
-      const edge = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([di, dj]) => { const v = H(i + di!, j + dj!); return v !== -1 && v !== hover[k]; });
-      if (!edge) bad.push(`${p.x},${p.y}: painted ${painted[k]} hover ${hover[k]}`);
-    });
-    expect(bad.slice(0, 8), `${bad.length} of ${hs.length} samples disagree away from the outline edge`).toEqual([]);
-  });
-}
 
 test("a tile copied from an imported mask is drawn as its quads, above the mask; undo shows the mask there again", async ({ page }) => {
   test.setTimeout(120_000);

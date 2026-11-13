@@ -74,7 +74,7 @@ const hoverDrawn = (page: Page) => page.evaluate(() => {
 /** Two animation frames: the label display redraws on the next one. */
 const frames = (page: Page) => page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))));
 
-// Spec 052: one raster, the first 10 positions; label-quads.tester checks dab = outline on 4326 at 45N and 84N.
+// Spec 052: one raster, the first 10 positions. Spec 061 dropped the EPSG:4326 globe check, so dab = outline is checked on UTM only.
 for (const [name, grid] of RASTERS.slice(0, 1)) {
   test(`dabs of sizes 1 and 7 cover exactly their outline: ${name} (spec 018 criterion 3)`, async ({ page }) => {
     await openApp(page);

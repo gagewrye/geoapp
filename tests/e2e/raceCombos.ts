@@ -1,20 +1,9 @@
 import { expect, type Page } from "@playwright/test";
-import { jumpTo, message, openRaster, paintMode, rgbFixture, selectClass, stroke, tiff, toScreen } from "./helpers";
+import { message, openRaster, paintMode, rgbFixture, tiff } from "./helpers";
 
 // Helpers for race-opens.tester.spec.ts: overlapping raster opens, held at the file read.
 
-const W_A: [number, number] = [13.005, 45.005], E_B: [number, number] = [17.005, 44.505];
 export const info = (page: Page) => page.locator("#raster-info");
-
-/** Two short strokes at zoom 6: `first` at 13E, `second` at 17E. */
-export async function paintPair(page: Page, first: number, second: number) {
-  await jumpTo(page, [15, 45], 6);
-  const a = await toScreen(page, W_A), b = await toScreen(page, E_B);
-  await selectClass(page, first);
-  await stroke(page, [a, { x: a.x + 30, y: a.y + 20 }, { x: a.x + 60, y: a.y }]);
-  await selectClass(page, second);
-  await stroke(page, [b, { x: b.x + 30, y: b.y - 20 }, { x: b.x + 60, y: b.y }]);
-}
 
 /** Hold FileReader and Blob.arrayBuffer reads of one file name ("all", or "committed": once #raster-info names it), for race-opens.tester.spec.ts and raster-race.spec.ts. */
 export async function fileGate(page: Page) {
