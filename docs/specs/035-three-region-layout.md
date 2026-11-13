@@ -2,6 +2,8 @@
 
 **Status:** Approved by Gage 2026-10-30, with the draft answers to its questions. **ADRs:** none (CSS grid, no framework). **Builds on specs 032–034.** Amended by spec 047 (2026-11-01): the top bar's file actions are Import labels, Apply class map (`#class-map`), Export labels. Amended by spec 056 (2026-11-11): the brush order in scope 3 is +, size, −.
 
+**Amended by spec 064 (2026-11-12):** scope 3's tool strip now starts with the label type switch (`#kinds`: Masks, Boxes, 48 × 22 px radios), and under Boxes it shows Pan, Box (▭), Smart select and Undo/Redo, with the brush controls and Paint–Polygon hidden. Criterion 1 still holds: the strip is 56 px wide.
+
 **Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): unit `ui/modes.structure.tester` (criterion 7).
 
 **Goal:** The map gets as much of the screen as possible. File actions, tools and classes each have one fixed place, and one key hides the side panels.
