@@ -1,7 +1,7 @@
 import type { BrushMode } from "../map/brush";
 
-/** A label type (spec 062, ADR 0037); spec 064 adds "box". */
-export type KindId = "mask";
+/** A label type (spec 062, ADR 0037): masks, and boxes (spec 064). */
+export type KindId = "mask" | "box";
 /** A label type's tools and panel: its modes, the tool strip groups and the panel sections it shows. */
 export type LabelKind = { id: KindId; name: string; modes: readonly BrushMode[]; groups: readonly string[]; sections: readonly string[] };
 
