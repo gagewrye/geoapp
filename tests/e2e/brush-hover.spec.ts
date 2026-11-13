@@ -26,28 +26,26 @@ const countReads = (page: Page) => page.evaluate(() => {
 const reads = (page: Page) => page.evaluate(() => (window as any).__reads as number);
 
 test.describe("hover (criterion 9)", () => {
-  for (const zoom of [14]) {
-    test(`zoom ${zoom}: a mouse moved with no button shows one feature, footprintRing at pixelAt of the pointer, in the selected colour`, async ({ page }) => {
-      await setup(page, zoom);
-      const c = await toScreen(page, zoom === 14 ? [15.0012, 44.9987] : [15.0123, 44.9871]);
-      await moveTo(page, { x: c.x - 30, y: c.y - 20 }, c, 5);
-      const [ll] = await toLngLat(page, [c]);
-      const [col, row] = pixelAt(RGB_GRID, ...ll!);
-      const want = footprintRing(RGB_GRID, footprint(RGB_GRID, col, row, 7)!);
-      await expect.poll(async () => (await hoverFeatures(page)).length).toBe(1);
-      const [f] = await hoverFeatures(page);
-      const ring: [number, number][] = f.geometry.coordinates[0];
-      expect(ring).toHaveLength(5);
-      ring.forEach(([lon, lat], i) => {
-        expect(Math.abs(lon - want[i]![0])).toBeLessThan(1e-6);
-        expect(Math.abs(lat - want[i]![1])).toBeLessThan(1e-6);
-      });
-      const colour = await page.evaluate(() => (window as any).__geoapp.labels.classes[0].colour);
-      expect(await page.evaluate(() => (window as any).__geoapp.map.getPaintProperty("brush-hover-fill", "fill-color"))).toBe(colour);
-      expect(await page.evaluate(() => (window as any).__geoapp.map.getPaintProperty("brush-hover-fill", "fill-opacity"))).toBe(0.4);
-      expect((await labels(page)).size).toBe(0);
+  test("zoom 14: a mouse moved with no button shows one feature, footprintRing at pixelAt of the pointer, in the selected colour", async ({ page }) => {
+    await setup(page, 14);
+    const c = await toScreen(page, [15.0012, 44.9987]);
+    await moveTo(page, { x: c.x - 30, y: c.y - 20 }, c, 5);
+    const [ll] = await toLngLat(page, [c]);
+    const [col, row] = pixelAt(RGB_GRID, ...ll!);
+    const want = footprintRing(RGB_GRID, footprint(RGB_GRID, col, row, 7)!);
+    await expect.poll(async () => (await hoverFeatures(page)).length).toBe(1);
+    const [f] = await hoverFeatures(page);
+    const ring: [number, number][] = f.geometry.coordinates[0];
+    expect(ring).toHaveLength(5);
+    ring.forEach(([lon, lat], i) => {
+      expect(Math.abs(lon - want[i]![0])).toBeLessThan(1e-6);
+      expect(Math.abs(lat - want[i]![1])).toBeLessThan(1e-6);
     });
-  }
+    const colour = await page.evaluate(() => (window as any).__geoapp.labels.classes[0].colour);
+    expect(await page.evaluate(() => (window as any).__geoapp.map.getPaintProperty("brush-hover-fill", "fill-color"))).toBe(colour);
+    expect(await page.evaluate(() => (window as any).__geoapp.map.getPaintProperty("brush-hover-fill", "fill-opacity"))).toBe(0.4);
+    expect((await labels(page)).size).toBe(0);
+  });
 
   test("over the panel, off the raster or off the globe there is none", async ({ page }) => {
     await setup(page, 5);

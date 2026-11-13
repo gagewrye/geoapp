@@ -12,7 +12,7 @@ One entry per merge to main, newest first. Details are in the named spec.
   - ⚠ seam colour (spec 011 criterion 6; `label-seams`).
   - ⚠ an open during an import, and Cancel then a failed read (spec 021; `label-import-progress`).
   - the not-allowed cursor during an Export (`cursor-lock`).
-  - ⚠ opacity and brush size kept on an open, and Pan on load (spec 016 criteria 3 and 8; `label-view`).
+  - ⚠ opacity and brush size kept on an open, Show labels reset on an open, and Pan on load (spec 016 criteria 3, 7 and 8; `label-view`).
   - ⚠ Pan-mode WASD with + focused, and pointercancel ending a middle pan (`navigation`).
 - **Spec 063:** Boxes exist as data: axis-aligned, whole-pixel boxes in a class, held per open raster, with pure geometry for drawing, moving, resizing and hit-testing them. Undo and redo keep one history for mask strokes and box edits (ADR 0038, amending ADR 0015); each box change counts 48 bytes against the 32 MiB budget. Nothing visible changes until spec 064.
 - **Spec 056:** The brush strip reads +, size, −, then the slider, so + sits above the end of the slider that means larger. The ✓ Apply button shows only in Smart select. The three file buttons in the top bar show no "No file chosen" text beside them.

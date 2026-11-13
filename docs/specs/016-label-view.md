@@ -6,7 +6,7 @@
 
 **Amended** (Gage, 2026-10-29): "instead of making the pointer show as blocked when hiding labels, just make it go to pan mode instead. That way there is no blocked state or message to worry about and the user can pan easily." This removes the blocked state. Gage approved the amendment, including the edge cases under "Hiding selects Pan" (Gage, 2026-10-29: "approve").
 
-**Amended by spec 061 (2026-11-12):** `label-view.tester`, `label-view-pan.tester` and `cursor-lock.tester` are deleted, and `label-view.spec.ts` loses its tests of criterion 3 (opacity and brush size kept on an open), criterion 4's Undo while hidden, criterion 6's Show labels in Pan mode, criterion 7 (reset on open) and criterion 8 (Pan on load). Criteria 1, 2, 4, 5 and 6 keep their other `label-view` tests. Criteria 3, 7 and 8 have no e2e test left; unit `ui/labelView` covers their rules. Lost: hidden labels under import and export locks, opacity and size kept on an open, and Pan on load.
+**Amended by spec 061 (2026-11-12):** `label-view.tester`, `label-view-pan.tester` and `cursor-lock.tester` are deleted, and `label-view.spec.ts` loses its tests of criterion 3 (opacity and brush size kept on an open), criterion 4's Undo while hidden, criterion 6's Show labels in Pan mode, criterion 7 (reset on open) and criterion 8 (Pan on load). Criteria 1, 2, 4, 5 and 6 keep their other `label-view` tests. Criteria 3, 7 and 8 have no e2e test left; unit `ui/labelView` covers their rules. Lost: hidden labels under import and export locks, opacity and size kept on an open, Show labels reset on an open (criterion 7), and Pan on load.
 
 **Decided (Gage, 2026-10-29):**
 - Opacity isn't saved across reloads. It is kept for the page session, including when another raster opens.

@@ -31,7 +31,7 @@
 | label-seams ✕ (1) | 120 s, pixel sampling | unit `labelQuads.lattice*` | ⚠ seam colour (spec 011 c6) |
 | label-import-progress 106, 121, 136, 166 | 120 s each | `label-import-progress` 79/150/198; `label-mask` 132; `label-import` 40 | ⚠ open during an import; Cancel then a failed read |
 | cursor-lock 64 | 120 s | `cursor-lock` 30; `label-lock-edits` 7 | the not-allowed cursor during an Export |
-| label-view 95, 145, 236, 262, 274 | 5 opens | `label-view` 55/72/122/163/188/217/245 | ⚠ opacity and size kept on an open; Pan on load (016 c8) |
+| label-view 95, 145, 236, 262, 274 | 5 opens | `label-view` 55/72/122/163/188/217/245 | ⚠ opacity and size kept on an open; reset on an open (016 c7); Pan on load (016 c8) |
 | label-mask 117; shelf 59; undo 76 | opens and imports | `brush-scope` 27; `label-import` 40; unit `ui/undo` | (none) |
 | navigation: 83 "none"; 160 pointercancel and buttons 0; 182 "plus" and "none"; 266 KeyD | WASD timing; 6 opens | the kept "paint" cases; `navigation` 222–248 | ⚠ Pan-mode WASD with + focused; pointercancel ending a middle pan |
 | basemap 63 zoom 3; label-alignment 124 4326; brush-hover 30 zoom 3; brush-paint 35 two moves; edges ✕ | duplicates | the other case; `globe` 19; `brush-paint` 56 | (none) |

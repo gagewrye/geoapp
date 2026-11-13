@@ -57,20 +57,18 @@ async function uniformPoints(page: Page, n: number): Promise<{ ll: LngLat; rgb: 
   }, [lls, n] as const);
 }
 
-// the second runs just below the basemap's maxzoom, the end of the globe-to-Mercator morph (spec 045 amends criterion 3)
+// just below the basemap's maxzoom, the end of the globe-to-Mercator morph, where placement is hardest (spec 045 amends criterion 3)
 const belowMax = (page: Page): Promise<number> => page.evaluate(() => (window as any).__geoapp.map.getLayer("basemap").maxzoom - 0.1);
-for (const [label, centre, zoom] of [["BASEMAP_MAXZOOM - 0.1", [-30, 30], null]] as const) {
-  test(`placement at ${label}: the rendered pixel matches the asset within 12 per channel (criterion 3)`, async ({ page }) => {
-    await openApp(page);
-    await jumpTo(page, [...centre], zoom ?? await belowMax(page));
-    const pts = await uniformPoints(page, 8);
-    expect(pts).toHaveLength(8);
-    for (const { ll, rgb } of pts) {
-      const got = await pixelAt(page, await toScreen(page, ll));
-      expect(near(got, rgb, 12), `${ll}: rendered ${got}, asset ${rgb}`).toBe(true);
-    }
-  });
-}
+test("placement at BASEMAP_MAXZOOM - 0.1: the rendered pixel matches the asset within 12 per channel (criterion 3)", async ({ page }) => {
+  await openApp(page);
+  await jumpTo(page, [-30, 30], await belowMax(page));
+  const pts = await uniformPoints(page, 8);
+  expect(pts).toHaveLength(8);
+  for (const { ll, rgb } of pts) {
+    const got = await pixelAt(page, await toScreen(page, ll));
+    expect(near(got, rgb, 12), `${ll}: rendered ${got}, asset ${rgb}`).toBe(true);
+  }
+});
 
 test("order: background, basemap, then imagery and labels; the opaque preview hides it (criterion 4)", async ({ page }) => {
   await openApp(page);
