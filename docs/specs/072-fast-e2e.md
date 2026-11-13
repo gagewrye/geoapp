@@ -5,7 +5,7 @@
 **Shrunk by spec 073 (2026-11-12; order 061 → 062 → 073 → 071 → 072).**
 - **Superseded rows,** deleted by 073:
   - every `brush-*`, `label-edit` 10, `label-mask` 57, `brush-paint`, `brush-scope` 27 and `brush-slider` 22 row (R1);
-  - every `*.tester` row: `label-persist-lock.t` 26, `label-lock-export.t` ×5, `undo-seed.t` 10, `label-export-snapshot.t` 24, `label-classmap-names.t` 18, `label-controls.t` 31, `brush-space-focus.t` (R2, unless Q1 keeps the saved-data testers).
+  - every `*.tester` row: `label-persist-lock.t` 26, `label-lock-export.t` ×5, `undo-seed.t` 10, `label-export-snapshot.t` 24, `label-classmap-names.t` 18, `label-controls.t` 31, `brush-space-focus.t` (R2; Gage answered Q1 "delete").
 - **The 17 tests left:** `label-persist` 76, 39, 104 and 123; `label-roundtrip` 7; `undo-seed` 76; `undo` 49 and 17; `label-replace` 36 and 64; `save-folder` 91; `class-map` 111; `label-import-progress` 78, 105 and 121; and `import-folder` 86.
 - **Also kept, since Gage said no to their 073 P rows (2026-11-12):** `basemap` 95 and `label-edit` 29. That makes 19 tests. Any other kept test over 15 s on current main is added at build time under the standing rule.
 - **The superseded `*.tester` rows stay deleted:** Gage answered Q1 "delete".
@@ -62,7 +62,7 @@
 | label-mask 57 | 17.0 | F, R (`effectiveTiles` already) |
 | brush-scope 27, import-folder 86, brush-slider 22 | 16.2–15.0 | F, W |
 
-**Not in this spec:** spec 071's tests, the @probe tests (not run on CI) and `smart-model-live` (only with `LIVE_HF=1`).
+**Not in this spec:** spec 071's tests.
 
 ## Acceptance criteria
 1. **Every listed test, and every test split from one, runs in ≤ 15 s on CI** in each of 3 consecutive runs of this spec's PR, read from a CI JSON report. The rest of the suite stays under 15 s too.
@@ -74,7 +74,7 @@
 3. **No fixed waits** in the changed tests: no `waitForTimeout`, and no `labels(page)` (checked by grep in those files). Step 0's timings are recorded in this spec.
 4. **The rule is enforced.**
    - `playwright.config.ts` sets `timeout: process.env.CI ? 15_000 : 60_000`.
-   - No file in `tests/e2e/` calls `test.setTimeout` above 15,000, except files tagged @probe and `smart-model-live`.
+   - No file in `tests/e2e/` calls `test.setTimeout` above 15,000.
    - A `tests/unit/ci.test.ts` assertion checks both.
 5. **Docs:** a CHANGELOG entry, and README's Develop section notes the 15 s limit.
 

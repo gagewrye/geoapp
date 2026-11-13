@@ -90,7 +90,7 @@
 **Targets:** each new or refactored test takes under 15 s on CI, in each of criterion 6's 3 runs.
 
 ## Acceptance criteria
-1. **No tags left.** No file in `tests/` or `playwright.config.ts` contains `@ci-skip` (checked by grep). A `tests/unit/ci.test.ts` assertion replaces the old one: no e2e test title contains `@ci-skip`, and `grepInvert` matches `@probe` only.
+1. **No tags left.** No file in `tests/` or `playwright.config.ts` contains `@ci-skip` (checked by grep). A `tests/unit/ci.test.ts` assertion replaces the old one: no e2e test title contains `@ci-skip`, and `playwright.config.ts` sets no `grepInvert` (it is removed, or `undefined`). Spec 073 removed @probe, so nothing is left to exclude.
 2. **Criteria still fully covered.** Each refactored test keeps every assertion of its criterion: spec 054 c10 (one block recoloured, an unlabelled block fills, a same-class click changes nothing, Undo and Redo); spec 047 c7 (the list, the 0.6 blend in #0000ff, the painted tile byte-equal, Undo); and the rest unchanged. A reviewer checks this against the diff.
 3. **No fixed waits or full scans.** The refactored tests contain no `waitForTimeout`, no `labels(page)` and no `expect.poll` around `pixelAt` or a canvas scan (checked by grep within those tests).
 4. **`labelsIn`** equals the matching entries of `labels()` on a small store, a unit-sized e2e check in `fill-polygon`. Off-raster cells read as 0.
