@@ -2,6 +2,8 @@
 
 **Status:** Approved (Gage waived review, 2026-11-02). **ADRs:** none (no dependency; the file format of ADR 0013 is unchanged). **Amends:** spec 004's `decodeClasses` line in Interfaces. Checked against GDAL master (`frmts/gtiff/gtiffdataset_write.cpp`, `gtiffdataset_read.cpp`, `port/cpl_minixml.cpp`, `port/cpl_string.cpp`, 2026-11-02) and geotiff 3.0.5 (`dist-module/geotiffimage.js` `getGDALMetadata`, `imagefiledirectory.js`).
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): unit `core/classTable.gdal.tester`, and `io/seedTable.gdal.tester`'s empty-table case (renamed `io/seedTable.gdal.test.ts`, three cases kept).
+
 **Goal:** Import labels takes the names and colours from a `GEOAPP_CLASSES` item written by GDAL or rasterio, as it does from an app-written one.
 
 ## Open question (does not block this spec)

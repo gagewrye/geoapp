@@ -4,6 +4,8 @@ Status: Approved (Gage, 2026-10-29: "approve all"). The request (Gage, 2026-10-2
 
 **Amended by spec 061 (2026-11-12):** the tester file `open-progress.tester.spec.ts` is deleted, and so are `race-opens.tester.spec.ts`'s two held-open cases. Criteria 4-9 stay covered by `open-progress` 60-151, `imagery` 84, `raster-race` 16 and 34 and `race-opens.tester` 8. Lost: navigation and Import labels while the preview loads, and out-of-order held opens.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): e2e `open-progress` (criteria 4–9); unit `io/pipeline.progress.tester` (1–3). `io/pipeline.progress.test.ts` stays. No e2e test of the open progress bar is left.
+
 ## Decided (Gage, 2026-10-29)
 1. No Cancel button. By the time the preview starts, the raster is already open, so Cancel would leave it with no imagery. Choosing another file replaces it and stops the old reads (criterion 5).
 2. Import labels, Export labels and class edits stay allowed while the preview loads. They don't paint, and an import selects Pan (spec 016).

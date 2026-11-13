@@ -2,6 +2,8 @@
 
 **Status:** Approved under Gage's 2026-10-30 perf delegation. Criterion 3's 1 s bound is no longer tested end to end (spec 060 c14, 2026-11-12): it measured the machine. **ADRs:** none. **Builds on spec 023:** it amends 023's F3, so background mask reads also wait while the map moves. It touches `map/navigation.ts`, `ui/imagery.ts` and `io/maskCache.ts`'s start condition.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): e2e `steady-pan` (criterion 3); unit `ui/steadyPan.tester`. `ui/steadyPan.test.ts` stays; no e2e test of it is left.
+
 **Goal:** Holding W, A, S or D pans as smoothly as a mouse drag; tiles load once the pan stops.
 
 ## Evidence (perf/baseline.md §4)

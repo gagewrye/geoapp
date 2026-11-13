@@ -6,6 +6,8 @@
 
 **Amended by spec 061 (2026-11-12):** `edges.spec.ts`, criterion 12's globe check, is deleted. Criterion 12 stays covered by `globe.spec.ts` (projection, and the preview at zoom 3 and at the known feature at zoom 14). `brush-180.tester` keeps only its stroke across 180, which opens criterion 16's zone 60 raster.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): e2e `workflow` (criterion 16, rasters at 180°), `globe` (criterion 12) and `brush-180.tester` (criterion 16's zone-60 raster); unit `io/pipeline.edge` (criteria 8 and 16), `io/nodata.edge` (criteria 5, 7 and 9), `io/nodata.inf.edge` and `core/warp.stretch`. The base unit tests of the pipeline, nodata, warp and CRS code stay. No e2e test opens a raster or checks the globe as its subject any more.
+
 **ADRs (all Accepted):** 0001 tiled TIFF writer, 0002 proj4 + warped preview, 0003 terra-draw, 0004 MapLibre >= 6.16 with globe.
 
 **Decided (Gage):** classic TIFF output only, BigTIFF/compression later (0001); CRSs EPSG:4326, 3857 and WGS84 UTM, more later (0002); no cap on training samples; `core/` may import proj4; globe map projection (0004); polygons crossing ±180° or beyond ±`MAX_LAT` are blocked with a message, never silently dropped or clamped (0003); EPSG:4326/3857 rasters whose extent crosses ±180° are refused on open.

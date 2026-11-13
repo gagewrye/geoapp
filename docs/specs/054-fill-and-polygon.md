@@ -2,6 +2,8 @@
 
 **Status:** Accepted (2026-11-11). Proposed by Rahual (2026-11-05); Gage accepted it as built, with the answers below as implemented. **Amended by spec 059:** a fill also fills the holes of at most 2 px its region encloses, so scope 2's region and criterion 3's `floodFill` are no longer a plain flood fill. **ADRs:** none (no dependency; ADR 0009's hand-rolled brush pattern is followed). **Builds on specs 003, 014, 023, 033, 037, 046 and 049.** Reverses part of ADR 0009's Context ("no polygon labelling is left"): polygons come back as a way to fill pixels, not as vector labels.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): e2e `fill-polygon` (criteria 10–13); unit `ui/clickTools`' text match on `labels.ts` (scope 2; that case's behaviour checks stay). `core/fill`, `core/polygon`, `io/fill`, `ui/fill`, `ui/polygon` and `ui/clickTools` stay; no e2e test of Fill or Polygon is left.
+
 **Request** (Rahual, 2026-11-05, correcting the 8-class pseudo-labels on the drone chunks): "add fill tool and polygon tool". Correcting a mask means recolouring whole blobs and outlining large regions; with the brush alone both are slow.
 
 ## Open questions (recommended answers are what the code does)

@@ -2,6 +2,8 @@
 
 **Status:** Accepted (2026-11-11). Gage approved it and answered its questions on 2026-11-11 (below). **ADRs:** none (no dependency or architecture change). **Amends spec 054** scope 2 and criterion 3 (`floodFill` no longer equals a plain flood fill). Shares no files with specs 055-058.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): e2e `fill-polygon`'s hole cases; unit `core/holes.tester` and `io/fill.tester`. `core/holes` and `io/fill` tests stay.
+
 **Request** (Gage): "the Fill tool should also fill small isolated holes enclosed by the fill region, with a 2 px cap." Agreed: a hole is a patch whose label differs from the fill's target, fully enclosed by the filled region, at most 2 px. It takes the selected class in the same fill and the same undo step. Nodata is never filled. A patch touching the region's outside or the edge of the reach stays. The region still spreads 4-connected.
 
 ## Decided by Gage (2026-11-11)

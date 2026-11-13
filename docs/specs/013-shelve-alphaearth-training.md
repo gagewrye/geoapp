@@ -8,6 +8,8 @@
 
 **Amended by spec 061 (2026-11-12):** criterion 8's e2e test (`shelf` "an AlphaEarth-shaped file opens…") is deleted; `label-import` 40 still refuses an AlphaEarth-shaped label file. `nav-undo.tester`, one of the mixed tests listed under Scope, is deleted too.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): e2e `shelf` 58 (criterion 2, no terra-draw in the build); unit `shelf.test` (2 and 3). `shelf` 20 (6) stays. Criteria 2 and 3 have no test.
+
 **Decided (Gage, 2026-10-28):** "remove alphaearth and model training from the site. It is out of the current scope. We are just trying to get labelling right." "Just hide the code from the UI by placing the code unused in a separate folder." Then accepted: `shelf/` stays outside `npm run check` and terra-draw is removed; an AlphaEarth file given to Open GeoTIFF opens as ordinary 64-band imagery; spec numbers 006-008 stay unused (spec 002 and ADR 0012 cite them). `CLAUDE.md` was updated with this approval, so this change leaves it alone.
 
 ## Scope

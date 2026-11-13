@@ -8,6 +8,8 @@
 
 **Amended by spec 061 (2026-11-12):** `nav-undo.tester.spec.ts` is deleted, so the class-name case of spec 052's note is covered by `navigation` "W typed in a class name field" alone. The checks that a size change mid-stroke applies to later cells only (`label-view.tester`) and that the brush size is kept on an open (`label-view`) are deleted.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): e2e `brush-slider` (criteria 2–4). Lost: the slider, its keys and Space have no test.
+
 **Decided (Gage, 2026-10-29):**
 - Every import replaces, with spec 004's `confirm("Replace labels?")` when any label or mask exists. Always Merge was rejected: spec 014 refuses Merge onto a loaded mask, so a second mask could never load.
 - "−" and "+" stay beside the slider, as coarse steps. `[` and `]` halve or double the size (`stepBrush`), which from 7 gives today's sizes exactly.

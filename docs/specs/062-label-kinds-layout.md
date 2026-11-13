@@ -6,6 +6,8 @@
 
 **Amended (2026-11-12, after review, a correction agreed by the orchestrator):** criterion 4 compares the layout before and after the change in the same page, instead of against a fixture recorded on macOS. That fixture failed on Linux CI by 1 px on `#brush-panel`'s height (run 43339686870). An assertion failure in a test this spec adds is not a reason for `@ci-skip`, and spec 060 criterion 7 forbids OS checks in e2e.
 
+**Amended by spec 073 (2026-11-12):** criteria 1–4's tests were run during verification and not kept, per Gage's rule that only lasting regression tests are committed; 062 merged with one `initKinds` unit test. The `tool-strip-tidy` test that criterion 5 edited is deleted by spec 073.
+
 **Request** (Gage, verbatim): "How about an object detection pipeline using bounding boxes. We can expand this tool to include more labelling features, but this would include an overhaul of the UI to accomodate"
 
 **Series, in build order:**

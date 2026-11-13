@@ -2,6 +2,8 @@
 
 **Status:** Accepted (2026-11-12), with the recommended answers, as relayed by the orchestrator. **ADRs:** 0038 (Accepted: one undo history; amends ADR 0015). **Builds on specs 010, 037 and 048.** It is part of the series in spec 062. It adds no UI.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): unit `core/boxes.tester` (criteria 1–5), `io/undoHistory.boxes.tester` (6–8) and `ui/labels.boxes.tester` (scope 6). The base `core/boxes`, `io/undoHistory.boxes` and `ui/labels` tests stay.
+
 ## Decided (Gage, 2026-11-12: the recommended answers)
 1. **One undo history** for masks and boxes (ADR 0038), not a separate box history.
 2. **Integer pixel edges.** Boxes snap to whole pixels, as every mask label does. Sub-pixel boxes would need float edges and gain little at native resolution.

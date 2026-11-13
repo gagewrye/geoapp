@@ -2,6 +2,8 @@
 
 **Status:** Accepted (Gage, 2026-11-11), with the recommended answers to the open questions. **ADRs:** 0035 (Accepted), which supersedes ADR 0032's hosting. **Amends spec 046** (decision 6, scope 1 and 2, criteria 4, 7, 8 and 11) and **spec 013** criterion 6.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): e2e `smart-model.tester` (criteria 7–9, scope 3–4) and `smart-model-live.tester` (10, live only); unit `io/modelCache.tester` (1–4) and `ui/smartLoad.tester` (6, scope 4). `io/segmenter.tester` is renamed `io/segmenter.load.test.ts` (3 and 5) with both cases kept. `smart-model` and `smart-select` stay.
+
 **Request** (Gage): "I want this fixed in the webapp code for the users." Then: "I want it so that the smart select tool only downloads the model when selected. I don't want to have to run npm to get the tool. … If the tool fails, a popup should read that the tool is not available for your device instead of an error. The error should go to a log." **Bug:** the weights were missing, the server answered with `index.html` (200, 4271 bytes), `fetchCached` cached it, and ORT's protobuf error then stayed.
 
 **Decided (Gage, 2026-11-11):** an exact byte-length check, not sha256, and no build guard.

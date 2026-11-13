@@ -6,6 +6,8 @@
 
 **Amended by spec 061 (2026-11-12):** criterion 3 runs at zoom 14 only, and the tester file `space.tester.spec.ts` is deleted. Criterion 2 stays covered by `space` 38. Lost: contrast of text and controls over the stars, and a pitched Mercator horizon.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): unit `ui/style.test` (criterion 4, stars drawn without `url(`). `space` stays.
+
 **Decided (Gage, 2026-10-28):** the stars stay still while the globe turns or zooms; only the globe moves in front of them. Stars that turn with the globe would need a custom WebGL layer. There is no atmosphere glow (see Out).
 
 ## What maplibre-gl 6.16.0 does (checked in `node_modules`, `dist/maplibre-gl-dev.mjs`, style-spec 26.4.4)

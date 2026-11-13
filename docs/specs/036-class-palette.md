@@ -4,6 +4,8 @@
 
 **Amended by spec 057 (2026-11-11):** criterion 10 no longer requires the README to contain "clear **Show** (H)" or "the opacity slider beside it"; Gage shortened the README. The `#status [hidden]` check stands.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): unit `ui/classPanel`'s check that `labels.ts` renders no class list (criterion 8), and `ui/style.test` (10).
+
 **Goal:** Each class row shows its key, its colour and its name at a glance. Renaming is an explicit action, so typing a shortcut never edits a name by accident.
 
 ## Scope

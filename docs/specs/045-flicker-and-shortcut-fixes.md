@@ -4,6 +4,8 @@
 
 **Amended by spec 052 (2026-11-02):** criterion 3's two e2e checks without `@probe` are removed. It is covered by the unit `basemap` `maxzoom` test and `basemap.spec.ts`'s placement check at `BASEMAP_MAXZOOM − 0.1`.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): e2e `flicker-probe` (scope 1, criteria 2 and 3; @probe). No flicker probe is left for `npm run e2e:probe` to run.
+
 **Decided by Gage (2026-10-31), as drafted:**
 1. Above `BASEMAP_MAXZOOM` (draft 12), the ground outside the raster becomes plain dark navy `BACKGROUND` instead of the blurred basemap. At z12 and above the basemap is only a few blurred pixels. The alternative is to re-tile the basemap as a raster source through `addProtocol`, which amends ADR 0014 and needs a new ADR. Draft: the former.
 

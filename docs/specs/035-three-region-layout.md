@@ -2,6 +2,8 @@
 
 **Status:** Approved by Gage 2026-10-30, with the draft answers to its questions. **ADRs:** none (CSS grid, no framework). **Builds on specs 032–034.** Amended by spec 047 (2026-11-01): the top bar's file actions are Import labels, Apply class map (`#class-map`), Export labels. Amended by spec 056 (2026-11-11): the brush order in scope 3 is +, size, −.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): unit `ui/modes.structure.tester` (criterion 7).
+
 **Goal:** The map gets as much of the screen as possible. File actions, tools and classes each have one fixed place, and one key hides the side panels.
 
 **Decided by Gage (2026-10-30), as drafted:** the research suggested Tab to collapse the panels. Tab is how keyboard users move focus (spec 009 and `labelKeys` rely on it), so the draft uses `\` (`e.code === "Backslash"`). Should it be Tab, accepting that conflict?

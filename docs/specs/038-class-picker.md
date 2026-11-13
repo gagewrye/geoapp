@@ -2,6 +2,8 @@
 
 **Status:** Approved by Gage 2026-10-30, with the draft answers to its questions. **ADRs:** none. **Builds on specs 014, 032 and 033.** Amended after implementation (2026-10-30): a failed mask read (scope 3, criterion 3).
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): unit `core/pick`'s check that no file names the removed undo helper (criterion 7).
+
 **Goal:** Alt+click on a labelled pixel, or `I` while hovering one, selects its class.
 
 ## Scope
