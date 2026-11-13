@@ -144,3 +144,46 @@ describe("capped overlays (spec 048 criterion 5)", () => {
     expect(pix.every((p) => values[p] === 0)).toBe(true);
   });
 });
+
+describe("idle (spec 071 criterion 5)", () => {
+  const SMALL: Grid = { epsg: 4326, gt: [10, PX, 0, 1, 0, -PX], width: 512, height: 512 };
+  const settledYet = async (p: Promise<void>) => { let done = false; void p.then(() => { done = true; }); await Promise.resolve(); await Promise.resolve(); return done; };
+
+  it("resolves at once when nothing is pending", async () => {
+    const m = fakeMap({ b: bounds(0, 0, 512, 512) });
+    const display = labelDisplay(m.map, () => emptyStore(512, 512), () => COLOURS);
+    expect(await settledYet(display.idle())).toBe(true);
+    display.open(SMALL);
+    expect(await settledYet(display.idle())).toBe(true);
+  });
+
+  it("resolves only once a redraw has made the stored tiles' overlays", async () => {
+    const s = emptyStore(512, 512);
+    const m = fakeMap({ b: bounds(0, 0, 512, 512) });
+    const display = labelDisplay(m.map, () => s, () => COLOURS);
+    display.open(SMALL);
+    s.tiles.set("0,0", new Uint8Array(65536).fill(1));
+    display.redraw(["0,0"]);
+    const idle = display.idle();
+    expect(await settledYet(idle)).toBe(false);
+    runFrames(m.overlaid);
+    expect(await settledYet(idle)).toBe(true);
+    expect(m.overlaid()).toEqual(new Set(["0,0"]));
+  });
+
+  it("waits for queued quad prefetches", async () => {
+    vi.useFakeTimers();
+    try {
+      const m = fakeMap({ b: bounds(0, 0, 512, 512) });
+      const display = labelDisplay(m.map, () => emptyStore(512, 512), () => COLOURS);
+      display.open(SMALL);
+      display.prefetch(["0,0", "256,0"]);
+      const idle = display.idle();
+      runFrames(m.overlaid);
+      expect(await settledYet(idle)).toBe(false);
+      await vi.runAllTimersAsync(); // no requestIdleCallback here: the cache's timeouts
+      runFrames(m.overlaid);
+      expect(await settledYet(idle)).toBe(true);
+    } finally { vi.useRealTimers(); }
+  });
+});

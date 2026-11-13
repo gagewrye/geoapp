@@ -44,6 +44,33 @@ export async function hideBasemap(page: Page): Promise<void> {
   });
 }
 
+/** Hide the preview and every full-resolution imagery tile (spec 020), including tiles added later, so unpainted space shows what lies below. */
+export async function hideImagery(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const { map } = (window as any).__geoapp;
+    for (const id of map.getLayersOrder() as string[]) if (id === "preview" || id.startsWith("imagery-")) map.setLayoutProperty(id, "visibility", "none");
+    if (map.__imageryHidden) return;
+    map.__imageryHidden = true;
+    const add = map.addLayer.bind(map);
+    map.addLayer = (l: { id: string; layout?: object }, before?: string) =>
+      add(l.id.startsWith("imagery-") ? { ...l, layout: { ...l.layout, visibility: "none" } } : l, before);
+  });
+}
+
+/** Resolves once no label-overlay redraw is scheduled and no quads are queued (spec 071). */
+export const overlaysIdle = (page: Page): Promise<void> => page.evaluate(() => (window as any).__geoapp.overlaysIdle());
+
+/** Waits for the map's next idle. */
+export const mapIdle = (page: Page): Promise<void> => page.evaluate(() => new Promise<void>((r) => {
+  const { map } = (window as any).__geoapp;
+  map.once("idle", () => r());
+  map.triggerRepaint();
+}));
+
+/** Tile keys of the `label-` overlay layers on the map, sorted. */
+export const overlayKeysShown = (page: Page): Promise<string[]> => page.evaluate(() =>
+  [...new Set(((window as any).__geoapp.map.getLayersOrder() as string[]).flatMap((id) => /^label-(\d+,\d+)/.exec(id)?.[1] ?? []))].sort());
+
 /** Select Paint: an open or a successful import selects Pan (spec 016 Tests), so tests that paint after one call this. */
 export async function paintMode(page: Page): Promise<void> {
   await page.click("#mode-paint");

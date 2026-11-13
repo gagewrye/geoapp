@@ -262,6 +262,13 @@ export function labelDisplay(map: MapLibreMap, store: () => LabelStore, colours:
       resetBase();
       refill();
     },
+    /** Resolves once no overlay redraw or fill is scheduled and no quads are queued (e2e: spec 071's overlaysIdle). */
+    idle(): Promise<void> {
+      return new Promise<void>((resolve) => {
+        const check = () => (frame || fillFrame || overlays?.busy ? requestAnimationFrame(check) : resolve());
+        check();
+      });
+    },
     /** The mask layer's preview values (for tests). */
     previewValues: () => mask?.values ?? null,
   };
