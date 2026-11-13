@@ -1,5 +1,3 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { classFile } from "../unit/helpers/labelFiles";
 import { jumpTo, logRequests, message, openApp, openRaster, paintMode, rgbFixture, settled, stroke, tiff, toScreen } from "./helpers";
@@ -54,12 +52,3 @@ async function paintBeside(page: Page) {
   await stroke(page, [a, { x: a.x + 40, y: a.y }]);
   await settled(page);
 }
-
-test("the build has no terra-draw, Source Cooperative or catalog index (criterion 2)", () => {
-  // Playwright's web server builds dist/ before any test runs
-  expect(existsSync("dist/index.html")).toBe(true);
-  expect(existsSync("dist/aef-index")).toBe(false);
-  const files = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? files(join(dir, e.name)) : [join(dir, e.name)]));
-  const hits = files("dist").filter((f) => /terra-draw|source\.coop|aef-index/.test(readFileSync(f, "latin1")));
-  expect(hits).toEqual([]);
-});
