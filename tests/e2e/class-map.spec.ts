@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { paletteColour } from "../../src/core/classes";
 import { toLonLat } from "../../src/core/crs";
 import { CLASS_GRID, classFile, itemFile } from "../unit/helpers/labelFiles";
-import { hideBasemap, jumpTo, message, openApp, openRaster, paintMode, pixelAt, rgbFixture, tileKeysStored, toScreen, type LngLat } from "./helpers";
+import { hideBasemap, hideImagery, jumpTo, mapIdle, message, openApp, openRaster, overlayKeysShown, overlaysIdle, paintMode, pixelAt, rgbFixture, settled, tileKeysStored, toScreen, type LngLat } from "./helpers";
 import { applyMap, classList, effectiveTiles, holdIdb, importFile, openFileGate, pauseLabelFile, storeTiles, upload } from "./seeding";
 
 // Spec 047 criteria 6-10: Apply class map, after Import labels, renames and recolours the imported classes only.
@@ -41,9 +41,9 @@ test("Apply class map comes after Import labels, and is enabled only once labels
   await expect(classMap(page)).toBeEnabled();
 });
 
-test("apply renames and recolours by raw value; the mask repaints, painted tiles and Undo are untouched (criterion 7) @ci-skip", async ({ page }) => {
-  test.setTimeout(120_000);
+test("apply renames and recolours by raw value; the mask repaints, painted tiles and Undo are untouched (criterion 7)", async ({ page }) => {
   await setup(page);
+  await hideImagery(page); // the ground under the probe is BACKGROUND alone, whatever imagery tiles have loaded
   await hideBasemap(page);
   await jumpTo(page, THREE, 8);
   const p = await toScreen(page, THREE);
@@ -57,7 +57,9 @@ test("apply renames and recolours by raw value; the mask repaints, painted tiles
   await page.mouse.move(a.x + 30, a.y + 20);
   await page.mouse.up();
   await expect.poll(async () => (await tileKeysStored(page)).length).toBeGreaterThan(0);
-  await expect(page.locator("#import-labels")).toBeEnabled();
+  await settled(page);
+  await overlaysIdle(page); // spec 071 criterion 5: the stroke's overlays exist once it resolves
+  expect(await overlayKeysShown(page)).toEqual(await tileKeysStored(page));
   const painted = await storeTiles(page);
 
   await applyMap(page, JSON.stringify([{ value: 3, name: "Water", colour: "#0000ff" }, { value: 0, name: "Sand" }]));
@@ -67,7 +69,10 @@ test("apply renames and recolours by raw value; the mask repaints, painted tiles
 
   await jumpTo(page, THREE, 8);
   await page.locator("#brush-panel").hover({ position: { x: 4, y: 4 } }); // no hover footprint over the probe
-  await expect.poll(async () => near(await pixelAt(page, p), rgb("#0000ff").map((v, i) => 0.6 * v + 0.4 * under[i]!))).toBe(true);
+  await overlaysIdle(page);
+  await mapIdle(page);
+  const got = await pixelAt(page, p);
+  expect(near(got, rgb("#0000ff").map((v, i) => 0.6 * v + 0.4 * under[i]!)), `${got} over ${under}`).toBe(true);
 
   await page.click("#undo");
   await expect.poll(() => tileKeysStored(page)).toEqual([]);
