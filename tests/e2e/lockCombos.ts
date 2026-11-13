@@ -24,7 +24,6 @@ export const gateWrites = (page: Page) => page.addInitScript(() => {
 export const writeHeld = (page: Page) => expect.poll(() => page.evaluate(() => (window as any).__writeGate.waiting)).toBe(true);
 export const openWrite = (page: Page) => page.evaluate(() => (window as any).__writeGate.open());
 
-
 /** Every 256x256 tile of a 1000x1000 label file, compared with stored tiles (zeros where none). */
 export async function expectFileHolds(path: string, tiles: Map<string, Uint8Array>, names: string[]): Promise<void> {
   const image = await (await fromArrayBuffer(arrayBuffer(await readFile(path)))).getImage();
