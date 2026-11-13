@@ -2,8 +2,6 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "tests/e2e",
-  // CI skips @ci-skip tests, which time out on its slow software GL; local runs keep them (spec 060 criterion 15)
-  grepInvert: process.env.CI ? /@ci-skip/ : undefined,
   timeout: 60_000,
   // 2 workers per CI shard (4 vCPU, ADR 0036) and locally, where more overloaded Gage's laptop (spec 060)
   workers: 2,

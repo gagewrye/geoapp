@@ -116,7 +116,24 @@ describe("playwright config (spec 060 criteria 3-4)", () => {
   });
 });
 
-describe("e2e tests (spec 060 criterion 7)", () => {
+describe("e2e tests (spec 060 criterion 7, spec 071 criterion 1)", () => {
+  it("run on CI with no tag filtered out", async () => {
+    vi.stubEnv("CI", "true");
+    vi.resetModules();
+    const config = (await import("../../playwright.config")).default;
+    vi.unstubAllEnvs();
+    expect(config.grepInvert).toBeUndefined();
+    const tag = ["@ci", "skip"].join("-"); // spelled apart, so no file in tests/ holds the tag
+    let n = 0;
+    for (const f of readdirSync("tests/e2e", { recursive: true, encoding: "utf8" })) {
+      if (!/\.spec\.[cm]?[jt]s$/.test(f)) continue;
+      const titles = [...readFileSync(`tests/e2e/${f}`, "utf8").matchAll(/\btest(?:\.\w+)?\(\s*(["'`])(.*?)\1/g)].map((m) => m[2]);
+      n += titles.length;
+      expect(titles.filter((t) => t!.includes(tag)), f).toEqual([]);
+    }
+    expect(n).toBeGreaterThan(50); // the title match finds the suite's tests
+  });
+
   it("never branch on the host OS", () => {
     for (const f of readdirSync("tests/e2e", { recursive: true, encoding: "utf8" })) {
       if (!/\.[cm]?[jt]s$/.test(f)) continue;
