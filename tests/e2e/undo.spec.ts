@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
-import { anotherRaster, jumpTo, labels, message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture, settled, toScreen, type Xy } from "./helpers";
+import { anotherRaster, jumpTo, labels, message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture, settled, toScreen } from "./helpers";
 
-// Spec 010: undo of paint and erase strokes (button and Ctrl+Z), and the brush cursor.
+// Spec 010: undo of paint strokes (button and Ctrl+Z). The brush cursor test went with spec 073.
 const undoButton = (page: Page) => page.locator("#undo");
 const snapshot = async (page: Page) => [...(await labels(page))].sort();
 
@@ -63,37 +63,4 @@ test("opening another raster clears the history (criterion 5)", async ({ page })
   await expect(undoButton(page)).toBeDisabled();
   await page.keyboard.press("ControlOrMeta+z");
   expect(await snapshot(page)).toEqual([]);
-});
-
-const cursorAt = (page: Page, p: Xy) => page.evaluate(([x, y]) => getComputedStyle(document.elementFromPoint(x, y)!).cursor, [p.x, p.y] as const);
-const classColour = (page: Page, i: number) => page.evaluate((i) => (window as any).__geoapp.labels.classes[i].colour as string, i);
-function expectBrush(cursor: string, colour: string) {
-  expect(cursor.startsWith('url("data:image/svg+xml')).toBe(true);
-  expect(decodeURIComponent(cursor).toLowerCase()).toContain(colour.toLowerCase());
-  expect(cursor.endsWith("crosshair")).toBe(true);
-}
-
-test("the brush cursor shows the selected colour in Paint mode only (criterion 7)", async ({ page }) => {
-  await openApp(page);
-  const box = (await page.locator("#map canvas").boundingBox())!;
-  const p = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-  expect((await cursorAt(page, p)).startsWith("url(")).toBe(false); // no imagery
-  await openRaster(page, rgbFixture());
-  await expect(message(page)).toHaveText("Raster opened.");
-  await paintMode(page);
-  await page.mouse.move(p.x, p.y);
-  expectBrush(await cursorAt(page, p), await classColour(page, 0));
-  await page.keyboard.press("2");
-  expectBrush(await cursorAt(page, p), await classColour(page, 1));
-  await page.locator("#classes .class-colour").nth(1).fill("#12ab34");
-  expectBrush(await cursorAt(page, p), "#12ab34");
-  const panel = (await page.locator("#panel").boundingBox())!;
-  expect((await cursorAt(page, { x: panel.x + 10, y: panel.y + panel.height - 10 })).startsWith("url(")).toBe(false);
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-  await page.keyboard.down("Space");
-  expect((await cursorAt(page, p)).startsWith("url(")).toBe(false);
-  await page.keyboard.up("Space");
-  expectBrush(await cursorAt(page, p), "#12ab34");
-  await page.click("#mode-pan");
-  expect((await cursorAt(page, p)).startsWith("url(")).toBe(false);
 });

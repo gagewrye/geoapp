@@ -1,8 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
-import { editName, jumpTo, labels, message, openApp, openRaster, paintMode, renameClass, rgbFixture, selectClass, settled, toScreen } from "./helpers";
+import { jumpTo, labels, message, openApp, openRaster, paintMode, renameClass, rgbFixture, selectClass, settled, toScreen } from "./helpers";
 
-// Spec 003 criteria 13 (brush size) and 14 (classes).
+// Spec 003 criterion 14 (classes). Criterion 13 (brush size) went with spec 073.
 
 async function setup(page: Page) {
   await openApp(page);
@@ -11,51 +11,9 @@ async function setup(page: Page) {
   await paintMode(page);
   await jumpTo(page, [15, 45], 9);
 }
-const sizeText = (page: Page) => page.locator("#brush-size");
 const names = (page: Page) => page.locator("#classes .class-name").evaluateAll((els) => els.map((e) => e.textContent));
 const selected = (page: Page) => page.locator("#classes li").evaluateAll((els) => els.findIndex((e) => e.getAttribute("aria-selected") === "true"));
 const hookClasses = (page: Page) => page.evaluate(() => (window as any).__geoapp.labels.classes.map((c: any) => ({ ...c })));
-
-test.describe("brush size (criterion 13)", () => {
-  test("] and + step up and stop at 127; [ and the minus button step down and stop at 1; the text follows", async ({ page }) => {
-    await setup(page);
-    await expect(sizeText(page)).toHaveText("7");
-    await page.locator("#map canvas").focus();
-    const up: string[] = [];
-    for (let i = 0; i < 3; i++) { await page.keyboard.press("]"); up.push((await sizeText(page).textContent())!); }
-    for (let i = 0; i < 3; i++) { await page.click("#brush-larger"); up.push((await sizeText(page).textContent())!); }
-    expect(up).toEqual(["15", "31", "63", "127", "127", "127"]);
-    const down: string[] = [];
-    for (let i = 0; i < 4; i++) { await page.keyboard.press("["); down.push((await sizeText(page).textContent())!); }
-    for (let i = 0; i < 4; i++) { await page.click("#brush-smaller"); down.push((await sizeText(page).textContent())!); }
-    expect(down).toEqual(["63", "31", "15", "7", "3", "1", "1", "1"]);
-  });
-
-  test("a size-15 dab labels 15x15 pixels", async ({ page }) => {
-    await setup(page);
-    await page.click("#brush-larger");
-    await expect(sizeText(page)).toHaveText("15");
-    const c = await toScreen(page, [15.005, 45.005]);
-    await page.mouse.click(c.x, c.y);
-    await settled(page);
-    const got = [...(await labels(page)).keys()].map((k) => k.split(",").map(Number) as [number, number]);
-    expect(got).toHaveLength(225);
-    const cs = got.map((p) => p[0]), rs = got.map((p) => p[1]);
-    expect([Math.max(...cs) - Math.min(...cs), Math.max(...rs) - Math.min(...rs)]).toEqual([14, 14]);
-    expect([Math.min(...cs) + 7, Math.min(...rs) + 7]).toEqual([500, 499]); // centred on the clicked pixel
-  });
-
-  test("typing [, ] or 1 in a class name field changes neither the size nor the selected class", async ({ page }) => {
-    await setup(page);
-    await selectClass(page, 1);
-    const field = await editName(page, 1);
-    await field.press("End");
-    await page.keyboard.type("[]1[1]");
-    await expect(sizeText(page)).toHaveText("7");
-    expect(await selected(page)).toBe(1);
-    await expect(field).toHaveValue("Class 2[]1[1]");
-  });
-});
 
 test.describe("classes (criterion 14)", () => {
   test("starts as Class 1 and Class 2 with Class 1 selected; select by click and by keys 1-9", async ({ page }) => {
