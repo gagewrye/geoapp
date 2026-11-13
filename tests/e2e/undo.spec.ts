@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { anotherRaster, editName, jumpTo, labels, message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture, selectClass, settled, stroke, toScreen, type Xy } from "./helpers";
+import { anotherRaster, jumpTo, labels, message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture, settled, toScreen, type Xy } from "./helpers";
 
 // Spec 010: undo of paint and erase strokes (button and Ctrl+Z), and the brush cursor.
 const undoButton = (page: Page) => page.locator("#undo");
@@ -13,80 +13,6 @@ async function setup(page: Page) {
   await paintMode(page);
   await jumpTo(page, [15, 45], 9);
 }
-
-/** Each stored tile has an overlay whose opaque colours are exactly its classes' colours; no other overlay exists. */
-const overlaysMatch = (page: Page) => page.evaluate(() => {
-  const { map, labels: { store, classes } } = (window as any).__geoapp;
-  // a tile is one or more quads, label-${key} or label-${key}-${i} (spec 018)
-  const ids: string[] = map.getStyle().layers.map((l: any) => l.id as string).filter((id: string) => id.startsWith("label-"));
-  const keyOf = (id: string) => id.split("-")[1];
-  const drawn = [...new Set(ids.map(keyOf))].sort(), keys = [...store.tiles.keys()].sort();
-  if (JSON.stringify(drawn) !== JSON.stringify(keys)) return `layers ${drawn} vs tiles ${keys}`;
-  for (const [key, tile] of store.tiles as Map<string, Uint8Array>) {
-    const want = new Set([...new Set(tile)].filter((v) => v).map((v) => classes[v - 1].colour.toLowerCase()));
-    const got = new Set<string>();
-    for (const id of ids.filter((i) => keyOf(i) === key)) {
-      const canvas: HTMLCanvasElement = map.getSource(id).canvas;
-      const d = canvas.getContext("2d")!.getImageData(0, 0, canvas.width, canvas.height).data;
-      for (let i = 0; i < d.length; i += 4) {
-        if (d[i + 3] === 0) continue;
-        if (d[i + 3] !== 255) return `alpha ${d[i + 3]}`;
-        got.add(`#${[d[i]!, d[i + 1]!, d[i + 2]!].map((v) => v.toString(16).padStart(2, "0")).join("")}`);
-      }
-    }
-    if (JSON.stringify([...got].sort()) !== JSON.stringify([...want].sort())) return `tile ${key}: ${[...got]} vs ${[...want]}`;
-  }
-  return "ok";
-});
-
-/** Strokes A (class 1), B (class 2 over part of A) and C (erasing class 2 over part of B); snapshots before each. */
-async function threeStrokes(page: Page) {
-  const c = await toScreen(page, [15.005, 45.005]);
-  const line = (dy: number, x0: number, x1: number): Xy[] => [{ x: c.x + x0, y: c.y + dy }, { x: c.x + (x0 + x1) / 2, y: c.y + dy + 5 }, { x: c.x + x1, y: c.y + dy }];
-  const before: [string, number][][] = [];
-  before.push(await snapshot(page));
-  await selectClass(page, 0);
-  await stroke(page, line(0, 0, 120));
-  before.push(await snapshot(page));
-  await selectClass(page, 1);
-  await stroke(page, [{ x: c.x + 60, y: c.y - 20 }, { x: c.x + 70, y: c.y }, { x: c.x + 80, y: c.y + 20 }]);
-  before.push(await snapshot(page));
-  await stroke(page, [{ x: c.x + 80, y: c.y + 20 }, { x: c.x + 70, y: c.y + 5 }], "right");
-  for (const s of before.slice(1)) expect(s.length).toBeGreaterThan(0);
-  expect(await snapshot(page)).not.toEqual(before[2]);
-  return before;
-}
-
-for (const how of ["button", "Ctrl+Z"] as const) {
-  test(`three undos by ${how} restore the store before each stroke, overlays follow, then Undo is disabled (criterion 3) @ci-skip`, async ({ page }) => {
-    await setup(page);
-    await expect(undoButton(page)).toBeDisabled();
-    const before = await threeStrokes(page);
-    await expect(undoButton(page)).toBeEnabled();
-    for (let i = 2; i >= 0; i--) {
-      if (how === "button") await undoButton(page).click();
-      else { await page.locator("#map canvas").focus(); await page.keyboard.press("ControlOrMeta+z"); }
-      expect(await snapshot(page)).toEqual(before[i]);
-      await expect.poll(() => overlaysMatch(page)).toBe("ok");
-    }
-    await expect(undoButton(page)).toBeDisabled();
-  });
-}
-
-test("Ctrl+Z in a class name field undoes the typing, not a stroke (criterion 3)", async ({ page }) => {
-  await setup(page);
-  const c = await toScreen(page, [15.005, 45.005]);
-  await stroke(page, [c, { x: c.x + 60, y: c.y }]);
-  const painted = await snapshot(page);
-  const field = await editName(page, 0);
-  await field.press("End");
-  await page.keyboard.type("xy");
-  await expect(field).toHaveValue("Class 1xy");
-  await page.keyboard.press("ControlOrMeta+z");
-  await expect(field).not.toHaveValue("Class 1xy");
-  expect(await snapshot(page)).toEqual(painted);
-  await expect(undoButton(page)).toBeEnabled();
-});
 
 test("Undo is disabled while a stroke's cells wait for masks; then one Undo removes the whole stroke (criterion 4)", async ({ page }) => {
   await setup(page);

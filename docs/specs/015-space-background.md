@@ -4,6 +4,8 @@
 
 **Status:** Approved (Gage, 2026-10-28). Gage asked: "Add a space backgroun to the globe view similar to what google maps has". He then accepted that the stars stay still. Revised 2026-10-28: stars only, no atmosphere glow. Gage chose option 1, "Drop the glow, stars only (the smallest change; no existing pixel tests need hideSky)". **ADRs:** none. There is no new dependency or asset, and privacy is unchanged (ADRs 0005 and 0014). This spec is independent of specs 013 and 014, so it can be built first or in parallel (see Build order).
 
+**Amended by spec 061 (2026-11-12):** criterion 3 runs at zoom 14 only, and the tester file `space.tester.spec.ts` is deleted. Criterion 2 stays covered by `space` 38. Lost: contrast of text and controls over the stars, and a pitched Mercator horizon.
+
 **Decided (Gage, 2026-10-28):** the stars stay still while the globe turns or zooms; only the globe moves in front of them. Stars that turn with the globe would need a custom WebGL layer. There is no atmosphere glow (see Out).
 
 ## What maplibre-gl 6.16.0 does (checked in `node_modules`, `dist/maplibre-gl-dev.mjs`, style-spec 26.4.4)

@@ -9,6 +9,8 @@
 
 Amended by spec 048 (2026-11-01): there is no tile cap (ADR 0033). `MAX_LABEL_TILES` and `brush`'s `"full"` are gone, so Storage's "full" sentence, criterion 4's cap clause and criterion 15's last sentence lapse. Display: at most 256 stored tiles in view have overlays, and every label also shows on the preview-resolution `mask` layer (spec 014), hidden only under overlays.
 
+**Amended by spec 061 (2026-11-12):** criterion 14's recolour test (`brush-panel` "recolouring…", @ci-skip) goes: criterion 14 stays covered by `brush-panel` 61 and 82 and `label-mask` "display…" (criterion 11, a recolour repaints the mask); no e2e test checks a recolour repainting a tile overlay or the hover fill. The brush tester edge cases go (Tier B): `brush-input.tester`, `brush-edge.tester`, `brush-nodata.tester`, `brush-gaps.tester` and `brush-scope.tester` whole; `brush-handler-matrix.tester` keeps only Paint and Pan; `brush-contextmenu-all.tester` keeps only "imagery open, Paint"; `brush-180.tester` keeps only the stroke across 180. Criterion 9 keeps its zoom 14 hover case (`brush-hover`), and criterion 10 its 20-move drag (`brush-paint`). Unit `map/brush.*`, `core/brush.tester`, `core/pixel`, `core/nodata` and `core/spans` cover the rules. Lost: a right press mid-stroke, pinch, keyboard zoom, a blur ending a stroke, the clipped edge hover, MAX_LAT, the hover at 180 and the world copy, and the zoom 3 hover.
+
 **Decided (Gage)**, besides what Scope and Rules state: polygon code is deleted, not flagged off (2026-10-26). Train's snapshot copies the stored tiles, at most 16 MiB (ADR 0010); the 500 ms post-erase `contextmenu` guard applies on the map only, not the panel; a model loaded while a Train runs is replaced when that Train finishes (2026-10-27).
 
 ## Scope

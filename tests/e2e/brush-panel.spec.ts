@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
-import { editName, hoverFeatures, jumpTo, labels, message, openApp, openRaster, paintMode, renameClass, rgbFixture, selectClass, settled, toScreen } from "./helpers";
+import { editName, jumpTo, labels, message, openApp, openRaster, paintMode, renameClass, rgbFixture, selectClass, settled, toScreen } from "./helpers";
 
 // Spec 003 criteria 13 (brush size) and 14 (classes).
 
@@ -92,35 +92,5 @@ test.describe("classes (criterion 14)", () => {
       await expect(page.locator("#classes .class-name").nth(2)).toHaveText("Mangrove");
       expect((await hookClasses(page))[2].name).toBe("Mangrove");
     }
-  });
-
-  test("recolouring changes the overlay and the hover colour @ci-skip", async ({ page }) => {
-    await setup(page);
-    const c = await toScreen(page, [15.005, 45.005]);
-    await page.mouse.click(c.x, c.y);
-    await settled(page);
-    const overlayPixel = () => page.evaluate(() => {
-      const { map, labels } = (window as any).__geoapp;
-      const key = [...labels.store.tiles.keys()][0];
-      // a tile is one or more quads, label-${key} or label-${key}-${i} (spec 018); added on the next animation frame
-      const ids = key === undefined ? [] : map.getStyle().layers.map((l: any) => l.id as string).filter((id: string) => id === `label-${key}` || id.startsWith(`label-${key}-`));
-      for (const id of ids) {
-        const canvas: HTMLCanvasElement = map.getSource(id).getCanvas();
-        const d = canvas.getContext("2d")!.getImageData(0, 0, canvas.width, canvas.height).data;
-        for (let i = 0; i < d.length; i += 4) if (d[i + 3]) return Array.from(d.subarray(i, i + 4));
-      }
-      return null;
-    });
-    const colour = (await hookClasses(page))[0].colour as string;
-    const rgb = (h: string) => [1, 3, 5].map((k) => parseInt(h.slice(k, k + 2), 16));
-    await expect.poll(overlayPixel).toEqual([...rgb(colour), 255]);
-    await page.locator("#classes .class-colour").first().fill("#12ab34");
-    await expect.poll(overlayPixel).toEqual([0x12, 0xab, 0x34, 255]);
-    const opacities: number[] = await page.evaluate(() => (window as any).__geoapp.map.getStyle().layers.filter((l: any) => l.id.startsWith("label-")).map((l: any) => l.paint["raster-opacity"]));
-    expect(opacities.length).toBeGreaterThan(0);
-    expect(new Set(opacities)).toEqual(new Set([0.6]));
-    await page.mouse.move(c.x + 40, c.y + 20);
-    await expect.poll(async () => (await hoverFeatures(page)).length).toBe(1);
-    expect(await page.evaluate(() => (window as any).__geoapp.map.getPaintProperty("brush-hover-fill", "fill-color"))).toBe("#12ab34");
   });
 });

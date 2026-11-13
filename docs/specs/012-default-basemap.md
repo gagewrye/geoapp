@@ -8,6 +8,8 @@
 
 **Amended by spec 052 (2026-11-02):** criterion 6 (not hideable) is dropped with its e2e test: it named the AlphaEarth preview and the area tool, which are gone. Layer order stays in `basemap.spec.ts` (criterion 4) and `label-alignment.spec.ts` (spec 018 criterion 5).
 
+**Amended by spec 061 (2026-11-12):** criterion 3 keeps only its `BASEMAP_MAXZOOM - 0.1` case; the zoom 3 globe case is deleted (`globe` 19 renders zoom 3).
+
 ## Scope
 In: one bundled Web Mercator image as the bottom map layer, always shown; its provenance file; adapting existing pixel tests.
 Out: vector or labelled basemaps, borders, place names; fetched tiles; higher resolutions; anything beyond ±`MAX_LAT` (ADR 0004); any user control to hide, dim or swap it.

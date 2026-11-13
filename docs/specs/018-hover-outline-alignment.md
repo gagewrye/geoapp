@@ -6,6 +6,8 @@
 
 **Amended by spec 052 (2026-11-02):** criterion 3's e2e test runs on one raster, the EPSG:32633 one, at the first 10 of its 40 positions. `label-quads.tester.spec.ts` checks dab = outline on EPSG:4326 at 45°N and 84°N.
 
+**Amended by spec 061 (2026-11-12):** `label-quads.tester.spec.ts` is deleted, and criteria 3 and 5 are checked on UTM only: `label-alignment` 79 and 124 (EPSG:32633). Unit `labelQuads*` check the quad math. Lost: dab = hover on the globe on EPSG:4326, which spec 052 relied on; rendering of 128-quad tiles; and mask-tile quads drawn above the mask.
+
 **What Gage reported** (testing main, display scale 125%):
 - "The highlight is under the pointer and correct. When it paints it is off. Its weird, the direction of the offset seems to change based on the area selected."
 - The offset is about one or two image pixels, the same at every zoom, and the pre-009 build (90f8f00) has it too.

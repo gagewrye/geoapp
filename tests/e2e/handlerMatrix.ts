@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { jumpTo, message, moveTo, openRaster, paintMode, rgbFixture, tiff, toScreen } from "./helpers";
+import { jumpTo, message, moveTo, openRaster, paintMode, rgbFixture, toScreen } from "./helpers";
 
 // Helpers for brush-handler-matrix.tester.spec.ts: MapLibre handler flags and the gestures they gate.
 
@@ -63,12 +63,3 @@ export async function openRgb(page: Page): Promise<void> {
   await paintMode(page);
   await jumpTo(page, CENTRE, 7);
 }
-/** A second raster over the same place, so the view stays on imagery. */
-export async function openOther(page: Page): Promise<void> {
-  await openRaster(page, tiff("other.tif", 1000, 1000, 3, (b, c) => (b === 0 ? (c < 500 ? 90 : 160) : 140),
-    { epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01] }));
-  await expect(page.locator("#raster-info")).toContainText("other.tif");
-  await expect(message(page)).toHaveText("Raster opened.");
-  await jumpTo(page, CENTRE, 7);
-}
-export const blurFocus = (page: Page) => page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());

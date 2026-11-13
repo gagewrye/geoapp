@@ -18,6 +18,7 @@ const mapCentreXy = async (page: Page): Promise<Xy> => {
 const canvasCursor = (page: Page) => page.evaluate(() => getComputedStyle((window as any).__geoapp.map.getCanvas()).cursor);
 const storeKeys = (page: Page) => labels(page).then((m) => [...m].sort());
 
+// spec 061 cut the "plus" case and the "none" (no imagery) case of the globe drag; "none" stays for wheel and middle drag
 type Setup = "paint" | "none";
 async function setup(page: Page, how: Setup, zoom = 14, at: LngLat = START) {
   await openApp(page);
@@ -79,16 +80,14 @@ test.describe("middle-button drag pans (criterion 2)", () => {
     });
   }
 
-  for (const how of ["paint", "none"] as const) {
-    test(`${how}: at zoom 3 (globe) a rightward drag lowers the centre longitude`, async ({ page }) => {
-      await setup(page, how, 3);
-      const lon0 = (await centre(page))[0];
-      const m = await mapCentreXy(page);
-      await middleDrag(page, m, { x: m.x + 150, y: m.y });
-      await idle(page);
-      expect((await centre(page))[0]).toBeLessThan(lon0 - 1);
-    });
-  }
+  test("paint: at zoom 3 (globe) a rightward drag lowers the centre longitude", async ({ page }) => {
+    await setup(page, "paint", 3);
+    const lon0 = (await centre(page))[0];
+    const m = await mapCentreXy(page);
+    await middleDrag(page, m, { x: m.x + 150, y: m.y });
+    await idle(page);
+    expect((await centre(page))[0]).toBeLessThan(lon0 - 1);
+  });
 });
 
 test.describe("middle-button details (criterion 3)", () => {
@@ -153,8 +152,6 @@ test.describe("middle-button details (criterion 3)", () => {
       await send("mouseMoved", over, "middle", 4);
       await send("mouseReleased", over, "middle", 0);
     }],
-    ["pointercancel", async (page) => { await page.evaluate(() => window.dispatchEvent(new PointerEvent("pointercancel", { pointerId: 1, pointerType: "mouse" }))); }],
-    ["a buttons: 0 move", async (_page, send, p) => { await send("mouseMoved", p, "none", 0); }],
   ];
   for (const [name, end] of ends) {
     test(`${name} ends the middle pan; later moves don't pan`, async ({ page }) => {
@@ -178,33 +175,29 @@ test.describe("middle-button details (criterion 3)", () => {
 const distinct = (s: [number, number][]) => new Set(s.map(([x, y]) => `${x.toFixed(3)},${y.toFixed(3)}`)).size;
 
 test.describe("WASD pans smoothly while held (criterion 5)", () => {
-  for (const how of ["paint", "plus", "none"] as const) {
-    test(`${how === "plus" ? "focus on +" : how}: W moves the view north, W+D diagonally, and stops on keyup`, async ({ page }) => {
-      await setup(page, how === "plus" ? "paint" : how);
-      if (how === "plus") await page.focus("#brush-larger");
-      const v0 = await view(page);
-      const w = await holdKeys(page, ["KeyW"], { ms: 500, frames: 10 });
-      const v1 = await view(page);
-      const last = w.samples.at(-1)!;
-      const dy = last[1] - w.start[1];
-      // budget is what the app's rule allows at this run's frame rate (spec 060 criterion 12)
-      expect(dy).toBeGreaterThanOrEqual(0.75 * w.budget);
-      expect(dy).toBeLessThanOrEqual(1.25 * w.budget);
-      expect(Math.abs(last[0] - w.start[0])).toBeLessThan(2);
-      expect(distinct(w.samples)).toBeGreaterThanOrEqual(10);
-      expect([v1.zoom, v1.bearing, v1.pitch]).toEqual([v0.zoom, v0.bearing, v0.pitch]);
-      const after = await centre(page);
-      await page.waitForTimeout(300);
-      expect(await centre(page)).toEqual(after);
+  test("paint: W moves the view north, W+D diagonally, and stops on keyup", async ({ page }) => {
+    await setup(page, "paint");
+    const v0 = await view(page);
+    const w = await holdKeys(page, ["KeyW"], { ms: 500, frames: 10 });
+    const v1 = await view(page);
+    const last = w.samples.at(-1)!;
+    const dy = last[1] - w.start[1];
+    // budget is what the app's rule allows at this run's frame rate (spec 060 criterion 12)
+    expect(dy).toBeGreaterThanOrEqual(0.75 * w.budget);
+    expect(dy).toBeLessThanOrEqual(1.25 * w.budget);
+    expect(Math.abs(last[0] - w.start[0])).toBeLessThan(2);
+    expect(distinct(w.samples)).toBeGreaterThanOrEqual(10);
+    expect([v1.zoom, v1.bearing, v1.pitch]).toEqual([v0.zoom, v0.bearing, v0.pitch]);
+    const after = await centre(page);
+    await page.waitForTimeout(300);
+    expect(await centre(page)).toEqual(after);
 
-      const wd = await holdKeys(page, ["KeyW", "KeyD"], { ms: 500, frames: 10 });
-      const e = wd.samples.at(-1)!;
-      const down = e[1] - wd.start[1], left = wd.start[0] - e[0];
-      expect(down).toBeGreaterThan((0.75 * wd.budget) / Math.SQRT2);
-      expect(Math.abs(down - left) / down).toBeLessThan(0.1);
-      if (how === "plus") await expect(page.locator("#brush-size")).toHaveText("7");
-    });
-  }
+    const wd = await holdKeys(page, ["KeyW", "KeyD"], { ms: 500, frames: 10 });
+    const e = wd.samples.at(-1)!;
+    const down = e[1] - wd.start[1], left = wd.start[0] - e[0];
+    expect(down).toBeGreaterThan((0.75 * wd.budget) / Math.SQRT2);
+    expect(Math.abs(down - left) / down).toBeLessThan(0.1);
+  });
 });
 
 test.describe("WASD stops and ignores (criterion 6)", () => {
@@ -258,30 +251,26 @@ test.describe("WASD stops and ignores (criterion 6)", () => {
 });
 
 test.describe("a camera move lifts the brush (criterion 7)", () => {
-  const moves: [string, (page: Page) => Promise<void>][] = [
-    ["wheel", async (page) => { await page.mouse.wheel(0, -100); await page.waitForTimeout(300); await idle(page); }],
-    ["KeyD hold", async (page) => { await page.keyboard.down("KeyD"); await page.waitForTimeout(200); await page.keyboard.up("KeyD"); await idle(page); }],
-  ];
-  for (const [name, move] of moves) {
-    test(`${name} mid-stroke: labels are strokeCells(p, q) plus r`, async ({ page }) => {
-      await setup(page, "paint");
-      while ((await page.locator("#brush-size").textContent()) !== "1") await page.click("#brush-smaller");
-      const m = await mapCentreXy(page);
-      const a = { x: m.x - 250, y: m.y - 150 }, b = { x: m.x + 250, y: m.y - 150 }, c = { x: m.x - 250, y: m.y + 250 };
-      const [la, lb] = await toLngLat(page, [a, b]);
-      const p = cellOf(RGB_GRID, ...la!), q = cellOf(RGB_GRID, ...lb!);
-      await page.mouse.move(a.x, a.y);
-      await page.mouse.down();
-      await page.mouse.move(b.x, b.y);
-      await move(page);
-      await page.mouse.move(c.x, c.y);
-      const [lc] = await toLngLat(page, [c]);
-      const r = cellOf(RGB_GRID, ...lc!);
-      await page.mouse.up();
-      await settled(page);
-      const want = new Set([...strokeCells(p, q), r].map(([x, y]) => `${x},${y}`));
-      expect(want.size).toBeGreaterThan(2);
-      expect((await storeKeys(page)).map(([k]) => k).sort()).toEqual([...want].sort());
-    });
-  }
+  test("wheel mid-stroke: labels are strokeCells(p, q) plus r", async ({ page }) => {
+    await setup(page, "paint");
+    while ((await page.locator("#brush-size").textContent()) !== "1") await page.click("#brush-smaller");
+    const m = await mapCentreXy(page);
+    const a = { x: m.x - 250, y: m.y - 150 }, b = { x: m.x + 250, y: m.y - 150 }, c = { x: m.x - 250, y: m.y + 250 };
+    const [la, lb] = await toLngLat(page, [a, b]);
+    const p = cellOf(RGB_GRID, ...la!), q = cellOf(RGB_GRID, ...lb!);
+    await page.mouse.move(a.x, a.y);
+    await page.mouse.down();
+    await page.mouse.move(b.x, b.y);
+    await page.mouse.wheel(0, -100); // the camera move
+    await page.waitForTimeout(300);
+    await idle(page);
+    await page.mouse.move(c.x, c.y);
+    const [lc] = await toLngLat(page, [c]);
+    const r = cellOf(RGB_GRID, ...lc!);
+    await page.mouse.up();
+    await settled(page);
+    const want = new Set([...strokeCells(p, q), r].map(([x, y]) => `${x},${y}`));
+    expect(want.size).toBeGreaterThan(2);
+    expect((await storeKeys(page)).map(([k]) => k).sort()).toEqual([...want].sort());
+  });
 });

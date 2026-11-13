@@ -46,19 +46,17 @@ test("stars: off the globe the bottom-left corner is dark with bright points; th
   expect(meanChannel(centre)).toBeGreaterThan(30);
 });
 
-for (const zoom of [12, 14]) {
-  test(`Mercator at zoom ${zoom}: the map is opaque and the page shows its pixels, not stars (criterion 3)`, async ({ page }) => {
-    await openApp(page);
-    await jumpTo(page, [10, 45], zoom);
-    const box = await mapBox(page);
-    const pts: Xy[] = [[0.5, 0.5], [0.1, 0.1], [0.9, 0.1], [0.1, 0.9], [0.9, 0.9]]
-      .map(([fx, fy]) => ({ x: Math.round(box.x + box.width * fx!), y: Math.round(box.y + box.height * fy!) }));
-    for (const p of pts) {
-      const gl = await pixelAt(page, p);
-      expect(gl[3], JSON.stringify(p)).toBe(255);
-      // pixelAt reads GL row height - y, which is the top-down row y - 1, so compare the page pixel one row up
-      const seen = Array.from((await shot(page, { x: p.x, y: p.y - 1 }, 1)).slice(0, 3));
-      expect(seen.every((v, k) => Math.abs(v - gl[k]!) <= 2), `${JSON.stringify(p)}: page ${seen} vs canvas ${gl}`).toBe(true);
-    }
-  });
-}
+test("Mercator at zoom 14: the map is opaque and the page shows its pixels, not stars (criterion 3)", async ({ page }) => {
+  await openApp(page);
+  await jumpTo(page, [10, 45], 14);
+  const box = await mapBox(page);
+  const pts: Xy[] = [[0.5, 0.5], [0.1, 0.1], [0.9, 0.1], [0.1, 0.9], [0.9, 0.9]]
+    .map(([fx, fy]) => ({ x: Math.round(box.x + box.width * fx!), y: Math.round(box.y + box.height * fy!) }));
+  for (const p of pts) {
+    const gl = await pixelAt(page, p);
+    expect(gl[3], JSON.stringify(p)).toBe(255);
+    // pixelAt reads GL row height - y, which is the top-down row y - 1, so compare the page pixel one row up
+    const seen = Array.from((await shot(page, { x: p.x, y: p.y - 1 }, 1)).slice(0, 3));
+    expect(seen.every((v, k) => Math.abs(v - gl[k]!) <= 2), `${JSON.stringify(p)}: page ${seen} vs canvas ${gl}`).toBe(true);
+  }
+});

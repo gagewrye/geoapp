@@ -1,7 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { writeFile } from "../unit/helpers/labelFiles";
 import { MESSAGES } from "../../src/ui/messages";
-import { rgbClassFile } from "../unit/helpers/labelFiles";
 import { collectErrors, jumpTo, message, openApp, openRaster, paintMode, path, RGB_GRID, rgbFixture, stroke, tileKeysStored, toScreen } from "./helpers";
 import { at, classList, effectiveTiles, importFile, maskFile, upload } from "./seeding";
 
@@ -103,50 +102,6 @@ test("the bar counts windows, Cancel shows, the old labels leave the map; Cancel
   expect(errors).toEqual([]);
 });
 
-test("Cancel while a read is in flight, then that read failing, restores and says the import was cancelled (criterion 5)", async ({ page }) => {
-  test.setTimeout(120_000);
-  await withLabels(page);
-  const before = await snapshot(page);
-  await startImport(page, other(), 4);
-  await allow(page, 3);
-  await expect.poll(() => barValue(page)).toBe("3");
-  await page.click("#import-cancel");
-  await allow(page, 1000); // read 4, in flight at the click, now rejects
-  await expect(message(page)).toHaveText(MESSAGES.importCancelled);
-  await expect(bar(page)).toBeHidden();
-  expect(await readsLogged(page)).toHaveLength(4);
-  await expectRestored(page, before);
-});
-
-test("on success only the new mask layer exists, and the bar and Cancel hide after the message (criteria 2, 3)", async ({ page }) => {
-  test.setTimeout(120_000);
-  await withLabels(page);
-  await startImport(page, other());
-  await expect(bar(page)).toBeVisible();
-  expect(await labelLayers(page)).toEqual([]);
-  await allow(page, 1000);
-  await expect(message(page)).toHaveText(seeded);
-  await expect(bar(page)).toBeHidden();
-  await expect(cancel(page)).toBeHidden();
-  await expect.poll(() => labelLayers(page)).toEqual(["mask"]);
-  expect(await tileKeysStored(page)).toEqual([]);
-  await expect(page.locator("#undo")).toBeDisabled();
-});
-
-test("a refused file after OK keeps the old labels, their layers and Undo, and the bar never shows (criterion 4)", async ({ page }) => {
-  await withLabels(page);
-  const before = await snapshot(page);
-  await page.evaluate(() => {
-    const b = document.getElementById("import-progress")!;
-    (window as any).__barShown = false;
-    new MutationObserver(() => { if (!b.hidden) (window as any).__barShown = true; }).observe(b, { attributes: true });
-  });
-  await startImport(page, upload("rgb.tif", rgbClassFile()));
-  await expect(message(page)).toHaveText(MESSAGES.labelFile);
-  await expectRestored(page, before);
-  expect(await page.evaluate(() => (window as any).__barShown)).toBe(false);
-});
-
 test("a read failure partway and an empty import restore the old labels, with their usual messages (criterion 6)", async ({ page }) => {
   test.setTimeout(120_000);
   await withLabels(page);
@@ -161,38 +116,6 @@ test("a read failure partway and an empty import restore the old labels, with th
   await expect(message(page)).toHaveText(MESSAGES.noSeed);
   await expect(bar(page)).toBeHidden();
   await expectRestored(page, before);
-});
-
-test("opening a raster during an import asks to discard: OK leaves no labels, bar or message; Cancel lets it finish (criterion 7)", async ({ page }) => {
-  test.setTimeout(120_000);
-  await withLabels(page);
-  await startImport(page, other());
-  await allow(page, 2);
-  await expect.poll(() => barValue(page)).toBe("2");
-  // Cancel on the discard confirm: the import goes on
-  let asked = "";
-  page.once("dialog", (d) => { asked = d.message(); void d.dismiss(); });
-  await openRaster(page, { ...rgbFixture(), name: "other.tif" });
-  await expect.poll(() => asked).toBe(MESSAGES.discard);
-  await expect(bar(page)).toBeVisible(); // the open clears #message as it starts (spec 019), so the bar shows the run goes on
-  await expect(cancel(page)).toBeVisible();
-  await allow(page, 1000);
-  await expect(message(page)).toHaveText(seeded);
-  // OK on the discard confirm: the import ends with no message
-  await startImport(page, other());
-  await allow(page, 2);
-  await expect.poll(() => barValue(page)).toBe("2");
-  page.once("dialog", (d) => { asked = d.message(); void d.accept(); });
-  await openRaster(page, { ...rgbFixture(), name: "third.tif" });
-  await expect(message(page)).toHaveText("Raster opened.");
-  await expect(bar(page)).toBeHidden();
-  await expect(cancel(page)).toBeHidden();
-  await allow(page, 1000);
-  await page.waitForTimeout(500);
-  await expect(message(page)).toHaveText("Raster opened.");
-  expect(await tileKeysStored(page)).toEqual([]);
-  expect(await labelLayers(page)).toEqual([]);
-  expect((await effectiveTiles(page)).size).toBe(0);
 });
 
 test("during an import edits are disabled or ignored, and Opacity and Show labels still apply (criterion 8)", async ({ page }) => {

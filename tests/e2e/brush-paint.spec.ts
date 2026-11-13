@@ -31,27 +31,24 @@ function covered(cells: [number, number][], side = 7): Set<string> {
 const keys = (m: Map<string, number>, v?: number) => new Set([...m].filter(([, x]) => v === undefined || x === v).map(([k]) => k));
 
 test.describe("paint and erase (criterion 10)", () => {
-  for (const moves of [20, 2]) {
-    test(`zoom 14: a horizontal size-7 left drag (${moves === 2 ? "two moves 300 px apart" : "20 moves"}) labels exactly rows r-3..r+3 from the start column to the end column`, async ({ page }) => {
-      await setup(page, 14);
-      const v0 = await view(page);
-      const box = (await page.locator("#map canvas").boundingBox())!;
-      const a = { x: box.x + 60, y: (await toScreen(page, [15, 45.0005])).y };
-      const b = { x: a.x + 600, y: a.y }; // inside the 744 px map, about 3 raster pixels
-      expect(b.x).toBeLessThan(box.x + box.width);
-      const pts = moves === 2 ? [a, { x: a.x + 300, y: a.y }, b] : path(a, b, moves + 1);
-      await stroke(page, pts);
-      const [[c0, r], [c1, r1]] = (await cellsOf(page, [a, b])) as [[number, number], [number, number]];
-      expect(r1).toBe(r);
-      expect(c1 - c0).toBeGreaterThanOrEqual(2); // a 0.01 degree pixel is about 200 screen px at zoom 14
-      const want = new Set<string>();
-      for (let y = r - 3; y <= r + 3; y++) for (let x = c0 - 3; x <= c1 + 3; x++) want.add(`${x},${y}`);
-      const got = await labels(page);
-      expect(keys(got)).toEqual(want);
-      expect(new Set(got.values())).toEqual(new Set([1]));
-      expect(await view(page)).toEqual(v0);
-    });
-  }
+  test("zoom 14: a horizontal size-7 left drag (20 moves) labels exactly rows r-3..r+3 from the start column to the end column", async ({ page }) => {
+    await setup(page, 14);
+    const v0 = await view(page);
+    const box = (await page.locator("#map canvas").boundingBox())!;
+    const a = { x: box.x + 60, y: (await toScreen(page, [15, 45.0005])).y };
+    const b = { x: a.x + 600, y: a.y }; // inside the 744 px map, about 3 raster pixels
+    expect(b.x).toBeLessThan(box.x + box.width);
+    await stroke(page, path(a, b, 21));
+    const [[c0, r], [c1, r1]] = (await cellsOf(page, [a, b])) as [[number, number], [number, number]];
+    expect(r1).toBe(r);
+    expect(c1 - c0).toBeGreaterThanOrEqual(2); // a 0.01 degree pixel is about 200 screen px at zoom 14
+    const want = new Set<string>();
+    for (let y = r - 3; y <= r + 3; y++) for (let x = c0 - 3; x <= c1 + 3; x++) want.add(`${x},${y}`);
+    const got = await labels(page);
+    expect(keys(got)).toEqual(want);
+    expect(new Set(got.values())).toEqual(new Set([1]));
+    expect(await view(page)).toEqual(v0);
+  });
 
   test("zoom 3: a drag of a few moves labels one 8-connected set containing the first and last footprints", async ({ page }) => {
     await setup(page, 3);

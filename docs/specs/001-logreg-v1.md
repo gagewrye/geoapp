@@ -4,6 +4,8 @@
 
 **Status:** Approved (Gage, 2026-10-26). Partly superseded by spec 003 (approved 2026-10-26): the brush replaces polygon labelling, and criteria 2, 3, 5 and 13-15, plus the polygon parts of 8 and 12, no longer apply (see spec 003, "Polygons removed"). Partly shelved by spec 013 (2026-10-28), lapsed: all but raster open, preview, globe, and criteria 1, 4, 12's globe checks and 16.
 
+**Amended by spec 061 (2026-11-12):** `edges.spec.ts`, criterion 12's globe check, is deleted. Criterion 12 stays covered by `globe.spec.ts` (projection, and the preview at zoom 3 and at the known feature at zoom 14). `brush-180.tester` keeps only its stroke across 180, which opens criterion 16's zone 60 raster.
+
 **ADRs (all Accepted):** 0001 tiled TIFF writer, 0002 proj4 + warped preview, 0003 terra-draw, 0004 MapLibre >= 6.16 with globe.
 
 **Decided (Gage):** classic TIFF output only, BigTIFF/compression later (0001); CRSs EPSG:4326, 3857 and WGS84 UTM, more later (0002); no cap on training samples; `core/` may import proj4; globe map projection (0004); polygons crossing ±180° or beyond ±`MAX_LAT` are blocked with a message, never silently dropped or clamped (0003); EPSG:4326/3857 rasters whose extent crosses ±180° are refused on open.

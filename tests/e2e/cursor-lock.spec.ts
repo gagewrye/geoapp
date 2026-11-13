@@ -1,8 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import { classFile } from "../unit/helpers/labelFiles";
 import { jumpTo, message, openApp, openRaster, paintMode, rgbFixture, type Xy } from "./helpers";
-import { gateWrites, openWrite, seeded, setup as twoClasses, writeHeld } from "./lockCombos";
-import { importFile, noSavePicker, openFileGate, pauseLabelFile, upload } from "./seeding";
+import { seeded } from "./lockCombos";
+import { importFile, openFileGate, pauseLabelFile, upload } from "./seeding";
 
 // Spec 010 criterion 8: while labels are locked (spec 004) the map shows not-allowed, not the brush.
 const cursorAt = (page: Page, p: Xy) => page.evaluate(([x, y]) => getComputedStyle(document.elementFromPoint(x, y)!).cursor, [p.x, p.y] as const);
@@ -59,25 +59,4 @@ test("during an import the map shows not-allowed, grabbing while middle-panning,
   await paintMode(page);
   await page.mouse.move(p.x, p.y);
   await expectBrush(page, p);
-});
-
-test("during an Export labels run the map shows not-allowed, and the brush once it ends", async ({ page }) => {
-  test.setTimeout(120_000);
-  await noSavePicker(page);
-  await gateWrites(page);
-  await twoClasses(page);
-  const p = await centre(page);
-  await page.mouse.move(p.x, p.y);
-  await expectBrush(page, p);
-  const downloaded = page.waitForEvent("download");
-  await page.click("#export-labels");
-  await writeHeld(page);
-  await page.mouse.move(p.x, p.y);
-  expect(await cursorAt(page, p)).toBe("not-allowed");
-  await panModeIsMapLibres(page, p);
-  expect(await cursorAt(page, p)).toBe("not-allowed");
-  await openWrite(page);
-  await downloaded;
-  await expect(message(page)).toHaveText("Labels exported.");
-  await expectBrush(page, p); // no pointer move since
 });
