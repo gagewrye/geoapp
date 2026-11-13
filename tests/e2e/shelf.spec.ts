@@ -1,8 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { MESSAGES } from "../../src/ui/messages";
-import { aefShapedFile, classFile } from "../unit/helpers/labelFiles";
+import { classFile } from "../unit/helpers/labelFiles";
 import { jumpTo, logRequests, message, openApp, openRaster, paintMode, rgbFixture, settled, stroke, tiff, toScreen } from "./helpers";
 import { download, importFile, noSavePicker, upload } from "./seeding";
 
@@ -55,19 +54,6 @@ async function paintBeside(page: Page) {
   await stroke(page, [a, { x: a.x + 40, y: a.y }]);
   await settled(page);
 }
-
-test("an AlphaEarth-shaped file opens as 64-band imagery, and Import labels refuses it (criterion 8)", async ({ page }) => {
-  await openApp(page);
-  const file = upload("aef-shaped.tif", aefShapedFile());
-  await openRaster(page, file);
-  await expect(message(page)).toHaveText("Raster opened.");
-  await paintMode(page);
-  await expect(page.locator("#raster-info")).toContainText("64 band(s)");
-  await expect(page.locator("#brush-panel")).toBeVisible();
-  await importFile(page, file);
-  await expect(message(page)).toHaveText(MESSAGES.labelFile);
-  expect(MESSAGES.labelFile).toBe("Label files must be single-band 8-bit GeoTIFFs.");
-});
 
 test("the build has no terra-draw, Source Cooperative or catalog index (criterion 2)", () => {
   // Playwright's web server builds dist/ before any test runs

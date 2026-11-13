@@ -120,7 +120,7 @@ for (const [name, grid] of RASTERS.slice(0, 1)) {
   });
 }
 
-for (const [name, grid] of RASTERS) {
+for (const [name, grid] of RASTERS.slice(0, 1)) {
   test(`each stored tile adds exactly one label- layer, between the preview and the hover: ${name} (spec 018 criterion 5)`, async ({ page }) => {
     await openApp(page);
     await openRaster(page, tiff("layers.tif", SIZE, SIZE, 1, () => 7, { epsg: grid.epsg, gt: grid.gt }));

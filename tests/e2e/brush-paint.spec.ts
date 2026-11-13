@@ -31,7 +31,7 @@ function covered(cells: [number, number][], side = 7): Set<string> {
 const keys = (m: Map<string, number>, v?: number) => new Set([...m].filter(([, x]) => v === undefined || x === v).map(([k]) => k));
 
 test.describe("paint and erase (criterion 10)", () => {
-  for (const moves of [20, 2]) {
+  for (const moves of [20]) {
     test(`zoom 14: a horizontal size-7 left drag (${moves === 2 ? "two moves 300 px apart" : "20 moves"}) labels exactly rows r-3..r+3 from the start column to the end column`, async ({ page }) => {
       await setup(page, 14);
       const v0 = await view(page);

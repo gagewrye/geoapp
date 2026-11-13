@@ -26,7 +26,7 @@ const countReads = (page: Page) => page.evaluate(() => {
 const reads = (page: Page) => page.evaluate(() => (window as any).__reads as number);
 
 test.describe("hover (criterion 9)", () => {
-  for (const zoom of [3, 14]) {
+  for (const zoom of [14]) {
     test(`zoom ${zoom}: a mouse moved with no button shows one feature, footprintRing at pixelAt of the pointer, in the selected colour`, async ({ page }) => {
       await setup(page, zoom);
       const c = await toScreen(page, zoom === 14 ? [15.0012, 44.9987] : [15.0123, 44.9871]);

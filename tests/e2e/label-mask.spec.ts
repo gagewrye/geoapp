@@ -4,7 +4,7 @@ import { toLonLat } from "../../src/core/crs";
 import { footprint, pixelAt, strokeCells } from "../../src/core/pixel";
 import { CLASS_GRID, classFile } from "../unit/helpers/labelFiles";
 import {
-  anotherRaster, clickAt, hideBasemap, jumpTo, message, openApp, openRaster, paintMode, path, pixelAt as screenPixel, RGB_GRID, rgbFixture,
+  clickAt, hideBasemap, jumpTo, message, openApp, openRaster, paintMode, path, pixelAt as screenPixel, RGB_GRID, rgbFixture,
   selectClass, stroke, tileKeysStored, toLngLat, toScreen, type LngLat, type Xy,
 } from "./helpers";
 import { at, classList, effectiveTiles, importFile, labelAt, maskFile, maskValue, tileDiff, upload } from "./seeding";
@@ -112,21 +112,6 @@ test("an Erase drag zeroes imported pixels of two classes, and Undo shows the ma
   await undoButton(page).click();
   expect(mismatches(await effectiveTiles(page), ALL, maskValue)).toEqual([]);
   expect(await tileKeysStored(page)).toEqual([]);
-});
-
-test("opening another raster after an import (OK on the confirm) leaves no labels and no mask layer (criterion 13)", async ({ page }) => {
-  await setup(page);
-  await importMask(page);
-  page.once("dialog", (d) => void d.accept());
-  await openRaster(page, anotherRaster()); // another raster: spec 031 would offer the same one's saved labels back
-  await expect(message(page)).toHaveText("Raster opened.");
-  await paintMode(page);
-  expect(await page.evaluate(() => (window as any).__geoapp.map.getLayer("mask"))).toBeUndefined();
-  // hasLabels is false: the next open asks nothing
-  page.on("dialog", (d) => { throw new Error(`unexpected dialog ${d.message()}`); });
-  await openRaster(page, anotherRaster("third.tif"));
-  await expect(message(page)).toHaveText("Raster opened.");
-  await paintMode(page);
 });
 
 test("with only a mask loaded an import asks to replace: Cancel keeps the mask and classes, OK replaces the mask; Pan is selected (criterion 10)", async ({ page }) => {

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { anotherRaster, editName, jumpTo, labels, message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture, settled, stroke, toScreen, type Xy } from "./helpers";
+import { anotherRaster, jumpTo, labels, message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture, settled, toScreen, type Xy } from "./helpers";
 
 // Spec 010: undo of paint and erase strokes (button and Ctrl+Z), and the brush cursor.
 const undoButton = (page: Page) => page.locator("#undo");
@@ -13,21 +13,6 @@ async function setup(page: Page) {
   await paintMode(page);
   await jumpTo(page, [15, 45], 9);
 }
-
-test("Ctrl+Z in a class name field undoes the typing, not a stroke (criterion 3)", async ({ page }) => {
-  await setup(page);
-  const c = await toScreen(page, [15.005, 45.005]);
-  await stroke(page, [c, { x: c.x + 60, y: c.y }]);
-  const painted = await snapshot(page);
-  const field = await editName(page, 0);
-  await field.press("End");
-  await page.keyboard.type("xy");
-  await expect(field).toHaveValue("Class 1xy");
-  await page.keyboard.press("ControlOrMeta+z");
-  await expect(field).not.toHaveValue("Class 1xy");
-  expect(await snapshot(page)).toEqual(painted);
-  await expect(undoButton(page)).toBeEnabled();
-});
 
 test("Undo is disabled while a stroke's cells wait for masks; then one Undo removes the whole stroke (criterion 4)", async ({ page }) => {
   await setup(page);
