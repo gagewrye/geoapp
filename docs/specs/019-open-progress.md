@@ -2,7 +2,7 @@
 
 Status: Approved (Gage, 2026-10-29: "approve all"). The request (Gage, 2026-10-29): the 1.49 GB file "eventually showed. It just took a while and there was no loading indication. A progress bar would be nice", and "Don't allow painting with no image." Spec 020 builds on this one.
 
-**Amended by spec 061 (2026-11-12):** the tester file `open-progress.tester.spec.ts` is deleted, and so are `race-opens.tester.spec.ts`'s two held-open cases (a newer open cancelled while the older builds its preview; two held opens released out of order). Criteria 4-9 stay covered by `open-progress` 60-151, `imagery` 84, `raster-race` 16 and 34 and `race-opens.tester` 8. Lost: navigation and Import labels while the preview loads, and out-of-order held opens.
+**Amended by spec 061 (2026-11-12):** the tester file `open-progress.tester.spec.ts` is deleted, and so are `race-opens.tester.spec.ts`'s two held-open cases. Criteria 4-9 stay covered by `open-progress` 60-151, `imagery` 84, `raster-race` 16 and 34 and `race-opens.tester` 8. Lost: navigation and Import labels while the preview loads, and out-of-order held opens.
 
 ## Decided (Gage, 2026-10-29)
 1. No Cancel button. By the time the preview starts, the raster is already open, so Cancel would leave it with no imagery. Choosing another file replaces it and stops the old reads (criterion 5).

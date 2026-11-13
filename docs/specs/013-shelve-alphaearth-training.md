@@ -6,7 +6,7 @@
 
 **Amended by spec 052 (2026-11-02):** criteria 1 and 5 lose their e2e tests. Criterion 1 is guarded by the unit `shelf` test; criterion 5's layer order by `label-alignment.spec.ts` (spec 018 criterion 5).
 
-**Amended by spec 061 (2026-11-12):** `nav-undo.tester`, one of the mixed tests listed under Scope, is deleted; no shelved step depended on it.
+**Amended by spec 061 (2026-11-12):** criterion 8's e2e test (`shelf` "an AlphaEarth-shaped file opens…") is deleted; `label-import` 40 still refuses an AlphaEarth-shaped label file. `nav-undo.tester`, one of the mixed tests listed under Scope, is deleted too.
 
 **Decided (Gage, 2026-10-28):** "remove alphaearth and model training from the site. It is out of the current scope. We are just trying to get labelling right." "Just hide the code from the UI by placing the code unused in a separate folder." Then accepted: `shelf/` stays outside `npm run check` and terra-draw is removed; an AlphaEarth file given to Open GeoTIFF opens as ordinary 64-band imagery; spec numbers 006-008 stay unused (spec 002 and ADR 0012 cite them). `CLAUDE.md` was updated with this approval, so this change leaves it alone.
 

@@ -4,6 +4,8 @@
 
 **Request** (Gage, 2026-10-30): "The paint tool has a lot of lag that makes it difficult to use." His imagery: chunks of 6,500 to 11,000 px, RGBA uint8, 1-row strips, uncompressed, with tagged alpha.
 
+**Amended by spec 061 (2026-11-12):** criterion 9 loses its only e2e test, `paint-latency.spec.ts` (300 s timeout). `brush-hover` 74 still checks that hover and erase read no imagery; unit `io/paintQueue` and `core/spans` cover one op per move and swept cells. Lost: criterion 9 on a big file end to end.
+
 ## Decided (Gage, 2026-10-30)
 1. Every valid mask is read in the background after open, so painting never waits. This must not starve the visible imagery tiles (F3).
 2. At the 256-tile cap, a pointer move applies whole or not at all.

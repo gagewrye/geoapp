@@ -3,17 +3,17 @@
 One entry per merge to main, newest first. Details are in the named spec.
 
 ## 2026-11-12
-- **Spec 061:** 38 e2e edge-case tests of stable features are deleted (325 → 287 listed, 319 → 284 on CI; 85 → 76 files), and the @ci-skip tests drop from 6 to 3. No app behaviour changes. One smoke test per feature stays. Coverage lost:
-  - navigation and undo (`nav-undo.tester`): the speed cap under key repeat; focus and visibility stops; a middle drag from the panel; Ctrl+Z mid-stroke.
-  - cursor locks (`cursor-lock.tester`): a class key during a lock; Space at lock end.
-  - `undo` "three undos…" (×2) and `brush-panel` "recolouring…" (all @ci-skip): local-only checks of overlays following each undo, and of overlay recolour.
-  - label view (`label-view.tester`, `label-view-pan.tester`): hidden labels combined with import and export locks; a size change mid-stroke.
-  - open progress (`open-progress.tester`, two `race-opens.tester` cases): navigation and import while the preview loads; out-of-order held opens.
-  - alpha (`alpha.tester`): the transparency render.
-  - label import (`label-import-progress.tester`, `label-overlay.tester`): the next import not pre-cancelled; restored labels taking settings changed mid-import.
-  - space (`space.tester`, `space` at zoom 12): contrast over the stars; a pitched horizon.
-  - `label-quads.tester` globe tests (×2): dab = hover on the globe on EPSG:4326, which spec 052 relied on; spec 018 criterion 3 is now checked on UTM only.
-  - Kept (6 tests, Gage 2026-11-12; criterion 7 held them back because spec 004 changed after 2026-10-31): `undo-seed.tester`, `label-controls.tester` and `label-lock-export.tester` 55, 75 and 99.
+- **Spec 061:** 94 e2e tests of stable features are deleted (325 → 231 listed, 319 → 229 on CI; 85 → 66 files), and the @ci-skip tests drop from 6 to 2. No app behaviour changes. One smoke test per feature stays. Kept although listed: the 6 spec 004 tests (`undo-seed.tester`, `label-controls.tester`, `label-lock-export.tester` 55, 75 and 99) and `label-edit` (2 tests), because spec 004's body changed after 2026-10-31; and 3 that took under 5 s on CI (`navigation` wheel and middle drag with no imagery, `status-bar` at 1280x720). Coverage lost, ⚠ where nothing else tests it:
+  - Tier A: the WASD speed cap under key repeat; focus and visibility stops; a middle drag from the panel; Ctrl+Z mid-stroke; a class key during a lock; Space at lock end; overlays following each undo, and overlay recolour (local-only); hidden labels under import and export locks; a size change mid-stroke; navigation and import while the preview loads; out-of-order held opens; the transparency render; the next import not pre-cancelled; restored labels taking settings changed mid-import; contrast over the stars; a pitched horizon.
+  - Tier B (brush edge cases): a right press mid-stroke, pinch, keyboard zoom, a blur ending a stroke, the clipped edge hover, MAX_LAT, and the 180° hover and world copy.
+  - ⚠ spec 023 criterion 9 (one op per move, swept = per-cell) on a big file (`paint-latency`).
+  - ⚠ the alpha band end to end (spec 022; `alpha`).
+  - ⚠ rendering of 128-quad tiles, mask quads above the mask, and dab = hover on EPSG:4326 globes (`label-quads.tester`); spec 018 criteria 3 and 5 are checked on UTM only.
+  - ⚠ seam colour (spec 011 criterion 6; `label-seams`).
+  - ⚠ an open during an import, and Cancel then a failed read (spec 021; `label-import-progress`).
+  - the not-allowed cursor during an Export (`cursor-lock`).
+  - ⚠ opacity and brush size kept on an open, and Pan on load (spec 016 criteria 3 and 8; `label-view`).
+  - ⚠ Pan-mode WASD with + focused, and pointercancel ending a middle pan (`navigation`).
 - **Spec 063:** Boxes exist as data: axis-aligned, whole-pixel boxes in a class, held per open raster, with pure geometry for drawing, moving, resizing and hit-testing them. Undo and redo keep one history for mask strokes and box edits (ADR 0038, amending ADR 0015); each box change counts 48 bytes against the 32 MiB budget. Nothing visible changes until spec 064.
 - **Spec 056:** The brush strip reads +, size, −, then the slider, so + sits above the end of the slider that means larger. The ✓ Apply button shows only in Smart select. The three file buttons in the top bar show no "No file chosen" text beside them.
   - `brush-panel` "recolouring changes the overlay and the hover colour" (run 43291075248): @ci-skip: not run on CI. On CI, nothing checks that recolouring a class repaints its overlay.

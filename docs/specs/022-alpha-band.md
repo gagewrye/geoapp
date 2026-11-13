@@ -2,7 +2,7 @@
 
 **Status:** Approved (Gage, 2026-10-30: "do all"). **ADRs:** none (no dependency; the alpha rule follows GDAL's mask convention). Build after spec 021 merges.
 
-**Amended by spec 061 (2026-11-12):** the tester file `alpha.tester.spec.ts` (the transparency render in the preview and the full-resolution tiles) is deleted. Criterion 6 stays covered by `alpha` 19 and the unit `io/alpha` and `core/alpha` tests. Lost: the rendered transparency.
+**Amended by spec 061 (2026-11-12):** criterion 6 loses both its e2e tests, `alpha.spec.ts` and `alpha.tester.spec.ts`. The unit `io/alpha` and `core/alpha` tests remain. Lost: the alpha band end to end, and its rendered transparency.
 
 **Amends:**
 - Spec 020: reads gain the alpha band.

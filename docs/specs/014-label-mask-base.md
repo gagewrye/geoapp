@@ -6,7 +6,7 @@
 
 **Amended by spec 052 (2026-11-02):** criterion 9 (round trip) loses its `label-mask.spec.ts` test. It is covered by `label-roundtrip.spec.ts` (byte-equal tiles and class list), `label-edit.spec.ts` (no requests) and the unit `io/maskExport` (the export equals the effective tiles).
 
-**Amended by spec 061 (2026-11-12):** the tester file `label-overlay.tester.spec.ts` (an import adds the mask in the class colours; a recolour repaints it; a Replace swaps it) is deleted. Criteria 10 and 11 stay covered by `label-mask` 132 and 168 and `label-replace` 27 and 36.
+**Amended by spec 061 (2026-11-12):** criterion 13's test (`label-mask` "opening another raster after an import…") and the tester file `label-overlay.tester.spec.ts` are deleted. Criterion 13 stays covered by `brush-scope` 27 (OK on the discard confirm opens the new raster), and criteria 10 and 11 by `label-mask` "with only a mask loaded…" and "display…" and `label-replace`.
 
 **Already built (spec 004 Import labels, ADR 0013), unchanged here:**
 - Formats: a single-band 8-bit unsigned GeoTIFF or COG. Anything else gets "Label files must be single-band 8-bit GeoTIFFs."
