@@ -12,6 +12,8 @@ Amended by spec 048 (2026-11-01): there is no tile cap (ADR 0033), so a stroke's
 
 **Amended by spec 058 (2026-11-11):** in Erase mode the canvas cursor is `eraserCursor()`, a block eraser that ignores the class colour, instead of the brush. The locked cursor, Space held and Pan are unchanged.
 
+**Amended by spec 061 (2026-11-12):** `nav-undo.tester.spec.ts` and `cursor-lock.tester.spec.ts` are deleted, and so is criterion 3's three-undo test (`undo.spec.ts`, button and Ctrl+Z, @ci-skip). Criterion 3 stays covered by `redo` 13, `undo` 17, the unit `ui/undo`, `io/undoHistory` and `core/undo.tester` tests; criteria 7 and 8 by `undo` 91, `cursor-lock` 30 and 64 and the unit `map/cursor` tests. Lost: overlays checked after each undo, Ctrl+Z mid-stroke, the cursor SVG's shape, an undo across partial edge tiles, a class key during a lock, and Space held when a lock ends.
+
 ## Scope
 In: the brush cursor; an "Undo" button in the brush panel; Ctrl+Z / Cmd+Z; multi-step undo of paint and erase strokes.
 Out: redo (since added by spec 037); undoing class edits, imports, seeding or a raster open; persisting history; a custom cursor for Pan mode.

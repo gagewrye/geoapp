@@ -6,6 +6,8 @@
 
 **Amended** (Gage, 2026-10-29): "instead of making the pointer show as blocked when hiding labels, just make it go to pan mode instead. That way there is no blocked state or message to worry about and the user can pan easily." This removes the blocked state. Gage approved the amendment, including the edge cases under "Hiding selects Pan" (Gage, 2026-10-29: "approve").
 
+**Amended by spec 061 (2026-11-12):** the tester files `label-view.tester.spec.ts`, `label-view-pan.tester.spec.ts` and `cursor-lock.tester.spec.ts` are deleted. Criteria 4-6 stay covered by `label-view` 122, 145, 163, 188, 217 and 245, and the lock cursor by `cursor-lock` 64. Lost: hidden labels combined with import and export locks, Space and class edits while hidden, and an import while hidden.
+
 **Decided (Gage, 2026-10-29):**
 - Opacity isn't saved across reloads. It is kept for the page session, including when another raster opens.
 - Labels are never painted while hidden: hiding them selects Pan.

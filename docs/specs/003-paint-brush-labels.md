@@ -9,6 +9,8 @@
 
 Amended by spec 048 (2026-11-01): there is no tile cap (ADR 0033). `MAX_LABEL_TILES` and `brush`'s `"full"` are gone, so Storage's "full" sentence, criterion 4's cap clause and criterion 15's last sentence lapse. Display: at most 256 stored tiles in view have overlays, and every label also shows on the preview-resolution `mask` layer (spec 014), hidden only under overlays.
 
+**Amended by spec 061 (2026-11-12):** criterion 14's recolour test (`brush-panel.spec.ts` "recolouring changes the overlay and the hover colour", @ci-skip) is deleted. Criterion 14 stays covered by `brush-panel` 61 and 82, `label-mask` 168 (a recolour repaints the mask) and `undo` 91 (the cursor colour). No e2e test checks that a recolour repaints a tile overlay or the hover fill.
+
 **Decided (Gage)**, besides what Scope and Rules state: polygon code is deleted, not flagged off (2026-10-26). Train's snapshot copies the stored tiles, at most 16 MiB (ADR 0010); the 500 ms post-erase `contextmenu` guard applies on the map only, not the panel; a model loaded while a Train runs is replaced when that Train finishes (2026-10-27).
 
 ## Scope

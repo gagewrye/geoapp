@@ -4,6 +4,8 @@
 
 **Status:** Approved (Gage, 2026-10-27; WASD smooth and continuous, pinch unchanged, middle-drag pans in every mode). **ADRs:** none (no dependency; uses maplibre-gl 6.16.0, ADR 0004). Partly shelved by spec 013 (2026-10-28), lapsed: the area tool. Amended by spec 017 (Gage, 2026-10-29): the app has no select left, so criterion 6's select case runs on a select the test adds to `#panel`. The WASD rule's select clause is unchanged.
 
+**Amended by spec 061 (2026-11-12):** the tester file `nav-undo.tester.spec.ts` is deleted. Criteria 3 and 6 stay covered by `navigation` 95, 115, 222, 229, 235 and 248 and the unit `core/wasd*` tests. Lost: the speed cap under key repeat, focus and visibility stops during a hold, a middle drag from the panel, and a middle press during a hold.
+
 ## Scope
 In: wheel zoom about the centre in all modes; middle-button (button 1) drag pan in Paint mode, Pan mode, with no imagery open and with the area tool active; continuous WASD panning while held; lifting the brush when the camera moves mid-stroke.
 Out: changing double-click, keyboard `+`/`-`, arrow keys, pinch or navigation-control zoom; rebinding keys; speed settings; inertia after release; Shift+WASD.
