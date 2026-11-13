@@ -8,6 +8,8 @@
 
 **Amended by spec 061 (2026-11-12):** `label-quads.tester.spec.ts` is deleted, and criteria 3 and 5 are checked on UTM only: `label-alignment` 79 and 124 (EPSG:32633). Unit `labelQuads*` check the quad math. Lost: dab = hover on the globe on EPSG:4326, which spec 052 relied on; rendering of 128-quad tiles; and mask-tile quads drawn above the mask.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): e2e `label-alignment` (criteria 3 and 5); unit `core/labelQuads.tester` (1 and 2) and `core/labelQuads.lattice.tester`. `core/labelQuads` tests stay. Lost: dab alignment (dab = hover outline, criterion 3) has no test.
+
 **What Gage reported** (testing main, display scale 125%):
 - "The highlight is under the pointer and correct. When it paints it is off. Its weird, the direction of the offset seems to change based on the area selected."
 - The offset is about one or two image pixels, the same at every zoom, and the pre-009 build (90f8f00) has it too.

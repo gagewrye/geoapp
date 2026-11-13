@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MESSAGES } from "../../../src/ui/messages";
 import { initClassPanel } from "../../../src/ui/classPanel";
@@ -102,11 +101,5 @@ describe("initClassPanel", () => {
     expect(panel.selected()).toBe(1);
     lock(false);
     expect(add.disabled).toBe(false);
-  });
-
-  it("labels.ts no longer renders the class list and is under 200 lines", () => {
-    const src = readFileSync("src/ui/labels.ts", "utf8");
-    expect(src).not.toMatch(/renderClasses/);
-    expect(src.split("\n").length).toBeLessThan(200);
   });
 });

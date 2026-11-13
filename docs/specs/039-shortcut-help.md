@@ -4,6 +4,8 @@
 
 **Amended by spec 057 (2026-11-11):** in scope 4, a button whose entry has a `hint` gets it as the title's lines after the key, `<action> (<key>)\n<hint>` (a hint may hold `\n`); the platform for Cmd or Ctrl is passed to `labelButtons`.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): e2e `shortcut-help` (criteria 3–5); unit `ui/shortcuts`' scans of `index.html` and of string literals in `labelKeys.ts` and `help.ts`. `ui/help` and `ui/shortcuts` tests stay; no e2e test of the help is left.
+
 **Goal:** The user can see every shortcut in one place, and each button shows its shortcut on hover.
 
 ## Scope

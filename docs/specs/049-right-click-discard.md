@@ -2,6 +2,8 @@
 
 **Status:** Approved (Gage waived review, 2026-11-02, as relayed by the orchestrator), with the recommended answers. **ADRs:** none. **Builds on spec 046.** **Amends spec 046:** scope 3 (right click no longer adds an exclude point), scope 8 and criterion 7 (the help entries). Checked against maplibre-gl 6.16.0 (`node_modules/maplibre-gl/src/ui/handler/box_zoom.ts`).
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): e2e `right-click-discard.tester`; unit `map/brush.discard.tester` (scope 4). The base `map/brush` tests stay.
+
 **Request** (Gage, 2026-11-02): "Put in the feature to forgo the smart select that was made by doing a right click. This way you can reset quickly."
 
 ## Decided (2026-11-02, recommended options)

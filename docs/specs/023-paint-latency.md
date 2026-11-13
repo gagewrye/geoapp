@@ -6,6 +6,8 @@
 
 **Amended by spec 061 (2026-11-12):** criterion 9 loses its only e2e test, `paint-latency.spec.ts` (300 s timeout). `brush-hover` 74 still checks that hover and erase read no imagery; unit `io/paintQueue` and `core/spans` cover one op per move and swept cells. Lost: criterion 9 on a big file end to end.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): e2e `brush-hover` (criterion 8 as kept here); unit `io/maskCache.tester` (3 and 4), `map/quadCache.tester` (review 2) and `io/paintQueue.memory.tester`. `io/labelFile.merge.tester` is renamed `io/labelFile.merge.test.ts` with both cases kept.
+
 ## Decided (Gage, 2026-10-30)
 1. Every valid mask is read in the background after open, so painting never waits. This must not starve the visible imagery tiles (F3).
 2. At the 256-tile cap, a pointer move applies whole or not at all.

@@ -14,6 +14,8 @@ Amended by spec 048 (2026-11-01): there is no tile cap (ADR 0033), so a stroke's
 
 **Amended by spec 061 (2026-11-12):** criterion 3 loses its three-undo test (`undo`, @ci-skip) and its Ctrl+Z-in-a-name-field test; criterion 8 loses its Export cursor test (`cursor-lock`); `nav-undo.tester` and `cursor-lock.tester` are deleted. Criterion 3 stays covered by `redo` 13 and the unit `ui/undo`, `io/undoHistory` and `core/undo.tester` tests; criterion 7 by `undo` "the brush cursor…" and unit `map/cursor`; criterion 8 by `cursor-lock` 30 (an import) and `label-lock-edits` 7. Lost: overlays checked after each undo, Ctrl+Z mid-stroke, the cursor SVG's shape, an undo across partial edge tiles, a class key during a lock, Space when a lock ends, and the not-allowed cursor during an Export.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): e2e `undo` 76 (criterion 7, the brush cursor), `cursor-lock` (8) and `undo-seed.tester`; unit `core/undo.tester` and `io/undoHistory.tester`. `undo` 17 and 49 and `redo` stay. Lost: the brush cursor (7) and the not-allowed cursor (8) have no test.
+
 ## Scope
 In: the brush cursor; an "Undo" button in the brush panel; Ctrl+Z / Cmd+Z; multi-step undo of paint and erase strokes.
 Out: redo (since added by spec 037); undoing class edits, imports, seeding or a raster open; persisting history; a custom cursor for Pan mode.

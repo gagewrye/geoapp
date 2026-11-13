@@ -4,6 +4,8 @@
 
 **Amended by spec 057 (2026-11-11):** criterion 8 no longer requires the README to describe the Save dialog; Gage shortened the README. The ADR 0001 Status check stands.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): e2e `save-folder.tester` and `brush-space-focus.tester`; unit `ui/readme.test` (criterion 8, ADR text). `save-folder` stays.
+
 **Request** (Gage, 2026-11-02): "There is an issue where the web app opens a different folder than the one you pulled the tif from. I might have saved a label_final there on accident." Each chunk has its own folder (`ChunkX_Y.tif`, `labels.tif`, `labels_final.tif`).
 
 ## Decided (2026-11-02, recommended options)

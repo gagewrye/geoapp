@@ -1,7 +1,7 @@
 // Node has no DOM and adding one needs an ADR: just enough of one for the class list (spec 036), with bubbling events.
 type Listener = (e: FakeEvent) => void;
 
-export class FakeEvent {
+class FakeEvent {
   defaultPrevented = false;
   stopped = false;
   target: FakeElement | null = null;

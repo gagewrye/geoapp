@@ -3,7 +3,7 @@ import { MODEL_CACHE, ModelFileError } from "../../../src/io/modelCache";
 import { loadSegmenter, MODEL_FILES, modelCached } from "../../../src/io/segmenter";
 import { fakes } from "../helpers/modelFakes";
 
-// Spec 055 criteria 3 and 5 (tester): all four files fetched, each GET checked; prune runs before the first GET;
+// Spec 055 criteria 3 and 5: all four files fetched, each GET checked; prune runs before the first GET;
 // a second load reads only the cache (the unit analogue of criterion 10's reload); a later bad file stops the load.
 const HF = "https://huggingface.co/onnx-community/sam2.1-hiera-tiny-ONNX/resolve/814a066640debee5a91e70aa401fb8e17e030503/onnx/";
 const size = (url: string) => MODEL_FILES.find((f) => f.url === url)?.bytes ?? 0;

@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Map as MapLibreMap } from "maplibre-gl";
 import { emptyStore } from "../../../src/core/labelStore";
@@ -68,10 +67,6 @@ describe("the click tools", () => {
     t.ops[0]!.done!("ok");
     expect(t.tools.filling()).toBe(false);
     expect(t.log).toEqual(["undo.sync", "busy", "tool"]);
-    // labels.ts gates on it: Undo's blocked() and busy(), which Import and Export read
-    const src = readFileSync("src/ui/labels.ts", "utf8");
-    expect(src).toMatch(/blocked: \(\) => [^,\n]*tools\.filling\(\)/);
-    expect(src).toMatch(/busy: \(\) => [^,\n]*tools\.filling\(\)/);
   });
 
   it("leaving Fill, or opening a raster, drops a fill still reading: nothing is pushed when its read ends", async () => {

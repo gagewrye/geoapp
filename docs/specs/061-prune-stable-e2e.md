@@ -2,6 +2,8 @@
 
 **Status:** Accepted (2026-11-12), with the answers below. **Amendment 1 (2026-11-12, approved by Gage: "cut more")**: Tier A's PR #10 ran 35:02 over 4 shards, against 29:24–35:04 on main, so the change was lost in runner noise. Amendment 1 adds Tier B and Tier C (time-targeted cuts). **Gage approved all 99 cuts (Tiers A, B and C) on 2026-11-12**, and chose "On CI" for the per-test timings: a local full run once overloaded his laptop. So no full e2e run happens locally anywhere in this spec. A local run covers only single changed files, with `--workers=2`. **Result:** 94 of the 99 were cut. Criterion 8 held back 2 and criterion 6 kept 3 (see Tier C results). **ADRs:** none. **Request** (Gage): "Are there any tests that can be removed for stable features unlikely to change?" Follows spec 052 and spec 060 c14.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): many tests this spec kept, among them `navigation`, `status-bar`, `label-edit` 10, `brush-space-focus.tester`, the saved-data testers and `imagery.tester`; see spec 073's lists.
+
 ## Questions, answered by Gage (2026-11-12)
 1. **Tiers:** first Tier A only, then "cut more", which adds B and C.
 2. **Dates:** criterion 8's `git log` check is enough.

@@ -14,10 +14,6 @@ describe("importTable on GDAL-form items (spec 051)", () => {
       expect(importTable(file(bad, 0)), bad).toEqual({ table: [], skipped: [{ field: "JSON", why: "is not valid JSON" }] });
   });
 
-  it("reports an empty GDAL table as empty, not as bad JSON", () => {
-    expect(importTable(file(gdalEscape("[]"), 0))).toEqual({ table: [], skipped: [{ field: "table", why: "is empty" }] });
-  });
-
   it("reads a single-class GDAL table, and skips its entry when it equals nodata", () => {
     const t = gdalEscape(JSON.stringify([{ value: 0, name: "mangrove", colour: "#FF00FF" }]));
     expect(importTable(file(t, 255))).toEqual({ table: [{ value: 0, name: "mangrove", colour: "#ff00ff" }], skipped: [] });

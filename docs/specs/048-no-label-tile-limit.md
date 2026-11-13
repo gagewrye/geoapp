@@ -2,6 +2,8 @@
 
 **Status:** Approved by Gage 2026-11-01, with the recommended answers. Criterion 7's e2e removed by spec 060 c14 (2026-11-12): the 324th-tile stroke and smart commit with 323 stored, and the preview render of a stored tile beyond the overlay cap, are no longer tested end to end; unit `core/overlays` keeps the selection and cap. **ADRs:** 0033 (Accepted). **Amends:** spec 003 (Storage's "full" sentence, Display, criteria 4's cap clause and 15's last sentence), spec 004 ("the 256-tile cap stays", Out's "raising `MAX_LABEL_TILES`", criterion 8's cap clause), spec 010 (What an edit is: "at most 256, 16 MiB"; Cap; criterion 6's "`MAX_LABEL_TILES`" becomes "256"), spec 014 (copy-on-touch's cap bullet, Display's hiding rule, criterion 8), spec 018 (criterion 5: "each stored tile with an overlay"), spec 023 (Decided 2, F6's cap bullet, criterion 2's cap clause), spec 032 (error kinds lose `labelLimit` and `editLimit`), spec 037 (scope 4 and criterion 4, per scope 4 below), spec 046 (scope 7's cap bullet, criterion 6's first bullet), README's v1 limits.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): unit `core/labelStore.nocap`'s scan for `MAX_LABEL_TILES` (criterion 1), `ui/labelDisplay.tester` (5, scope 3), `ui/persist.preview` (8) and `io/paintQueue.memory.tester`.
+
 **Request** (Gage, 2026-11-01): "remove the 256 tile limit".
 
 **Goal:** Paint and edit labels over a whole raster with no tile limit, while display and undo memory stay bounded.

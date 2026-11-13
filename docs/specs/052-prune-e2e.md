@@ -4,6 +4,8 @@
 
 **Amended by spec 061 (2026-11-12):** many tests this spec names as still covering are deleted, among them `nav-undo.tester`, `label-view.tester`, `label-view-pan.tester`, `label-quads.tester`, `alpha`, `label-seams` and `label-view` 95 (see spec 061). The 4326 dab = outline check is gone; `label-alignment` 79 checks UTM only.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): several tests this spec keeps as cover, among them `label-mask`, `label-alignment`, `label-edit` 10, `workflow`, `fill-polygon` and `navigation`; see spec 073's lists.
+
 **Goal:** `npm run e2e` runs in about 3 minutes, and no core flow loses its last e2e test.
 
 ## Delete (60 tests). R = redundant, N = no longer necessary, S = slow, low importance

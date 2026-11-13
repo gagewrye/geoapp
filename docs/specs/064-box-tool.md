@@ -2,6 +2,8 @@
 
 **Status:** Accepted (2026-11-12), with the recommended answers, as relayed by the orchestrator. **ADRs:** none. There is no dependency: the tool is hand-written in `map/`, as the brush and polygon are (ADR 0009). terra-draw (ADR 0003) is shelved, and it edits rectangles in lon/lat, which aren't axis-aligned on a UTM raster. **Builds on specs 062 and 063, plus 004, 016, 019, 032, 034, 038 and 039.** It is part of the series in spec 062.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): unit `ui/labels.boxes.tester`, which named this spec in a title. Spec 064 is not built yet.
+
 ## Decided (Gage, 2026-11-12: the recommended answers)
 1. **Key.** `R` for Box (`B` is Paint, and `R` is free). Delete or Backspace deletes the selected box.
 2. **Changing a box's class.** With a box selected, choosing a class (1–9, or a click on its row) also gives that box the class, as one undo step.

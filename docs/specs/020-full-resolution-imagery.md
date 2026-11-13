@@ -4,6 +4,8 @@
 
 **Amended by spec 052 (2026-11-02):** criterion 4's e2e checks run on the rotated UTM grid only (`imagery.tester.spec.ts`), not the 4326 checkerboard. Criterion 8's cap is checked by unit tests only (`map/imagery`); the e2e test checks that opening another raster removes every `imagery-` source.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): e2e `imagery` (criteria 8 and 9) and `imagery.tester` (4); unit `core/imagery.tester`, `io/imageryLoader.tester`, `io/pipeline.preview.tester` (10) and `map/imagery.tester`. The base `core/imagery`, `io/imageryLoader` and `map/imagery` tests stay.
+
 **Request** (Gage, 2026-10-29): "If you are labelling, you want that full resolution when you zoom in to see the details."
 
 **Decided:**

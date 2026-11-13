@@ -8,6 +8,8 @@
 
 **Amended by spec 061 (2026-11-12):** criterion 13's test (`label-mask` "opening another raster after an import…") and the tester file `label-overlay.tester.spec.ts` are deleted. Criterion 13 stays covered by `brush-scope` 27 (OK on the discard confirm opens the new raster), and criteria 10 and 11 by `label-mask` "with only a mask loaded…" and "display…" and `label-replace`.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): e2e `label-mask` (criteria 6, 7, 10, 11, 13 and 14); unit `io/maskEdit.tester`, and `io/seedBuild.tester`'s case that an import never reaches the cap. The import, replace and round-trip e2e stay.
+
 **Already built (spec 004 Import labels, ADR 0013), unchanged here:**
 - Formats: a single-band 8-bit unsigned GeoTIFF or COG. Anything else gets "Label files must be single-band 8-bit GeoTIFFs."
 - CRS: any ADR 0002 CRS, resampled onto the imagery grid by nearest pixel centre. On an equal grid this is the identity.

@@ -2,6 +2,8 @@
 
 **Status:** Approved under Gage's 2026-10-30 perf delegation. **ADRs:** none. **Builds on spec 023** (its mask cache and label-file row bands), so it is built after 023 merges. Amended by spec 047 (2026-11-01): classes are the file's table, then "Class v" for every other value; "too many" comes before the pass only when the table alone has over 255 entries, else after it.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): unit `io/onePassImport.tester` (criteria 3 and 4), `io/maskCache.hold` (5), `io/maskCache.hold.tester`, `io/maskCache.windows` (scope 3), `io/blobSource.hold` and `io/geotiffSource.hold`.
+
 **Goal:** Importing a label file reads each of its strips once and takes seconds, not minutes.
 
 ## Evidence (perf/baseline.md §2, main 57e0493)

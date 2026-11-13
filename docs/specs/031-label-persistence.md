@@ -4,6 +4,8 @@
 - Spec 016's "Opacity isn't saved across reloads": a restored session brings its opacity back. Without a restore, a reload still reads 60, so 016's criterion 3 stands.
 - README's "labels live in memory until you export them".
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): e2e `label-persist-lock.tester` (criterion 11, scope 4); unit `ui/persist.tester`, `ui/persist.amend` (11–13) and `lint.test` (14). `label-persist` and `ui/persist.test.ts` stay.
+
 **Goal:** A tab that closes, reloads or crashes loses at most the last 2 s of labelling. Reopening the same raster offers the saved labels back.
 
 **Decided by Gage (2026-10-30), as drafted:**

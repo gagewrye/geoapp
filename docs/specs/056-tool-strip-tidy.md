@@ -2,6 +2,8 @@
 
 **Status:** Accepted (2026-11-11). **ADRs:** none (no dependency or architecture change). **Amends spec 035** scope 3 (brush order) and **spec 046** (the Apply button's visibility). **Depends on spec 055:** both touch the Smart select UI. Build this on a branch from `main` after 055 merges. 055's failure paths leave the mode unchanged, so criterion 4 applies to them.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): e2e `tool-strip-tidy` (criteria 1, 2 and 7) and `tool-strip-tidy.tester` (3 and 8). No test of this spec is left.
+
 **Request** (Gage, verbatim): "Also, on the paintbrush size, the plus and minus buttons are backwards and unintuitive. swap them. The apply smart select button should only be visible when smart select is active. The choose file buttons should not have n. when nothing is selected. Just leave it blank."
 
 ## Open questions (the spec does the recommended answer)

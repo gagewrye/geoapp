@@ -2,6 +2,8 @@
 
 **Status:** Accepted (2026-11-11). **ADRs:** none (no dependency or architecture change). **Amends spec 033** (scope 1 and 6, criteria 1 and 4, and its out-of-scope line "an eraser that clears every class"), **spec 010** (the cursor in Erase mode) and **spec 057** scope 3 (the `erase` hint is superseded here). **Build after spec 057 merges.** Spec 056 shares no files with this spec: it changes `index.html`, `style.css` and `modes.ts`. Both edit the tool strip's tests, so rebase whichever merges second.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): e2e `erase-any` (criteria 5, 7 and 8), `tool-keys` (4) and `label-mask` (6); unit `core/labelStore.eraseAny.tester` (1), `map/brush.eraseKinds.tester` (scope 2), `map/cursor.eraser.tester` (3) and `ui/readme.test` (9). The base `core/labelStore.eraseAny`, `map/brush` and `map/cursor` tests stay; no e2e test of Erase is left.
+
 **Request** (Gage, verbatim): "Change the erase tool to be class agnostic and erase any label. The paint right drag already covers the selected class removal feature." Then: "Also, change the pointer to an eraser".
 
 ## Open questions (the spec does the recommended answer)

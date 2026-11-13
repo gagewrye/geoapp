@@ -4,6 +4,8 @@
 
 **Amended by spec 057 (2026-11-11):** criterion 9 no longer requires the README to name "**Redo**"; Gage shortened the README. The check that it has no "shows the labels again, and the opacity slider" stands.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): unit `ui/readme.test` (criterion 9, README text).
+
 **Goal:** An undone stroke can be redone with Ctrl+Shift+Z, Ctrl+Y or a Redo button.
 
 ## Scope

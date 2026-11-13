@@ -4,6 +4,8 @@
 
 **Amended by spec 061 (2026-11-12):** criterion 6 loses both its e2e tests, `alpha.spec.ts` and `alpha.tester.spec.ts`. The unit `io/alpha` and `core/alpha` tests remain. Lost: the alpha band end to end, and its rendered transparency.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): unit `io/alpha.tester`. `io/alpha.test.ts` stays.
+
 **Amends:**
 - Spec 020: reads gain the alpha band.
 - Spec 021: the imagery-read skip condition.

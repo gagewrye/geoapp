@@ -2,6 +2,8 @@
 
 **Status:** Approved under Gage's 2026-10-30 perf delegation. **ADR:** 0023 (amends 0019). Changes only `core/labelQuads.ts` internals plus a quad cache in `core/imagery.ts` and its caller. Spec 023's F5 precompute keeps calling `tileQuads` unchanged.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): unit `core/imagery.quadCache.tester` (scope 3), `core/labelQuads.lattice.tester` and `map/imagery.quads` (criterion 5).
+
 **Goal:** Placing a new imagery or label tile takes about 1 ms instead of 10–15 ms, with ADR 0019's accuracy kept.
 
 ## Evidence (perf/baseline.md §1, §3, §4)
