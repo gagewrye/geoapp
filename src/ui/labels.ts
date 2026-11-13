@@ -1,12 +1,12 @@
 import type { Map as MapLibreMap } from "maplibre-gl";
-import { emptyBoxes, type BoxStore } from "../core/boxes";
-import type { LabelClass } from "../core/classes";
+import { coverValues, type LabelClass } from "../core/classes";
 import { emptyStore, tileWindow, type LabelStore } from "../core/labelStore";
 import { pixelAt } from "../core/pixel";
 import { ownTile, type MaskBase } from "../io/maskBase";
 import type { PaintOp } from "../io/paintQueue";
 import type { RasterSource } from "../io/source";
 import { createBrush } from "../map/brush";
+import { wireBoxes } from "./boxes";
 import { initBrushSize } from "./brushSize";
 import { initClassPanel } from "./classPanel";
 import { labelDisplay } from "./labelDisplay";
@@ -57,14 +57,14 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
   // labels) or a restore offer (spec 031); each holds it under its own name, and it lifts once neither does
   const holders = new Set<"run" | "restore">();
   let locked = false;
-  let store: LabelStore = emptyStore(0, 0), boxes: BoxStore = emptyBoxes(); // boxes (spec 063): replace() keeps them, open() empties them
+  let store: LabelStore = emptyStore(0, 0);
   let imagery: RasterSource | null = null;
   let base: MaskBase | null = null; // an imported mask under the stored tiles (spec 014)
   // the Classes section (spec 036)
   const panel = initClassPanel({
     list: $("classes"), add: $<HTMLButtonElement>("class-add"), say, locked: () => locked,
-    recoloured: () => { edits.record(); redraw(store.tiles.keys(), true); brush.refresh(); tools.redraw(); },
-    selectedChanged: () => { edits.record(); brush.refresh(); tools.redraw(); toolChanged(); },
+    recoloured: () => { edits.record(); redraw(store.tiles.keys(), true); brush.refresh(); tools.redraw(); bx.redraw(); },
+    selectedChanged: () => { edits.record(); brush.refresh(); tools.redraw(); toolChanged(); }, chosen: (i) => bx.classChosen(i),
     edited: () => { edits.record(); toolChanged(); },
   });
   const picker = initPicker({ tile, dims: () => store, classes: panel.classes, select: panel.select, say }); // Alt+click or I (spec 038)
@@ -77,9 +77,9 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
   const redraw = display.redraw;
   // Undo and redo (specs 010, 037, 063): one entry per stroke or box edit; opening a raster or replacing the store clears it
   const undo = initUndo({
-    button: $<HTMLButtonElement>("undo"), redoButton: $<HTMLButtonElement>("redo"), store: () => store, boxes: () => boxes,
-    blocked: () => locked || brush.stroking() || paint.size() > 0 || tools.filling(), shortcut: () => open && !inTextField(document.activeElement),
-    undone: ({ tiles: keys }) => { edits.tiles(keys); redraw(keys); onChange(); }, // Import and Export follow the store (spec 004); boxes aren't drawn until spec 064
+    button: $<HTMLButtonElement>("undo"), redoButton: $<HTMLButtonElement>("redo"), store: () => store, boxes: () => bx.store(),
+    blocked: () => locked || brush.stroking() || bx.dragging() || paint.size() > 0 || tools.filling(), shortcut: () => open && !inTextField(document.activeElement),
+    undone: ({ tiles: keys, boxes: ids }) => { edits.tiles(keys); redraw(keys); bx.undone(ids); onChange(); }, // Import and Export follow the store (spec 004)
   });
 
   const paint = initPaint({
@@ -93,13 +93,15 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
     onStroke: (active) => { undo.stroke(active); if (!active) { edits.strokeEnded(); modes.strokeEnded(); } }, panning, pick: picker.pick,
     click: (cell, include) => tools.click(cell, include), discard: () => tools.rightClick() }); // Smart, Fill and Polygon's clicks (specs 046, 049, 054)
 
-  const view = initLabelView(map, (visible) => { if (!visible) modes.setMode("pan"); }, () => edits.record()); // hiding labels selects Pan (spec 016)
-  const modes = initModes({ brush, view, toolChanged: () => { tools.modeChanged(); toolChanged(); }, smart: () => tools.chooseSmart() }); // a tool that is left drops what it had pending
+  const view = initLabelView(map, (visible) => { if (!visible) modes.setMode("pan"); }, () => edits.record(), (v) => bx.visible(v)); // hiding labels selects Pan (spec 016)
+  const modes = initModes({ brush, view, toolChanged: () => { tools.modeChanged(); bx.modeChanged(); toolChanged(); }, smart: () => tools.chooseSmart() }); // a tool that is left drops what it had pending
   const tools = initClickTools({ map, store: () => store, imagery: () => imagery, base: () => base, masks: paint.masks, undo, push: paint.push, panel, locked: () => locked, say, modes, toolChanged, edits, smart: smartDeps, onBusy, pending: () => paint.size() > 0 });
   const size = initBrushSize(() => { brush.refresh(); toolChanged(); });
+  // the Box tool (spec 064): its store (spec 063: replace() keeps it, open() empties it), selection and edits; locked or peeking, it does nothing
+  const bx = wireBoxes(map, { undo, panel, modes, brush, panning, blocked: () => locked || view.peeking(), changed: () => { undo.sync(); toolChanged(); onChange(); } });
   initLabelKeys({
-    open: () => open, brush, size, select: panel.select, classCount: () => panel.classes().length, pick: () => picker.pick(brush.hoverCell()),
-    setMode: modes.request, canPaint: modes.canPaint, stroking: brush.stroking, view: { toggle: view.toggle, peek: modes.peek }, ...tools.keys,
+    open: () => open, brush, size, select: (i) => { panel.select(i); bx.classChosen(i); }, classCount: () => panel.classes().length, pick: () => picker.pick(brush.hoverCell()),
+    setMode: modes.request, canPaint: modes.canPaint, stroking: brush.stroking, view: { toggle: view.toggle, peek: modes.peek }, ...tools.keys, box: bx.keys,
   });
 
   /** While seeding or exporting labels ("run") or a restore offer settles: the brush, the class list's edits and Undo are off; selecting still works. */
@@ -125,7 +127,7 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
       base = null; picker.cancel(); // opening a raster drops the mask, and a pick still reading the old one
       imagery = source;
       const { width, height, epsg, gt } = source.meta, grid = { width, height, epsg, gt };
-      store = emptyStore(width, height); boxes = emptyBoxes();
+      store = emptyStore(width, height); bx.open(grid);
       holders.clear(); // the old raster's run or offer no longer holds these labels
       apply();
       view.reset();
@@ -144,8 +146,8 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
       base = nextBase;
       display.setMask(base?.preview ?? null);
       undo.clear(); picker.cancel(); // a seed isn't undoable, strokes recorded against the old store can't be undone over it, nor a pick apply
-      panel.replace(list);
-      redraw(keys); // colours may have changed too
+      panel.replace(coverValues(list, bx.values())); // boxes are kept, and their values need classes (spec 064 decision 3)
+      redraw(keys); bx.redraw(); // colours may have changed too
       modes.setMode("pan"); // an import selects Pan (spec 014 as amended by spec 016)
       brush.refresh();
       edits.replaced();
@@ -159,7 +161,7 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
     },
     selected: panel.selected,
     /** The status bar's tool: mode, selected class name and brush side. */
-    tool: () => ({ mode: modes.mode(), className: panel.classes()[panel.selected()]?.name ?? "", side: size.side(), reading: tools.reading() }),
+    tool: () => ({ mode: modes.mode(), className: panel.classes()[panel.selected()]?.name ?? "", side: size.side(), reading: tools.reading(), box: bx.size() }),
     view: () => view.get(),
     /** Takes the labels off the map for an import (spec 021); the store, classes, base and history stay as they are. */
     hold(): Held { display.hide(); return { store, base }; },
@@ -189,10 +191,10 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
     tile,
     /** A paint or erase stroke is in progress. */
     stroking: brush.stroking,
-    /** True when a tile is stored or a mask with labelled pixels is loaded. */
-    hasLabels: () => store.tiles.size > 0 || (base?.count ?? 0) > 0,
+    /** True when a tile is stored, a mask with labelled pixels is loaded, or a box is drawn (spec 064). */
+    hasLabels: () => store.tiles.size > 0 || (base?.count ?? 0) > 0 || bx.store().boxes.size > 0,
     /** Pointer moves are waiting for valid masks, or a fill is being read. */
     busy: () => paint.size() > 0 || tools.filling(),
-    store: () => store, boxes: () => boxes, classes: panel.classes, setClasses: panel.setClasses,
+    store: () => store, boxes: bx.store, classes: panel.classes, setClasses: panel.setClasses,
   };
 }

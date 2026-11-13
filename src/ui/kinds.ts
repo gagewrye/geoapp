@@ -8,12 +8,14 @@ export type LabelKind = { id: KindId; name: string; modes: readonly BrushMode[];
 /** Pan and Smart select are shared, so they belong to no kind. */
 export const KINDS: readonly LabelKind[] = [
   { id: "mask", name: "Masks", modes: ["paint", "erase", "fill", "polygon"], groups: ["tools-mask", "brush-group"], sections: ["mask-view"] },
+  { id: "box", name: "Boxes", modes: ["box"], groups: ["tools-box"], sections: [] },
 ];
 
-type Deps = { kinds: readonly LabelKind[]; mode: () => BrushMode; setMode: (m: BrushMode) => void };
+/** changed: a kind radio was clicked (a mode change reports through setMode). */
+type Deps = { kinds: readonly LabelKind[]; mode: () => BrushMode; setMode: (m: BrushMode) => void; changed?: () => void };
 
 /** The label type switch at the top of the tool strip: it shows one kind's tools and panel sections at a time (spec 062). */
-export function initKinds({ kinds, mode, setMode }: Deps) {
+export function initKinds({ kinds, mode, setMode, changed = () => {} }: Deps) {
   const box = document.getElementById("kinds")!;
   const radios = kinds.map((k) => {
     const b = document.createElement("button");
@@ -21,7 +23,7 @@ export function initKinds({ kinds, mode, setMode }: Deps) {
     b.setAttribute("id", `kind-${k.id}`);
     b.setAttribute("role", "radio");
     b.textContent = k.name;
-    b.addEventListener("click", () => setKind(k.id));
+    b.addEventListener("click", () => { setKind(k.id); changed(); });
     return b;
   });
   box.replaceChildren(...radios);

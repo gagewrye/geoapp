@@ -113,7 +113,7 @@ describe("hints", () => {
       "brush-smaller": "Halves the brush (in raster pixels).",
       "brush-larger": "Doubles the brush (in raster pixels).",
       help: "Lists every keyboard and mouse shortcut.",
-      undo: "Takes back the last stroke, fill or applied selection.",
+      undo: "Takes back the last stroke, fill, applied selection or box edit.", // spec 064 scope 7
       redo: "Puts back what you undid.",
     };
     const changed = ["paint", "erase", "smart", "fill"];

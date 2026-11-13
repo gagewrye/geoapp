@@ -3,13 +3,13 @@ import { applyLabelView, DEFAULT_LABEL_OPACITY } from "../map/layers";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
-/** The Opacity slider and Show labels checkbox (spec 016), and the peek (spec 034). They change how labels show, never the labels, so no lock disables them. */
-export function initLabelView(map: MapLibreMap, onVisible: (visible: boolean) => void, onChange: () => void = () => {}) {
+/** The Opacity slider and Show labels checkbox (spec 016), and the peek (spec 034). They change how labels show, never the labels, so no lock disables them. shown: boxes follow Show and the peek, not the opacity (spec 064). */
+export function initLabelView(map: MapLibreMap, onVisible: (visible: boolean) => void, onChange: () => void = () => {}, shown: (visible: boolean) => void = () => {}) {
   const range = $<HTMLInputElement>("label-opacity"), text = $("label-opacity-text"), show = $<HTMLInputElement>("show-labels");
 
   let peeking = false; // a held peek key hides the layers only: the checkbox and the saved view stay (spec 034)
   const showText = () => { text.textContent = `${range.value}%`; }; // beside its slider (spec 035)
-  const layers = () => applyLabelView(map, { opacity: Number(range.value) / 100, visible: show.checked && !peeking });
+  const layers = () => { applyLabelView(map, { opacity: Number(range.value) / 100, visible: show.checked && !peeking }); shown(show.checked && !peeking); };
   const apply = () => {
     showText();
     layers();
