@@ -1,13 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
-import { readFileSync } from "node:fs";
 import { message, openApp, openRaster, rgbFixture } from "./helpers";
-import { measure, type Box } from "./layoutBoxes";
 
-// Spec 062 criterion 4: grouping by label kind moves nothing. The fixture was recorded at 4a54545, before the change.
+// Spec 062 criterion 4: grouping by label kind moves nothing. One page measures the tool strip and panel
+// as built, then again with scope 2 undone in place, so no fixture or platform's font metrics come into it.
 test.use({ viewport: { width: 1280, height: 720 } });
-
-/** Recorded on macOS (`platform`); Linux font metrics differ by 1 px (run 43339686870). */
-const BEFORE: { platform: string; boxes: Box[] } = JSON.parse(readFileSync("tests/fixtures/layout-062.json", "utf8"));
 
 async function setup(page: Page) {
   await openApp(page);
@@ -15,15 +11,27 @@ async function setup(page: Page) {
   await expect(message(page)).toHaveText("Raster opened.");
 }
 
-test("after open, every element of the tool strip and panel sits where it did at 4a54545", async ({ page }) => {
+test("after open, every element of the tool strip and panel sits where it does with scope 2's wrappers undone", async ({ page }) => {
   await setup(page);
-  const now = new Map((await measure(page)).map((b) => [b.key, b]));
-  const off: string[] = [];
-  for (const b of BEFORE.boxes) {
-    const a = now.get(b.key);
-    if (!a) { off.push(`${b.key} missing`); continue; }
-    for (const k of ["x", "y", "width", "height"] as const) if (Math.abs(a[k] - b[k]) > 0.5) off.push(`${b.key} ${k}: ${b[k]} -> ${a[k]}`);
-  }
+  const { compared, off } = await page.evaluate(() => {
+    const ADDED = ["kinds", "tools-mask", "brush-group"];
+    const els = ["tools", "side"].flatMap((r) => [...document.getElementById(r)!.querySelectorAll("*")]).filter((e) => !ADDED.includes(e.id));
+    const rect = (e: Element) => { const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; };
+    const wrapped = els.map(rect);
+    for (const id of ["tools-mask", "brush-group"]) { const w = document.getElementById(id)!; w.replaceWith(...w.childNodes); }
+    document.getElementById("kinds")!.remove();
+    const view = document.getElementById("mask-view")!;
+    view.removeAttribute("id");
+    view.removeAttribute("data-kind");
+    const name = (e: Element) => e.id || `${e.tagName.toLowerCase()} in #${e.closest("[id]")?.id}`;
+    const off: string[] = [];
+    els.forEach((e, i) => {
+      const now = rect(e), was = wrapped[i]!;
+      for (const k of ["x", "y", "width", "height"] as const) if (Math.abs(now[k] - was[k]) > 0.5) off.push(`${name(e)} ${k}: wrapped ${was[k]}, unwrapped ${now[k]}`);
+    });
+    return { compared: els.length, off };
+  });
+  expect(compared).toBeGreaterThan(30); // the strip's 15 controls and the panel's rows, not an empty query
   expect(off).toEqual([]);
 });
 
