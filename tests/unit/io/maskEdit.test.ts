@@ -65,7 +65,7 @@ describe("copy on touch (spec 014 Rules)", () => {
         if (a[i] !== (inDab ? 2 : b[i])) throw new Error(`${c},${r}: ${a[i]}`);
       }
     }
-    expect(t.history.undo()).toEqual(["0,0", "256,0", "0,256", "256,256"]);
+    expect(t.history.undo()).toEqual({ tiles: ["0,0", "256,0", "0,256", "256,256"], boxes: [] });
     expect(t.store.tiles.size).toBe(0);
   });
 
@@ -97,7 +97,7 @@ describe("no cap with a base (spec 048 criterion 2)", () => {
     const tile = t.store.tiles.get(`${w.x0},${w.y0}`)!;
     expect(tile[5 * 256 + 5]).toBe(2);
     expect(tile[0]).toBe(1); // the rest is the base
-    expect(t.history.undo()).toEqual([`${w.x0},${w.y0}`]);
+    expect(t.history.undo()).toEqual({ tiles: [`${w.x0},${w.y0}`], boxes: [] });
     expect(t.store.tiles.size).toBe(300);
   });
 });

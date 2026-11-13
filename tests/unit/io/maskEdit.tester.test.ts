@@ -52,9 +52,9 @@ describe("undo across copy on touch (spec 014, ADR 0018: a null entry shows the 
     expect([...afterA.keys()]).toEqual(["0,0"]);
     await t.strokeAt([[20, 20], [300, 20]], 1, false, 3);
     expect([...t.store.tiles.keys()].sort()).toEqual(["0,0", "256,0"]);
-    expect(t.history.undo()).toEqual(["0,0", "256,0"]);
+    expect(t.history.undo()).toEqual({ tiles: ["0,0", "256,0"], boxes: [] });
     expect(same(t.store.tiles, afterA)).toBe(true);
-    expect(t.history.undo()).toEqual(["0,0"]);
+    expect(t.history.undo()).toEqual({ tiles: ["0,0"], boxes: [] });
     expect(t.store.tiles.size).toBe(0);
     expect(same(await effectiveTiles(t.imagery.source, { store: t.store, base: t.r.base }), imported)).toBe(true);
   });

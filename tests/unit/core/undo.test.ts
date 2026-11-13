@@ -3,7 +3,7 @@ import { tileWindows, type Window } from "../../../src/core/grid";
 import { brush, emptyStore, type LabelStore, type NodataMasks } from "../../../src/core/labelStore";
 import { nodataMask } from "../../../src/core/nodata";
 import { TILE_SIZE } from "../../../src/core/types";
-import { UNDO_BYTES, UNDO_STEPS, editBytes, finishEdit, recordTiles, swapEdit, trimHistory, type Edit } from "../../../src/core/undo";
+import { UNDO_BYTES, UNDO_STEPS, editBytes, finishEdit, recordTiles, swapEdit, trimHistory, type Edit, type Entry } from "../../../src/core/undo";
 import { makeTile } from "../helpers/tiles";
 
 const TILE = TILE_SIZE * TILE_SIZE;
@@ -84,11 +84,13 @@ describe("recordTiles / finishEdit / swapEdit (spec 010 criterion 1)", () => {
   });
 });
 
-const oneTileEdit = (k: number): Edit => new Map([[`${k * 256},0`, new Uint8Array(TILE)]]);
-const sized = (bytes: number): Edit => {
+// trimHistory takes whole entries (spec 063); these hold tiles only
+const entry = (tiles: Edit): Entry => ({ tiles, boxes: new Map() });
+const oneTileEdit = (k: number): Entry => entry(new Map([[`${k * 256},0`, new Uint8Array(TILE)]]));
+const sized = (bytes: number): Entry => {
   const e: Edit = new Map();
   for (let i = 0; i * TILE < bytes; i++) e.set(`${i * 256},0`, new Uint8Array(TILE));
-  return e;
+  return entry(e);
 };
 
 describe("trimHistory / editBytes (spec 010 criterion 2)", () => {
@@ -104,7 +106,7 @@ describe("trimHistory / editBytes (spec 010 criterion 2)", () => {
   it("keeps the newest 8 of nine 4 MiB edits within UNDO_BYTES", () => {
     expect(UNDO_BYTES).toBe(32 * MiB);
     const h = Array.from({ length: 9 }, () => sized(4 * MiB));
-    expect(editBytes(h[0]!)).toBe(4 * MiB);
+    expect(editBytes(h[0]!.tiles)).toBe(4 * MiB);
     const newest = h.slice(1);
     trimHistory(h, UNDO_BYTES, UNDO_STEPS);
     expect(h).toHaveLength(8);

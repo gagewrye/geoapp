@@ -14,6 +14,7 @@ One entry per merge to main, newest first. Details are in the named spec.
   - space (`space.tester`, `space` at zoom 12): contrast over the stars; a pitched horizon.
   - `label-quads.tester` globe tests (×2): dab = hover on the globe on EPSG:4326, which spec 052 relied on; spec 018 criterion 3 is now checked on UTM only.
   - Kept (6 tests, Gage 2026-11-12; criterion 7 held them back because spec 004 changed after 2026-10-31): `undo-seed.tester`, `label-controls.tester` and `label-lock-export.tester` 55, 75 and 99.
+- **Spec 063:** Boxes exist as data: axis-aligned, whole-pixel boxes in a class, held per open raster, with pure geometry for drawing, moving, resizing and hit-testing them. Undo and redo keep one history for mask strokes and box edits (ADR 0038, amending ADR 0015); each box change counts 48 bytes against the 32 MiB budget. Nothing visible changes until spec 064.
 - **Spec 056:** The brush strip reads +, size, −, then the slider, so + sits above the end of the slider that means larger. The ✓ Apply button shows only in Smart select. The three file buttons in the top bar show no "No file chosen" text beside them.
   - `brush-panel` "recolouring changes the overlay and the hover colour" (run 43291075248): @ci-skip: not run on CI. On CI, nothing checks that recolouring a class repaints its overlay.
   - `labelDisplay.tester` "partial edge tiles get overlays; erasing an overlaid edge tile drops its overlay…" (run 43296016620): 30 s timeout: heavy on CI runners, spec 060 c11.
