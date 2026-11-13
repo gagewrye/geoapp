@@ -1,5 +1,6 @@
 import type { BrushMode, createBrush } from "../map/brush";
 import { deferMode } from "./deferMode";
+import { initKinds, KINDS } from "./kinds";
 import type { initLabelView } from "./labelView";
 
 const MODES: BrushMode[] = ["paint", "erase", "pan", "smart", "fill", "polygon"];
@@ -15,18 +16,20 @@ type Deps = {
   smart: () => void;
 };
 
-/** The Pan, Paint, Erase, Fill, Polygon and Smart buttons, mode keys held to a stroke's end, and the peek's brush block (specs 016, 033, 034, 046, 054). */
+/** The Pan, Paint, Erase, Fill, Polygon and Smart buttons, mode keys held to a stroke's end, the peek's brush block and the label kind switch (specs 016, 033, 034, 046, 054, 062). */
 export function initModes({ brush, view, toolChanged, smart }: Deps) {
   let mode: BrushMode = "pan";
   let noSmart = false; // no WebGPU: Smart stays off for this page's life
   const setMode = (m: BrushMode) => {
     keyed.clear();
     mode = m;
+    kinds.follow(m); // a tool of another label kind shows that kind first (spec 062)
     brush.setMode(m);
     toolChanged();
     for (const b of MODES) $(`mode-${b}`).setAttribute("aria-pressed", String(m === b));
     $("smart-apply").hidden = m !== "smart"; // Apply is Smart's alone (spec 056)
   };
+  const kinds = initKinds({ kinds: KINDS, mode: () => mode, setMode });
   // No tool but Pan applies to labels you can't see (specs 016, 033, 046, 054): hiding selects Pan, and each shows them first
   const choose = (m: BrushMode) => { if (m !== "pan") view.show(); setMode(m); };
   const keyed = deferMode(() => brush.stroking(), choose);
