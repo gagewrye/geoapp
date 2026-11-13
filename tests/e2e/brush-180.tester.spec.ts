@@ -1,12 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 import { fromLonLat } from "../../src/core/crs";
-import { footprint, footprintRing, pixelAt, strokeCells } from "../../src/core/pixel";
+import { footprint, pixelAt, strokeCells } from "../../src/core/pixel";
 import type { Grid } from "../../src/core/types";
-import { collectErrors, hoverFeatures, jumpTo, labels, message, openApp, openRaster, paintMode, pixelAt as screenPixel, settled, tiff, toLngLat, toScreen, type LngLat, type Xy } from "./helpers";
+import { collectErrors, jumpTo, labels, message, openApp, openRaster, paintMode, pixelAt as screenPixel, settled, tiff, toLngLat, toScreen, type Xy } from "./helpers";
 
 // Tester: spec 003 "180 and MAX_LAT": longitude is normalised so every world copy hits the same pixel.
-// An EPSG:32660 raster straddling 180 (zone 60 opens, spec 001 criterion 16): strokes and hover across
-// the meridian, and painting while the map centre sits in another world copy.
+// An EPSG:32660 raster straddling 180 (zone 60 opens, spec 001 criterion 16): a stroke across the meridian.
+// Spec 061 cut the hover and world-copy cases.
 
 const [X0, Y0] = fromLonLat(32660, 179.6, 10.02);
 const GRID: Grid = { width: 3000, height: 120, epsg: 32660, gt: [X0, 30, 0, Y0, 0, -30] }; // 90 km: to about 179.58W
@@ -63,37 +63,4 @@ test("a stroke across 180 labels one continuous run of columns through the merid
   expect(cols.size).toBe(hi - lo + 1);
   await expect.poll(async () => (await screenPixel(page, probe)).slice(0, 3)).not.toEqual(before.slice(0, 3));
   expect(errors).toEqual([]);
-});
-
-test("the hover east of 180 is footprintRing at the normalised pointer pixel", async ({ page }) => {
-  await setup(page, 180);
-  const p = round(await toScreen(page, [180.003, 9.9995]));
-  await page.mouse.move(p.x - 1, p.y);
-  await page.mouse.move(p.x, p.y);
-  await expect.poll(async () => (await hoverFeatures(page)).length).toBe(1);
-  const [ll] = await toLngLat(page, [p]);
-  const cell = pixelAt(GRID, ll![0] - 360, ll![1]); // the same pixel from the -179.997 copy
-  expect(cell).toEqual(pixelAt(GRID, ...ll!));
-  expect(cell[0]).toBeGreaterThan(col180);
-  const want = footprintRing(GRID, footprint(GRID, cell[0], cell[1], 7)!);
-  const ring: LngLat[] = (await hoverFeatures(page))[0].geometry.coordinates[0];
-  ring.forEach(([lon, lat], i) => { expect(Math.abs(lon - want[i]![0])).toBeLessThan(1e-6); expect(Math.abs(lat - want[i]![1])).toBeLessThan(1e-6); });
-});
-
-test("the same screen stroke with the map centred one world copy east (lon 540) labels the same pixels", async ({ page }) => {
-  await setup(page, 180);
-  const a = await strokeAcross(page, 179.995, 180.005);
-  const first = new Set((await labels(page)).keys());
-  expect(first.size).toBeGreaterThan(0);
-  await page.evaluate(() => { for (const [, t] of (window as any).__geoapp.labels.store.tiles) t.fill(0); (window as any).__geoapp.labels.store.tiles.clear(); });
-  await jumpTo(page, [540, 9.9995], 12);
-  const lls = await toLngLat(page, a);
-  const copyLon = lls[0]![0];
-  test.skip(Math.abs(copyLon - 179.995) < 1, `MapLibre wrapped the centre back (unproject gave ${copyLon}); no world copy to test`);
-  await page.mouse.move(a[0]!.x, a[0]!.y);
-  await page.mouse.down();
-  for (const p of a.slice(1)) await page.mouse.move(p.x, p.y);
-  await page.mouse.up();
-  await settled(page);
-  expect(new Set((await labels(page)).keys())).toEqual(first);
 });
