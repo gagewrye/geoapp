@@ -6,7 +6,7 @@ import type { Grid } from "../core/types";
 import { brushCursor, eraserCursor } from "./cursor";
 import { ERASE_COLOUR, showHover } from "./hover";
 
-export type BrushMode = "paint" | "erase" | "pan" | "smart" | "fill" | "polygon";
+export type BrushMode = "paint" | "erase" | "pan" | "smart" | "fill" | "polygon" | "box";
 type Deps = {
   side: () => number;
   colour: () => string;
@@ -43,6 +43,7 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
   let pointer: { x: number; y: number; target: EventTarget | null } | null = null; // last mouse or pen position
   let press: { pointerId: number; button: number; shift: boolean; x: number; y: number } | null = null; // a click in progress
   const painting = () => grid !== null && (mode === "paint" || mode === "erase") && !space; // Paint or Erase (spec 033)
+  const boxing = () => grid !== null && mode === "box" && !space; // drags draw boxes (map/boxTool.ts), so they don't pan either (spec 064)
   const clicking = () => grid !== null && (mode === "smart" || mode === "fill" || mode === "polygon") && !space; // these take clicks, and drags pan
   const shaping = () => clicking() && mode !== "smart"; // Fill or Polygon (spec 054): a crosshair, and a double click closes a polygon instead of zooming
 
@@ -52,7 +53,7 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
   const syncCursor = () => {
     container.classList.toggle("brush-cursor", painting() && !locked && !blocked);
     container.classList.toggle("locked-cursor", painting() && (locked || blocked));
-    container.classList.toggle("click-cursor", shaping());
+    container.classList.toggle("click-cursor", shaping() || boxing());
     const c = mode === "erase" ? eraserCursor() : brushCursor(deps.colour());
     if (c !== cursor) container.style.setProperty("--brush-cursor", cursor = c);
   };
@@ -61,7 +62,7 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
   const handlers = [map.dragRotate, map.doubleClickZoom, map.boxZoom];
   let owned: typeof handlers = [];
   const syncHandlers = () => {
-    const off = painting() ? handlers : shaping() ? [map.doubleClickZoom] : [];
+    const off = painting() || boxing() ? handlers : shaping() ? [map.doubleClickZoom] : [];
     for (const h of owned) if (!off.includes(h)) h.enable();
     for (const h of off) h.disable();
     owned = off;
@@ -161,7 +162,7 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
   // Capture on the map container runs before MapLibre's mousedown listener on the canvas container.
   map.getContainer().addEventListener("mousedown", (e) => {
     if (lastType === "touch" || !(e.target instanceof Node) || !container.contains(e.target)) return;
-    if (painting() || (grid && picks(e))) e.stopPropagation(); // an Alt pick doesn't pan in Pan mode either
+    if (painting() || boxing() || (grid && picks(e))) e.stopPropagation(); // an Alt pick doesn't pan in Pan mode either
     // Shift+left is a click (Smart's exclude point), not MapLibre's box zoom, which would zoom to a 1-4 px box (spec 049)
     else if (clicking() && e.button === 0 && e.shiftKey) e.stopPropagation();
   }, { capture: true });
@@ -179,6 +180,8 @@ export function createBrush(map: MapLibreMap, deps: Deps) {
     /** Changing mode ends a stroke in progress (spec 016: hiding labels mid-stroke selects Pan). */
     setMode(m: BrushMode): void { if (m !== mode) end(); mode = m; syncHandlers(); hover(); },
     mode: () => mode,
+    /** Box mode with a raster open and Space not held: left drags are the box tool's. */
+    boxing,
     /** Space held acts as Pan. */
     setSpace(held: boolean): void { if (space !== held) { space = held; syncHandlers(); hover(); } },
     /** Locked, the brush neither paints nor shows its footprint; a stroke in progress ends. */
