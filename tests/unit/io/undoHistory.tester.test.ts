@@ -46,7 +46,7 @@ describe("UndoHistory edges (spec 010, tester)", () => {
     expect(t.errors).toHaveLength(1);
     expect([...t.store.tiles.keys()].sort()).toEqual(["0,0", "256,0"]);
     expect(t.history.size).toBe(1);
-    expect(t.history.undo()).toEqual(["0,0", "256,0"]);
+    expect(t.history.undo()).toEqual({ tiles: ["0,0", "256,0"], boxes: [] });
     expect(t.store.tiles.size).toBe(0);
   });
 
@@ -68,9 +68,9 @@ describe("UndoHistory edges (spec 010, tester)", () => {
     cells(afterA, ra, [[10, 10], [20, 10]], 1, 3);
     afterA.history.end(ra);
     await idle(afterA.q);
-    expect(t.history.undo()).toEqual(["0,0", "256,0"]);
+    expect(t.history.undo()).toEqual({ tiles: ["0,0", "256,0"], boxes: [] });
     expect(snapshot(t.store)).toEqual(snapshot(afterA.store));
-    expect(t.history.undo()).toEqual(["0,0"]);
+    expect(t.history.undo()).toEqual({ tiles: ["0,0"], boxes: [] });
     expect(t.store.tiles.size).toBe(0);
   });
 
@@ -136,7 +136,7 @@ describe("UndoHistory edges (spec 010, tester)", () => {
     }
     expect(peak).toBeLessThanOrEqual(UNDO_BYTES);
     // each 64-tile entry (once tiles exist) is 4 MiB, so 8 fit
-    expect(t.history.entries().every((e) => editBytes(e) <= 64 * TILE_SIZE * TILE_SIZE)).toBe(true);
+    expect(t.history.entries().every((e) => editBytes(e.tiles) <= 64 * TILE_SIZE * TILE_SIZE)).toBe(true);
     expect(t.history.size).toBeLessThanOrEqual(UNDO_STEPS);
   }, 30_000); // 2,560 cells with 64 KiB tile copies: about 4 s alone, more under full-suite load
 });
