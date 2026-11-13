@@ -44,7 +44,16 @@ jobs:
       - run: npm ci
       # browsers aren't cached: Playwright's docs advise against it (a restore takes about as long as the download)
       - run: npx playwright install --with-deps chromium
-      - run: npx playwright test --shard=${{ matrix.shard }}/4
+      # TEMPORARY (spec 061 criteria 6-7): per-test durations as JSON; reverted before merge
+      - run: npx playwright test --shard=${{ matrix.shard }}/4 --reporter=dot,html,json
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: results-${{ matrix.shard }}.json
+      - if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: e2e-json-${{ matrix.shard }}
+          path: results-${{ matrix.shard }}.json
+          retention-days: 14
       - if: failure()
         uses: actions/upload-artifact@v5
         with:
