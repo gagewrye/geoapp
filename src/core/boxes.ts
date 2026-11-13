@@ -82,3 +82,23 @@ export function handlePoints(r: Rect): { handle: Handle; x: number; y: number }[
   });
   return HANDLES.map(at);
 }
+
+/** The handle within radius screen px of (x, y): the nearest corner if any is in reach, else the nearest edge (spec 064). */
+export function handleNear(points: { handle: Handle; x: number; y: number }[], x: number, y: number, radius = 6): Handle | null {
+  for (const corner of [true, false]) {
+    let best: Handle | null = null, bestD = Infinity;
+    for (const p of points) {
+      const d = Math.hypot(p.x - x, p.y - y);
+      if ((p.handle.length === 2) === corner && d <= radius && d < bestD) { best = p.handle; bestD = d; }
+    }
+    if (best) return best;
+  }
+  return null;
+}
+
+/** The id a click selects among hits (boxesAt): the one after selected when the click repeats on the same pixel, else the first; null for none. */
+export function cycleBox(hits: Box[], selected: number | null, again: boolean): number | null {
+  if (!hits.length) return null;
+  const i = again ? hits.findIndex((b) => b.id === selected) : -1;
+  return hits[(i + 1) % hits.length]!.id;
+}
