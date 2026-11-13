@@ -198,19 +198,29 @@ describe("idle (spec 071 criterion 5)", () => {
     expect(m.overlaid()).toEqual(new Set(["0,0"]));
   });
 
+  // Spec 072 criterion 2: vi.useFakeTimers() with no list also fakes the stubbed requestAnimationFrame, and
+  // runAllTimersAsync then ran the idle loop's frames between real setTimeout yields. Only timers and clocks are
+  // faked here, frames stay on the stub and idle callbacks on idles, so nothing waits on real time.
   it("waits for queued quad prefetches", async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: FAKED });
+    const idles: ((d: { timeRemaining(): number; didTimeout?: boolean }) => void)[] = [];
+    vi.stubGlobal("requestIdleCallback", (cb: (typeof idles)[number]) => idles.push(cb));
     try {
       const m = fakeMap({ b: bounds(0, 0, 512, 512) });
       const display = labelDisplay(m.map, () => emptyStore(512, 512), () => COLOURS);
       display.open(SMALL);
       display.prefetch(["0,0", "256,0"]);
       const idle = display.idle();
-      runFrames(m.overlaid);
+      step();
       expect(await settledYet(idle)).toBe(false);
-      await vi.runAllTimersAsync(); // no requestIdleCallback here: the cache's timeouts
-      runFrames(m.overlaid);
+      for (let i = 0; i < 2; i++) { // a timed-out idle callback computes one tile
+        expect(idles).toHaveLength(1);
+        idles.shift()!({ timeRemaining: () => 0, didTimeout: true });
+        step();
+      }
       expect(await settledYet(idle)).toBe(true);
+      expect(idles).toHaveLength(0);
+      expect(vi.getTimerCount()).toBe(0);
     } finally { vi.useRealTimers(); }
   });
 });
