@@ -1,5 +1,6 @@
 import { expect, type Page, type Request } from "@playwright/test";
 import { geotiffBuffer, type Value } from "../unit/helpers/sources";
+import { tiledGeotiffBuffer } from "../unit/helpers/tiledTiff";
 import type { Affine, Grid } from "../../src/core/types";
 import { SHORTCUTS } from "../../src/ui/shortcuts";
 
@@ -14,6 +15,16 @@ export function tiff(name: string, width: number, height: number, nb: number, f:
   return { name, mimeType: "image/tiff", buffer: Buffer.from(geotiffBuffer(width, height, nb, f, geo)) };
 }
 
+/** A fixture built once per worker (spec 072: building one took 2-3 s on CI); each call returns a fresh payload around the same bytes. */
+export function once(make: () => ReturnType<typeof tiff>): () => ReturnType<typeof tiff> {
+  let made: ReturnType<typeof tiff> | null = null;
+  return () => ({ ...(made ??= make()) });
+}
+
+/** Uint8 RGB in 256 px tiles on rgbFixture's 0.01 degree grid from 10E 50N (spec 072 step 0: the cheapest fixture that keeps the grid and the mask reads). */
+const rgbTiles = (name: string, height: number, f: Value, nodata: string) => ({ name, mimeType: "image/tiff",
+  buffer: Buffer.from(tiledGeotiffBuffer(1000, height, 3, f, { epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01], nodata }, { uint8: true })) });
+
 /** 10x10 degree RGB raster at 10..20E, 40..50N; a white block marks 15.5E 45.5N. */
 const FEATURE: LngLat = [15.5, 45.5];
 const rgbValue: Value = (b, c, r) => {
@@ -21,9 +32,10 @@ const rgbValue: Value = (b, c, r) => {
   if (Math.abs(lon - FEATURE[0]) < 0.05 && Math.abs(lat - FEATURE[1]) < 0.05) return 255;
   return b === 0 ? (c < 500 ? 200 : 120) : b === 1 ? 100 + (r % 100) : 150;
 };
-export const rgbFixture = () => tiff("rgb4326.tif", 1000, 1000, 3, rgbValue, { epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01] });
-/** rgbFixture run on south to 37N (still one strip under the 16 MiB block limit), with a nodata value none of its pixels hold: its 6 row bands need mask reads (spec 023 F2), and band 4 lies far from paintTwoClasses' hovers. */
-export const rgbNodataFixture = () => tiff("rgbtall.tif", 1000, 1300, 3, rgbValue, { epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01], nodata: "0" });
+/** GDAL_NODATA 0, which no pixel holds, so its masks are read (spec 023) as the Float32 strip's were. */
+export const rgbFixture = once(() => rgbTiles("rgb4326.tif", 1000, rgbValue, "0"));
+/** rgbFixture run on south to 37N, with a nodata value none of its pixels hold: its 6 row bands need mask reads (spec 023 F2), and band 4 lies far from paintTwoClasses' hovers. */
+export const rgbNodataFixture = once(() => rgbTiles("rgbtall.tif", 1300, rgbValue, "0"));
 /** rgbFixture with 16 more bytes at its end: the same grid and pixels, but another raster to spec 031, so it offers no saved labels. */
 export const anotherRaster = (name = "other.tif") => { const f = rgbFixture(); return { ...f, name, buffer: Buffer.concat([f.buffer, Buffer.alloc(16)]) }; };
 
@@ -166,6 +178,39 @@ export async function labels(page: Page): Promise<Map<string, number>> {
   for (let i = 0; i < flat.length; i += 3) m.set(`${flat[i]},${flat[i + 1]}`, flat[i + 2]!);
   return m;
 }
+
+type Win = { x0: number; y0: number; width: number; height: number };
+/** The effective labels in this window, row-major, read in the page through tile(key); off-raster cells are 0 (spec 071, 072). */
+export async function labelsIn(page: Page, w: Win): Promise<Uint8Array> {
+  const out: number[] = await page.evaluate(async (w) => {
+    const { store, tile } = (window as any).__geoapp.labels;
+    const v = new Array<number>(w.width * w.height).fill(0);
+    for (let y0 = Math.floor(w.y0 / 256) * 256; y0 < Math.min(w.y0 + w.height, store.height); y0 += 256) {
+      for (let x0 = Math.floor(w.x0 / 256) * 256; x0 < Math.min(w.x0 + w.width, store.width); x0 += 256) {
+        if (x0 < 0 || y0 < 0) continue;
+        const t: Uint8Array | null = await tile(`${x0},${y0}`);
+        if (!t) continue;
+        const tw = Math.min(256, store.width - x0), th = Math.min(256, store.height - y0);
+        for (let r = Math.max(y0, w.y0); r < Math.min(y0 + th, w.y0 + w.height); r++) {
+          for (let c = Math.max(x0, w.x0); c < Math.min(x0 + tw, w.x0 + w.width); c++) v[(r - w.y0) * w.width + (c - w.x0)] = t[(r - y0) * tw + (c - x0)]!;
+        }
+      }
+    }
+    return v;
+  }, w);
+  return Uint8Array.from(out);
+}
+
+/** The number of non-zero effective labels, counted in the page (spec 071, 072). */
+export const labelCount = (page: Page): Promise<number> => page.evaluate(async () => {
+  const { store, tile } = (window as any).__geoapp.labels;
+  let n = 0;
+  for (let y0 = 0; y0 < store.height; y0 += 256) for (let x0 = 0; x0 < store.width; x0 += 256) {
+    const t: Uint8Array | null = await tile(`${x0},${y0}`);
+    t?.forEach((v) => { if (v) n++; });
+  }
+  return n;
+});
 
 /** Keys of the stored label tiles. */
 export const tileKeysStored = (page: Page): Promise<string[]> =>

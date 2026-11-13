@@ -4,7 +4,8 @@ import type { LabelClass } from "../../src/core/classes";
 import type { LabelStore } from "../../src/core/labelStore";
 import type { Grid } from "../../src/core/types";
 import { writeFile } from "../unit/helpers/labelFiles";
-import { RGB_GRID, type LngLat, tiff } from "./helpers";
+import { tiledGeotiffBuffer } from "../unit/helpers/tiledTiff";
+import { once, RGB_GRID, type LngLat } from "./helpers";
 
 // Spec 004 e2e helpers: label files as uploads, the store and list through the hook, downloads, gates.
 
@@ -13,10 +14,14 @@ export const upload = (name: string, data: ArrayBuffer | string) =>
 
 /** The generated mask on rgbFixture's grid: 16 x 16 px blocks of 0..3, GDAL_NODATA 0, so classes 1, 2, 3 are values 1, 2, 3 (spec 014 tests). */
 export const maskValue = (c: number, r: number) => ((c >> 4) + (r >> 4)) % 4;
+let defaultMask: ReturnType<typeof upload> | null = null; // built once per worker (spec 072)
 export function maskFile(value: (c: number, r: number) => number = maskValue) {
+  if (value === maskValue && defaultMask) return { ...defaultMask };
   const v = new Uint8Array(1000 * 1000);
   for (let r = 0; r < 1000; r++) for (let c = 0; c < 1000; c++) v[r * 1000 + c] = value(c, r);
-  return upload("mask.tif", writeFile(RGB_GRID, 1, v, "0", { GTModelTypeGeoKey: 2, GTRasterTypeGeoKey: 1, GeographicTypeGeoKey: 4326 }));
+  const file = upload("mask.tif", writeFile(RGB_GRID, 1, v, "0", { GTModelTypeGeoKey: 2, GTRasterTypeGeoKey: 1, GeographicTypeGeoKey: 4326 }));
+  if (value === maskValue) defaultMask = file;
+  return { ...file };
 }
 /** Lon/lat of rgbFixture pixel position (col, row may be fractional). */
 export const at = (c: number, r: number): LngLat => [10 + c * 0.01, 50 - r * 0.01];
@@ -103,12 +108,13 @@ export const pauseImagery = (page: Page) => page.evaluate(() => {
 export const holdMasks = (page: Page) => page.evaluate(() => { (window as any).__geoapp.pauseMasks = true; });
 export const openImageryGate = (page: Page) => page.evaluate(() => (window as any).__gate.open());
 
-/** Spec 001's EPSG:4326 fixture grid, with band 2 nodata (-9999) on a block the class rasters cover. */
+/** Spec 001's EPSG:4326 fixture grid, with band 2 nodata (0) on a block the class rasters cover. */
 export const ND_GRID: Grid = { width: 1000, height: 1000, epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01] };
 export const inNodata = (c: number, r: number) => c >= 400 && c < 460 && r >= 400 && r < 450; // 14.0..14.6E, 45.5..46.0N
-export const nodataImagery = () => tiff("nodata4326.tif", 1000, 1000, 3,
-  (b, c, r) => (b === 1 && inNodata(c, r) ? -9999 : b === 0 ? (c < 500 ? 200 : 120) : b === 1 ? 100 + (r % 100) : 150),
-  { epsg: 4326, gt: ND_GRID.gt, nodata: "-9999" });
+// Uint8 in 256 px tiles, built once per worker (spec 072), so its nodata is 0 rather than the Float32 strip's -9999
+export const nodataImagery = once(() => ({ name: "nodata4326.tif", mimeType: "image/tiff", buffer: Buffer.from(tiledGeotiffBuffer(1000, 1000, 3,
+  (b, c, r) => (b === 1 && inNodata(c, r) ? 0 : b === 0 ? (c < 500 ? 200 : 120) : b === 1 ? 100 + (r % 100) : 150),
+  { epsg: 4326, gt: ND_GRID.gt, nodata: "0" }, { uint8: true })) }));
 
 /** Every stored pixel is off imagery nodata. */
 export function expectNoNodata(tiles: Map<string, Uint8Array>, width: number, nodata: (c: number, r: number) => boolean): void {
