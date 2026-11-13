@@ -1,9 +1,7 @@
-import { expect, type CDPSession, type Page, type Request } from "@playwright/test";
+import { expect, type Page, type Request } from "@playwright/test";
 import { geotiffBuffer, type Value } from "../unit/helpers/sources";
-import { uint8Tiff } from "../unit/helpers/tiffFixtures";
 import type { Affine, Grid } from "../../src/core/types";
 import { SHORTCUTS } from "../../src/ui/shortcuts";
-import { WASD_MAX_DT, WASD_SPEED } from "../../src/core/wasd";
 
 export type LngLat = [number, number];
 export type Xy = { x: number; y: number };
@@ -16,13 +14,8 @@ export function tiff(name: string, width: number, height: number, nb: number, f:
   return { name, mimeType: "image/tiff", buffer: Buffer.from(geotiffBuffer(width, height, nb, f, geo)) };
 }
 
-/** Like tiff(), but 8-bit in 256 px tiles: spec 020's preview reads a file block by block, and tiff()'s single strip is one read. */
-export function tiledTiff(name: string, width: number, height: number, nb: number, f: Value, geo: { epsg: number; gt: Affine }) {
-  return { name, mimeType: "image/tiff", buffer: Buffer.from(uint8Tiff([{ width, height, bands: nb, value: f, layout: { tile: [256, 256] } }], geo)) };
-}
-
 /** 10x10 degree RGB raster at 10..20E, 40..50N; a white block marks 15.5E 45.5N. */
-export const FEATURE: LngLat = [15.5, 45.5];
+const FEATURE: LngLat = [15.5, 45.5];
 const rgbValue: Value = (b, c, r) => {
   const lon = 10 + (c + 0.5) * 0.01, lat = 50 - (r + 0.5) * 0.01;
   if (Math.abs(lon - FEATURE[0]) < 0.05 && Math.abs(lat - FEATURE[1]) < 0.05) return 255;
@@ -33,8 +26,6 @@ export const rgbFixture = () => tiff("rgb4326.tif", 1000, 1000, 3, rgbValue, { e
 export const rgbNodataFixture = () => tiff("rgbtall.tif", 1000, 1300, 3, rgbValue, { epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01], nodata: "0" });
 /** rgbFixture with 16 more bytes at its end: the same grid and pixels, but another raster to spec 031, so it offers no saved labels. */
 export const anotherRaster = (name = "other.tif") => { const f = rgbFixture(); return { ...f, name, buffer: Buffer.concat([f.buffer, Buffer.alloc(16)]) }; };
-/** rgbFixture's pixels in 16 tiles, so its preview takes 16 reads (spec 019's bar and read gates). */
-export const rgbTiled = () => tiledTiff("rgb4326.tif", 1000, 1000, 3, rgbValue, { epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01] });
 
 export async function openApp(page: Page): Promise<void> {
   await page.goto("/");
@@ -50,19 +41,6 @@ export async function hideBasemap(page: Page): Promise<void> {
     const { map } = (window as any).__geoapp;
     map.setLayoutProperty("basemap", "visibility", "none");
     await new Promise<void>((r) => { map.once("idle", () => r()); map.triggerRepaint(); });
-  });
-}
-
-/** Hide the preview and every full-resolution imagery tile (spec 020), including tiles added later, so unpainted space shows what lies below. */
-export async function hideImagery(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    const { map } = (window as any).__geoapp;
-    for (const id of map.getLayersOrder() as string[]) if (id === "preview" || id.startsWith("imagery-")) map.setLayoutProperty(id, "visibility", "none");
-    if (map.__imageryHidden) return;
-    map.__imageryHidden = true;
-    const add = map.addLayer.bind(map);
-    map.addLayer = (l: { id: string; layout?: object }, before?: string) =>
-      add(l.id.startsWith("imagery-") ? { ...l, layout: { ...l.layout, visibility: "none" } } : l, before);
   });
 }
 
@@ -140,29 +118,6 @@ export function collectErrors(page: Page): string[] {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   return errors;
-}
-
-/** Mouse path a -> b in `steps` moves, button state unchanged. */
-export async function moveTo(page: Page, a: Xy, b: Xy, steps = 20): Promise<void> {
-  for (let i = 1; i <= steps; i++) await page.mouse.move(a.x + ((b.x - a.x) * i) / steps, a.y + ((b.y - a.y) * i) / steps);
-}
-
-/** Raw CDP touch: each point is [id, xy]; an empty list ends (or cancels) every touch. */
-export function toucher(cdp: CDPSession) {
-  return (type: "touchStart" | "touchMove" | "touchEnd" | "touchCancel", pts: [number, Xy][] = []) =>
-    cdp.send("Input.dispatchTouchEvent", { type, touchPoints: pts.map(([id, p]) => ({ id, x: p.x, y: p.y })) });
-}
-
-/**
- * Raw CDP mouse or pen, so coordinates may lie outside the viewport. `held` false sends buttons 0
- * (a lost release when no mouseReleased came). A pen's barrel button is "right".
- */
-export function rawPointer(cdp: CDPSession, pointerType: "mouse" | "pen" = "mouse", button: "left" | "right" = "left") {
-  return (type: "mousePressed" | "mouseMoved" | "mouseReleased", p: Xy, held: boolean) =>
-    cdp.send("Input.dispatchMouseEvent", {
-      type, x: p.x, y: p.y, pointerType,
-      button: type === "mouseMoved" && !held ? "none" : button, buttons: held ? (button === "left" ? 1 : 2) : 0, clickCount: type === "mouseMoved" ? 0 : 1,
-    });
 }
 
 /** rgbFixture's grid. */
@@ -254,66 +209,4 @@ export async function paintTwoClasses(page: Page, names = ["left", "right"]): Pr
     const a = await toScreen(page, [lon, 45.005]);
     await stroke(page, [a, { x: a.x + 30, y: a.y + 20 }, { x: a.x + 60, y: a.y }]);
   }
-}
-
-/** Resolves after the page has run n animation frames. */
-export const nextFrames = (page: Page, n: number) => page.evaluate((n) => new Promise<void>((r) => {
-  const f = () => (--n > 0 ? requestAnimationFrame(f) : r());
-  requestAnimationFrame(f);
-}), n);
-
-/** Holds keys for at least ms and frames map moves; returns the samples and the app's per-frame pan budget (spec 060 c12). */
-export async function holdKeys(page: Page, keys: string[], opts: { ms: number; frames: number; during?: () => Promise<void>; beforeUp?: () => Promise<void> }) {
-  await page.evaluate(([speed, maxDt, codes]) => {
-    const w = window as any;
-    const { map } = w.__geoapp;
-    const c = map.getCenter();
-    const p = map.project(c);
-    const key = (x: number, y: number) => `${x.toFixed(3)},${y.toFixed(3)}`; // as the tests' distinct() rounds
-    const h: any = { start: [p.x, p.y], samples: [] as number[][], budget: 0, moves: 0, last: key(p.x, p.y), down: 0, up: 0, prev: 0, held: new Set<string>(), raf: 0, c };
-    w.__hold = h;
-    // listeners and the sampler start before the keydown, so each frame is sampled before the app's own step pans it
-    h.onDown = (e: KeyboardEvent) => {
-      if (!codes.includes(e.code)) return;
-      if (!h.held.size && !h.down) h.down = h.prev = performance.now();
-      h.held.add(e.code);
-    };
-    h.onUp = (e: KeyboardEvent) => { if (h.held.delete(e.code) && !h.held.size) h.up = performance.now(); };
-    window.addEventListener("keydown", h.onDown);
-    window.addEventListener("keyup", h.onUp);
-    const frame = (t: number) => {
-      const q = map.project(h.c);
-      h.samples.push([q.x, q.y]);
-      const k = key(q.x, q.y);
-      if (h.down && k !== h.last) h.moves++;
-      h.last = k;
-      if (h.down && !h.up) {
-        h.budget += (speed * Math.min(Math.max(0, t - h.prev), maxDt)) / 1000;
-        h.prev = t;
-      }
-      h.raf = requestAnimationFrame(frame);
-    };
-    h.raf = requestAnimationFrame(frame);
-  }, [WASD_SPEED, WASD_MAX_DT, keys] as const);
-  for (const k of keys) await page.keyboard.down(k);
-  // during runs just after the keydown; beforeUp runs once the hold is long enough, with the keys still down
-  if (opts.during) await opts.during();
-  // moves are counted, not frames: a frame can pan nothing (the first one's timestamp often precedes the keydown),
-  // so the samples hold at least frames distinct positions however slow the frames are; budget makes the checks frame-rate free
-  await page.waitForFunction(({ ms, frames }) => {
-    const h = (window as any).__hold;
-    return h.moves >= frames && performance.now() - h.down >= ms;
-  }, { ms: opts.ms, frames: opts.frames }, { timeout: 15_000 });
-  if (opts.beforeUp) await opts.beforeUp();
-  for (const k of keys) await page.keyboard.up(k);
-  return page.evaluate(() => {
-    const w = window as any;
-    const h = w.__hold;
-    cancelAnimationFrame(h.raf);
-    window.removeEventListener("keydown", h.onDown);
-    window.removeEventListener("keyup", h.onUp);
-    const q = w.__geoapp.map.project(h.c);
-    h.samples.push([q.x, q.y]); // the last held frame's pan lands after that frame's sample
-    return { start: h.start as [number, number], samples: h.samples as [number, number][], budget: h.budget as number };
-  });
 }

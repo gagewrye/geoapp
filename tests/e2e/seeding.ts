@@ -61,12 +61,6 @@ export async function effectiveTiles(page: Page): Promise<Map<string, Uint8Array
   return new Map(entries.map(([k, b]) => [k, new Uint8Array(Buffer.from(b, "base64"))]));
 }
 
-/** The label at (c, r) in effectiveTiles' result on a grid `width` px wide; 0 where no tile is listed. */
-export function labelAt(tiles: Map<string, Uint8Array>, width: number, c: number, r: number): number {
-  const x0 = c - (c % 256), y0 = r - (r % 256), t = tiles.get(`${x0},${y0}`);
-  return t ? t[(r - y0) * Math.min(256, width - x0) + c - x0]! : 0;
-}
-
 /** Keys whose tiles differ between two effectiveTiles results (byte compare, far cheaper than labels() on a full mask: spec 052). */
 export const tileDiff = (a: Map<string, Uint8Array>, b: Map<string, Uint8Array>): string[] =>
   [...new Set([...a.keys(), ...b.keys()])].filter((k) => !a.has(k) || !b.has(k) || !Buffer.from(a.get(k)!).equals(Buffer.from(b.get(k)!))).sort();
