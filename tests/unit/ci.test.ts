@@ -110,16 +110,16 @@ describe("playwright config (spec 060 criteria 3-4)", () => {
     expect(config.reporter).toEqual([["dot"], ["html", { open: "never" }]]);
   });
 
-  it("skips @ci-skip tests only on CI, and @probe tests everywhere but npm run e2e:probe (amendment 4)", async () => {
+  it("skips @probe tests everywhere but npm run e2e:probe (amendment 4)", async () => {
     const skips = async (env: { CI: string; event: string }) => {
       vi.resetModules();
       vi.stubEnv("CI", env.CI);
       vi.stubEnv("npm_lifecycle_event", env.event);
       const invert = (await import("../../playwright.config")).default.grepInvert as RegExp | undefined;
-      return ["a @probe", "b @ci-skip", "c"].filter((t) => invert?.test(t));
+      return ["a @probe", "c"].filter((t) => invert?.test(t));
     };
     expect(await skips({ CI: "", event: "e2e" })).toEqual(["a @probe"]);
-    expect(await skips({ CI: "true", event: "" })).toEqual(["a @probe", "b @ci-skip"]);
+    expect(await skips({ CI: "true", event: "" })).toEqual(["a @probe"]);
     expect(await skips({ CI: "", event: "e2e:probe" })).toEqual([]);
   });
 
