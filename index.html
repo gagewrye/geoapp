@@ -20,18 +20,24 @@
     </header>
     <nav id="tools" hidden aria-label="Tools">
       <div id="brush-panel">
+        <!-- the label type switch (spec 062): filled by ui/kinds.ts, shown once there are two kinds -->
+        <div id="kinds" role="radiogroup" aria-label="Label type" hidden></div>
         <button id="mode-pan" type="button" aria-pressed="true" aria-label="Pan" title="Pan (P)">&#x2725;</button>
-        <button id="mode-paint" type="button" aria-pressed="false" aria-label="Paint" title="Paint (B)">&#x270E;</button>
-        <button id="mode-erase" type="button" aria-pressed="false" aria-label="Erase" title="Erase (E)">&#x232B;</button>
-        <button id="mode-fill" type="button" aria-pressed="false" aria-label="Fill" title="Fill (F)">&#x25A7;</button>
-        <button id="mode-polygon" type="button" aria-pressed="false" aria-label="Polygon" title="Polygon (L)">&#x2B20;</button>
+        <div id="tools-mask" class="tool-group" data-kind="mask">
+          <button id="mode-paint" type="button" aria-pressed="false" aria-label="Paint" title="Paint (B)">&#x270E;</button>
+          <button id="mode-erase" type="button" aria-pressed="false" aria-label="Erase" title="Erase (E)">&#x232B;</button>
+          <button id="mode-fill" type="button" aria-pressed="false" aria-label="Fill" title="Fill (F)">&#x25A7;</button>
+          <button id="mode-polygon" type="button" aria-pressed="false" aria-label="Polygon" title="Polygon (L)">&#x2B20;</button>
+        </div>
         <button id="mode-smart" type="button" aria-pressed="false" aria-label="Smart select" title="Smart select (M)">&#x2316;</button>
         <button id="smart-apply" type="button" hidden disabled aria-label="Apply smart selection" title="Apply smart selection (Enter)">&#x2713;</button>
         <hr />
-        <button id="brush-larger" type="button" aria-label="Larger brush" title="Larger brush (])">+</button>
-        <span id="brush-size" title="Brush size in raster pixels">7</span>
-        <button id="brush-smaller" type="button" aria-label="Smaller brush" title="Smaller brush ([)">&minus;</button>
-        <input id="brush-size-range" type="range" min="1" max="127" step="2" value="7" aria-label="Brush size" />
+        <div id="brush-group" class="tool-group" data-kind="mask">
+          <button id="brush-larger" type="button" aria-label="Larger brush" title="Larger brush (])">+</button>
+          <span id="brush-size" title="Brush size in raster pixels">7</span>
+          <button id="brush-smaller" type="button" aria-label="Smaller brush" title="Smaller brush ([)">&minus;</button>
+          <input id="brush-size-range" type="range" min="1" max="127" step="2" value="7" aria-label="Brush size" />
+        </div>
         <hr />
         <button id="undo" type="button" disabled aria-label="Undo" title="Undo (Ctrl+Z)">&#x21B6;</button>
         <button id="redo" type="button" disabled aria-label="Redo" title="Redo (Ctrl+Shift+Z)">&#x21B7;</button>
@@ -53,7 +59,7 @@
         <section id="label-section">
           <h2>Labels</h2>
           <label><input id="show-labels" type="checkbox" checked /> Show (H)</label>
-          <div class="row">
+          <div id="mask-view" class="row" data-kind="mask">
             <input id="label-opacity" type="range" min="0" max="100" step="5" value="60" aria-label="Opacity" />
             <span id="label-opacity-text">60%</span>
           </div>

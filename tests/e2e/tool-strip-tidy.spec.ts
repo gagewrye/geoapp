@@ -17,7 +17,7 @@ async function setup(page: Page) {
 
 test("the brush strip reads +, size, −, slider in DOM order and top to bottom (criterion 1)", async ({ page }) => {
   await setup(page);
-  const dom = await page.evaluate((ids) => [...document.querySelectorAll("#brush-panel > *")].map((e) => e.id).filter((id) => ids.includes(id)), ORDER);
+  const dom = await page.evaluate((ids) => [...document.querySelectorAll("#brush-panel *")].map((e) => e.id).filter((id) => ids.includes(id)), ORDER);
   expect(dom).toEqual(ORDER);
   const tops: number[] = [];
   for (const id of ORDER) tops.push((await page.locator(`#${id}`).boundingBox())!.y);
