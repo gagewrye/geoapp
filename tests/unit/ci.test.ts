@@ -53,9 +53,8 @@ describe("ci.yml jobs (spec 060 criterion 2)", () => {
     expect(e2e).toMatch(/strategy:\n(?: {6}#.*\n)? {6}fail-fast: false\n/); // a failing shard doesn't cancel the others
     expect(e2e).toContain("timeout-minutes: 30");
     expect(e2e).toContain("run: npx playwright install --with-deps chromium");
-    // TEMPORARY (spec 061 criterion 6): the timed runs add JSON reporters; reverted before merge
-    expect(e2e).toContain("run: npx playwright test --shard=${{ matrix.shard }}/4 --reporter=dot,html,json");
-    expect(yml.match(/--shard=[^\n]*/g)).toEqual(["--shard=${{ matrix.shard }}/4 --reporter=dot,html,json"]);
+    expect(e2e).toContain("run: npx playwright test --shard=${{ matrix.shard }}/4");
+    expect(yml.match(/--shard=[^\n]*/g)).toEqual(["--shard=${{ matrix.shard }}/4"]);
   });
 
   it("uploads the report only when a shard fails", () => {
@@ -66,7 +65,7 @@ describe("ci.yml jobs (spec 060 criterion 2)", () => {
     expect(upload).toContain("playwright-report/");
     expect(upload).toContain("test-results/");
     expect(upload).toContain("retention-days: 14");
-    expect(yml.match(/upload-artifact/g)).toHaveLength(2); // TEMPORARY (spec 061 criterion 6): plus the JSON upload
+    expect(yml.match(/upload-artifact/g)).toHaveLength(1);
   });
 
   it("has no Playwright browser cache step", () => {
