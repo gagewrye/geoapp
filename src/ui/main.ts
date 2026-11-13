@@ -88,8 +88,9 @@ map.on("load", () => {
   // and pauseMasks = true to hold the background mask reads, so strokes wait on reads it gates.
   // Spec 031: persistTiles(keys) marks stored tiles a test or perf run set through the hook as changed. Spec 046: segmenter replaces the model.
   // Spec 071: overlaysIdle() resolves once no label-overlay redraw is scheduled and no quads are queued; spec 072: nor a settle or mask tile read.
+  // Spec 072: saving() says a label save is scheduled or in flight.
   const hook = { map, imagery: () => source ?? null, labelFile: null, rasterFile: null, fullRes: fullRes.limits, masksDone: labels.masksDone, sweep: true, paintOp: null, pauseMasks: false,
-    persistTiles: (keys: string[]) => persist.tiles(keys), segmenter: null, overlaysIdle: () => overlaysIdle(fullRes.settling, labels.overlaysIdle) };
+    persistTiles: (keys: string[]) => persist.tiles(keys), segmenter: null, overlaysIdle: () => overlaysIdle(fullRes.settling, labels.overlaysIdle), saving: persist.saving };
   Object.defineProperty(hook, "labels", { get: () => ({ store: labels.store(), classes: labels.classes(), tile: labels.tile }) });
   (window as unknown as Record<string, unknown>).__geoapp = hook;
   $("map").dataset.ready = "true";
