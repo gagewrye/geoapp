@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  addBox, boxesAt, emptyBoxes, handlePoints, moveRect, rectFrom, removeBox, resizeRect, setBox, type Handle, type Rect,
+  addBox, boxesAt, cycleBox, emptyBoxes, handleNear, handlePoints, moveRect, rectFrom, removeBox, resizeRect, setBox, type Handle, type Rect,
 } from "../../../src/core/boxes";
 
 // Spec 063 criteria 1 to 5.
@@ -181,5 +181,42 @@ describe("handlePoints", () => {
       { handle: "nw", x: 10, y: 20 }, { handle: "n", x: 20, y: 20 }, { handle: "ne", x: 30, y: 20 }, { handle: "e", x: 30, y: 22.5 },
       { handle: "se", x: 30, y: 25 }, { handle: "s", x: 20, y: 25 }, { handle: "sw", x: 10, y: 25 }, { handle: "w", x: 10, y: 22.5 },
     ]);
+  });
+});
+
+// Spec 064: the Box tool's handle choice (criterion 2) and click cycle (criterion 3).
+describe("handleNear (criterion 2)", () => {
+  // a 10 x 10 px box on screen: its corners and edge midpoints 5 px apart
+  const points = handlePoints({ x0: 0, y0: 0, x1: 10, y1: 10 });
+  it("gives the nearest handle within 6 px, and null beyond", () => {
+    expect(handleNear(points, 10.5, 10.5)).toBe("se");
+    expect(handleNear(points, 5, -4)).toBe("n");
+    expect(handleNear(points, 5, 16.5)).toBeNull();
+    expect(handleNear(points, 5, 5)).toBe("n"); // the centre is 5 px from four edge handles; the first wins a tie
+  });
+
+  it("a corner within 6 px wins over a nearer edge", () => {
+    expect(handleNear(points, 3, -1)).toBe("nw"); // 2.2 px from n, 3.2 px from nw
+    expect(handleNear(points, 10, 4.5)).toBe("ne"); // 0.5 px from e, 4.5 px from ne
+    const big = handlePoints({ x0: 0, y0: 0, x1: 20, y1: 20 });
+    expect(handleNear(big, 21, 10)).toBe("e"); // no corner within 6 px
+  });
+});
+
+describe("cycleBox (criterion 3)", () => {
+  const s = emptyBoxes();
+  const outer = addBox(s, { x0: 0, y0: 0, x1: 40, y1: 40 }, 1), mid = addBox(s, { x0: 5, y0: 5, x1: 30, y1: 30 }, 1);
+  const inner = addBox(s, { x0: 10, y0: 10, x1: 20, y1: 20 }, 2);
+  const hits = boxesAt(s, 12, 12);
+  it("selects the smallest box first, then the next on each click on the same pixel, wrapping round", () => {
+    let sel = cycleBox(hits, null, false);
+    const seen = [sel];
+    for (let i = 0; i < 3; i++) seen.push(sel = cycleBox(hits, sel, true));
+    expect(seen).toEqual([inner.id, mid.id, outer.id, inner.id]);
+  });
+
+  it("a click on another pixel starts again from the smallest, and one on no box clears the selection", () => {
+    expect(cycleBox(hits, outer.id, false)).toBe(inner.id);
+    expect(cycleBox(boxesAt(s, 45, 45), inner.id, true)).toBeNull();
   });
 });

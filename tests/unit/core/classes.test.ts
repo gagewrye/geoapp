@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_CLASSES, PALETTE, checkName, initialClasses, nextClass } from "../../../src/core/classes";
+import { MAX_CLASSES, PALETTE, checkName, coverValues, initialClasses, nextClass } from "../../../src/core/classes";
 
 describe("label classes (spec 003 Classes)", () => {
   it("starts as Class 1 and Class 2 with the first palette colours", () => {
@@ -31,5 +31,21 @@ describe("label classes (spec 003 Classes)", () => {
     expect(checkName(list, 0, " Class 2 ")).toBeNull();
     expect(checkName(list, 0, "Class 1")).toBe("Class 1");
     expect(checkName(list, 1, "  Mangrove & <salt> ")).toBe("Mangrove & <salt>");
+  });
+});
+
+describe("coverValues (open question 3)", () => {
+  it("extends the list with Class v up to the highest value, and leaves a list that covers them alone", () => {
+    const list = initialClasses();
+    expect(coverValues(list, [1, 2])).toBe(list);
+    const out = coverValues(list, [2, 4]);
+    expect(out.map((c) => c.name)).toEqual(["Class 1", "Class 2", "Class 3", "Class 4"]);
+    expect(out.slice(0, 2)).toEqual(list);
+    expect(new Set(out.map((c) => c.colour)).size).toBe(4);
+  });
+
+  it("names a class by the next free name when Class v is taken", () => {
+    const out = coverValues([{ name: "Class 3", colour: "#000000" }], [3]);
+    expect(out.map((c) => c.name)).toEqual(["Class 3", "Class 2", "Class 4"]);
   });
 });

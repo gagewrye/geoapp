@@ -24,3 +24,15 @@ export function checkName(list: { name: string }[], index: number, name: string)
   if (!t || list.some((c, i) => i !== index && c.name === t)) return null;
   return t;
 }
+
+/** list extended so every value (class index + 1) has a class: "Class v", or the next free name if taken (spec 064); list itself when it covers them. */
+export function coverValues(list: LabelClass[], values: Iterable<number>): LabelClass[] {
+  const top = Math.min(MAX_CLASSES, Math.max(0, ...values));
+  if (top <= list.length) return list;
+  const out = [...list];
+  for (let v = out.length + 1; v <= top; v++) {
+    const name = out.some((c) => c.name === `Class ${v}`) ? nextClass(out).name : `Class ${v}`;
+    out.push({ name, colour: paletteColour(v - 1) });
+  }
+  return out;
+}
