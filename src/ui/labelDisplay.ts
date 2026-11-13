@@ -262,14 +262,22 @@ export function labelDisplay(map: MapLibreMap, store: () => LabelStore, colours:
       resetBase();
       refill();
     },
-    /** Resolves once no overlay redraw or fill is scheduled and no quads are queued (e2e: spec 071's overlaysIdle). */
+    /** Resolves once no overlay redraw or fill is scheduled, no mask tile read is in flight and no quads are queued (specs 071, 072). */
     idle(): Promise<void> {
       return new Promise<void>((resolve) => {
-        const check = () => (frame || fillFrame || overlays?.busy ? requestAnimationFrame(check) : resolve());
+        const check = () => (frame || fillFrame || reading > 0 || overlays?.busy ? requestAnimationFrame(check) : resolve());
         check();
       });
     },
     /** The mask layer's preview values (for tests). */
     previewValues: () => mask?.values ?? null,
   };
+}
+
+/** Resolves once the view isn't settling (imagery's debounce), then once the display is idle (e2e: __geoapp.overlaysIdle, spec 072). */
+export function overlaysIdle(settling: () => boolean, idle: () => Promise<void>): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const check = () => { if (settling()) requestAnimationFrame(check); else void idle().then(resolve); };
+    check();
+  });
 }
