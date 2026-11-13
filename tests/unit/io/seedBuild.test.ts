@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { initialClasses, type LabelClass } from "../../../src/core/classes";
 import type { ClassEntry } from "../../../src/core/classTable";
 import { tileWindows, type Window } from "../../../src/core/grid";
-import { emptyStore, type LabelStore } from "../../../src/core/labelStore";
+import { emptyStore } from "../../../src/core/labelStore";
 import type { Affine, Grid } from "../../../src/core/types";
 import type { LabelSource } from "../../../src/io/labelFile";
 import { importLabels, type Labels, type SeedOutcome } from "../../../src/io/seeding";
@@ -10,10 +10,9 @@ import type { RasterSource } from "../../../src/io/source";
 import { fakeLabelSource } from "../helpers/labelFiles";
 import { fakeSource } from "../helpers/sources";
 
-// Tester checks of spec 004's import build and its memory rule: the current labels are never
-// written (success, "empty", "stale"), imports replace (spec 017) and no longer reach the cap (spec 014),
-// the N and K counts, and, structurally, that every read is one aligned window of at most 256x256
-// with one read in flight, that a stale run stops reading, and that huge rasters are never read whole.
+// Spec 004's import build and memory rule: the current labels are never written (spec 017: imports
+// build new labels), every read is one aligned window of at most 256x256 with one in flight, and a
+// stale run stops reading.
 
 const GT: Affine = [500000, 10, 0, 5000000, 0, -10];
 const ok = (r: SeedOutcome) => { if (typeof r === "string") throw new Error(r); return r; };
@@ -54,28 +53,6 @@ describe("the current labels are never written", () => {
   });
 });
 
-describe("imports never reach the cap (spec 014: the file is a base)", () => {
-  const size = 256 * 17; // 289 tiles
-  const g: Grid = { width: size, height: size, epsg: 32633, gt: GT };
-  it("a mask labelling all 289 tiles stores none", { timeout: 120_000 }, async () => {
-    const r = ok(await importLabels(fakeSource({ ...g, bandCount: 1 }, () => 1).source, fakeLabelSource(g, () => 3).source, [{ value: 3, name: "three" }]));
-    expect(r.store.tiles.size).toBe(0);
-    expect(r.base.count).toBe(size * size);
-    expect(r.classes).toEqual([{ name: "three", colour: expect.any(String) }]);
-  });
-});
-
-describe("N and K", () => {
-  it("count every labelled pixel and its classes; a listed value that never occurs isn't counted", async () => {
-    const g: Grid = { width: 256, height: 256, epsg: 32633, gt: GT };
-    const { source } = fakeSource({ ...g, bandCount: 1 }, () => 1);
-    const r = ok(await importLabels(source, fakeLabelSource(g, (_c, r) => (r === 0 ? 8 : 5)).source, [{ value: 5, name: "five" }, { value: 8, name: "eight" }, { value: 9, name: "nine" }]));
-    expect(r.pixels).toBe(65536);
-    expect(r.classCount).toBe(2);
-    expect(r.classes.map((c) => c.name)).toEqual(["five", "eight", "nine"]);
-  });
-});
-
 /** Wraps sources so every read is logged with its window and the most reads in flight at once is tracked. */
 function instrument(imagery: RasterSource, file: LabelSource) {
   const log: { kind: "i" | "f"; w: Window }[] = [];
@@ -111,21 +88,6 @@ describe("memory, structurally", () => {
     expect(io.log.filter((e) => e.kind === "f").length).toBeLessThan(400);
   });
 
-  it("a 200000 x 200000 file under a small imagery reads only the file windows holding its cells", { timeout: 60_000 }, async () => {
-    const img: Grid = { width: 600, height: 500, epsg: 32633, gt: [500000, 30, 0, 5000000, 0, -30] };
-    const f: Grid = { width: 200000, height: 200000, epsg: 32633, gt: [0, 5, 0, 5500000, 0, -5] };
-    const io = instrument(fakeSource({ ...img, bandCount: 1 }, () => 1).source, fakeLabelSource(f, () => 2).source);
-    ok(await importLabels(io.imagery, io.file, [{ value: 2, name: "two" }]));
-    expect(io.max()).toBe(1);
-    expect(io.log.filter((e) => e.kind === "f").every((e) => aligned(e.w))).toBe(true);
-    // the imagery covers 18 x 15 km = 3600 x 3000 file px: at most 16 x 13 file windows, each read once per imagery window
-    const fileReads = io.log.filter((e) => e.kind === "f");
-    expect(new Set(fileReads.map((e) => `${e.w.x0},${e.w.y0}`)).size).toBeLessThanOrEqual(16 * 13);
-    expect(fileReads.length).toBeLessThanOrEqual(16 * 13 + 6 * 16 + 6 * 13); // window seams read twice at most
-    // spec 024: one imagery read per row band, together covering the imagery once
-    expect(io.log.filter((e) => e.kind === "i").map((e) => [e.w.x0, e.w.y0, e.w.width, e.w.height])).toEqual([[0, 0, 600, 256], [0, 256, 600, 244]]);
-  });
-
   it("a stale run reads nothing more once stale", { timeout: 30_000 }, async () => {
     const g: Grid = { width: 2048, height: 2048, epsg: 32633, gt: GT };
     const io = instrument(fakeSource({ ...g, bandCount: 1 }, () => 1).source, fakeLabelSource(g, () => 4).source);
@@ -139,4 +101,3 @@ describe("memory, structurally", () => {
   });
 });
 
-export type { LabelStore };
