@@ -32,6 +32,17 @@
 - **The fix:** the implementer finds that wait and puts it under the fakes or the stubs. Candidates to check: `requestIdleCallback` or its `setTimeout` fallback in `map/quadCache.ts`, a real `setTimeout`/`queueMicrotask` chain, or `performance.now()`.
 - **Not a fix:** raising a timeout.
 
+## Step 0 result (amendment, 2026-11-13; CI runs 43491180826 and 43505857065)
+Per fixture, two cases per run, in ms: building the fixture in Node, the open, `jumpTo` at zoom 7, then one stroke.
+- **`rgbFixture` (Float32 1000² strip):** build 2,000–2,800, open 2,200–2,700, jump 500–650, stroke 300–800.
+- **Float32 1000² in 256 px tiles:** build 60–70, open 3,000–3,900, stroke 170–240. The 12 MB upload dominates.
+- **Uint8 1000² tiled:** build 50–70, open 1,300–1,750, stroke 100. **The same with GDAL_NODATA 0:** open 1,360–1,520, stroke 140.
+- **512² tiled:** Float32 open 1,000–1,330, Uint8 open 420–450, strokes 110–140.
+
+**Decision:** `rgbFixture` (and `rgbNodataFixture`, `nodataImagery`) become Uint8 in 256 px tiles with GDAL_NODATA 0, which no pixel holds. Each is built once per worker. They save about 3.5 s per open and keep the grid, every position and the mask reads (spec 023) that a Uint8 file with no nodata would skip. 512² would save about 1 s more per open but changes the grid under about 60 tests, so it isn't the default. `nodataImagery`'s nodata becomes 0. No kept e2e test needs the strip layout, so there is no `rgbStrip`.
+
+**Also over 15 s on current main** (run 43491180826), so added under the standing rule: `layout` 50, `label-view` 71, 142 and 94, `label-lock-edits` 7, `save-folder` 82 and 72, `redo` 13, `undo-seed` 64, 44 and 54, `shelf` 18 and `label-stale` 23. The two runs differ by up to 7 s per test, so the target is about 10 s.
+
 ## Open questions
 1. **Which fixture is the cheap default?** Step 0 decides by measurement (see Levers). The implementer records the result in this spec as an amendment before changing any test.
 2. **Is 15 s a hard limit?** Recommended: yes, as the CI test timeout (criterion 6), so a slower test fails and CLAUDE.md's rule sends it back to be refactored. Local runs keep 60 s.
