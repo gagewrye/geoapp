@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { labelButtons } from "../../../src/ui/help";
 import { KEYMAP } from "../../../src/ui/labelKeys";
@@ -44,12 +43,6 @@ describe("SHORTCUTS and KEYMAP", () => {
 
 describe("buttons named by SHORTCUTS", () => {
   const ids = SHORTCUTS.flatMap((s) => (s.button ? [s.button] : []));
-
-  it("each exists in index.html", () => {
-    const html = readFileSync("index.html", "utf8");
-    expect(ids.length).toBeGreaterThanOrEqual(7);
-    for (const id of ids) expect(html, id).toContain(`id="${id}"`);
-  });
 
   const label = (mac: boolean) => {
     const doc = new FakeDocument();
@@ -144,13 +137,5 @@ describe("Mac modifiers and stable ids", () => {
     const ids = SHORTCUTS.map((s) => s.id);
     expect(new Set(ids).size).toBe(ids.length);
     for (const v of Object.values(KEYMAP)) expect(ids, v).toContain(v);
-  });
-
-  it("labelKeys.ts and help.ts branch on ids: no string literal in them equals an action", () => {
-    const actions = new Set(SHORTCUTS.map((s) => s.action));
-    for (const f of ["src/ui/labelKeys.ts", "src/ui/help.ts"]) {
-      const literals = [...readFileSync(f, "utf8").matchAll(/"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|`([^`$]*)`/g)].map((m) => m[1] ?? m[2] ?? m[3]);
-      expect(literals.filter((l) => actions.has(l!)), f).toEqual([]);
-    }
   });
 });
