@@ -4,6 +4,8 @@
 
 **Amended (2026-11-12, during implementation, agreed by the orchestrator):** criterion 5 allows one test edit. Scope 2's `#brush-group` wrapper takes the brush controls out of `#brush-panel`'s direct children, so `tests/e2e/tool-strip-tidy.spec.ts:20` (spec 056 criterion 1), which queries `#brush-panel > *`, finds none of them. Their DOM order, Tab order and positions are unchanged. This is a correction, not a scope change.
 
+**Amended (2026-11-12, after review, a correction agreed by the orchestrator):** criterion 4 compares the layout before and after the change in the same page, instead of against a fixture recorded on macOS. That fixture failed on Linux CI by 1 px on `#brush-panel`'s height (run 43339686870). An assertion failure in a test this spec adds is not a reason for `@ci-skip`, and spec 060 criterion 7 forbids OS checks in e2e.
+
 **Request** (Gage, verbatim): "How about an object detection pipeline using bounding boxes. We can expand this tool to include more labelling features, but this would include an overhaul of the UI to accomodate"
 
 **Series, in build order:**
@@ -11,7 +13,7 @@
 | Spec | Adds | Depends on |
 |---|---|---|
 | 062 | label-kind structure (this spec) | none |
-| 063 | box model, store and shared undo (ADR 0038) | none |
+| 063 | box model, store and shared undo (ADR 0038): on main (PR #12, merged as 7032e4f), and a rebase of this branch brings it in | none |
 | 064 | Box tool | 062 and 063 |
 | 065 | boxes list | 064 |
 | 066 | box persistence (built straight after 064) | 064 |
@@ -67,9 +69,16 @@
    - `setKind("b")` in a mode of `a` calls `setMode("pan")`.
    - In Pan or Smart the mode is kept.
 3. **Unit (real `KINDS` and `index.html`):** every `BrushMode` is `pan`, `smart`, or in exactly one kind's modes. Every group and section id exists in `index.html`.
-4. **E2E (1280×720, after open):**
-   - The implementer records the bounding box of every element in `#tools` and `#side` at 4a54545 into a fixture. After the change, each matches within 0.5 px.
+4. **E2E (1280×720, after open), one page, with no fixture, no OS check (spec 060 criterion 7) and no `@ci-skip`, so it runs on CI:**
    - `#kinds` is hidden.
+   - **Wrapped.** Record `getBoundingClientRect()` of every element in `#tools` and `#side`, keyed by the element object, except `#kinds`, `#tools-mask` and `#brush-group`.
+   - **Unwrapped.** In the same page, undo scope 2 in place:
+     - move the children of `#tools-mask` and of `#brush-group` into their parent, at the wrapper's position and in their order, then remove both wrappers;
+     - remove `#kinds`;
+     - remove the `id` and `data-kind` of `#mask-view`.
+   - **Compare.** Measure the same element objects again. Each of x, y, width and height matches the wrapped measurement within 0.5 px.
+   - The earlier fixture (recorded on macOS at 4a54545) and its test are deleted.
+   - Before the change, the implementer runs the fixture test once on CI and puts its full list of mismatches in the PR description. That shows whether they are only text heights (run 43339686870 showed 1 px on `#brush-panel`'s height).
 5. **E2E:** the existing suite passes with exactly one test edit.
    - In `tests/e2e/tool-strip-tidy.spec.ts` line 20, the selector `#brush-panel > *` becomes `#brush-panel *`.
    - The id filter, `ORDER` and both assertions (DOM order, then tops increasing) are unchanged, so spec 056 criterion 1 is checked as before.
