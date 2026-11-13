@@ -26,6 +26,8 @@ type Deps = {
   smart?: { choose(): void; canChoose(): boolean; apply(): boolean; discard(): boolean };
   /** Spec 054: Enter fills the polygon, Backspace removes its last corner, and Escape discards it (each false when there is nothing to act on). */
   polygon?: { apply(): boolean; back(): boolean; discard(): boolean };
+  /** Spec 064: Escape cancels a box drag or clears the selection, and Delete or Backspace deletes the selected box (false: nothing to act on). */
+  box?: { escape(): boolean; remove(): boolean };
 };
 
 /**
@@ -41,14 +43,15 @@ export const KEYMAP: Record<string, string> = {
   KeyW: "move", KeyA: "move", KeyS: "move", KeyD: "move",
   m: "smart", Enter: "smart-apply", // spec 046; Escape discards a smart prompt before it selects Pan
   f: "fill", l: "polygon", Backspace: "polygon-back", // spec 054; Enter and Escape act on a polygon as they do on a smart prompt
+  r: "box", Delete: "box-delete", // spec 064; Backspace deletes a box when no polygon corner is removed, and Escape acts after Smart and Polygon
 };
 /** The SHORTCUTS id of a key event: by its key first (so letters follow the layout), else by its code. */
 export const actionOf = (e: Pick<KeyboardEvent, "key" | "code">): string | undefined =>
   KEYMAP[e.key.length === 1 ? e.key.toLowerCase() : e.key] ?? KEYMAP[e.code];
 
-const MODES: Record<string, BrushMode> = { paint: "paint", erase: "erase", pan: "pan", fill: "fill", polygon: "polygon" };
+const MODES: Record<string, BrushMode> = { paint: "paint", erase: "erase", pan: "pan", fill: "fill", polygon: "polygon", box: "box" };
 
-/** Labelling shortcuts (specs 003, 009, 033, 034, 046, 054): Space holds Pan, [ ] size, 1-9 class, B E P M F L Escape mode, H Show labels, ` held peeks, I picks, Enter applies; keys looked up in KEYMAP. */
+/** Labelling shortcuts (specs 003, 009, 033, 034, 046, 054, 064): Space holds Pan, [ ] size, 1-9 class, B E P M F L R Escape mode, Delete a box, H Show labels, ` held peeks, I picks, Enter applies; keys looked up in KEYMAP. */
 export function initLabelKeys(d: Deps): void {
   // Chromium marks the focused element :focus-visible on any keydown, so how it got focus is read when focus arrives
   let keyFocused = false;
@@ -78,8 +81,9 @@ export function initLabelKeys(d: Deps): void {
     else if (a === "smart") { if (!e.repeat && d.smart?.canChoose()) d.smart.choose(); }
     // a focused button takes Enter as its own click
     else if (a === "smart-apply") { if (!(document.activeElement instanceof HTMLButtonElement) && (d.smart?.apply() || d.polygon?.apply())) e.preventDefault(); }
-    else if (a === "polygon-back") { if (d.polygon?.back()) e.preventDefault(); }
-    else if (e.key === "Escape" && (d.smart?.discard() || d.polygon?.discard())) e.preventDefault();
+    else if (a === "polygon-back") { if (d.polygon?.back() || d.box?.remove()) e.preventDefault(); }
+    else if (a === "box-delete") { if (d.box?.remove()) e.preventDefault(); }
+    else if (e.key === "Escape" && (d.smart?.discard() || d.polygon?.discard() || d.box?.escape())) e.preventDefault();
     else {
       const m = a === undefined ? undefined : MODES[a];
       if (m && (m === "pan" || d.canPaint())) d.setMode(m);

@@ -27,7 +27,12 @@ body.collapsed #tools, body.collapsed #side { display: none; }
 .tool-group { display: flex; flex-direction: column; align-items: center; gap: 4px; }
 #tools button { width: 40px; height: 32px; padding: 0; font-size: 18px; }
 #tools button[aria-pressed="true"] { background: #cfe0f5; border-color: #3a6ea5; font-weight: bold; }
+/* the label type switch (spec 064): two text radios, small enough for the 56 px strip */
+#kinds { display: flex; flex-direction: column; align-items: center; gap: 2px; margin-bottom: 4px; }
+#tools #kinds button { width: 48px; height: 22px; font-size: 11px; }
+#tools #kinds button[aria-checked="true"] { background: #cfe0f5; border-color: #3a6ea5; font-weight: bold; }
 #tools hr { width: 40px; margin: 4px 0; }
+#brush-group[hidden] + hr { display: none; } /* Boxes have no brush: one rule, not two (spec 064) */
 #brush-size { font-variant-numeric: tabular-nums; }
 /* vertical, larger values at the top */
 #brush-size-range { writing-mode: vertical-lr; direction: rtl; width: 24px; height: 140px; margin: 4px 0; }
