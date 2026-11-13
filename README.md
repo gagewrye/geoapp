@@ -35,9 +35,8 @@ After **Set up**:
 ```
 npm run check        # lint + typecheck + unit tests (Vitest)
 npx playwright install chromium
-npm run e2e          # builds, serves on :4173, runs Playwright (without the @probe tests)
+npm run e2e          # builds, serves on :4173, runs Playwright
 npm run e2e:changed  # only the e2e files that differ from main, and those that import a changed file
-npm run e2e:probe    # the slow flicker probe (spec 045)
 ```
 The e2e suite runs in CI (GitHub Actions, `.github/workflows/ci.yml`) on every PR to main and every push to it, except tests tagged `@ci-skip`, which run only locally.
 Smart select runs SAM 2.1 Hiera Tiny (Meta, Apache-2.0; its licence is in `public/models/sam2.1-hiera-tiny/LICENSE`) with onnxruntime-web (Microsoft, MIT). Its 78 MB of weights come from Hugging Face the first time Smart select is chosen, after a confirm, and stay in the browser's cache (ADR 0035). The tests use a fake model.
