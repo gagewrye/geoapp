@@ -1,6 +1,6 @@
 # 0015: Undo by per-stroke copies of label tiles, capped at 32 MiB
 
-**Status:** Accepted (Gage, 2026-10-27; cap raised from the proposed 16 MiB to 32 MiB), with spec 010. Amends ADR 0010's memory budget. Partly shelved by spec 013 (2026-10-28), lapsed: Train's 16 MiB. Amended by ADR 0033 (2026-11-01): one edit over the cap is kept alone.
+**Status:** Accepted (Gage, 2026-10-27; cap raised from the proposed 16 MiB to 32 MiB), with spec 010. Amends ADR 0010's memory budget. Partly shelved by spec 013 (2026-10-28), lapsed: Train's 16 MiB. Amended by ADR 0033 (2026-11-01): one edit over the cap is kept alone. Amended by ADR 0038 (2026-11-12): entries hold box before-states too, 48 bytes each.
 
 **Context:** Gage wants paint undo, which spec 003 left out. Labels are sparse 256x256 Uint8 tiles (ADR 0010, at most 256 = 16 MiB; about 146 MiB at the cap, 162 MiB during a Train). Options: (a) before a stroke first touches a tile, copy it (64 KiB) or note it absent; undo puts the copies back. (b) Log changed pixels (index, old value): smaller for thin strokes, but a large brush over a full tile costs more than the tile, and needs new code on `brush`'s hot path. (c) Replay strokes from a base state: needs stored strokes and mask reads again.
 
