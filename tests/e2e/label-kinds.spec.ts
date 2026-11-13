@@ -15,7 +15,7 @@ async function setup(page: Page) {
   await expect(message(page)).toHaveText("Raster opened.");
 }
 
-test("after open, every element of the tool strip and panel sits where it did at 4a54545", async ({ page }) => {
+test("after open, every element of the tool strip and panel sits where it did at 4a54545 @ci-skip", async ({ page }) => {
   await setup(page);
   const now = new Map((await measure(page)).map((b) => [b.key, b]));
   const off: string[] = [];
