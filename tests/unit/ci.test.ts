@@ -54,8 +54,8 @@ describe("ci.yml jobs (spec 060 criterion 2)", () => {
     expect(e2e).toContain("timeout-minutes: 30");
     expect(e2e).toContain("run: npx playwright install --with-deps chromium");
     // TEMPORARY (spec 072 step 0): the timed runs add JSON reporters; reverted before merge
-    expect(e2e).toContain("run: npx playwright test --shard=${{ matrix.shard }}/4 --reporter=dot,html,json");
-    expect(yml.match(/--shard=[^\n]*/g)).toEqual(["--shard=${{ matrix.shard }}/4 --reporter=dot,html,json"]);
+    expect(e2e).toContain("run: npx playwright test --shard=${{ matrix.shard }}/4 --reporter=dot,html,json,./tests/e2e/stepReporter.ts");
+    expect(yml.match(/--shard=[^\n]*/g)).toEqual(["--shard=${{ matrix.shard }}/4 --reporter=dot,html,json,./tests/e2e/stepReporter.ts"]);
   });
 
   it("uploads the report only when a shard fails", () => {
