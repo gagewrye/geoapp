@@ -1,7 +1,6 @@
 import { expect, test, type Dialog, type Page } from "@playwright/test";
-import {
-  anotherRaster, jumpTo, message, openApp, openRaster, paintMode, paintTwoClasses, path, renameClass, rgbFixture, selectClass, stroke, tileKeysStored, toScreen,
-} from "./helpers";
+import { anotherRaster, rgbFixture } from "./fixtures";
+import { jumpTo, message, openApp, openRaster, paintMode, paintOne, paintTwoClasses, path, renameClass, selectClass, settled, stroke, tileKeysStored, toScreen } from "./helpers";
 import { at, classList, download, effectiveTiles, importFile, maskFile, noSavePicker, storeTiles, tileDiff } from "./seeding";
 
 // Spec 031 criteria 6-9: labels survive a reload in this browser.
@@ -21,8 +20,9 @@ async function open(page: Page, file = rgbFixture()) {
   await expect(message(page)).toHaveText("Raster opened.");
 }
 
-/** Waits until the latest change is saved: no save scheduled or in flight (spec 072), and "Saved". */
+/** Waits until the latest change is saved: no stroke op still queued (an earlier save may already show "Saved"), no save scheduled or in flight (spec 072), and "Saved". */
 async function saved(page: Page) {
+  await settled(page); // Import labels is enabled once the paint queue is empty
   await expect.poll(() => page.evaluate(() => (window as any).__geoapp.saving()), { timeout: 15_000 }).toBe(false);
   await expect(saveState(page)).toHaveText(/^Saved /);
 }
@@ -40,9 +40,7 @@ test("criterion 6, tiles: paint; after Saved and a reload, accepting the restore
   await openApp(page);
   await open(page);
   await paintMode(page);
-  await jumpTo(page, [15, 45], 6);
-  const s = await toScreen(page, [12.005, 45.005]);
-  await stroke(page, [s, { x: s.x + 30, y: s.y + 20 }, { x: s.x + 60, y: s.y }]);
+  await paintOne(page);
   await saved(page);
   const tiles = await storeTiles(page);
   expect(tiles.size).toBeGreaterThan(0);
