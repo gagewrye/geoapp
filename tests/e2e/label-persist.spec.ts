@@ -157,7 +157,8 @@ test("opening a different raster after a save shows no prompt, and the first ras
   expect(await tileKeysStored(page)).toEqual(tiles);
 });
 
-test("a reload within 2 s of a stroke raises a beforeunload dialog; after Saved a reload raises none (criterion 9)", async ({ page }) => {
+// Spec 072: criterion 9's two reloads are two tests, each from a fresh page.
+test("criterion 9: a reload within 2 s of a stroke raises a beforeunload dialog", async ({ page }) => {
   const log = dialogs(page);
   await openApp(page);
   await open(page);
@@ -167,13 +168,17 @@ test("a reload within 2 s of a stroke raises a beforeunload dialog; after Saved 
   await stroke(page, [a, { x: a.x + 40, y: a.y }]);
   await reload(page);
   expect(log).toEqual(["beforeunload: "]);
+});
+
+test("criterion 9: after Saved a reload raises no dialog", async ({ page }) => {
+  const log = dialogs(page);
+  await openApp(page);
   await open(page);
-  await expect(message(page)).toHaveText(/^(Raster opened\.|Labels restored\.)$/);
   await paintMode(page);
   await jumpTo(page, [15, 45], 6);
+  const a = await toScreen(page, [12.005, 45.005]);
   await stroke(page, [a, { x: a.x + 40, y: a.y + 10 }]);
   await saved(page);
-  log.length = 0;
   await reload(page);
   expect(log).toEqual([]);
 });
