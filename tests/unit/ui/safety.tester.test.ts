@@ -18,7 +18,7 @@ const G: Grid = { width: 1000, height: 700, epsg: 32633, gt: [500000, 0.1, 0, 40
 const tile = (v: number) => new Uint8Array(256 * 256).fill(v);
 const maskBase = (count: number) => ({ lut: new Uint8Array(4), count, windows: new Set(["0,0"]), preview: { values: new Uint8Array(4) } }) as unknown as MaskBase;
 
-function persistSetup(fake = fakeSessionStore()) {
+function persistSetup(fake = fakeSessionStore(), answers: boolean[] = []) {
   let store: LabelStore = emptyStore(G.width, G.height), base: MaskBase | null = null;
   const classes: LabelClass[] = [{ name: "Class 1", colour: "#1f77b4" }];
   const labels: PersistLabels = {
@@ -31,7 +31,7 @@ function persistSetup(fake = fakeSessionStore()) {
     labels, open: async () => fake.store, state: { textContent: "" }, win: new EventTarget(), doc: Object.assign(new EventTarget(), { visibilityState: "visible" }),
     yieldTask: async () => {}, now: () => clock, time: () => "12:00", dateTime: (ms) => `t${ms}`, say: () => {},
     openBase: async (blob) => ({ meta: { width: G.width, height: G.height }, blob } as unknown as LabelSource),
-    confirm: () => true,
+    confirm: () => answers.shift() ?? true,
   });
   const paint = (k: string, v: number) => { store.tiles.set(k, tile(v)); p.tiles([k]); };
   const flush = async (ms = SAVE_DELAY_MS) => { clock += ms; await vi.advanceTimersByTimeAsync(ms); await p.idle(); };
@@ -158,6 +158,29 @@ describe("spec 056 scope 2 with c1c1d6c's queue order: a dropped replaced sessio
     const counts = (r: string) => [...t.fake.records.values()].filter((x) => x.role === r).map((x) => x.base!.count);
     expect(counts("current")).toEqual([7]);
     expect(counts("replaced")).toEqual([9]); // only B; A, dropped, is not resurrected by its pending retry
+  });
+});
+
+describe("867d906's delete stamps: a re-used id after a declined restore still saves", () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("delete on Cancel then OK, paint, save fails, open another raster (pending), storage recovers: the re-used id is written", async () => {
+    const a = persistSetup();
+    await a.open(); a.paint("0,0", 1); await a.flush();
+    const id = [...a.fake.records.keys()][0]!;
+    const t = persistSetup(a.fake, [false, true]); // Cancel, then OK: deleted
+    expect(await t.open()).toBe(null);
+    expect(a.fake.records.size).toBe(0);
+    t.paint("256,0", 2);
+    t.fake.failWith(new Error("disk"));
+    await t.flush();
+    t.p.open("b.tif", 999, G); // the failed snapshot of the re-used id becomes pending
+    await t.p.idle(); await t.p.offer();
+    t.fake.failWith(null);
+    for (let ms = 0; ms < 2 * 60_000; ms += 5000) await t.flush(5000);
+    expect(a.fake.records.has(id)).toBe(true);
+    expect([...a.fake.tiles.get(id)!.keys()]).toEqual(["256,0"]);
   });
 });
 
