@@ -290,3 +290,25 @@ describe("the open raster's save while a previous raster's copy keeps failing (s
     expect(t.fake.records.get(KEY)!.base!.copyMissing).toBe(true);
   });
 });
+
+describe("a previous raster's snapshot that keeps failing (spec 031 scope 8)", () => {
+  it("doesn't block the open raster's saves, and stays queued for its retry", async () => {
+    const t = setup();
+    let failA = true;
+    const putTiles = t.fake.store.putTiles.bind(t.fake.store);
+    t.fake.store.putTiles = async (id, list) => { if (id === KEY && failA) throw new Error("A's tiles fail"); return putTiles(id, list); };
+    await t.open();
+    t.paint("0,0", 1);
+    t.p.open("b.tif", SIZE + 1, G); // A's save fails: pending
+    await t.p.idle(); await t.p.offer();
+    t.paint("256,256", 2);
+    await t.flush();
+    const b = [...t.fake.records.values()].find((r) => r.id !== KEY)!;
+    expect([...t.fake.tiles.get(b.id)!.keys()]).toEqual(["256,256"]);
+    expect(t.fake.records.has(KEY)).toBe(false);
+    failA = false;
+    await t.flush(30_000); // the retry writes A
+    expect([...t.fake.tiles.get(KEY)!.keys()]).toEqual(["0,0"]);
+    expect(t.fake.records.has(KEY)).toBe(true);
+  });
+});

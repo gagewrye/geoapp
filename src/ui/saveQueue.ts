@@ -59,14 +59,15 @@ export function saveQueue(d: Deps) {
   /**
    * A snapshot that wasn't written: the current session's is dirty again (only its file, when just its copy failed);
    * another session's becomes (or joins) a pending one. Either is tried again after RETRY_MS. After a quota error, or
-   * COPY_RETRIES failed copy retries, the mask copy is left out until the next import (specs 032, 056). A snapshot
-   * never tried (`attempted` false: a pending one before it failed) is dirty again in full, and counts no failure.
+   * COPY_RETRIES failed copy retries, the mask copy is left out until the next import (specs 032, 056).
    */
-  function lost(s: Session, snap: Snapshot, e: unknown, attempted = true): void {
-    const quota = attempted && isQuota(e), copy = attempted && e instanceof CopyFailed;
-    if (copy && ++s.copyFails > COPY_RETRIES) s.noCopy = true;
-    if (quota) s.noCopy = true;
-    if (s === d.current() && snap.id === s.id) {
+  function lost(s: Session, snap: Snapshot, e: unknown): void {
+    const quota = isQuota(e), copy = e instanceof CopyFailed;
+    const own = s === d.current() && snap.id === s.id;
+    // only the session's own import counts against its copy; a replaced or earlier snapshot's are counted on its pending entry
+    if (own && copy && ++s.copyFails > COPY_RETRIES) s.noCopy = true;
+    if (own && quota) s.noCopy = true;
+    if (own) {
       if (copy) s.file ??= snap.file;
       else {
         for (const [k] of snap.tiles) s.tiles.add(k);
@@ -79,17 +80,23 @@ export function saveQueue(d: Deps) {
       if (s.replaced?.id === snap.id) snap = { ...snap, record: { ...snap.record, role: "replaced" } };
       const i = pending.findIndex((p) => p.s === s && p.snap.id === snap.id);
       const merged = i >= 0 ? mergeSnapshots(pending[i]!.snap, snap) : snap;
-      const p = { s, snap: quota || s.noCopy ? withoutCopy(merged) : merged, reason: reasonOf(e) };
+      const copyFails = (i >= 0 ? pending[i]!.copyFails ?? 0 : 0) + (copy ? 1 : 0);
+      const leaveOut = quota || copyFails > COPY_RETRIES || (s !== d.current() && s.noCopy);
+      const p = { s, snap: leaveOut ? withoutCopy(merged) : merged, reason: reasonOf(e), copyFails };
       if (i >= 0) pending[i] = p; else pending.push(p);
     }
     retryLater();
   }
 
-  /** Writes the pending snapshots, if any, then this one. */
+  /**
+   * Writes the pending snapshots, if any, then this one. A pending one that fails stays queued for the retry, and the
+   * rest are still written: one that keeps failing never blocks the open raster's saves.
+   */
   function enqueue(s: Session | null, snap: Snapshot | null): void {
     inFlight++;
     d.sync();
     chain = chain.then(async () => {
+      let reason = "";
       for (const p of [...pending]) {
         try {
           await write(p.s, p.snap);
@@ -98,15 +105,17 @@ export function saveQueue(d: Deps) {
           if (pending.includes(p)) {
             p.reason = reasonOf(e);
             // as for the open raster: the copy is left out after a quota error or COPY_RETRIES failed retries
-            if (isQuota(e) || (e instanceof CopyFailed && ++p.s.copyFails > COPY_RETRIES)) p.snap = withoutCopy(p.snap);
+            if (e instanceof CopyFailed) p.copyFails = (p.copyFails ?? 0) + 1;
+            if (isQuota(e) || (p.copyFails ?? 0) > COPY_RETRIES) p.snap = withoutCopy(p.snap);
           }
-          if (s && snap) lost(s, snap, e, false);
+          reason ||= reasonOf(e);
           retryLater();
-          return reasonOf(e);
         }
       }
-      if (!s || !snap) return "";
-      try { await write(s, snap); return ""; } catch (e) { lost(s, snap, e); return reasonOf(e); }
+      if (s && snap) {
+        try { await write(s, snap); } catch (e) { lost(s, snap, e); reason = reasonOf(e); }
+      }
+      return reason;
     }).then((reason) => {
       failed = reason;
       // spec 056 scope 5: said on the first failure, and again only after a save succeeded

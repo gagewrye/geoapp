@@ -37,7 +37,8 @@ export type Session = {
 };
 
 /** A snapshot whose write failed (spec 031 scope 8): kept and written before anything else. */
-export type Pending = { s: Session; snap: Snapshot; reason: string };
+// copyFails: this snapshot's own failed copies, so a replaced session's never use up the open import's retries
+export type Pending = { s: Session; snap: Snapshot; reason: string; copyFails?: number };
 
 /** A snapshot whose mask copy is left out: its record says the copy is missing. */
 export const withoutCopy = (p: Snapshot): Snapshot =>
