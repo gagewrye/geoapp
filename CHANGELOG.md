@@ -3,6 +3,7 @@
 One entry per merge to main, newest first. Details are in the named spec.
 
 ## 2026-11-14
+- **Fix (spec 055):** After restoring labels whose imported mask was never copied, Export refuses that mask's file name (it is still being read) until the raster is reopened, instead of offering to replace it.
 - **Spec 056:** Saved labels are never lost by the app: Cancel on the restore prompt asks again before deleting, importing over labels keeps them as "replaced" labels that the next open offers to restore (an import is refused while any replaced labels are unexported), a raster's labels are evicted only once exported, and a save that keeps failing says so and retries instead of stalling.
 - **Spec 055:** Export labels writes into a chosen folder instead of the Save dialog, so exporting over the imported mask (e.g. `labels_merged.tif`) can no longer leave a 0-byte file: it writes a copy and replaces the old file only once the new one is complete, refuses the imagery's name, and leaves the old file untouched if anything fails.
 
