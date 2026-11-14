@@ -65,7 +65,11 @@ export function initPersist(d: Deps) {
   let db: Promise<SessionStore> | null = null;
   // every delete (a drop, an eviction, a declined restore, labels gone) also drops that session's pending snapshots (spec 056)
   const watched = (s: SessionStore): SessionStore => new Proxy(s, {
-    get: (t, k) => (k === "delete" ? async (id: string) => { await t.delete(id); q.deleted(id); } : t[k as keyof SessionStore]),
+    get: (t, k) => {
+      if (k === "delete") return async (id: string) => { await t.delete(id); q.deleted(id); };
+      const v = t[k as keyof SessionStore];
+      return typeof v === "function" ? v.bind(t) : v;
+    },
   });
   const store = () => (db ??= d.open().then(watched));
   let current: Session | null = null;
