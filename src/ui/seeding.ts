@@ -1,3 +1,4 @@
+// Over ~200 lines: Import labels, Export labels and Apply class map share one lock and one run state, so they stay together
 import type { LabelClass } from "../core/classes";
 import { applyClassMap, type Skip } from "../core/classTable";
 import { canPickFiles, pickRaster } from "../io/filePick";
@@ -9,6 +10,7 @@ import { maskTarget, runExport, type KnownFile } from "./exportLabels";
 import type { Held, initLabels } from "./labels";
 import { classMapMessage, MESSAGES, seedMessage } from "./messages";
 import { initProgress } from "./progress";
+import type { SessionHooks } from "./sessionState";
 import type { MessageKind } from "./messages";
 
 type Deps = {
@@ -25,18 +27,6 @@ type Deps = {
   opened: (file: LabelSource) => void;
   /** Spec 031's saved session, which an import and an export report to (specs 074, 075). */
   session: SessionHooks;
-};
-
-/**
- * What Import and Export tell the saved session: an import's mask file and base (copied, then read from the copy: ADR 0041);
- * why an import may not replace the labels (spec 075 scope 2); a flush of unsaved changes before a replace; a wait for
- * the import's copy, which resolves once written or failed (spec 074 scope 1); and a verified export's time (spec 075 scope 6).
- */
-export type SessionHooks = {
-  imported(file: File, base: MaskBase): void; replaceRefused(): string | null; flush(): void;
-  waitCopy(): Promise<unknown>; exported(at: number): void;
-  /** The user's file a restored base reads, its copy not written; null when none. */
-  maskUncopied(): Blob | null;
 };
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;

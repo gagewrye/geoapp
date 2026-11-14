@@ -1,4 +1,5 @@
 import type { Grid } from "../core/types";
+import type { MaskBase } from "../io/maskBase";
 import type { SessionRecord } from "../io/session";
 import { CopyFailed, type Snapshot } from "./snapshot";
 
@@ -53,3 +54,15 @@ export const newSession = (raster: string, name: string, grid: Grid): Session =>
   tiles: new Set(), record: false, clear: false, file: null, touched: false, savedAt: null, exportedAt: null, demote: null, drop: [],
   noCopy: false, copyFails: 0, copied: true, failed: null, lastChange: 0,
 });
+
+/**
+ * What Import and Export tell the saved session: an import's mask file and base (copied, then read from the copy: ADR 0041);
+ * why an import may not replace the labels (spec 075 scope 2); a flush of unsaved changes before a replace; a wait for
+ * the import's copy, which resolves once written or failed (spec 074 scope 1); and a verified export's time (spec 075 scope 6).
+ */
+export type SessionHooks = {
+  imported(file: File, base: MaskBase): void; replaceRefused(): string | null; flush(): void;
+  waitCopy(): Promise<unknown>; exported(at: number): void;
+  /** The user's file a restored base reads, its copy not written; null when none. */
+  maskUncopied(): Blob | null;
+};
