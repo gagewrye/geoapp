@@ -19,7 +19,7 @@
    - Picking no folder or cancelling the prompt does nothing and shows no message.
 3. **Target checks**, done after the prompt and before the file handle is created. They use `isSameEntry` when the app holds a handle. Without a handle, a file with the same name and size counts as a match.
    - **The open imagery:** refused with `That is the imagery file. Choose another name.`
-   - **The imported mask, before the app's copy exists:** refused with `That is the imported mask, and this browser couldn't keep a copy of it. Choose another name.`
+   - **The imported mask, before the app's copy exists:** refused with `That is the imported mask, and this browser couldn't keep a copy of it. Choose another name.` This includes a restored session whose mask still reads the user's file (spec 056 strays); that name stays refused until the raster is reopened.
    - **Any other existing file, including the imported mask once copied:** `confirm("Replace <name>? It stays as it is until the new file is complete.")`. Cancel writes nothing.
 4. **Verify.** After `close()`, the written file's size must equal `tiffLayout().totalBytes`. Then the message is `Labels exported to <name> (<MB> MB).`. A size mismatch shows an error that names the file.
 5. **Failure.** Any error before `close()` aborts the writable, and the target keeps its old bytes. The labels, the mask, Undo and the session are unchanged (spec 056 criterion 6). The message is the error, plus `Nothing was overwritten.`

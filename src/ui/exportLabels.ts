@@ -2,7 +2,7 @@ import type { LabelClass } from "../core/classes";
 import { exportName, targetAction } from "../core/exportTarget";
 import type { LabelStore } from "../core/labelStore";
 import { checkLabelExport, exportLabels } from "../io/labelExport";
-import { maskReadFailed } from "../io/labelFile";
+import { maskReadFailed, type LabelSource } from "../io/labelFile";
 import type { MaskBase } from "../io/maskBase";
 import { canPickFolder, downloadSink, existingFile, folderSink, pickFolder, sameFile, type SizedSink } from "../io/sink";
 import type { RasterSource } from "../io/source";
@@ -10,6 +10,15 @@ import { MESSAGES, type MessageKind } from "./messages";
 
 /** A user file Export must recognise (spec 055 scope 3): its handle when the app holds one, else its name and size. */
 export type KnownFile = { handle: FileSystemHandle | null; name: string; size: number };
+
+/**
+ * The mask Export must not write over while uncopied (spec 055 scope 3): this page's import while the base is it, else
+ * the user's file a restored base still reads, its copy not written (a stray's import: ui/strays.ts).
+ */
+export function maskTarget(own: { known: KnownFile; base: MaskBase; source: LabelSource } | null, base: MaskBase | null, uncopied: Blob | null): (KnownFile & { copied: boolean }) | null {
+  if (own && base === own.base) return { ...own.known, copied: base.file !== own.source };
+  return uncopied ? { handle: null, name: uncopied instanceof File ? uncopied.name : "", size: uncopied.size, copied: false } : null;
+}
 
 export type ExportDeps = {
   imagery: RasterSource;

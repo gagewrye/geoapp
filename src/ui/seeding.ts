@@ -5,7 +5,7 @@ import { LabelFileRefused, openLabelFile, type LabelSource } from "../io/labelFi
 import type { MaskBase } from "../io/maskBase";
 import { importLabels, importTable } from "../io/seeding";
 import type { RasterSource } from "../io/source";
-import { runExport, type KnownFile } from "./exportLabels";
+import { maskTarget, runExport, type KnownFile } from "./exportLabels";
 import type { Held, initLabels } from "./labels";
 import { classMapMessage, MESSAGES, seedMessage } from "./messages";
 import { initProgress } from "./progress";
@@ -35,6 +35,8 @@ type Deps = {
 export type SessionHooks = {
   imported(file: File, base: MaskBase): void; replaceRefused(): string | null; flush(): void;
   waitCopy(): Promise<unknown>; exported(at: number): void;
+  /** The user's file a restored base reads, its copy not written; null when none. */
+  maskUncopied(): Blob | null;
 };
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -186,11 +188,8 @@ export function initSeeding({ labels, imagery, folder, imageryFile, say, error, 
     say(m.text, m.kind);
   });
 
-  /** The imported mask's own file while it is the base; copied once the base reads the app's copy (ADR 0036). */
-  const maskFile = () => {
-    const b = labels.base();
-    return mask && b === mask.base ? { ...mask.known, copied: b.file !== mask.source } : null;
-  };
+  /** The imported mask's own file while it is the base, copied once the base reads the app's copy (ADR 0036); else a restored base's uncopied one. */
+  const maskFile = () => maskTarget(mask, labels.base(), session.maskUncopied());
 
   exportBtn.addEventListener("click", async () => {
     const s = imagery();

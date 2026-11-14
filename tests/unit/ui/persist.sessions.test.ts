@@ -355,7 +355,7 @@ describe("a raster with a snapshot still to write (scope 4)", () => {
   });
 });
 
-describe("a raster reopened while its save is still on the way, which then fails (spec 056)", () => {
+describe("a raster reopened while its save is still on the way, which then fails (spec 056 criterion 9)", () => {
   /** A imports and paints 256,0 = 1; B opens (A's save starts, its copy held), A reopens, and the copy fails: A's snapshot is pending. */
   async function reopened(answers: boolean[]) {
     const t = setup(fakeSessionStore(), answers);
@@ -378,6 +378,7 @@ describe("a raster reopened while its save is still on the way, which then fails
     expect(await back).toBe(MESSAGES.restored);
     expect(t.store().tiles.get("256,0")![0]).toBe(1);
     expect(t.base()!.count).toBe(5); // from the import's own file: its copy was never written
+    expect(await t.p.maskUncopied()!.text()).toBe("mask 5"); // so Export must not write over it (spec 055 scope 3)
     t.tick(60_000);
     t.paint("256,0", 2);
     t.classes[0]!.name = "Roads"; t.p.record();
@@ -506,5 +507,45 @@ describe("a current session and two replaced ones, R1 older than R2 (spec 056 cr
     expect(role(t.fake, "replaced").map((r) => r.id)).toEqual([KEY]);
     expect(role(t.fake, "current")).toHaveLength(1);
     expect(t.fake.records.size).toBe(2);
+  });
+});
+
+describe("tester: maskUncopied never goes stale (spec 055 scope 3)", () => {
+  async function restoredStray() {
+    const t = setup(fakeSessionStore(), []);
+    let release!: () => void;
+    const held = new Promise<void>((r) => { release = r; });
+    t.fake.store.saveBase = async () => { await held; throw new DOMException("The file changed.", "NotReadableError"); };
+    await t.open();
+    await t.importMask(5, "0,0", 1);
+    t.paint("256,0", 1);
+    t.p.open("b.tif", SIZE + 1, G);
+    void t.p.offer();
+    t.reset();
+    const back = t.open();
+    release();
+    expect(await back).toBe(MESSAGES.restored);
+    expect(t.p.maskUncopied()).not.toBe(null);
+    return t;
+  }
+
+  it("is null once another raster opens", async () => {
+    const t = await restoredStray();
+    t.p.open("c.tif", SIZE + 2, G);
+    expect(t.p.maskUncopied()).toBe(null);
+    await t.p.offer();
+    expect(t.p.maskUncopied()).toBe(null);
+  });
+
+  it("is null once a new import replaces the base", async () => {
+    const t = await restoredStray();
+    await t.importMask(9, "512,256", 3);
+    expect(t.p.maskUncopied()).toBe(null);
+  });
+
+  it("stays set while the restored base is on the map, through saves and failed copies", async () => {
+    const t = await restoredStray();
+    for (let ms = 0; ms < 5 * 60_000; ms += 5000) await t.flush(5000);
+    expect(await t.p.maskUncopied()!.text()).toBe("mask 5");
   });
 });
