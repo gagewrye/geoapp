@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { classFile } from "../unit/helpers/labelFiles";
-import { jumpTo, message, openApp, openRaster, overlaysIdle, paintMode, rgbStrip, stroke, toScreen } from "./helpers";
+import { message, openApp, openRaster, overlaysIdle, paintMode, paintOne, rgbStrip } from "./helpers";
 import { applyMap, download, importFile, noSavePicker, upload } from "./seeding";
 
 // Spec 004 criterion 19 (privacy). Criterion 13 went with spec 073; criterion 18 with label-mask (spec 052).
@@ -14,9 +14,7 @@ test("importing and exporting labels make no network requests (criterion 19)", a
   await openRaster(page, rgbStrip());
   await expect(message(page)).toHaveText("Raster opened.");
   await paintMode(page);
-  await jumpTo(page, [15, 45], 6);
-  const a = await toScreen(page, [12.005, 45.005]);
-  await stroke(page, [a, { x: a.x + 60, y: a.y }]); // labels, so the import replaces them (spec 072: one stroke, not paintTwoClasses)
+  await paintOne(page); // labels, so the import replaces them (spec 072: one stroke, not paintTwoClasses)
   const requests: string[] = [];
   page.on("request", (r) => requests.push(r.url()));
   page.once("dialog", (d) => void d.accept()); // "Replace labels?": every import replaces (spec 017)

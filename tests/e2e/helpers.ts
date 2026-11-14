@@ -271,6 +271,13 @@ export async function renameClass(page: Page, i: number, name: string): Promise<
   await field.press("Enter");
 }
 
+/** On rgbFixture: one class 1 stroke west of 15E at zoom 6, for tests that need labels but not two classes (spec 072). */
+export async function paintOne(page: Page): Promise<void> {
+  await jumpTo(page, [15, 45], 6);
+  const a = await toScreen(page, [12.005, 45.005]);
+  await stroke(page, [a, { x: a.x + 30, y: a.y + 20 }, { x: a.x + 60, y: a.y }]);
+}
+
 /**
  * On rgbFixture: name classes 1 and 2, then paint class 1 west (band 1 = 200) and class 2 east
  * (band 1 = 120) of 15E by mouse, at zoom 6 around 15E 45N.

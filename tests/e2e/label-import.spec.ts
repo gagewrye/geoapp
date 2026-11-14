@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
 import { aefShapedFile, classItemFile, ITEM_CLASSES, rgbClassFile, uint16ClassFile, writeFile } from "../unit/helpers/labelFiles";
-import { message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture } from "./helpers";
+import { message, openApp, openRaster, paintMode, paintOne, rgbFixture } from "./helpers";
 import { classList, importFile, storeTiles, upload } from "./seeding";
 
 // Spec 004 criteria 12 (classes) and 15 (refusals), on spec 001's EPSG:4326 fixture. The import-time class map's
@@ -36,21 +36,34 @@ test.describe("classes (criterion 12)", () => {
   });
 });
 
+/** Painted labels, and a check that the store and class list are as they were. */
+async function painted(page: Page) {
+  await paintOne(page);
+  const before = { tiles: await storeTiles(page), list: await classList(page) };
+  return async () => {
+    expect(await storeTiles(page)).toEqual(before.tiles);
+    expect(await classList(page)).toEqual(before.list);
+  };
+}
+
+// Spec 072: criterion 15's refusals are two tests, the file formats and the grids, each over its own painted labels.
 test.describe("refusals (criterion 15)", () => {
-  test("3-band, 16-bit and AlphaEarth-shaped files, an unsupported CRS and a file off the imagery each show their message and change nothing", async ({ page }) => {
+  test.describe.configure({ mode: "parallel" });
+
+  test("criterion 15, formats: 3-band, 16-bit and AlphaEarth-shaped files each show their message and change nothing", async ({ page }) => {
     await setup(page, true);
-    await paintTwoClasses(page);
-    const before = { tiles: await storeTiles(page), list: await classList(page) };
-    const unchanged = async () => {
-      expect(await storeTiles(page)).toEqual(before.tiles);
-      expect(await classList(page)).toEqual(before.list);
-    };
+    const unchanged = await painted(page);
     for (const f of [upload("rgb.tif", rgbClassFile()), upload("u16.tif", uint16ClassFile()), upload("aef.tif", aefShapedFile())]) {
       await page.evaluate(() => { document.getElementById("message")!.textContent = ""; });
       await importFile(page, f);
       await expect(message(page)).toHaveText(MESSAGES.labelFile);
       await unchanged();
     }
+  });
+
+  test("criterion 15, grids: an unsupported CRS and a file off the imagery each show their message and change nothing", async ({ page }) => {
+    await setup(page, true);
+    const unchanged = await painted(page);
     // the unsupported CRS gives the message Open GeoTIFF gives for the same file
     const lambert = writeFile({ width: 10, height: 10, epsg: 2154, gt: [700000, 10, 0, 6600000, 0, -10] }, 1, new Uint8Array(100).fill(3), undefined,
       { GTModelTypeGeoKey: 1, GTRasterTypeGeoKey: 1, ProjectedCSTypeGeoKey: 2154 });
