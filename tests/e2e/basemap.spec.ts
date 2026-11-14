@@ -90,25 +90,41 @@ test("order: background, basemap, then imagery and labels; the opaque preview hi
   expect(await pixelAt(page, p)).toEqual(shown);
 });
 
-test("privacy: one request for the basemap, under assets/, the same in two sessions; moving makes none (criterion 5)", async ({ browser, baseURL }) => {
-  const urls: string[] = [];
-  for (const [i, place] of ([[13, 23], [-120, -40]] as LngLat[]).entries()) {
-    const ctx = await browser.newContext();
-    const page = await ctx.newPage();
-    const log = logRequests(page);
-    await openApp(page);
-    await page.evaluate(() => new Promise<void>((r) => { const { map } = (window as any).__geoapp; if (map.loaded()) r(); else map.once("idle", () => r()); }));
-    const name = fileName(await basemapUrl(page));
-    expect(name).toMatch(/^basemap.*\.jpg$/);
-    const hits = network(log).filter((u) => fileName(u) === name);
-    expect(hits).toHaveLength(1);
-    expect(hits[0]!.startsWith(`${baseURL}/assets/`)).toBe(true);
-    urls.push(hits[0]!);
-    // after load, jumps across zoom 1..14 request nothing
-    const before = log.length;
-    for (let z = 1; z <= 14; z++) await jumpTo(page, [place[0] + z * 0.37 * (i ? -1 : 1), place[1] + z * 0.21], z);
-    expect(network(log.slice(before)), `session ${i}`).toEqual([]);
-    await ctx.close();
+/** Opens the app in this page once the map has loaded, and returns the basemap's one request (criterion 5). */
+async function basemapRequest(page: Page, log: Request[], baseURL: string | undefined): Promise<string> {
+  await openApp(page);
+  await page.evaluate(() => new Promise<void>((r) => { const { map } = (window as any).__geoapp; if (map.loaded()) r(); else map.once("idle", () => r()); }));
+  const name = fileName(await basemapUrl(page));
+  expect(name).toMatch(/^basemap.*\.jpg$/);
+  const hits = network(log).filter((u) => fileName(u) === name);
+  expect(hits).toHaveLength(1);
+  expect(hits[0]!.startsWith(`${baseURL}/assets/`)).toBe(true);
+  return hits[0]!;
+}
+
+// Spec 072: criterion 5 is split into its sessions' request and its moves, each test with its own page.
+test.describe("privacy (criterion 5)", () => {
+  test.describe.configure({ mode: "parallel" });
+
+  test("privacy: one request for the basemap, under assets/, the same in two sessions (criterion 5)", async ({ browser, baseURL }) => {
+    const urls: string[] = [];
+    for (let i = 0; i < 2; i++) {
+      const ctx = await browser.newContext();
+      const page = await ctx.newPage();
+      urls.push(await basemapRequest(page, logRequests(page), baseURL));
+      await ctx.close();
+    }
+    expect(urls[0]).toBe(urls[1]);
+  });
+
+  // each session's jumps across zoom 1..14, in two halves
+  for (const [i, place] of ([[13, 23], [-120, -40]] as LngLat[]).entries()) for (const [z0, z1] of [[1, 7], [8, 14]]) {
+    test(`privacy: after load, moving across zoom ${z0}..${z1} from ${place} makes no request (criterion 5, session ${i})`, async ({ page, baseURL }) => {
+      const log = logRequests(page);
+      await basemapRequest(page, log, baseURL);
+      const before = log.length;
+      for (let z = z0!; z <= z1!; z++) await jumpTo(page, [place[0] + z * 0.37 * (i ? -1 : 1), place[1] + z * 0.21], z);
+      expect(network(log.slice(before)), `session ${i}`).toEqual([]);
+    });
   }
-  expect(urls[0]).toBe(urls[1]);
 });

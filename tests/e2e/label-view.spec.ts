@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { classFile } from "../unit/helpers/labelFiles";
 import { clickAt, hideBasemap, hoverFeatures, jumpTo, message, openApp, openRaster, paintMode, pixelAt, rgbFixture, selectClass, settled, stroke, tileKeysStored, toScreen, view, type Xy } from "./helpers";
-import { at, classList, importFile, maskFile, openFileGate, pauseLabelFile, storeTiles, upload } from "./seeding";
+import { at, classList, countOps, importFile, maskFile, openFileGate, opsCounted, pauseLabelFile, storeTiles, upload } from "./seeding";
 
 // Spec 016: label Opacity, Show labels, hiding selects Pan, and Pan on load.
 
@@ -69,7 +69,6 @@ test("controls: Opacity 0-100 step 5 at 60, Show labels checked; both enabled du
 });
 
 test("opacity 30 sets 0.3 on every overlay and the mask, and on a later tile; a pixel blends 0.7 imagery + 0.3 class (criterion 2)", async ({ page }) => {
-  test.setTimeout(120_000);
   await setup(page);
   await hideBasemap(page);
   await jumpTo(page, at(456, 440), 10);
@@ -92,7 +91,6 @@ test("opacity 30 sets 0.3 on every overlay and the mask, and on a later tile; a 
 });
 
 test("hiding sets visibility none on the overlays and mask and shows the imagery; nothing else changes (criterion 4)", async ({ page }) => {
-  test.setTimeout(120_000);
   await setup(page);
   await hideBasemap(page);
   await jumpTo(page, at(456, 440), 10);
@@ -148,7 +146,7 @@ test("hiding labels mid-stroke by keyboard ends the stroke; later moves label no
   await page.mouse.down();
   for (let i = 1; i <= 5; i++) await page.mouse.move(a.x + 4 * i, a.y);
   await settled(page);
-  await page.waitForTimeout(100);
+  await expect.poll(() => page.evaluate(() => document.getElementById("map")!.contains(document.activeElement))).toBe(true); // the press focused the map
   await page.locator("#label-opacity").focus(); // after the press, which focuses the map
   await page.keyboard.press("Shift+Tab"); // Show comes before Opacity in the right panel (spec 035)
   await expect(show(page)).toBeFocused();
@@ -158,9 +156,10 @@ test("hiding labels mid-stroke by keyboard ends the stroke; later moves label no
   await settled(page);
   const painted = await storeTiles(page);
   expect(painted.size).toBeGreaterThan(0);
+  await countOps(page);
   for (let i = 1; i <= 10; i++) await page.mouse.move(a.x + 20, a.y + 8 * i);
   await page.mouse.up();
-  await page.waitForTimeout(200);
+  expect(await opsCounted(page)).toBe(0); // the ended stroke takes no more moves (spec 072: counted, not waited for)
   await settled(page);
   expect(await storeTiles(page)).toEqual(painted);
   await page.click("#undo");

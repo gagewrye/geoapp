@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
-import { labels, message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture } from "./helpers";
-import { classList, effectiveTiles, importFile, maskFile, storeTiles } from "./seeding";
+import { message, openApp, openRaster, paintMode, paintOne, rgbFixture } from "./helpers";
+import { classList, effectiveTiles, importFile, maskFile, storeTiles, tileDiff } from "./seeding";
 
 // Spec 053 criteria 2-6: on Chromium, with the imagery's handle held, Import labels' picker starts in its folder.
 
@@ -86,10 +86,10 @@ test("criterion 2: Import labels picks within the click, starting in A, and impo
 test("criterion 3: a cancelled picker imports nothing and shows nothing; a dismissed replace confirm imports nothing", async ({ page }) => {
   await setup(page);
   await openA(page);
-  await paintTwoClasses(page);
-  const before = { labels: [...(await labels(page))].sort(), list: await classList(page) };
+  await paintOne(page); // labels, so the import asks to replace them (spec 072: one stroke)
+  const before = { labels: await effectiveTiles(page), list: await classList(page) };
   const unchanged = async () => {
-    expect([...(await labels(page))].sort()).toEqual(before.labels);
+    expect(tileDiff(await effectiveTiles(page), before.labels)).toEqual([]);
     expect(await classList(page)).toEqual(before.list);
     await expect(page.locator("#undo")).toBeEnabled();
     await expect(page.locator("#class-map")).toBeDisabled(); // no imported mask
@@ -99,15 +99,13 @@ test("criterion 3: a cancelled picker imports nothing and shows nothing; a dismi
   const asked: string[] = [];
   page.on("dialog", (d) => { asked.push(d.message()); void d.dismiss(); });
   await label(page, "import-labels").click();
-  await expect.poll(() => picks(page)).toBe(2);
-  await page.waitForTimeout(300);
+  await expect.poll(() => picks(page)).toBe(2); // the rejected picker is handled before the next evaluate (spec 072: no fixed wait)
   await expect(message(page)).toHaveText("");
   expect(asked).toEqual([]);
   await unchanged();
   await pick(page, "L");
   await page.click("#import-labels"); // a click on the input itself
-  await expect.poll(() => asked).toEqual([MESSAGES.replace]);
-  await page.waitForTimeout(300);
+  await expect.poll(() => asked).toEqual([MESSAGES.replace]); // dismissed: the import stops as confirm returns
   await expect(message(page)).toHaveText("");
   await unchanged();
 });

@@ -97,8 +97,7 @@ test("criterion 4: after A, picking B but cancelling the close question gives A"
   page.once("dialog", (d) => { asked.push(d.message()); void d.dismiss(); });
   await pick(page, "B");
   await opener(page).click();
-  await expect.poll(() => asked.length).toBe(1);
-  await page.waitForTimeout(300);
+  await expect.poll(() => asked.length).toBe(1); // cancelled: the open stops as confirm returns (spec 072: no fixed wait)
   await expect(page.locator("#raster-info")).toContainText("rgb4326.tif");
   expect(await exportStartIn(page)).toBe("A");
 });
@@ -118,8 +117,7 @@ test("criterion 4: after A, a cancelled picker gives A and shows no message", as
   await openA(page);
   await pick(page, "abort");
   await opener(page).click();
-  await expect.poll(() => page.evaluate(() => (window as any).__pick.active.length)).toBe(2);
-  await page.waitForTimeout(300);
+  await expect.poll(() => page.evaluate(() => (window as any).__pick.active.length)).toBe(2); // the rejected picker is handled before the next evaluate (spec 072)
   await expect(message(page)).toHaveText("Raster opened.");
   await expect(message(page)).not.toHaveClass(/\berror\b/);
   expect(await exportStartIn(page)).toBe("A");

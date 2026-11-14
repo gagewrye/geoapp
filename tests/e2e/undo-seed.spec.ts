@@ -1,14 +1,16 @@
 import { expect, test, type Page } from "@playwright/test";
 import { CLASS_GRID, classFile } from "../unit/helpers/labelFiles";
 import { MESSAGES } from "../../src/ui/messages";
-import { jumpTo, labels, message, openApp, openRaster, paintMode, rgbFixture, stroke, toScreen } from "./helpers";
+import { jumpTo, message, openApp, openRaster, paintMode, rgbFixture, stroke, toScreen } from "./helpers";
 import { expectFileHolds, gateWrites, openWrite, seeded, setup as twoClasses, writeHeld } from "./lockCombos";
-import { importFile, noSavePicker, openFileGate, pauseLabelFile, storeTiles, upload } from "./seeding";
+import { effectiveTiles, importFile, labelled, noSavePicker, openFileGate, pauseLabelFile, storeTiles, tileDiff, upload } from "./seeding";
 
 // Spec 010 criterion 5, the spec 004 clauses: seeds clear the history, refused or cancelled ones keep it,
 // and Undo waits for imports and Export labels runs (labels.lock).
 const undoButton = (page: Page) => page.locator("#undo");
-const snapshot = async (page: Page) => [...(await labels(page))].sort();
+/** The effective labels, by tile (spec 072: compared with tileDiff, not through labels()). */
+const snapshot = (page: Page) => effectiveTiles(page);
+const pixels = (tiles: Map<string, Uint8Array>) => [...labelled(tiles, 1000)];
 const classes = () => upload("classes.tif", classFile("255"));
 
 async function oneStroke(page: Page) {
@@ -30,7 +32,7 @@ async function undoBlocked(page: Page, why: string) {
   const before = await snapshot(page);
   await page.locator("#map canvas").focus();
   await page.keyboard.press("ControlOrMeta+z");
-  expect(await snapshot(page), why).toEqual(before);
+  expect(tileDiff(await snapshot(page), before), why).toEqual([]);
 }
 
 test("a successful import clears the history", async ({ page }) => {
@@ -43,12 +45,13 @@ test("a successful import clears the history", async ({ page }) => {
 
 test("a cancelled Replace confirm keeps the history; one Undo then removes the stroke", async ({ page }) => {
   const empty = await oneStroke(page);
-  page.once("dialog", (d) => { expect(d.message()).toBe(MESSAGES.replace); void d.dismiss(); });
+  const asked: string[] = [];
+  page.once("dialog", (d) => { asked.push(d.message()); void d.dismiss(); });
   await importFile(page, classes());
-  await page.waitForTimeout(300);
+  await expect.poll(() => asked).toEqual([MESSAGES.replace]); // dismissed: the import stops at once (spec 072: no fixed wait)
   await expect(undoButton(page)).toBeEnabled();
   await undoButton(page).click();
-  expect(await snapshot(page)).toEqual(empty);
+  expect(tileDiff(await snapshot(page), empty)).toEqual([]);
 });
 
 test("an import showing 'No labels to seed here.' keeps the history; one Undo then removes the stroke", async ({ page }) => {
@@ -58,7 +61,7 @@ test("an import showing 'No labels to seed here.' keeps the history; one Undo th
   await expect(message(page)).toHaveText(MESSAGES.noSeed);
   await expect(undoButton(page)).toBeEnabled();
   await undoButton(page).click();
-  expect(await snapshot(page)).toEqual(empty);
+  expect(tileDiff(await snapshot(page), empty)).toEqual([]);
 });
 
 test("while an import runs (paused file) Undo is disabled and Ctrl+Z changes nothing", async ({ page }) => {
@@ -73,13 +76,12 @@ test("while an import runs (paused file) Undo is disabled and Ctrl+Z changes not
   await expect(undoButton(page)).toBeDisabled(); // the import replaced the store
 });
 
-test("while Export labels runs (paused sink) Undo is disabled; the file holds the store at its click; then the history is intact", async ({ page }) => {
-  test.setTimeout(120_000);
+// Spec 072: split in two, the export's lock and file, then the history after an export.
+test("while Export labels runs (paused sink) Undo is disabled; the file holds the store at its click (spec 010 criterion 5)", async ({ page }) => {
   await noSavePicker(page);
   await gateWrites(page);
   await twoClasses(page);
   const atClick = await storeTiles(page);
-  const painted = await snapshot(page);
   const downloaded = page.waitForEvent("download");
   await page.click("#export-labels");
   await writeHeld(page);
@@ -88,10 +90,20 @@ test("while Export labels runs (paused sink) Undo is disabled; the file holds th
   const dl = await downloaded;
   await expect(message(page)).toHaveText("Labels exported.");
   await expectFileHolds((await dl.path())!, atClick, ["left", "right"]);
+});
+
+test("after Export labels the history is intact: one Undo removes the last stroke and leaves the first (spec 010 criterion 5)", async ({ page }) => {
+  await noSavePicker(page);
+  await twoClasses(page);
+  const painted = await snapshot(page);
+  const downloaded = page.waitForEvent("download");
+  await page.click("#export-labels");
+  await downloaded;
+  await expect(message(page)).toHaveText("Labels exported.");
   await expect(undoButton(page)).toBeEnabled();
   await undoButton(page).click(); // the class 2 stroke
-  const one = await snapshot(page);
-  expect(one.length).toBeLessThan(painted.length);
-  expect(one.every(([, v]) => v === 1)).toBe(true);
+  const one = pixels(await snapshot(page));
+  expect(one.length).toBeLessThan(pixels(painted).length);
+  expect(one.every(([, , v]) => v === 1)).toBe(true);
   await expect(undoButton(page)).toBeEnabled(); // the class 1 stroke remains
 });
