@@ -1,5 +1,5 @@
 import type { Map as MapLibreMap } from "maplibre-gl";
-import type { Handle, Rect } from "../core/boxes";
+import { clampCell, contains, type Handle, type Rect } from "../core/boxes";
 import { pixelAt } from "../core/pixel";
 import type { Grid } from "../core/types";
 
@@ -26,7 +26,6 @@ type Deps = {
 type Press = { pointerId: number; x: number; y: number; gesture: BoxGesture; cell: Cell; onRaster: boolean; dragging: boolean };
 
 const CLICK_PX = 4;
-const clamp = (v: number, hi: number) => Math.min(hi, Math.max(0, v));
 
 /** Box mode's pointer input (spec 064): mouse and pen left drags draw, move or resize a box, and clicks select one; touch, Alt and other buttons are left to the map and the brush. */
 // The brush keeps MapLibre from seeing Box mode's mousedowns and turns its drag handlers off (brush.boxing).
@@ -41,18 +40,16 @@ export function createBoxTool(map: MapLibreMap, d: Deps) {
     const cell = pixelAt(d.grid()!, lng, lat);
     return { x, y, on: x >= 0 && y >= 0 && x < r.width && y < r.height, cell: Number.isFinite(cell[0]) && Number.isFinite(cell[1]) ? cell : null };
   };
-  const inside = (r: Rect, [c, row]: Cell) => r.x0 <= c && c < r.x1 && r.y0 <= row && row < r.y1;
 
   container.addEventListener("pointerdown", (e) => {
     if (press || e.pointerType === "touch" || e.button !== 0 || e.altKey || !d.active() || !d.grid()) return;
     const g = d.grid()!, { x, y, on, cell } = at(e);
     if (!cell || !on) return;
-    const onRaster = cell[0] >= 0 && cell[1] >= 0 && cell[0] < g.width && cell[1] < g.height;
-    const clamped: Cell = [clamp(cell[0], g.width - 1), clamp(cell[1], g.height - 1)];
+    const onRaster = contains({ x0: 0, y0: 0, x1: g.width, y1: g.height }, cell[0], cell[1]), clamped = clampCell(cell, g);
     const sel = d.selected(), handle = sel && d.handleAt(sel, x, y);
     // a handle wins over the inside, so a small box can still be resized
     const gesture: BoxGesture | null = handle ? { kind: "resize", handle, from: clamped }
-      : sel && onRaster && inside(sel, cell) ? { kind: "move", from: clamped } : onRaster ? { kind: "draw", from: clamped } : null;
+      : sel && onRaster && contains(sel, cell[0], cell[1]) ? { kind: "move", from: clamped } : onRaster ? { kind: "draw", from: clamped } : null;
     if (gesture) press = { pointerId: e.pointerId, x: e.clientX, y: e.clientY, gesture, cell: clamped, onRaster, dragging: false };
   });
 
@@ -60,7 +57,7 @@ export function createBoxTool(map: MapLibreMap, d: Deps) {
   const follow = (p: Press, e: PointerEvent) => {
     if (!p.dragging && Math.hypot(e.clientX - p.x, e.clientY - p.y) > CLICK_PX) { p.dragging = true; d.start(p.gesture); }
     const g = d.grid(), cell = g && at(e).cell;
-    if (g && cell) p.cell = [clamp(cell[0], g.width - 1), clamp(cell[1], g.height - 1)];
+    if (g && cell) p.cell = clampCell(cell, g);
     if (p.dragging) d.drag(p.cell);
   };
   const finish = (e: PointerEvent) => {

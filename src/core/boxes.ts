@@ -12,6 +12,13 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 
 export function emptyBoxes(): BoxStore { return { boxes: new Map(), next: 1 }; }
 
+/** Pixel (col, row) lies in r: x0 <= col < x1 and y0 <= row < y1. */
+export const contains = (r: Rect, col: number, row: number) => r.x0 <= col && col < r.x1 && r.y0 <= row && row < r.y1;
+
+/** The raster pixel nearest cell ([col, row]): each coordinate clamped to 0..width-1 or 0..height-1 (spec 064). */
+export const clampCell = (cell: [number, number], dims: Dims): [number, number] =>
+  [clamp(cell[0], 0, dims.width - 1), clamp(cell[1], 0, dims.height - 1)];
+
 /** Adds a copy of r with a new id; throws for a value outside 1..255 or an empty rect. */
 export function addBox(s: BoxStore, r: Rect, value: number): Box {
   if (!Number.isInteger(value) || value < 1 || value > 255) throw new RangeError(`box value ${value} is outside 1..255`);
@@ -68,7 +75,7 @@ const area = (r: Rect) => (r.x1 - r.x0) * (r.y1 - r.y0);
 
 /** The boxes containing pixel (col, row): smallest area first, newest first on a tie. */
 export function boxesAt(s: BoxStore, col: number, row: number): Box[] {
-  const hit = [...s.boxes.values()].filter((b) => b.x0 <= col && col < b.x1 && b.y0 <= row && row < b.y1);
+  const hit = [...s.boxes.values()].filter((b) => contains(b, col, row));
   return hit.sort((a, b) => area(a) - area(b) || b.id - a.id);
 }
 
