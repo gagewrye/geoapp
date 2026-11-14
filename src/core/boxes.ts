@@ -12,6 +12,13 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 
 export function emptyBoxes(): BoxStore { return { boxes: new Map(), next: 1 }; }
 
+/** Pixel (col, row) lies in r: x0 <= col < x1 and y0 <= row < y1. */
+export const contains = (r: Rect, col: number, row: number) => r.x0 <= col && col < r.x1 && r.y0 <= row && row < r.y1;
+
+/** The raster pixel nearest cell ([col, row]): each coordinate clamped to 0..width-1 or 0..height-1 (spec 064). */
+export const clampCell = (cell: [number, number], dims: Dims): [number, number] =>
+  [clamp(cell[0], 0, dims.width - 1), clamp(cell[1], 0, dims.height - 1)];
+
 /** Adds a copy of r with a new id; throws for a value outside 1..255 or an empty rect. */
 export function addBox(s: BoxStore, r: Rect, value: number): Box {
   if (!Number.isInteger(value) || value < 1 || value > 255) throw new RangeError(`box value ${value} is outside 1..255`);
@@ -68,7 +75,7 @@ const area = (r: Rect) => (r.x1 - r.x0) * (r.y1 - r.y0);
 
 /** The boxes containing pixel (col, row): smallest area first, newest first on a tie. */
 export function boxesAt(s: BoxStore, col: number, row: number): Box[] {
-  const hit = [...s.boxes.values()].filter((b) => b.x0 <= col && col < b.x1 && b.y0 <= row && row < b.y1);
+  const hit = [...s.boxes.values()].filter((b) => contains(b, col, row));
   return hit.sort((a, b) => area(a) - area(b) || b.id - a.id);
 }
 
@@ -81,4 +88,24 @@ export function handlePoints(r: Rect): { handle: Handle; x: number; y: number }[
     y: h.includes("n") ? r.y0 : h.includes("s") ? r.y1 : my,
   });
   return HANDLES.map(at);
+}
+
+/** The handle within radius screen px of (x, y): the nearest corner if any is in reach, else the nearest edge (spec 064). */
+export function handleNear(points: { handle: Handle; x: number; y: number }[], x: number, y: number, radius = 6): Handle | null {
+  for (const corner of [true, false]) {
+    let best: Handle | null = null, bestD = Infinity;
+    for (const p of points) {
+      const d = Math.hypot(p.x - x, p.y - y);
+      if ((p.handle.length === 2) === corner && d <= radius && d < bestD) { best = p.handle; bestD = d; }
+    }
+    if (best) return best;
+  }
+  return null;
+}
+
+/** The id a click selects among hits (boxesAt): the one after selected when the click repeats on the same pixel, else the first; null for none. */
+export function cycleBox(hits: Box[], selected: number | null, again: boolean): number | null {
+  if (!hits.length) return null;
+  const i = again ? hits.findIndex((b) => b.id === selected) : -1;
+  return hits[(i + 1) % hits.length]!.id;
 }

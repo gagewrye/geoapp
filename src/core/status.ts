@@ -4,10 +4,11 @@
 export const formatLonLat = (lon: number, lat: number): string =>
   `${Math.abs(lat).toFixed(5)} ${lat < 0 ? "S" : "N"} ${Math.abs(lon).toFixed(5)} ${lon < 0 ? "W" : "E"}`;
 
-const TOOL = { paint: "Paint", erase: "Erase", pan: "Pan", smart: "Smart", fill: "Fill", polygon: "Polygon" } as const;
-/** `Paint · Water · 7 px`, from the brush mode, the selected class's name and the brush side; Smart, Fill and Polygon have no brush, and say when they read (specs 046, 054); Erase has no class (spec 058). */
-export const formatTool = (mode: keyof typeof TOOL, className: string, side: number, reading = false): string =>
-  mode === "smart" || mode === "fill" || mode === "polygon" ? `${TOOL[mode]} · ${className}${reading ? " · reading…" : ""}`
+const TOOL = { paint: "Paint", erase: "Erase", pan: "Pan", smart: "Smart", fill: "Fill", polygon: "Polygon", box: "Box" } as const;
+/** `Paint · Water · 7 px`, from the brush mode, the selected class's name and the brush side; Smart, Fill and Polygon have no brush, and say when they read (specs 046, 054); Erase has no class (spec 058); Box gives the selected box's size (spec 064). */
+export const formatTool = (mode: keyof typeof TOOL, className: string, side: number, reading = false, box: [number, number] | null = null): string =>
+  mode === "box" ? `Box · ${className}${box ? ` · ${box[0]}×${box[1]} px` : ""}`
+    : mode === "smart" || mode === "fill" || mode === "polygon" ? `${TOOL[mode]} · ${className}${reading ? " · reading…" : ""}`
     : mode === "erase" ? `${TOOL[mode]} · ${side} px` : `${TOOL[mode]} · ${className} · ${side} px`;
 
 /** `px col, row` for a pixel on the raster, else blank. */

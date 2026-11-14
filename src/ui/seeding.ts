@@ -63,8 +63,8 @@ export function initSeeding({ labels, imagery, folder, say, error, opened, impor
     exportBtn.disabled = off.exportLabels;
   }
 
-  /** Every import replaces (spec 017): true unless labels exist and the user cancels the confirm. */
-  const replaceConfirmed = () => !labels.hasLabels() || confirm(MESSAGES.replace);
+  /** Every import replaces (spec 017): true unless masks exist and the user cancels the confirm; boxes are kept, so they don't ask (spec 064 decision 3). */
+  const replaceConfirmed = () => !labels.hasMasks() || confirm(MESSAGES.replace);
 
   // Order (spec 021): header checks, then the old labels leave the map (held, not
   // dropped), then the passes. Only success replaces; a failure, Cancel, "empty" or "too many" restores

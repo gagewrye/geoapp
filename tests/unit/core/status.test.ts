@@ -27,3 +27,10 @@ describe("status formats", () => {
     expect(formatZoom(17.3456)).toBe("z 17.3");
   });
 });
+
+describe("formatTool for Box (scope 7)", () => {
+  it("names the class, and the selected box's size", () => {
+    expect(formatTool("box", "Water", 7)).toBe("Box · Water");
+    expect(formatTool("box", "Water", 7, false, [31, 21])).toBe("Box · Water · 31×21 px");
+  });
+});
