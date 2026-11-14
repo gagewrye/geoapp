@@ -27,11 +27,12 @@ function persistSetup(fake = fakeSessionStore(), answers: boolean[] = []) {
     restoreSession(s, _c, b) { store = s; base = b; },
   };
   let clock = 1000;
+  const prompts: string[] = [];
   const p = initPersist({
     labels, open: async () => fake.store, state: { textContent: "" }, win: new EventTarget(), doc: Object.assign(new EventTarget(), { visibilityState: "visible" }),
     yieldTask: async () => {}, now: () => clock, time: () => "12:00", dateTime: (ms) => `t${ms}`, say: () => {},
     openBase: async (blob) => ({ meta: { width: G.width, height: G.height }, blob } as unknown as LabelSource),
-    confirm: () => answers.shift() ?? true,
+    confirm: (q) => { prompts.push(q); return answers.shift() ?? true; },
   });
   const paint = (k: string, v: number) => { store.tiles.set(k, tile(v)); p.tiles([k]); };
   const flush = async (ms = SAVE_DELAY_MS) => { clock += ms; await vi.advanceTimersByTimeAsync(ms); await p.idle(); };
@@ -45,7 +46,7 @@ function persistSetup(fake = fakeSessionStore(), answers: boolean[] = []) {
     p.replaced(); p.imported(new Blob([`mask ${count}`]));
     return null;
   };
-  return { fake, p, paint, flush, importMask, open: async () => { p.open("a.tif", 4321, G); return p.offer(); }, now: () => clock };
+  return { fake, p, paint, flush, importMask, open: async () => { p.open("a.tif", 4321, G); return p.offer(); }, now: () => clock, prompts };
 }
 
 describe("spec 056 scope 2: a replaced session changed after its export is never dropped", () => {
@@ -181,6 +182,37 @@ describe("867d906's delete stamps: a re-used id after a declined restore still s
     for (let ms = 0; ms < 2 * 60_000; ms += 5000) await t.flush(5000);
     expect(a.fake.records.has(id)).toBe(true);
     expect([...a.fake.tiles.get(id)!.keys()]).toEqual(["256,0"]);
+  });
+});
+
+describe("cb8adf5's strays: a stray kept apart never deletes or demotes the session the reopen restored", () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("stray K#2 (drop K, demote K#1) kept apart while the user restores K via '…instead?': K stays whole and current", async () => {
+    const t = persistSetup(fakeSessionStore(), [false, true]); // reopen: Cancel K#1, OK '…instead?' (K)
+    await t.open();
+    await t.importMask(5, "0,0", 1); await t.flush(); // K
+    t.p.exported(t.now()); await t.flush(); // K exported after its last change
+    await t.importMask(9, "512,256", 3); await t.flush(); // K replaced, K#1 current
+    expect(await t.importMask(7, "0,256", 4)).toBe(null); // K#2: drop K, demote K#1; not saved yet
+    let down = true; // the whole store fails, deletes too, as IndexedDB would
+    const del = t.fake.store.delete.bind(t.fake.store);
+    t.fake.store.delete = async (id) => { if (down) throw new Error("disk"); return del(id); };
+    t.fake.failWith(new Error("disk"));
+    t.p.open("a.tif", 4321, G); // the same raster again: K#2's save fails on the way, a stray
+    await t.p.idle();
+    t.fake.failWith(null); down = false;
+    expect(await t.p.offer()).toBe(MESSAGES.restored);
+    expect(t.prompts[1]).toMatch(/instead\?/);
+    const k = [...t.fake.records.values()].find((r) => r.base!.count === 5)!;
+    t.paint("768,0", 6); // the user edits the restored K
+    for (let ms = 0; ms < 2 * 60_000; ms += 5000) await t.flush(5000);
+    const after = t.fake.records.get(k.id);
+    expect(after?.role).toBe("current");
+    expect([...(t.fake.tiles.get(k.id)?.keys() ?? [])].sort()).toEqual(["0,0", "768,0"]);
+    expect(t.fake.bases.has(k.id)).toBe(true);
+    expect([...t.fake.records.values()].filter((r) => r.role === "current")).toHaveLength(1);
   });
 });
 
