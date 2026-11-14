@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { jumpTo, message, openApp, openRaster, rgbFixture, toScreen, type Xy } from "./helpers";
+import { rgbFixture } from "./fixtures";
+import { jumpTo, message, openApp, openRaster, toScreen, type Xy } from "./helpers";
 
 // Spec 064 criteria 6 and 7: draw, edit and undo a box on rgbFixture (1000 x 1000 px of 0.01 degrees from 10E 50N).
 type Box = { id: number; value: number; x0: number; y0: number; x1: number; y1: number };
