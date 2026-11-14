@@ -97,8 +97,7 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
   const modes = initModes({ brush, view, toolChanged: () => { tools.modeChanged(); bx.modeChanged(); toolChanged(); }, smart: () => tools.chooseSmart() }); // a tool that is left drops what it had pending
   const tools = initClickTools({ map, store: () => store, imagery: () => imagery, base: () => base, masks: paint.masks, undo, push: paint.push, panel, locked: () => locked, say, modes, toolChanged, edits, smart: smartDeps, onBusy, pending: () => paint.size() > 0 });
   const size = initBrushSize(() => { brush.refresh(); toolChanged(); });
-  // the Box tool (spec 064): its store (spec 063: replace() keeps it, open() empties it), selection and edits; locked or peeking, it does nothing
-  const bx = wireBoxes(map, { undo, panel, modes, brush, panning, blocked: () => locked || view.peeking(), changed: () => { undo.sync(); toolChanged(); onChange(); } });
+  const bx = wireBoxes(map, { undo, panel, modes, brush, panning, blocked: () => locked || view.peeking(), changed: () => { undo.sync(); toolChanged(); onChange(); } }); // the Box tool (spec 064)
   initLabelKeys({
     open: () => open, brush, size, select: (i) => { panel.select(i); bx.classChosen(i); }, classCount: () => panel.classes().length, pick: () => picker.pick(brush.hoverCell()),
     setMode: modes.request, canPaint: modes.canPaint, stroking: brush.stroking, view: { toggle: view.toggle, peek: modes.peek }, ...tools.keys, box: bx.keys,
@@ -191,8 +190,9 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
     tile,
     /** A paint or erase stroke is in progress. */
     stroking: brush.stroking,
-    /** True when a tile is stored, a mask with labelled pixels is loaded, or a box is drawn (spec 064). */
-    hasLabels: () => store.tiles.size > 0 || (base?.count ?? 0) > 0 || bx.store().boxes.size > 0,
+    /** A tile is stored or a mask with labelled pixels is loaded: what a session saves and an import replaces (boxes aren't: spec 064). */
+    hasMasks: () => store.tiles.size > 0 || (base?.count ?? 0) > 0,
+    hasLabels(): boolean { return this.hasMasks() || bx.store().boxes.size > 0; }, // masks or boxes: spec 032 asks before an open discards them
     /** Pointer moves are waiting for valid masks, or a fill is being read. */
     busy: () => paint.size() > 0 || tools.filling(),
     store: () => store, boxes: bx.store, classes: panel.classes, setClasses: panel.setClasses,
