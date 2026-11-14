@@ -1,18 +1,18 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
-import { RGB_GRID, rgbFixture } from "./fixtures";
+import { once, RGB_GRID, rgbFixture } from "./fixtures";
 import { jumpTo, message, openApp, openRaster, paintMode, path, selectClass, stroke, toScreen } from "./helpers";
 import { at, effectiveTiles, importFile, maskFile, saved, tileDiff, upload } from "./seeding";
 import { writeFile } from "../unit/helpers/labelFiles";
 
 // Spec 075 criterion 7: an import keeps the labels it replaces, and the restore prompt offers them back.
 
-/** A second mask on rgbFixture's grid, its 16 px blocks shifted by one class from maskFile's. */
-function maskB() {
+/** A second mask on rgbFixture's grid, its 16 px blocks shifted by one class from maskFile's; built once per worker (spec 072). */
+const maskB = once(() => upload("mask-b.tif", writeFile(RGB_GRID, 1, (() => {
   const v = new Uint8Array(1000 * 1000);
   for (let r = 0; r < 1000; r++) for (let c = 0; c < 1000; c++) v[r * 1000 + c] = ((c >> 4) + (r >> 4) + 1) % 4;
-  return upload("mask-b.tif", writeFile(RGB_GRID, 1, v, "0", { GTModelTypeGeoKey: 2, GTRasterTypeGeoKey: 1, GeographicTypeGeoKey: 4326 }));
-}
+  return v;
+})(), "0", { GTModelTypeGeoKey: 2, GTRasterTypeGeoKey: 1, GeographicTypeGeoKey: 4326 })));
 
 /** Answers dialogs in order (true accepts, false dismisses) and logs their messages; beforeunload is accepted. */
 function answer(page: Page) {
@@ -45,7 +45,7 @@ async function reopen(page: Page) {
   await openRaster(page, rgbFixture());
 }
 
-/** Imports mask A and paints, then mask B (OK on Replace labels?) and paints, then waits for Saved; A's and B's tiles, and the role counts. */
+/** Imports mask A and paints, then mask B (OK on Replace labels?) and paints, then waits for Saved; A's tiles and the role counts. */
 async function importAThenB(page: Page, dialogs: ReturnType<typeof answer>) {
   await openApp(page);
   await openRaster(page, rgbFixture());
@@ -65,7 +65,7 @@ async function importAThenB(page: Page, dialogs: ReturnType<typeof answer>) {
   expect(tileDiff(a, b).length).toBeGreaterThan(0);
   const counts = await roles(page);
   expect(Object.keys(counts).sort()).toEqual(["current", "replaced"]);
-  return { a, b, counts };
+  return { a, counts };
 }
 
 test("import A, paint, import B, paint; reopening, Cancel then OK on '…instead?' shows A, with B kept as replaced", async ({ page }) => {
@@ -79,15 +79,18 @@ test("import A, paint, import B, paint; reopening, Cancel then OK on '…instead
   expect(await roles(page)).toEqual({ current: counts.replaced, replaced: counts.current });
 });
 
-test("import A, paint, import B, paint; reopening and accepting restores B, with A still stored as replaced", async ({ page }) => {
+test("after the '…instead?' swap, a reload, open and accept restores A again, with B still stored as replaced", async ({ page }) => {
   const dialogs = answer(page);
-  const { b, counts } = await importAThenB(page, dialogs);
+  const { a, counts } = await importAThenB(page, dialogs);
+  dialogs.then(false, true); // the swap: Cancel the restore, then OK "…instead?"
+  await reopen(page);
+  await expect(message(page)).toHaveText("Labels restored.");
   dialogs.then(true);
   await reopen(page);
   await expect(message(page)).toHaveText("Labels restored.");
   expect(dialogs.log.at(-1)).toMatch(/^Restore labels saved .+ for rgb4326\.tif\?$/);
-  expect(tileDiff(await effectiveTiles(page), b)).toEqual([]);
-  expect(await roles(page)).toEqual(counts);
+  expect(tileDiff(await effectiveTiles(page), a)).toEqual([]);
+  expect(await roles(page)).toEqual({ current: counts.replaced, replaced: counts.current });
 });
 
 test("a third import with the replaced labels not exported is refused and changes no labels", async ({ page }) => {

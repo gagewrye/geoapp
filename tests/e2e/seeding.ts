@@ -6,7 +6,7 @@ import type { Grid } from "../../src/core/types";
 import { writeFile } from "../unit/helpers/labelFiles";
 import { tiledGeotiffBuffer } from "../unit/helpers/tiledTiff";
 import { once, RGB_GRID } from "./fixtures";
-import { type LngLat } from "./helpers";
+import { settled, type LngLat } from "./helpers";
 
 // Spec 004 e2e helpers: label files as uploads, the store and list through the hook, downloads, gates.
 
@@ -71,15 +71,12 @@ export async function effectiveTiles(page: Page): Promise<Map<string, Uint8Array
 export const tileDiff = (a: Map<string, Uint8Array>, b: Map<string, Uint8Array>): string[] =>
   [...new Set([...a.keys(), ...b.keys()])].filter((k) => !a.has(k) || !b.has(k) || !Buffer.from(a.get(k)!).equals(Buffer.from(b.get(k)!))).sort();
 
-/**
- * Waits until every change is saved in this browser: persist's beforeunload guard is off (nothing dirty, no save in
- * flight, failed or pending) and #save-state says Saved. Call it after strokes settle (stroke() waits for that).
- */
-export const saved = (page: Page) => expect.poll(() => page.evaluate(() => {
-  const e = new Event("beforeunload", { cancelable: true });
-  window.dispatchEvent(e);
-  return !e.defaultPrevented && document.getElementById("save-state")!.textContent!.startsWith("Saved ");
-}), { timeout: 10_000 }).toBe(true);
+/** Waits until the latest change is saved: no stroke op queued, no save scheduled or in flight (spec 072's saving hook), and "Saved". */
+export async function saved(page: Page): Promise<void> {
+  await settled(page);
+  await expect.poll(() => page.evaluate(() => (window as any).__geoapp.saving()), { timeout: 15_000 }).toBe(false);
+  await expect(page.locator("#save-state")).toHaveText(/^Saved /);
+}
 
 export const classList = (page: Page): Promise<LabelClass[]> =>
   page.evaluate(() => (window as any).__geoapp.labels.classes.map((c: LabelClass) => ({ ...c })));
