@@ -1,4 +1,4 @@
-# 0037: One saved session per labelling run, two per raster, evicted only once exported
+# 0037: One saved session per labelling run, normally two per raster, evicted only once exported
 
 **Status:** Accepted (Gage approved in advance, 2026-11-14, as relayed by the orchestrator), with spec 056. Amends ADR 0025's keys and eviction.
 
@@ -11,11 +11,11 @@
 - (b) Give each session an `id`, with `raster` and `role` fields, and key tiles and the mask copy by `id`, so a replace only rewrites one record.
 
 **Decision:**
-- (b): at most one `current` and one `replaced` session per raster.
+- (b): one `current` and normally one `replaced` session per raster.
 - Eviction past 8 rasters takes only sessions exported since their last change.
 - Old records are read as `id = raster = key`, with no IndexedDB version bump.
 
 **Consequences:**
 - No dependency.
-- Disk use can reach about twice a raster's mask.
+- Disk use is normally about twice a raster's mask. Rare failures can leave more `replaced` sessions. The offer reaches each one, and an import is refused while any is unexported.
 - With nothing evictable, the quota is the limit, and spec 056 reports failed saves in `#message`.

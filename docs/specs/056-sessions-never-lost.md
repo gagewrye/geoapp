@@ -30,12 +30,13 @@
 2. **Replaced labels are kept (B, ADR 0037).**
    - A session gets its own `id`. Records gain `raster` (the rasterKey), `role` (`"current"` or `"replaced"`) and `exportedAt: number | null`.
    - Tiles are keyed `[id, tile]`. The mask copy is `bases/<keyHash(id)>.tif`.
-   - An import that replaces saved labels turns the current session into the raster's `replaced` one. The previous `replaced` session is deleted only if it was exported after its last change; otherwise the import is refused with `Export or restore the earlier replaced labels first.`
+   - An import that replaces saved labels turns the current session into the raster's `replaced` one. While any `replaced` session of the raster is unexported (not exported after its last change), the import is refused with `Export or restore the earlier replaced labels first.` Otherwise the earlier `replaced` sessions are deleted.
    - The new labels start a new `current` session. Nothing is cleared.
-   - **With a `replaced` session,** Cancel on the current session's prompt first asks `Restore the labels replaced on <time> instead? The newer labels are kept.`
-    - OK restores the replaced session, and the two sessions swap roles.
-    - Cancel goes on to scope 1's delete question.
-  - **With no `current` session,** the `replaced` one gets the normal prompt.
+   - One `replaced` session per raster is the normal case, not an invariant: rare failures (scope 1's strays) can leave more, and every one stays reachable.
+   - **With `replaced` sessions,** Cancel on the current session's prompt asks `Restore the labels replaced on <time> instead? The newer labels are kept.` for each in turn, newest first.
+    - OK restores that session, and it swaps roles with the current one.
+    - Cancel on the last one goes on to scope 1's delete question.
+  - **With no `current` session,** the newest `replaced` one gets the normal prompt, and the others follow as above.
    - Existing records are read as `id = raster = key`, `role = "current"` and `exportedAt = null`. No IndexedDB version bump is needed.
 3. **Copy never blocks tiles (C).** The save order becomes:
    - tiles;
@@ -60,7 +61,7 @@
 ## Interfaces
 - `core/session.ts`:
   - `evict(s: { id: string; savedAt: number; exportedAt: number | null }[], limit: number): string[]`;
-  - `offers(records: { role: string; savedAt: number }[]): number[]` gives the record indexes in offer order: current first, then replaced.
+  - `offers(records: { role: string; savedAt: number }[]): number[]` gives the record indexes in offer order: current first, then replaced, each newest first.
 - `io/session.ts`:
   - `SessionStore.get(key)` becomes `forRaster(raster): Promise<SessionRecord[]>`;
   - `SessionRecord` gains `id`, `raster`, `role` and `exportedAt`.
@@ -93,3 +94,6 @@
    - Restore, paint `256,0` = 2, rename the class, run 10 minutes of flushes: the stored tile is 2, the classes and `savedAt` are the new session's, and there is one `current` record.
    - Cancel, then OK to delete: the old session is kept as `replaced` with tile 1, and a new `current` session with another id has tile 2. An import is refused. A new open offers the kept labels through `…instead?` and restores them without the mask.
    - With an unexported `replaced` session R stored first, Cancel, Cancel, OK: the session is restored with the stray laid over and scope 1's message shows. R is still the only `replaced` session and is still offered through `…instead?`. No stored or stray tile is lost.
+10. **Unit, fake store with a current session and two unexported `replaced` sessions, R1 older than R2:**
+   - Cancel, Cancel on R2's `…instead?`, OK on R1's: R1's labels are restored and R1 becomes `current`. R2 and the old current session are stored as `replaced`.
+   - In a separate run, an import is refused with scope 2's message while R1 is unexported, even after R2 is exported.
