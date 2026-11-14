@@ -45,16 +45,16 @@ describe("ci.yml jobs (spec 060 criterion 2)", () => {
     expect(check.indexOf("run: npm run check")).toBeGreaterThan(check.indexOf("run: npm ci"));
   });
 
-  it("e2e needs check and runs 4 shards of Playwright on Chromium", () => {
+  it("e2e needs check and runs 8 shards of Playwright on Chromium (spec 074 criterion 1)", () => {
     const e2e = job("e2e");
     expect(e2e).toContain("needs: check");
     expect(e2e).toContain("runs-on: ubuntu-latest");
-    expect(e2e).toContain("shard: [1, 2, 3, 4]");
+    expect(e2e).toContain("shard: [1, 2, 3, 4, 5, 6, 7, 8]");
     expect(e2e).toMatch(/strategy:\n(?: {6}#.*\n)? {6}fail-fast: false\n/); // a failing shard doesn't cancel the others
     expect(e2e).toContain("timeout-minutes: 30");
     expect(e2e).toContain("run: npx playwright install --with-deps chromium");
-    expect(e2e).toContain("run: npx playwright test --shard=${{ matrix.shard }}/4");
-    expect(yml.match(/--shard=[^\n]*/g)).toEqual(["--shard=${{ matrix.shard }}/4"]);
+    expect(e2e).toContain("run: npx playwright test --shard=${{ matrix.shard }}/8");
+    expect(yml.match(/--shard=[^\n]*/g)).toEqual(["--shard=${{ matrix.shard }}/8"]);
   });
 
   it("uploads the report only when a shard fails", () => {
@@ -83,7 +83,7 @@ describe("ci.yml jobs (spec 060 criterion 2)", () => {
   });
 });
 
-describe("playwright config (spec 060 criteria 3-4)", () => {
+describe("playwright config (spec 060 criteria 3-4, spec 074 criterion 2)", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.resetModules();
@@ -100,10 +100,10 @@ describe("playwright config (spec 060 criteria 3-4)", () => {
     expect(config.globalTimeout).toBeUndefined();
   });
 
-  it("on CI forbids .only, never retries, stops at 25 min and writes dot and html reports", async () => {
+  it("on CI uses 1 worker, forbids .only, never retries, stops at 25 min and writes dot and html reports", async () => {
     vi.stubEnv("CI", "true");
     const config = (await import("../../playwright.config")).default;
-    expect(config.workers).toBe(2);
+    expect(config.workers).toBe(1); // spec 074: 2 workers sharing 4 vCPUs made tests 4-8x slower
     expect(config.forbidOnly).toBe(true);
     expect(config.retries).toBe(0);
     expect(config.globalTimeout).toBe(25 * 60_000);
