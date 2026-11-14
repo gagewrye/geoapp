@@ -43,6 +43,13 @@ Per fixture, two cases per run, in ms: building the fixture in Node, the open, `
 
 **Also over 15 s on current main** (run 43491180826), so added under the standing rule: `layout` 50, `label-view` 71, 142 and 94, `label-lock-edits` 7, `save-folder` 82 and 72, `redo` 13, `undo-seed` 64, 44 and 54, `shelf` 18 and `label-stale` 23. The two runs differ by up to 7 s per test, so the target is about 10 s.
 
+## Build notes (amendment, 2026-11-13)
+- **Hooks:** `__geoapp.saving()` (a label save is scheduled or in flight) replaces label-persist's 2.5 s wait. `paintOne` (one stroke) replaces `paintTwoClasses` where a test needs labels but not two classes.
+- **label-import-progress:** its files are 500 × 500, not 512 × 512. 512 touches a third row and column of raster windows, so 9 windows instead of 4. Cancel is at window 2 of 4.
+- **label-edit 10** opens `rgbStrip`, the old Float32 strip. Opening a raster the raw reader reads leaves geotiff.js's `raw` and `basedecoder` chunks to the first label import, which fetches them from the app's origin. Criterion 19 counts those requests. This is app behaviour, not changed here.
+- **Also over 15 s during the build, added under the standing rule:** `label-import` 40, split into formats and grids.
+- **Why 15 s isn't met yet:** on CI, two workers share 4 vCPUs on SwiftShader. Creating a browser context takes 2–9 s while the other worker runs, and about 0 s once it has finished. A test's own work runs 4–8 times slower than on a quiet laptop. The slowest tests come out at 13–21 s in each run, and a different few go over 15 s each time. Criterion 3 needs Gage to decide between finer splits and a change to ADR 0036's shards or workers. Criterion 6's timeout is not committed until then.
+
 ## Open questions
 1. **Which fixture is the cheap default?** Step 0 decides by measurement (see Levers). The implementer records the result in this spec as an amendment before changing any test.
 2. **Is 15 s a hard limit?** Recommended: yes, as the CI test timeout (criterion 6), so a slower test fails and CLAUDE.md's rule sends it back to be refactored. Local runs keep 60 s.
