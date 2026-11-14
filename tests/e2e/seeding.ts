@@ -74,14 +74,17 @@ export const tileDiff = (a: Map<string, Uint8Array>, b: Map<string, Uint8Array>)
 export const classList = (page: Page): Promise<LabelClass[]> =>
   page.evaluate(() => (window as any).__geoapp.labels.classes.map((c: LabelClass) => ({ ...c })));
 
-/** Bytes of the file a click downloads (Save dialog removed, so the app downloads from OPFS). */
+/** Bytes of the file a click downloads (folder picker removed, so the app downloads from OPFS). */
 export async function download(page: Page, selector: string): Promise<Buffer> {
   const [dl] = await Promise.all([page.waitForEvent("download"), page.click(selector)]);
   return readFile((await dl.path())!);
 }
 
-/** Before page scripts run: no Save dialog, so exports download. */
-export const noSavePicker = (page: Page) => page.addInitScript(() => { delete (window as { showSaveFilePicker?: unknown }).showSaveFilePicker; });
+/** Before page scripts run: no folder picker (nor Save dialog), so exports download (ADR 0001's path, spec 055 scope 6). */
+export const noSavePicker = (page: Page) => page.addInitScript(() => {
+  delete (window as { showSaveFilePicker?: unknown }).showSaveFilePicker;
+  delete (window as { showDirectoryPicker?: unknown }).showDirectoryPicker;
+});
 
 /** Holds every read of the next opened label file until `openGate` (window.__fileGate counts them). */
 export const pauseLabelFile = (page: Page) => page.evaluate(() => {
@@ -127,7 +130,7 @@ export function expectNoNodata(tiles: Map<string, Uint8Array>, width: number, no
   expect(bad).toBe(0);
 }
 
-/** Holds IndexedDB `get` on store sessions and `getAll`/`getAllKeys` on store tiles until each gate opens. */
+/** Holds the session lookup (IndexedDB `get` and, since spec 056, `getAll` on store sessions) and `getAll`/`getAllKeys` on store tiles until each gate opens. */
 export const holdIdb = () => {
   const w = window as any;
   const gate = () => { let open!: () => void; const p = new Promise<void>((r) => { open = r; }); return { p, open }; };
@@ -148,6 +151,7 @@ export const holdIdb = () => {
     };
   };
   wrap("get", "sessions", "get");
+  wrap("getAll", "sessions", "get");
   wrap("getAll", "tiles", "tiles");
   wrap("getAllKeys", "tiles", "tiles");
 };

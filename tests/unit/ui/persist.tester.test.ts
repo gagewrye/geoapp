@@ -15,7 +15,7 @@ const SIZE = 999, KEY = rasterKey(SIZE, G);
 const tile = (v: number) => new Uint8Array(256 * 256).fill(v);
 const keys = (n: number) => Array.from({ length: n }, (_, i) => `${(i % 16) * 256},${Math.floor(i / 16) * 256}`);
 
-function setup(fake = fakeSessionStore(), confirmAnswer = true) {
+function setup(fake = fakeSessionStore(), confirmAnswer: boolean | boolean[] = true) {
   let store: LabelStore = emptyStore(G.width, G.height), base: MaskBase | null = null;
   const classes: LabelClass[] = [{ name: "Class 1", colour: "#1f77b4" }];
   const labels: PersistLabels = {
@@ -25,7 +25,7 @@ function setup(fake = fakeSessionStore(), confirmAnswer = true) {
   };
   const win = new EventTarget(), doc = Object.assign(new EventTarget(), { visibilityState: "visible" });
   const state = { textContent: "" as string | null };
-  const p = initPersist({ labels, open: async () => fake.store, state, win, doc, yieldTask: async () => {}, confirm: () => confirmAnswer,
+  const p = initPersist({ labels, open: async () => fake.store, state, win, doc, yieldTask: async () => {}, confirm: () => (Array.isArray(confirmAnswer) ? confirmAnswer.shift() ?? true : confirmAnswer),
     openBase: async (blob) => ({ meta: { width: G.width, height: G.height }, blob } as unknown as LabelSource), time: () => "t", dateTime: () => "d" });
   const guarded = () => { const e = new Event("beforeunload", { cancelable: true }); win.dispatchEvent(e); return e.defaultPrevented; };
   const paint = (k: string, v: number) => { store.tiles.set(k, tile(v)); p.tiles([k]); };
@@ -61,9 +61,9 @@ describe("strokes made before the restore prompt is answered", () => {
     expect(new Uint8Array(fake.tiles.get(KEY)!.get("0,0")!)[0]).toBe(7);
   });
 
-  it("Cancel: they are kept, and saved once the session is deleted", async () => {
+  it("Cancel, then OK on the delete question: they are kept, and saved once the session is deleted", async () => {
     const fake = await saved(3);
-    const b = setup(fake, false);
+    const b = setup(fake, [false, true]);
     b.p.open("a.tif", SIZE, G);
     b.paint("3840,1792", 9);
     expect(b.guarded()).toBe(true);
@@ -91,7 +91,7 @@ describe("restore", () => {
 });
 
 describe("writes", () => {
-  it("a replace of 40 tiles with a mask: clearTiles, saveBase, batches of at most 16, the record last", async () => {
+  it("a replace of 40 tiles with a mask: clearTiles, batches of at most 16, the record, then the copy and the record again (spec 056 scope 3)", async () => {
     const t = setup();
     t.p.open("a.tif", SIZE, G); await t.p.offer();
     const next = emptyStore(G.width, G.height);
@@ -100,11 +100,11 @@ describe("writes", () => {
     t.setBase({ lut: new Uint8Array(2), count: 9, windows: new Set(["0,0"]), preview: { values: new Uint8Array(4) } } as unknown as MaskBase);
     t.p.replaced(); t.p.imported(new Blob(["mask"]));
     await t.flush();
-    expect(t.fake.log).toEqual(["clearTiles", "saveBase", "putTiles 16", "putTiles 16", "putTiles 8", "putRecord"]);
+    expect(t.fake.log).toEqual(["clearTiles", "putTiles 16", "putTiles 16", "putTiles 8", "putRecord", "saveBase", "putRecord"]);
   });
 
   // spec 032 scope 5: a quota error leaves the copy out until the next import, so this failure is another write error
-  it("a failed mask copy keeps the guard on and shows the reason; the retry copies the file again before the record", async () => {
+  it("a failed mask copy keeps the guard on and shows the reason, with the record saved as missing the copy; the retry copies the file again", async () => {
     const t = setup();
     t.p.open("a.tif", SIZE, G); await t.p.offer();
     t.setBase({ lut: new Uint8Array(2), count: 9, windows: new Set(["0,0"]), preview: { values: new Uint8Array(4) } } as unknown as MaskBase);
@@ -115,11 +115,12 @@ describe("writes", () => {
     await t.flush();
     expect(t.state.textContent).toBe("Not saved: the disk failed");
     expect(t.guarded()).toBe(true);
-    expect(t.fake.records.has(KEY)).toBe(false);
+    expect(t.fake.records.get(KEY)!.base!.copyMissing).toBe(true);
     fail = false;
     t.fake.log.length = 0;
     await vi.advanceTimersByTimeAsync(RETRY_MS); await t.p.idle(); // retried after RETRY_MS (spec 032)
-    expect(t.fake.log).toEqual(["clearTiles", "saveBase", "putRecord"]);
+    expect(t.fake.log).toEqual(["putRecord", "saveBase", "putRecord"]);
+    expect(t.fake.records.get(KEY)!.base!.copyMissing).toBeUndefined();
     expect(t.fake.bases.has(KEY)).toBe(true);
     expect(t.guarded()).toBe(false);
   });

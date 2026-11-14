@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Dialog } from "@playwright/test";
 import { jumpTo, labels, message, openApp, openRaster, paintMode, path, renameClass, selectClass, stroke, toScreen } from "./helpers";
 import { classList, download, effectiveTiles, expectNoNodata, importFile, inNodata, noSavePicker, nodataImagery, storeTiles, upload } from "./seeding";
 
@@ -36,8 +36,13 @@ test("export then import restores every tile byte for byte and the class list, w
   const file = await download(page, "#export-labels");
   await expect(message(page)).toHaveText("Labels exported.");
 
-  page.once("dialog", (d) => { expect(d.message()).toBe("Close these labels? They stay saved in this browser."); void d.accept(); });
+  // Close these labels?, then spec 056's two steps to decline the saved session: Cancel the restore, OK the delete
+  const answers = [true, false, true], asked: string[] = [];
+  const answer = (d: Dialog) => { asked.push(d.message()); if (answers.shift()) void d.accept(); else void d.dismiss(); if (!answers.length) page.off("dialog", answer); };
+  page.on("dialog", answer);
   await openRaster(page, nodataImagery());
+  await expect.poll(() => answers.length).toBe(0);
+  expect(asked[0]).toBe("Close these labels? They stay saved in this browser.");
   await expect(message(page)).toHaveText("Raster opened.");
   await paintMode(page);
   expect((await storeTiles(page)).size).toBe(0);

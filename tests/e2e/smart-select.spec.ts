@@ -128,7 +128,7 @@ test("the Smart button, M, Escape, the status bar and the help list (criterion 7
   await openRaster(page, nodataImagery());
   await expect(message(page)).toHaveText("Raster opened.");
   await expect(smartButton(page)).toHaveAttribute("aria-pressed", "false");
-  await expect(smartButton(page)).toHaveAttribute("title", "Smart select (M)");
+  await expect(smartButton(page)).toHaveAttribute("title", /^Smart select \(M\)($|\s)/); // name and key, then what it does (07c50a0)
   await page.click("#show-labels"); // hidden labels: choosing Smart shows them
   await expect(page.locator("#show-labels")).not.toBeChecked();
   await unfocus(page);

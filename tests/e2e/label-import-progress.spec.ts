@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Dialog, type Page } from "@playwright/test";
 import { writeFile } from "../unit/helpers/labelFiles";
 import { MESSAGES } from "../../src/ui/messages";
 import { rgbClassFile } from "../unit/helpers/labelFiles";
@@ -165,7 +165,15 @@ test("a read failure partway and an empty import restore the old labels, with th
 
 test("opening a raster during an import asks to discard: OK leaves no labels, bar or message; Cancel lets it finish (criterion 7)", async ({ page }) => {
   test.setTimeout(120_000);
+  // Export writes into an OPFS folder: a download never marks the session exported (spec 056 scope 6)
+  await page.addInitScript(() => {
+    (window as any).showDirectoryPicker = async () => (await navigator.storage.getDirectory()).getDirectoryHandle("export", { create: true });
+  });
   await withLabels(page);
+  // exported, so the second import below may drop them once the first keeps them as the replaced session (spec 056)
+  page.once("dialog", (d) => { void d.accept(d.defaultValue()); }); // the name prompt's labels.tif
+  await page.click("#export-labels");
+  await expect(message(page)).toHaveText(/^Labels exported to labels\.tif /);
   await startImport(page, other());
   await allow(page, 2);
   await expect.poll(() => barValue(page)).toBe("2");
@@ -182,8 +190,13 @@ test("opening a raster during an import asks to discard: OK leaves no labels, ba
   await startImport(page, other());
   await allow(page, 2);
   await expect.poll(() => barValue(page)).toBe("2");
-  page.once("dialog", (d) => { asked = d.message(); void d.accept(); });
+  // OK, then spec 056's steps to decline the same raster's saved session: Cancel the restore, Cancel restoring the
+  // replaced (painted, exported) labels instead, OK the delete
+  const answers = [true, false, false, true];
+  const answer = (d: Dialog) => { asked = d.message(); if (answers.shift()) void d.accept(); else void d.dismiss(); if (!answers.length) page.off("dialog", answer); };
+  page.on("dialog", answer);
   await openRaster(page, { ...rgbFixture(), name: "third.tif" });
+  await expect.poll(() => answers.length).toBe(0);
   await expect(message(page)).toHaveText("Raster opened.");
   await expect(bar(page)).toBeHidden();
   await expect(cancel(page)).toBeHidden();

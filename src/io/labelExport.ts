@@ -8,10 +8,10 @@ import type { RasterSource, Sink } from "./source";
 // 0 is unlabelled, so all of 1..255 can be classes (ADR 0013)
 const text = (classes: LabelClass[]): TiffText => ({ nodata: "0", metadata: encodeClasses(classes) });
 
-/** Throws if the label file would exceed classic TIFF (spec 001's size limit); reads and writes nothing. */
-export function checkLabelExport(imagery: RasterSource, classes: LabelClass[]): void {
+/** The label file's layout (its totalBytes); throws if it would exceed classic TIFF (spec 001's size limit). Reads and writes nothing. */
+export function checkLabelExport(imagery: RasterSource, classes: LabelClass[]): { totalBytes: number } {
   const { width, height, geoTags } = imagery.meta;
-  tiffLayout(width, height, geoTags, text(classes));
+  return tiffLayout(width, height, geoTags, text(classes));
 }
 
 /** Streams the label GeoTIFF on the imagery's whole grid: per window the stored tile, else the mask's, else zeros; and every class. */

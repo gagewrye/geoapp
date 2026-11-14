@@ -2,6 +2,7 @@ import type { Map as MapLibreMap } from "maplibre-gl";
 import type { LabelClass } from "../core/classes";
 import { emptyStore, tileWindow, type LabelStore } from "../core/labelStore";
 import { pixelAt } from "../core/pixel";
+import type { LabelSource } from "../io/labelFile";
 import { ownTile, type MaskBase } from "../io/maskBase";
 import type { PaintOp } from "../io/paintQueue";
 import type { RasterSource } from "../io/source";
@@ -37,8 +38,7 @@ type Deps = {
   /** What spec 031 saves: changed tile keys, record edits (classes, selection, view), replaces and stroke ends. */
   edits?: Edits;
   /** e2e hooks (spec 023): F6 off when false, and each paint op pushed. Smart select's model loader and imagery read (spec 046); without them the click tools have no Smart. */
-  sweep?: () => boolean;
-  op?: (op: PaintOp) => void; smart?: SmartInputs;
+  sweep?: () => boolean; op?: (op: PaintOp) => void; smart?: SmartInputs;
 };
 
 type Edits = { tiles(keys: Iterable<string>): void; record(): void; replaced(): void; strokeEnded(): void };
@@ -46,7 +46,6 @@ const NO_EDITS: Edits = { tiles() {}, record() {}, replaced() {}, strokeEnded() 
 
 /** The labels an import took off the map (spec 021), to restore if it doesn't replace them. */
 export type Held = { readonly store: LabelStore; readonly base: MaskBase | null };
-
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 /** Brush labels on local imagery (spec 003): panel, classes, shortcuts, store, paint queue and overlays. */
@@ -183,8 +182,9 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
     masksDone: paint.finished,
     /** The open raster's valid masks: an import reads through them (spec 024). */
     masks: paint.masks,
-    /** The mask base, if one is loaded. */
-    base: () => base,
+    base: () => base, // the mask base, if one is loaded
+    /** ADR 0036: the base reads `file` (the app's copy) instead of the user's file, if `prev` is still the base; swapped in place, so a held or exporting base reads it too. */
+    useCopy(prev: MaskBase, file: LabelSource): boolean { if (base !== prev) return false; prev.file = file; return true; },
     tile,
     /** A paint or erase stroke is in progress. */
     stroking: brush.stroking,

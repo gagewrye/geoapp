@@ -33,6 +33,8 @@ export const MESSAGES = {
   restored: "Labels restored.",
   pendingDiscard: (name: string, reason: string) => `Labels for ${name} couldn't be saved (${reason}). Discard them?`,
   restoredNoMask: "Labels restored without the imported mask, whose saved copy can't be read. Import it again.",
+  // spec 056 scope 1: a decline kept nothing apart, so as not to hide R behind a second replaced session
+  restoredStray: "Labels restored: they have unsaved changes, and the earlier replaced labels aren't exported.",
   // spec 038
   picked: (name: string) => `Picked ${name}.`,
   noLabel: "No label here.",
@@ -46,6 +48,20 @@ export const MESSAGES = {
   fillSame: "This area already has the selected class.",
   fillNodata: "There is no imagery to label here.",
   polygonTooLarge: "A polygon can span 2048 px at most. Fill this one first, or zoom in.",
+  // spec 055
+  saveAs: "Save labels as",
+  badName: "That name can't be used. Leave out / \\ : * ? \" < > | and names Windows reserves, such as con.",
+  exportImagery: "That is the imagery file. Choose another name.",
+  exportMask: "That is the imported mask, and this browser couldn't keep a copy of it. Choose another name.",
+  exportReplace: (name: string) => `Replace ${name}? It stays as it is until the new file is complete.`,
+  exportedTo: (name: string, bytes: number) => `Labels exported to ${name} (${(bytes / 1e6).toFixed(1)} MB).`,
+  exportShort: (name: string, got: number, want: number) => `${name} was written with ${got} bytes, not ${want}. Export it again.`,
+  nothingOverwritten: "Nothing was overwritten.",
+  // spec 056
+  restoreDelete: (savedAt: string, name: string) => `Delete the labels saved ${savedAt} for ${name}? This can't be undone. Cancel restores them.`,
+  restoreReplaced: (time: string) => `Restore the labels replaced on ${time} instead? The newer labels are kept.`,
+  replacedFirst: "Export or restore the earlier replaced labels first.",
+  notSaving: (reason: string) => `Labels aren't being saved (${reason}). Export them to keep a copy.`,
 } as const;
 
 /** The first skip, and how many more: "[0].value has no class in these labels (+2 more)." (spec 047). */

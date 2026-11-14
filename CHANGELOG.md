@@ -2,6 +2,10 @@
 
 One entry per merge to main, newest first. Details are in the named spec.
 
+## 2026-11-14
+- **Spec 056:** Saved labels are never lost by the app: Cancel on the restore prompt asks again before deleting, importing over labels keeps them as "replaced" labels that the next open offers to restore (an import is refused while any replaced labels are unexported), a raster's labels are evicted only once exported, and a save that keeps failing says so and retries instead of stalling.
+- **Spec 055:** Export labels writes into a chosen folder instead of the Save dialog, so exporting over the imported mask (e.g. `labels_merged.tif`) can no longer leave a 0-byte file: it writes a copy and replaces the old file only once the new one is complete, refuses the imagery's name, and leaves the old file untouched if anything fails.
+
 ## 2026-11-03
 - **Spec 053:** On Chrome and Edge, Import labels opens its chooser in the imagery's folder (when the imagery came through Open GeoTIFF's picker) instead of the last folder used; the import itself, its replace confirm and other browsers are unchanged.
 - **Spec 052:** The e2e suite is pruned and shrunk: 60 redundant or obsolete tests are removed (361 → 301) and the slowest ones compare stored tile bytes or read only the pixels they check, so a run takes about a third less time and no test takes over 30 s. No app behaviour changes.

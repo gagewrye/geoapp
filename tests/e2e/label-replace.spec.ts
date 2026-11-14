@@ -52,13 +52,12 @@ test("with painted tiles an import confirms: Cancel keeps labels and classes, OK
   expect(await classList(page)).toEqual(["Class 0", "Class 3", "Class 7"].map((name, i) => ({ name, colour: paletteColour(i) })));
   expect(new Set((await labels(page)).values())).toEqual(new Set([1, 2, 3]));
   await expect(page.locator("#undo")).toBeDisabled();
-  // a second import, over imported labels only, replaces them too (spec 014 criterion 10 covers a mask-only store)
-  page.once("dialog", (d) => { asked.push(d.message()); void d.accept(); });
+  // spec 056: a second import would drop the painted labels, kept as the replaced session and never exported, so it is refused
+  const imported = await labels(page);
   await importFile(page, classes());
-  await expect.poll(() => asked.length).toBe(3);
-  await expect(message(page)).toHaveText(seeded);
-  expect(await classList(page)).toEqual(["Class 0", "Class 3", "Class 7"].map((name, i) => ({ name, colour: paletteColour(i) })));
-  expect(new Set((await labels(page)).values())).toEqual(new Set([1, 2, 3]));
+  await expect(message(page)).toHaveText(MESSAGES.replacedFirst);
+  expect(asked).toHaveLength(2);
+  expect(await labels(page)).toEqual(imported);
 });
 
 test("while an import runs the brush and class edits are disabled; while mask reads are pending Import labels and Export labels are", async ({ page }) => {

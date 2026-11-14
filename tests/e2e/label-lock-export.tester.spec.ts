@@ -6,10 +6,10 @@ import { classList, noSavePicker, openImageryGate, pauseImagery, storeTiles } fr
 
 // Spec 004's shared lock, part 1: Export labels alone, with the paint queue and with raster opens.
 
-test("a Save dialog held open locks; cancelling it unlocks, and Export runs again", async ({ page }) => {
+test("a folder picker held open locks; cancelling it unlocks, and Export runs again", async ({ page }) => {
   await page.addInitScript(() => {
     const g = (window as any).__save = { opened: 0, cancel: null as null | (() => void) };
-    (window as any).showSaveFilePicker = () => new Promise((_, rej) => {
+    (window as any).showDirectoryPicker = () => new Promise((_, rej) => {
       g.opened++;
       g.cancel = () => rej(new DOMException("The user aborted a request.", "AbortError"));
     });
@@ -20,8 +20,10 @@ test("a Save dialog held open locks; cancelling it unlocks, and Export runs agai
   await expect.poll(() => page.evaluate(() => (window as any).__save.opened)).toBe(1);
   await expect(page.locator("#export-labels")).toBeDisabled();
   await expectLock(page, true, "dialog open");
+  const said = await message(page).textContent();
   await page.evaluate(() => (window as any).__save.cancel());
-  await expect(message(page)).toHaveText("The user aborted a request.");
+  await expect(page.locator("#export-labels")).toBeEnabled();
+  await expect(message(page)).toHaveText(said!); // spec 055: no folder picked does nothing and says nothing
   await expect(page.locator("#export-labels")).toBeEnabled();
   await expectLock(page, false, "dialog cancelled");
   expect(await storeTiles(page)).toEqual(before.tiles);
@@ -42,7 +44,7 @@ test("a write that fails unlocks, leaves no file, and a retry exports the labels
   await expect(page.locator("#export-labels")).toBeDisabled(); // one at a time
   await expectLock(page, true, "write held");
   await page.evaluate(() => (window as any).__writeGate.fail("disk full"));
-  await expect(message(page)).toHaveText("disk full");
+  await expect(message(page)).toHaveText(`disk full ${MESSAGES.nothingOverwritten}`);
   await expect(page.locator("#export-labels")).toBeEnabled();
   await expectLock(page, false, "write failed");
   expect(await opfsNames(page)).toEqual([]);
@@ -55,7 +57,7 @@ test("a write that fails unlocks, leaves no file, and a retry exports the labels
 test("Export is a no-op while the paint queue is non-empty, even if its button is forced enabled", async ({ page }) => {
   await page.addInitScript(() => {
     const g = (window as any).__save = { opened: 0 };
-    (window as any).showSaveFilePicker = () => { g.opened++; return new Promise(() => {}); };
+    (window as any).showDirectoryPicker = () => { g.opened++; return new Promise(() => {}); };
   });
   await setup(page, rgbNodataFixture());
   await pauseImagery(page);

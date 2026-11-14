@@ -112,7 +112,7 @@ test("Apply class map is disabled during an import, an export and a pending rest
   test.setTimeout(120_000);
   await page.addInitScript(() => {
     const g = (window as any).__save = { cancel: null as null | (() => void) };
-    (window as any).showSaveFilePicker = () => new Promise((_, rej) => { g.cancel = () => rej(new DOMException("The user aborted a request.", "AbortError")); });
+    (window as any).showDirectoryPicker = () => new Promise((_, rej) => { g.cancel = () => rej(new DOMException("The user aborted a request.", "AbortError")); });
   });
   await setup(page);
   await importClasses(page);

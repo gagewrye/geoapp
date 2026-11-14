@@ -41,7 +41,7 @@ test("before open the side columns are hidden and the map is full width; after o
   await expect(page.locator("#topbar #export-labels")).toBeVisible();
   await expect(page.locator("#topbar #class-map")).toBeVisible();
   for (const m of ["pan", "paint", "erase"]) await expect(page.locator(`#tools #mode-${m}`)).toBeVisible();
-  await expect(page.locator("#tools #mode-paint")).toHaveAttribute("title", "Paint (B)");
+  await expect(page.locator("#tools #mode-paint")).toHaveAttribute("title", /^Paint \(B\)($|\s)/); // name and key, then what it does (07c50a0)
   await expect(page.locator("#tools #undo")).toBeVisible();
   await expect(page.locator("#brush-size")).toHaveText("7");
   await expect(page.locator("#label-opacity-text")).toHaveText("60%");

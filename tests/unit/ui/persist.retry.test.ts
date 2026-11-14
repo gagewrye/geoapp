@@ -33,30 +33,35 @@ function setup(fake = fakeSessionStore()) {
   return { fake, p, prompts, answers, state, stateClasses: classes2, copy, paint, emptyStore: () => { store = emptyStore(G.width, G.height); }, setBase: (b: unknown) => { base = b; }, store: () => store, opens };
 }
 
+/** The store's current and replaced records (ADR 0037). */
+const current = (f: ReturnType<typeof fakeSessionStore>) => [...f.records.values()].find((r) => r.role === "current")!;
+const replaced = (f: ReturnType<typeof fakeSessionStore>) => [...f.records.values()].find((r) => r.role === "replaced")!;
+
 beforeEach(() => { vi.useFakeTimers(); });
 afterEach(() => { vi.useRealTimers(); });
 
 describe("save retries (criterion 7)", () => {
-  it("after a quota error the next try is at 30 s, not 2 s, and writes tiles and the record without the mask copy", async () => {
+  it("after a quota error on the copy the tiles and record are written; the next try is at 30 s, not 2 s, and writes the record without the mask copy", async () => {
     const t = setup();
     t.p.open("a.tif", 1, G); await t.p.offer();
     t.paint("0,0", 1);
     t.p.imported(new Blob(["mask"]));
     await vi.advanceTimersByTimeAsync(SAVE_DELAY_MS); await t.p.idle();
     expect(t.copy.calls).toBe(1);
+    expect(t.fake.log).toEqual(["putTiles 1", "putRecord"]); // spec 056 scope 3: the copy comes after them
     expect(t.state.textContent).toBe("Not saved: the browser's storage is full");
     expect(t.stateClasses.has("error")).toBe(true);
     t.fake.log.length = 0;
     await vi.advanceTimersByTimeAsync(SAVE_DELAY_MS * 2); await t.p.idle();
     expect(t.fake.log).toEqual([]);
     await vi.advanceTimersByTimeAsync(RETRY_MS - SAVE_DELAY_MS * 2); await t.p.idle(); // 30 s after the failure
-    expect(t.fake.log).toEqual(["putTiles 1", "putRecord"]);
+    expect(t.fake.log).toEqual(["putRecord"]);
     expect(t.copy.calls).toBe(1);
     expect(t.state.textContent).toBe("Saved 12:00");
     expect(t.stateClasses.has("error")).toBe(false);
   });
 
-  it("over 5 minutes of failures the copy is tried at most once, and a new import tries it again; new changes still save at 2 s", async () => {
+  it("over 5 minutes of quota failures the copy is never tried (the tiles fail first), and a new import tries it again; new changes still save at 2 s", async () => {
     const t = setup();
     t.p.open("a.tif", 1, G); await t.p.offer();
     t.fake.failWith(QUOTA());
@@ -64,22 +69,22 @@ describe("save retries (criterion 7)", () => {
     t.p.imported(new Blob(["mask"]));
     for (let ms = 0; ms < 5 * 60_000; ms += 1000) await vi.advanceTimersByTimeAsync(1000);
     await t.p.idle();
-    expect(t.copy.calls).toBe(1);
+    expect(t.copy.calls).toBe(0);
     t.fake.failWith(null);
     t.paint("256,0", 2); // a new change: the 2 s delay, not the retry's
     await vi.advanceTimersByTimeAsync(SAVE_DELAY_MS); await t.p.idle();
     expect(t.fake.records.size).toBe(1);
-    expect(t.copy.calls).toBe(1);
+    expect(t.copy.calls).toBe(0);
     t.copy.full = false;
     t.p.imported(new Blob(["mask 2"]));
     await vi.advanceTimersByTimeAsync(SAVE_DELAY_MS); await t.p.idle();
-    expect(t.copy.calls).toBe(2);
+    expect(t.copy.calls).toBe(1);
     expect(t.fake.bases.size).toBe(1);
   });
 });
 
 describe("a record saved without its import's copy (criterion 7)", () => {
-  it("import A copied, then import B whose copy fails on quota: a restore brings back B's tiles, never opens A's copy, and asks for the mask", async () => {
+  it("import A copied, then import B whose copy fails on quota: a restore brings back B's tiles, never opens a copy, and asks for the mask; A keeps its own", async () => {
     const t = setup();
     t.copy.full = false;
     t.p.open("a.tif", 1, G); await t.p.offer();
@@ -96,14 +101,14 @@ describe("a record saved without its import's copy (criterion 7)", () => {
     t.p.replaced(); t.p.imported(new Blob(["mask B"]));
     await vi.advanceTimersByTimeAsync(SAVE_DELAY_MS); await t.p.idle();
     await vi.advanceTimersByTimeAsync(RETRY_MS); await t.p.idle();
-    const r = [...t.fake.records.values()][0]!;
+    const r = current(t.fake), a = replaced(t.fake);
     expect(r.base!.count).toBe(9);
     expect(r.base!.copyMissing).toBe(true);
-    expect(t.fake.bases.size).toBe(0); // the stale copy of A is deleted when space allows
+    expect([...t.fake.bases.keys()]).toEqual([a.id]); // spec 056: A is the replaced session, with its copy
 
     const b = setup(t.fake);
     b.p.open("a.tif", 1, G);
-    t.fake.bases.set(r.key, new Blob(["mask A"])); // even with A's copy still there
+    t.fake.bases.set(r.id, new Blob(["mask A"])); // even with a stale copy under B's id
     expect(await b.p.offer()).toBe(MESSAGES.restoredNoMask);
     expect(b.opens).toEqual([]);
     expect([...b.store().tiles.keys()]).toEqual(["512,256"]);
@@ -139,7 +144,7 @@ describe("a copy still being written isn't missing (spec 032 review)", () => {
 });
 
 describe("a copy that failed for another reason is missing (spec 032 review)", () => {
-  it("import A copied, then B whose first copy rejects with a disk error: a save taken meanwhile marks the copy missing, and a restore never opens A's copy", async () => {
+  it("import A copied, then B whose first copy rejects with a disk error: a save taken meanwhile marks the copy missing, and a restore never opens a copy", async () => {
     const t = setup();
     t.copy.full = false;
     const base = (count: number) => ({ lut: new Uint8Array(4), count, windows: new Set(["0,0"]), preview: { values: new Uint8Array(4) } });
@@ -160,13 +165,14 @@ describe("a copy that failed for another reason is missing (spec 032 review)", (
     await vi.advanceTimersByTimeAsync(SAVE_DELAY_MS); // save 2 is taken meanwhile
     reject(new Error("the disk failed"));
     await t.p.idle();
-    const r = t.fake.records.get(key)!;
+    const r = current(t.fake);
     expect(r.base!.count).toBe(9);
     expect(r.base!.copyMissing).toBe(true);
-    expect(t.fake.bases.has(key)).toBe(false); // A's stale copy is deleted
+    expect(replaced(t.fake).id).toBe(key);
+    expect([...t.fake.bases.keys()]).toEqual([key]); // A's copy stays with A, the replaced session
 
     const b = setup(t.fake);
-    t.fake.bases.set(key, new Blob(["mask A"])); // even with A's copy still there
+    t.fake.bases.set(r.id, new Blob(["mask A"])); // even with a stale copy under B's id
     b.p.open("a.tif", 1, G);
     expect(await b.p.offer()).toBe(MESSAGES.restoredNoMask);
     expect(b.opens).toEqual([]);

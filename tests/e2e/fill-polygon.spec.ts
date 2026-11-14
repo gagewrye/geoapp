@@ -123,8 +123,8 @@ test("F and L select the tools, Escape discards an outline before it selects Pan
   await expect(message(page)).toHaveText("Raster opened.");
   await jumpTo(page, at(408, 408), 9);
   await unfocus(page);
-  await expect(page.locator("#mode-fill")).toHaveAttribute("title", "Fill (F)");
-  await expect(page.locator("#mode-polygon")).toHaveAttribute("title", "Polygon (L)");
+  await expect(page.locator("#mode-fill")).toHaveAttribute("title", /^Fill \(F\)($|\s)/); // name and key, then what it does (07c50a0)
+  await expect(page.locator("#mode-polygon")).toHaveAttribute("title", /^Polygon \(L\)($|\s)/);
   await page.keyboard.press("f");
   await pressed(page, "fill");
   await page.keyboard.press("l");
