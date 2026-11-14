@@ -1,3 +1,4 @@
+// Over ~200 lines: one raster session state machine (open, restore offer, changes, replace, export), whose writes are in saveQueue.ts
 import type { LabelClass } from "../core/classes";
 import type { LabelStore } from "../core/labelStore";
 import { exportedSince, rasterKey, sessionId } from "../core/session";
@@ -8,16 +9,14 @@ import type { SessionRecord, SessionStore } from "../io/session";
 import { yieldToBrowser } from "../io/yieldTask";
 import { MESSAGES, type MessageKind } from "./messages";
 import { chooseSession, settle } from "./restoreOffer";
-import { isQuota, newSession, reasonOf, withoutCopy, type Pending, type Session } from "./sessionState";
-import { CopyFailed, loadSession, mergeSnapshots, writeSnapshot, type Snapshot } from "./snapshot";
+import { saveQueue } from "./saveQueue";
+import { newSession, type Session } from "./sessionState";
+import { loadSession, type Snapshot } from "./snapshot";
 
 export { MAX_SESSIONS, TILE_BATCH } from "./snapshot";
 /** Spec 031: a save starts this long after the last change. */
 export const SAVE_DELAY_MS = 2000;
-/** While a previous raster's snapshot is pending (scope 8), a save is tried this often. */
-export const RETRY_MS = 30_000;
-/** Spec 056 scope 3: a mask copy failing for another reason than the quota is tried this many times more, then left out. */
-export const COPY_RETRIES = 3;
+export { COPY_RETRIES, RETRY_MS } from "./saveQueue";
 
 /** What persistence reads from and restores into the labels. */
 export type PersistLabels = {
@@ -65,12 +64,10 @@ export function initPersist(d: Deps) {
   const dateTime = d.dateTime ?? ((ms) => new Date(ms).toLocaleString());
   let db: Promise<SessionStore> | null = null;
   const store = () => (db ??= d.open());
-  let current: Session | null = null, pending: Pending[] = [];
-  let timer: ReturnType<typeof setTimeout> | null = null, retry: ReturnType<typeof setTimeout> | null = null;
-  let chain: Promise<void> = Promise.resolve();
-  let inFlight = 0, failed = "", saved = "", applying = false, persisted = false, guarded = false, loud = true;
-  // ADR 0036: an import's file, and what to do with its copy once written
-  const uses = new WeakMap<Blob, (copy: Blob) => Promise<void>>();
+  let current: Session | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let applying = false, guarded = false;
+  const q = saveQueue({ store, current: () => current, save: () => save(false), sync: () => sync(), now, yieldTask, time, say: d.say, persistStorage: d.persistStorage });
 
   const dirty = (s: Session | null) => !!s && (s.tiles.size > 0 || s.record || s.clear || s.file !== null || s.demote !== null);
   // changes to a raster with no labels, and no session saved from this page, have nothing to save (an open resets the view)
@@ -78,10 +75,10 @@ export function initPersist(d: Deps) {
   const guard = (e: Event) => { e.preventDefault(); (e as BeforeUnloadEvent).returnValue = ""; };
   /** #save-state and the beforeunload guard: on iff something is dirty, a save is in flight, the last failed, or a snapshot is pending. */
   function sync(): void {
-    const p = pending[0];
-    state.textContent = p ? `Not saved: ${p.snap.record.name}: ${p.reason}` : inFlight > 0 ? "Saving…" : failed ? `Not saved: ${failed}` : saved;
-    state.classList?.toggle("error", state.textContent.startsWith("Not saved"));
-    const on = unsaved(current) || inFlight > 0 || failed !== "" || p !== undefined;
+    const st = q.status();
+    state.textContent = st.text;
+    state.classList?.toggle("error", st.text.startsWith("Not saved"));
+    const on = unsaved(current) || st.busy;
     if (on === guarded) return;
     guarded = on;
     if (on) win.addEventListener("beforeunload", guard); else win.removeEventListener("beforeunload", guard);
@@ -110,95 +107,12 @@ export function initPersist(d: Deps) {
     return snap;
   }
 
-  async function write(s: Session, snap: Snapshot): Promise<void> {
-    const sessions = await store();
-    if (!persisted) { persisted = true; d.persistStorage?.(); }
-    // decided now, not when copied: saves run one at a time, so every earlier copy attempt has ended and `copied` is
-    // accurate. A record saved without its import's copy says so, so a restore never opens an older copy (spec 032)
-    if (snap.record.base && !snap.file && !s.copied) snap.record.base.copyMissing = true;
-    const at = await writeSnapshot(sessions, snap, s.owned && snap.id === s.id, now, yieldTask);
-    if (snap.id !== s.id) return;
-    if (s.failed) {
-      const done = new Set(snap.tiles.map(([k]) => k));
-      const left = s.failed.tiles.filter(([k]) => !done.has(k));
-      s.failed = left.length ? { ...s.failed, tiles: left, clear: false, record: snap.record } : null;
-    }
-    s.owned = at !== null;
-    if (at !== null) s.savedAt = at;
-    if (!snap.file) return;
-    s.copied = true;
-    const use = uses.get(snap.file);
-    const copy = use && await sessions.base(snap.id).catch(() => null);
-    if (use && copy && copy.size === snap.file.size) await use(copy).catch(() => {}); // a short copy is never read
-  }
-
-  const retryLater = () => { retry ??= setTimeout(() => { retry = null; save(false); }, RETRY_MS); };
-
-  /**
-   * A snapshot that wasn't written: the current session's is dirty again (only its file, when just the copy failed);
-   * another session's becomes (or joins) a pending one. Either is tried again after RETRY_MS. After a quota error, or
-   * COPY_RETRIES failed copy retries, the mask copy is left out until the next import (specs 032, 056).
-   */
-  function lost(s: Session, snap: Snapshot, e: unknown): void {
-    const quota = isQuota(e);
-    if (e instanceof CopyFailed && ++s.copyFails > COPY_RETRIES) s.noCopy = true;
-    if (quota) s.noCopy = true;
-    if (s === current && snap.id === s.id) {
-      if (e instanceof CopyFailed) s.file ??= snap.file;
-      else {
-        for (const [k] of snap.tiles) s.tiles.add(k);
-        s.record = true; s.clear ||= snap.clear; s.file ??= snap.file; s.demote ??= snap.demote; s.drop ??= snap.drop;
-        if (snap.savedAt === null) s.touched = true;
-        s.failed = s.failed ? mergeSnapshots(s.failed, snap) : snap; // the tiles as they were, should an import replace them
-      }
-    } else {
-      // a session an import replaced while its save was on the way is the replaced one now
-      if (s.replaced?.id === snap.id) snap = { ...snap, record: { ...snap.record, role: "replaced" } };
-      const i = pending.findIndex((p) => p.s === s && p.snap.id === snap.id);
-      const merged = i >= 0 ? mergeSnapshots(pending[i]!.snap, snap) : snap;
-      const p = { s, snap: quota || s.noCopy ? withoutCopy(merged) : merged, reason: reasonOf(e) };
-      if (i >= 0) pending[i] = p; else pending.push(p);
-    }
-    retryLater();
-  }
-
-  /** Writes the pending snapshots, if any, then this one. */
-  function enqueue(s: Session | null, snap: Snapshot | null): void {
-    inFlight++;
-    sync();
-    chain = chain.then(async () => {
-      for (const p of [...pending]) {
-        try {
-          await write(p.s, p.snap);
-          pending = pending.filter((x) => x !== p);
-        } catch (e) {
-          if (pending.includes(p)) {
-            p.reason = reasonOf(e);
-            // as for the open raster: the copy is left out after a quota error or COPY_RETRIES failed retries
-            if (isQuota(e) || (e instanceof CopyFailed && ++p.s.copyFails > COPY_RETRIES)) p.snap = withoutCopy(p.snap);
-          }
-          if (s && snap) lost(s, snap, e);
-          retryLater();
-          return reasonOf(e);
-        }
-      }
-      if (!s || !snap) return "";
-      try { await write(s, snap); return ""; } catch (e) { lost(s, snap, e); return reasonOf(e); }
-    }).then((reason) => {
-      failed = reason;
-      // spec 056 scope 5: said on the first failure, and again only after a save succeeded
-      if (reason && loud) { loud = false; d.say?.(MESSAGES.notSaving(reason), "error"); }
-      if (!reason && !pending.length) { loud = true; saved = `Saved ${time(now())}`; }
-      if (!reason && !pending.length && retry) { clearTimeout(retry); retry = null; }
-    }).finally(() => { inFlight--; sync(); });
-  }
-
   /** Starts a save of the current session's changes, after any pending snapshot; force: a hidden or closing tab, which doesn't wait for a stroke. */
   function save(force: boolean): void {
     if (timer) { clearTimeout(timer); timer = null; }
     if (!force && labels.stroking()) { schedule(); return; }
     const snap = current && take(current);
-    if (snap || pending.length) enqueue(snap ? current : null, snap);
+    if (snap || q.pending().length) q.enqueue(snap ? current : null, snap);
   }
 
   doc.addEventListener("visibilitychange", () => { if (doc.visibilityState === "hidden") save(true); });
@@ -212,13 +126,11 @@ export function initPersist(d: Deps) {
      * raster saves nothing until offer() settles.
      */
     open(name: string, size: number, grid: Grid, hasLabels = false): boolean {
-      const p = pending[0];
+      const p = q.pending()[0];
       if (!p && hasLabels && !d.confirm(MESSAGES.discard)) return false;
       if (p) {
         if (!d.confirm(MESSAGES.pendingDiscard(p.snap.record.name, p.reason))) return false;
-        pending = [];
-        if (retry) { clearTimeout(retry); retry = null; }
-        failed = ""; saved = "";
+        q.discard();
       }
       if (current) save(true);
       const raster = rasterKey(size, grid);
@@ -298,7 +210,7 @@ export function initPersist(d: Deps) {
         // its last change, saved or not (a flush may still be writing, or have failed): spec 056 drops it only if exported after
         s.replaced = { id: s.id, savedAt: Math.max(s.savedAt ?? now(), s.lastChange), exportedAt: s.exportedAt };
         if (s.failed) {
-          pending.push({ s, snap: { ...s.failed, record: { ...s.failed.record, role: "replaced" } }, reason: failed || "not saved yet" });
+          q.hold({ s, snap: { ...s.failed, record: { ...s.failed.record, role: "replaced" } }, reason: q.failed() || "not saved yet" });
           s.failed = null;
         }
         s.id = sessionId(s.raster, [s.id, ...(old ? [old.id] : [])]);
@@ -312,7 +224,7 @@ export function initPersist(d: Deps) {
     /** An import loaded this mask file: it is copied once, with the next save; `use` gets the copy once written whole (ADR 0036). */
     imported(file: Blob, use?: (copy: Blob) => Promise<void>): void {
       if (!current) return;
-      if (use) uses.set(file, use);
+      if (use) q.uses.set(file, use);
       current.file = file;
       current.noCopy = false; // a new import tries the copy again
       current.copyFails = 0;
@@ -324,7 +236,7 @@ export function initPersist(d: Deps) {
       const s = current;
       if (!s || s.copied || s.noCopy || s.copyFails > 0 || !s.ready) return;
       save(true);
-      await chain;
+      await q.idle();
     },
     /**
      * A verified export of the labels finished at `at` (spec 056 scope 6): the session records it, saved now. Edits were
@@ -339,6 +251,6 @@ export function initPersist(d: Deps) {
       save(false);
     },
     /** The saves started so far have ended (tests). */
-    idle: () => chain,
+    idle: () => q.idle(),
   };
 }

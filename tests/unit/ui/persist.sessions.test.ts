@@ -262,3 +262,31 @@ describe("a previous raster's pending copy (scope 3)", () => {
     expect(t.fake.records.get(KEY)!.base!.copyMissing).toBe(true);
   });
 });
+
+describe("the open raster's save while a previous raster's copy keeps failing (scope 3)", () => {
+  it("raster B's tiles, record and own copy are saved, and A's failures count only against A", async () => {
+    const t = setup();
+    const save = t.fake.store.saveBase.bind(t.fake.store);
+    let aCalls = 0;
+    t.fake.store.saveBase = async (k, f) => {
+      if (k === KEY) { aCalls++; throw new DOMException("The file changed.", "NotReadableError"); }
+      return save(k, f);
+    };
+    await t.open();
+    await t.importMask(5, "0,0", 1);
+    t.p.open("b.tif", SIZE + 1, G); // A's save starts now; its copy fails, so it is pending
+    await t.p.idle(); await t.p.offer();
+    const B = [...t.fake.records.keys()].find((k) => k !== KEY) ?? "";
+    expect(B).toBe(""); // B has nothing saved yet
+    await t.importMask(9, "512,256", 3); // B's own mask, while A is pending
+    t.paint("768,256", 4);
+    for (let ms = 0; ms < 10 * 60_000; ms += 5000) await t.flush(5000);
+    const b = [...t.fake.records.values()].find((r) => r.id !== KEY)!;
+    expect([...t.fake.tiles.get(b.id)!.keys()].sort()).toEqual(["512,256", "768,256"]);
+    expect(b.base!.count).toBe(9);
+    expect(b.base!.copyMissing).toBeUndefined();
+    expect(await t.fake.bases.get(b.id)!.text()).toBe("mask 9");
+    expect(aCalls).toBeLessThanOrEqual(4);
+    expect(t.fake.records.get(KEY)!.base!.copyMissing).toBe(true);
+  });
+});

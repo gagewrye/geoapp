@@ -86,11 +86,16 @@ const fileLabel = (page: Page, id: string) => page.locator("label.file", { has: 
 const seeded = /^Seeded \d+ pixels in \d+ classes\.$/;
 const exportedTo = (name: string) => new RegExp(`^Labels exported to ${name.replace(".", "\\.")} \\([\\d.]+ MB\\)\\.$`);
 
+/** Waits until the latest change is saved: "Saved", unchanged over a debounce (undo, redo and strokes may save again). */
 async function saved(page: Page) {
-  await expect(page.locator("#save-state")).toHaveText(/^Saved /, { timeout: 15_000 });
-  const text = await page.locator("#save-state").textContent();
-  await page.waitForTimeout(2500);
-  await expect(page.locator("#save-state")).toHaveText(text!);
+  const state = page.locator("#save-state");
+  await expect(state).toHaveText(/^Saved /, { timeout: 15_000 });
+  for (let text = await state.textContent(); ;) {
+    await page.waitForTimeout(2500);
+    const now = await state.textContent();
+    if (now === text && now!.startsWith("Saved ")) return;
+    text = now;
+  }
 }
 
 /** Opens rgb4326.tif from work/ through the open picker, so the app holds its handle. */
@@ -106,6 +111,14 @@ async function importPicked(page: Page, name: string) {
   await pick(page, name);
   await fileLabel(page, "import-labels").click();
   await expect(message(page)).toHaveText(seeded);
+}
+
+/** Undo's depth: Undo until it is disabled, counting, then Redo as many times, so the labels end as they were. */
+async function undoDepth(page: Page): Promise<number> {
+  let n = 0;
+  while (await page.locator("#undo").isEnabled()) { await page.click("#undo"); n++; }
+  for (let i = 0; i < n; i++) { await expect(page.locator("#redo")).toBeEnabled(); await page.click("#redo"); }
+  return n;
 }
 
 async function exportAs(page: Page) {
@@ -182,12 +195,18 @@ test("criterion 7 and spec 056 criterion 6: a write that fails midway keeps the 
   await paintTwoClasses(page);
   await saved(page);
   const before = await effectiveTiles(page);
+  const depth = await undoDepth(page);
+  expect(depth).toBeGreaterThan(0);
 
   await page.evaluate(() => { (window as any).__f.failAt = 3; }); // the header and a tile, then the third write rejects
   dialogs.then("labels.tif", true);
   await exportAs(page);
   await expect(message(page)).toHaveText(`The disk failed. ${MESSAGES.nothingOverwritten}`);
   expect((await bytesOf(page, "labels.tif"))!.equals(old)).toBe(true);
+  expect(tileDiff(await effectiveTiles(page), before)).toEqual([]); // the labels, mask and Undo are unchanged (criterion 3)
+  expect(await undoDepth(page)).toBe(depth);
+  expect(tileDiff(await effectiveTiles(page), before)).toEqual([]);
+  await saved(page);
 
   await page.reload();
   await expect(page.locator("#map[data-ready=true]")).toBeVisible();

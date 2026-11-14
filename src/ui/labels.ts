@@ -184,7 +184,7 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
     masks: paint.masks,
     base: () => base, // the mask base, if one is loaded
     /** ADR 0036: the base reads `file` (the app's copy) instead of the user's file, if `prev` is still the base; swapped in place, so a held or exporting base reads it too. */
-    useCopy: (prev: MaskBase, file: LabelSource): boolean => base === prev && !!(prev.file = file),
+    useCopy(prev: MaskBase, file: LabelSource): boolean { if (base !== prev) return false; prev.file = file; return true; },
     tile,
     /** A paint or erase stroke is in progress. */
     stroking: brush.stroking,
