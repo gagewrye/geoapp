@@ -38,13 +38,17 @@ test("there is no Seed mode; with no labels an import shows no confirm, and Undo
 // Spec 072: the confirm's Cancel and OK are two tests, each from its own painted tiles.
 test("with painted tiles an import confirms: Cancel keeps labels and classes (spec 004 criterion 16)", async ({ page }) => {
   await setup(page);
-  await paintOne(page);
+  await paintOne(page, "left");
   await expect(page.locator("#undo")).toBeEnabled();
   const before = { tiles: await storeTiles(page), list: await classList(page) };
+  await page.evaluate(() => { document.getElementById("message")!.textContent = ""; });
   const asked: string[] = [];
   page.once("dialog", (d) => { asked.push(d.message()); void d.dismiss(); });
   await importFile(page, classes());
-  await expect.poll(() => asked).toEqual([MESSAGES.replace]); // dismissed: the import stops at once (no fixed wait)
+  await expect.poll(() => asked).toEqual([MESSAGES.replace]);
+  // an import that carried on would say "Importing labels…" and lock Import labels in the task the confirm returns to
+  await expect(message(page)).toHaveText("");
+  await expect(page.locator("#import-labels")).toBeEnabled();
   expect(await storeTiles(page)).toEqual(before.tiles);
   expect(await classList(page)).toEqual(before.list);
 });
