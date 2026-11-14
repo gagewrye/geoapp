@@ -76,12 +76,12 @@ test("while an import runs (paused file) Undo is disabled and Ctrl+Z changes not
   await expect(undoButton(page)).toBeDisabled(); // the import replaced the store
 });
 
-test("while Export labels runs (paused sink) Undo is disabled; the file holds the store at its click; then the history is intact", async ({ page }) => {
+// Spec 072: split in two, the export's lock and file, then the history after an export.
+test("while Export labels runs (paused sink) Undo is disabled; the file holds the store at its click", async ({ page }) => {
   await noSavePicker(page);
   await gateWrites(page);
   await twoClasses(page);
   const atClick = await storeTiles(page);
-  const painted = await snapshot(page);
   const downloaded = page.waitForEvent("download");
   await page.click("#export-labels");
   await writeHeld(page);
@@ -90,6 +90,16 @@ test("while Export labels runs (paused sink) Undo is disabled; the file holds th
   const dl = await downloaded;
   await expect(message(page)).toHaveText("Labels exported.");
   await expectFileHolds((await dl.path())!, atClick, ["left", "right"]);
+});
+
+test("after Export labels the history is intact: one Undo removes the last stroke and leaves the first", async ({ page }) => {
+  await noSavePicker(page);
+  await twoClasses(page);
+  const painted = await snapshot(page);
+  const downloaded = page.waitForEvent("download");
+  await page.click("#export-labels");
+  await downloaded;
+  await expect(message(page)).toHaveText("Labels exported.");
   await expect(undoButton(page)).toBeEnabled();
   await undoButton(page).click(); // the class 2 stroke
   const one = pixels(await snapshot(page));
