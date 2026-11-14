@@ -97,8 +97,7 @@ test("criterion 4: after A, picking B but cancelling the close question gives A"
   page.once("dialog", (d) => { asked.push(d.message()); void d.dismiss(); });
   await pick(page, "B");
   await opener(page).click();
-  await expect.poll(() => asked.length).toBe(1);
-  await page.waitForTimeout(300);
+  await expect.poll(() => asked.length).toBe(1); // cancelled: the open stops as confirm returns (spec 072: no fixed wait)
   await expect(page.locator("#raster-info")).toContainText("rgb4326.tif");
   expect(await exportStartIn(page)).toBe("A");
 });
