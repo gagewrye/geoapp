@@ -79,7 +79,6 @@ test("apply renames and recolours by raw value; the mask repaints, painted tiles
 });
 
 test("the real case: a file's own table, and a map of values 0-7 under other names (criterion 8)", async ({ page }) => {
-  test.setTimeout(120_000);
   await setup(page);
   const table = Array.from({ length: 8 }, (_, i) => ({ name: `t${i + 1}`, colour: paletteColour(i) }));
   await importFile(page, upload("labels-last.tif", await itemFile((c, r) => ((Math.floor(c / 24) + Math.floor(r / 20)) % 8) + 1, table)));
@@ -113,37 +112,51 @@ test("a map file that can't be read shows the read error in red and changes noth
   expect(await classList(page)).toEqual(before);
 });
 
-test("Apply class map is disabled during an import, an export and a pending restore (criterion 10)", async ({ page }) => {
-  test.setTimeout(120_000);
-  await page.addInitScript(() => {
-    const g = (window as any).__save = { cancel: null as null | (() => void) };
-    (window as any).showSaveFilePicker = () => new Promise((_, rej) => { g.cancel = () => rej(new DOMException("The user aborted a request.", "AbortError")); });
+// Spec 072: criterion 10's import, export and pending restore are three tests, each from its own imported labels.
+test.describe("Apply class map is disabled during an import, an export and a pending restore (criterion 10)", () => {
+  test.describe.configure({ mode: "parallel" });
+
+  test("criterion 10, import: disabled while an import runs, enabled after it", async ({ page }) => {
+    await setup(page);
+    await importClasses(page);
+    await expect(classMap(page)).toBeEnabled();
+    await pauseLabelFile(page);
+    await importFile(page, upload("classes.tif", classFile("255")));
+    await expect.poll(() => page.evaluate(() => (window as any).__fileGate.reads)).toBeGreaterThan(0);
+    await expect(classMap(page)).toBeDisabled();
+    await openFileGate(page);
+    await expect(message(page)).toHaveText(seeded);
+    await expect(classMap(page)).toBeEnabled();
   });
-  await setup(page);
-  await importClasses(page);
-  await expect(classMap(page)).toBeEnabled();
 
-  await pauseLabelFile(page);
-  await importFile(page, upload("classes.tif", classFile("255")));
-  await expect.poll(() => page.evaluate(() => (window as any).__fileGate.reads)).toBeGreaterThan(0);
-  await expect(classMap(page)).toBeDisabled();
-  await openFileGate(page);
-  await expect(message(page)).toHaveText(seeded);
-  await expect(classMap(page)).toBeEnabled();
+  test("criterion 10, export: disabled while an export holds the Save dialog, enabled after it", async ({ page }) => {
+    await page.addInitScript(() => {
+      const g = (window as any).__save = { cancel: null as null | (() => void) };
+      (window as any).showSaveFilePicker = () => new Promise((_, rej) => { g.cancel = () => rej(new DOMException("The user aborted a request.", "AbortError")); });
+    });
+    await setup(page);
+    await importClasses(page);
+    await expect(classMap(page)).toBeEnabled();
+    await page.click("#export-labels");
+    await expect.poll(() => page.evaluate(() => (window as any).__save.cancel !== null)).toBe(true);
+    await expect(classMap(page)).toBeDisabled();
+    await page.evaluate(() => (window as any).__save.cancel());
+    await expect(classMap(page)).toBeEnabled();
+  });
 
-  await page.click("#export-labels");
-  await expect.poll(() => page.evaluate(() => (window as any).__save.cancel !== null)).toBe(true);
-  await expect(classMap(page)).toBeDisabled();
-  await page.evaluate(() => (window as any).__save.cancel());
-  await expect(classMap(page)).toBeEnabled();
-
-  await expect(page.locator("#save-state")).toHaveText(/^Saved /, { timeout: 15_000 });
-  await page.addInitScript(holdIdb);
-  await page.reload();
-  await openRaster(page, rgbFixture());
-  await expect(message(page)).toHaveText("Raster opened.");
-  await expect(classMap(page)).toBeDisabled();
-  await page.evaluate(() => { (window as any).__idb.get.open(); (window as any).__idb.tiles.open(); });
-  await expect(message(page)).toHaveText("Labels restored.");
-  await expect(classMap(page)).toBeEnabled();
+  test("criterion 10, pending restore: disabled while a restore is pending, enabled once restored", async ({ page }) => {
+    await setup(page);
+    await importClasses(page);
+    await expect(classMap(page)).toBeEnabled();
+    await expect.poll(() => page.evaluate(() => (window as any).__geoapp.saving()), { timeout: 15_000 }).toBe(false);
+    await expect(page.locator("#save-state")).toHaveText(/^Saved /);
+    await page.addInitScript(holdIdb);
+    await page.reload();
+    await openRaster(page, rgbFixture());
+    await expect(message(page)).toHaveText("Raster opened.");
+    await expect(classMap(page)).toBeDisabled();
+    await page.evaluate(() => { (window as any).__idb.get.open(); (window as any).__idb.tiles.open(); });
+    await expect(message(page)).toHaveText("Labels restored.");
+    await expect(classMap(page)).toBeEnabled();
+  });
 });
