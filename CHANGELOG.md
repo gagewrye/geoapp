@@ -2,12 +2,13 @@
 
 One entry per merge to main, newest first. Details are in the named spec.
 
-## 2026-11-13
+## 2026-11-14
 - **Spec 072:** The slow e2e tests are refactored toward 15 s on CI. No app behaviour changes.
   - `__geoapp.overlaysIdle()` also waits for the 150 ms settle debounce and in-flight mask tile reads. The prefetch idle unit test no longer waits on real time.
   - `rgbFixture`, `rgbNodataFixture` and `nodataImagery` are Uint8 in 256 px tiles with GDAL_NODATA 0, built once per worker. Step 0's timings are in the spec. `__geoapp.saving()` replaces fixed waits on saves. No changed test calls `labels()` or `waitForTimeout`.
   - Split by criterion: `label-persist` 6 and 9, `basemap` 5, `class-map` 10, `label-replace` (Cancel, OK, second import; lock, pending reads), `label-import` 15 and `undo-seed`'s export.
-  - Criterion 3 (every test 15 s or less in 3 runs) and criterion 6 (the CI timeout) are open: see the spec's build notes.
+  - Criterion 3 (every test 15 s or less in 3 runs) and criterion 6 (the 15 s CI timeout) move to spec 074, which runs 1 worker per CI job across 8 shards (Gage, 2026-11-14). On CI, 3–9 tests per run still take 15–26 s, because the two workers in each shard share CPU.
+  - `label-edit` 10 opens `rgbStrip`, the old Float32 strip: with a raster the raw reader reads, the first label import fetches geotiff.js's decoder chunks from the app's origin (a follow-up question in the spec).
 
 ## 2026-11-12
 - **Spec 071:** `class-map` 44 (spec 047 criterion 7) is refactored and runs on CI again, and the @ci-skip tag is gone: `playwright.config.ts` has no `grepInvert`, and `ci.test.ts` checks that no e2e title carries the tag. The test hides the imagery and basemap before it reads the ground colour, and reads the recoloured pixel once, after the new `__geoapp.overlaysIdle()` hook and a map `idle`, instead of polling it. `overlaysIdle()` resolves once no label-overlay redraw is scheduled and no quads are queued; the same test checks that the `label-` layers match the stored tiles right after its stroke. No app behaviour changes.
