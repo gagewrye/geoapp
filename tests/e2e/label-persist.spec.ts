@@ -1,6 +1,6 @@
 import { expect, test, type Dialog, type Page } from "@playwright/test";
 import {
-  anotherRaster, jumpTo, message, openApp, openRaster, paintMode, paintTwoClasses, path, rgbFixture, selectClass, stroke, tileKeysStored, toScreen,
+  anotherRaster, jumpTo, message, openApp, openRaster, paintMode, paintTwoClasses, path, renameClass, rgbFixture, selectClass, stroke, tileKeysStored, toScreen,
 } from "./helpers";
 import { at, classList, download, effectiveTiles, importFile, maskFile, noSavePicker, storeTiles, tileDiff } from "./seeding";
 
@@ -34,17 +34,18 @@ async function reload(page: Page) {
 
 const selected = (page: Page) => page.locator("#classes li[aria-selected=true]").evaluate((li) => [...li.parentElement!.children].indexOf(li));
 
-// Criterion 6 is split in two (spec 072): each part has one Saved and one reload.
-test("criterion 6, tiles and classes: paint and rename; after Saved and a reload, accepting the restore brings back the tiles and classes; paint still works", async ({ page }) => {
+// Criterion 6 is split in three (spec 072): each part has one Saved and one reload.
+test("criterion 6, tiles: paint; after Saved and a reload, accepting the restore brings back the tiles; paint still works", async ({ page }) => {
   const log = dialogs(page);
   await openApp(page);
   await open(page);
   await paintMode(page);
-  await paintTwoClasses(page, ["Mangrove", "Water"]);
+  await jumpTo(page, [15, 45], 6);
+  const s = await toScreen(page, [12.005, 45.005]);
+  await stroke(page, [s, { x: s.x + 30, y: s.y + 20 }, { x: s.x + 60, y: s.y }]);
   await saved(page);
   const tiles = await storeTiles(page);
   expect(tiles.size).toBeGreaterThan(0);
-  const classes = await classList(page);
 
   await reload(page);
   expect(log).toEqual([]); // nothing unsaved: no beforeunload
@@ -56,13 +57,34 @@ test("criterion 6, tiles and classes: paint and rename; after Saved and a reload
   const back = await storeTiles(page);
   expect([...back.keys()].sort()).toEqual([...tiles.keys()].sort());
   for (const [k, t] of tiles) expect(Buffer.from(back.get(k)!).equals(Buffer.from(t)), k).toBe(true);
-  expect(await classList(page)).toEqual(classes);
 
   await paintMode(page);
   await jumpTo(page, [15, 45], 6);
   const a = await toScreen(page, [15.005, 47.005]);
   await stroke(page, [a, { x: a.x + 40, y: a.y }]);
   expect((await tileKeysStored(page)).length).toBeGreaterThan(tiles.size);
+});
+
+test("criterion 6, classes: rename both classes; after Saved and a reload, accepting the restore brings back the classes", async ({ page }) => {
+  const log = dialogs(page);
+  await openApp(page);
+  await open(page);
+  await paintMode(page);
+  for (const [i, n] of ["Mangrove", "Water"].entries()) await renameClass(page, i, n);
+  await jumpTo(page, [15, 45], 6);
+  const a = await toScreen(page, [12.005, 45.005]);
+  await stroke(page, [a, { x: a.x + 40, y: a.y }]); // a label, so the session saves (spec 031)
+  await saved(page);
+  const classes = await classList(page);
+  expect(classes.map((c) => c.name)).toEqual(["Mangrove", "Water"]);
+
+  await reload(page);
+  expect(log).toEqual([]); // nothing unsaved: no beforeunload
+  await open(page, { ...rgbFixture(), name: "renamed.tif" });
+  await expect(message(page)).toHaveText("Labels restored.");
+  expect(log).toHaveLength(1);
+  expect(log[0]!.slice(9)).toMatch(restorePrompt);
+  expect(await classList(page)).toEqual(classes);
 });
 
 test("criterion 6, selection and opacity: class 2 selected and opacity 30%; after Saved and a reload, accepting the restore brings both back", async ({ page }) => {
