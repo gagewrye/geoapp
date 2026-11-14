@@ -23,7 +23,8 @@ export type PersistLabels = {
   view(): { opacity: number; visible: boolean };
   base(): MaskBase | null;
   stroking(): boolean;
-  hasLabels(): boolean;
+  /** A tile is stored or a mask with labelled pixels is loaded: what a session saves. Boxes don't count until spec 066 saves them. */
+  hasMasks(): boolean;
   /** Swaps in a restored session; its replace must not count as an edit. */
   restoreSession(store: LabelStore, classes: LabelClass[], base: MaskBase | null, selected: number, view: { opacity: number; visible: boolean }): void;
   /** Spec 004's lock, held until the restore offer settles (scope 4). */
@@ -90,7 +91,7 @@ export function initPersist(d: Deps) {
 
   const dirty = (s: Session | null) => !!s && (s.tiles.size > 0 || s.record || s.clear || s.file !== null);
   // changes to a raster with no labels, and no session saved from this page, have nothing to save (an open resets the view)
-  const unsaved = (s: Session | null) => dirty(s) && (s!.owned || labels.hasLabels());
+  const unsaved = (s: Session | null) => dirty(s) && (s!.owned || labels.hasMasks());
   const guard = (e: Event) => { e.preventDefault(); (e as BeforeUnloadEvent).returnValue = ""; };
   /** #save-state and the beforeunload guard: on iff something is dirty, a save is in flight, the last failed, or a snapshot is pending. */
   function sync(): void {
@@ -119,7 +120,7 @@ export function initPersist(d: Deps) {
       base: base && { lut: base.lut.slice(), count: base.count, windows: [...base.windows], values: base.preview.values.slice() },
     };
     const file = s.noCopy ? null : s.file;
-    const snap = { key: s.key, tiles, clear: s.clear, file, record, labelled: labels.hasLabels() };
+    const snap = { key: s.key, tiles, clear: s.clear, file, record, labelled: labels.hasMasks() };
     s.tiles = new Set(); s.record = false; s.clear = false; s.file = null;
     return snap;
   }
