@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  addBox, boxesAt, cycleBox, emptyBoxes, handleNear, handlePoints, moveRect, rectFrom, removeBox, resizeRect, setBox, type Handle, type Rect,
+  addBox, boxesAt, clampCell, contains, cycleBox, emptyBoxes, handleNear, handlePoints, moveRect, rectFrom, removeBox, resizeRect, setBox, type Handle, type Rect,
 } from "../../../src/core/boxes";
 
 // Spec 063 criteria 1 to 5.
@@ -184,7 +184,17 @@ describe("handlePoints", () => {
   });
 });
 
-// Spec 064: the Box tool's handle choice (criterion 2) and click cycle (criterion 3).
+// Spec 064: the Box tool's handle choice (criterion 2) and click cycle (criterion 3), and its pixel helpers.
+describe("contains and clampCell (spec 064)", () => {
+  it("contains takes x0 and y0 but not x1 or y1; clampCell moves a pixel off the raster to its edge", () => {
+    const r = { x0: 2, y0: 3, x1: 5, y1: 6 };
+    expect([contains(r, 2, 3), contains(r, 4, 5), contains(r, 5, 4), contains(r, 3, 6), contains(r, 1, 4)]).toEqual([true, true, false, false, false]);
+    expect(clampCell([-4, 250], dims)).toEqual([0, 199]);
+    expect(clampCell([400, -1], dims)).toEqual([299, 0]);
+    expect(clampCell([7, 8], dims)).toEqual([7, 8]);
+  });
+});
+
 describe("handleNear (criterion 2)", () => {
   // a 10 x 10 px box on screen: its corners and edge midpoints 5 px apart
   const points = handlePoints({ x0: 0, y0: 0, x1: 10, y1: 10 });
