@@ -45,9 +45,9 @@ const status = initStatus(map, () => (source ? source.meta : null));
 // nav and labels exist before any map event; a held pan key holds tile updates until it settles (spec 027)
 const fullRes = initImagery(map, say, { moving: () => nav.moving(), viewSettled: () => labels.viewSettled() });
 let source: RasterSource | undefined;
-// the open raster's file handle, so Export's folder picker and Import labels' picker start in its folder; null when it came through the input (specs 050, 053, 055)
+// the open raster's file handle, so Export's folder picker and Import labels' picker start in its folder; null when it came through the input (specs 050, 053, 074)
 let folder: FileSystemFileHandle | null = null;
-let imageryFile: { handle: FileSystemFileHandle | null; name: string; size: number } | null = null; // which Export refuses to write over (spec 055)
+let imageryFile: { handle: FileSystemFileHandle | null; name: string; size: number } | null = null; // which Export refuses to write over (spec 074)
 // Opens are numbered so that an older open finishing late can't replace the raster a newer one opened
 let opens = 0;
 let opened = 0;
@@ -78,7 +78,7 @@ const persist = initPersist({ labels, open: openSessionStore, state: $("save-sta
   confirm: (t) => confirm(t), say, persistStorage: () => { void navigator.storage?.persist?.(); } });
 const seeding = initSeeding({ labels, imagery: () => source, folder: () => folder, imageryFile: () => imageryFile, say, error: errorText,
   opened: (f) => testHook("labelFile", f), session: {
-    // ADR 0036: once the copy is written whole, the mask is read from it, never the user's file again
+    // ADR 0041: once the copy is written whole, the mask is read from it, never the user's file again
     imported: (f, base) => persist.imported(f, async (copy) => { labels.useCopy(base, await openLabelFile(copy)); }),
     replaceRefused: persist.replaceRefused, flush: persist.flush, waitCopy: persist.waitCopy, exported: persist.exported, maskUncopied: persist.maskUncopied,
   } });

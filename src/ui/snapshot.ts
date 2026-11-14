@@ -6,7 +6,7 @@ import type { SessionRecord, SessionStore } from "../io/session";
 
 /** Tiles per IndexedDB transaction (about 1 MiB), and per read on restore (spec 031). */
 export const TILE_BATCH = 16;
-/** Rasters whose sessions are kept; past it, the least recently saved exported ones go, with their mask copies (spec 056). */
+/** Rasters whose sessions are kept; past it, the least recently saved exported ones go, with their mask copies (spec 075). */
 export const MAX_SESSIONS = 8;
 
 /** One session's changes, copied when a save starts (spec 031): tiles (null for a deleted one), the record, a replace's clear and mask file. */
@@ -16,18 +16,18 @@ export type Snapshot = {
   clear: boolean;
   file: Blob | null;
   record: Omit<SessionRecord, "savedAt">;
-  /** The savedAt to keep when only exportedAt changed (spec 056 scope 6); null saves the time of the write. */
+  /** The savedAt to keep when only exportedAt changed (spec 075 scope 6); null saves the time of the write. */
   savedAt: number | null;
   /** Labels existed when copied; with none, a saved session is deleted instead. */
   labelled: boolean;
-  /** An import replaced session `demote`, which becomes the raster's replaced one; `drop`, the replaced ones before it, are deleted (ADR 0037). */
+  /** An import replaced session `demote`, which becomes the raster's replaced one; `drop`, the replaced ones before it, are deleted (ADR 0042). */
   demote: string | null;
   drop: string[];
   /** When it was copied, on the save queue's clock: a session deleted after that never gets it written back. */
   taken?: number;
 };
 
-/** The mask copy failed after the tiles and the record, saved at `savedAt`, were written (spec 056 scope 3). */
+/** The mask copy failed after the tiles and the record, saved at `savedAt`, were written (spec 075 scope 3). */
 export class CopyFailed extends Error {
   constructor(readonly reason: unknown, readonly savedAt = 0) {
     super(reason instanceof Error ? reason.message : String(reason));
@@ -45,7 +45,7 @@ export function mergeSnapshots(a: Snapshot, b: Snapshot): Snapshot {
 }
 
 /**
- * Writes a snapshot (spec 056 scope 3): the replaced sessions' roles, a clear, the tiles TILE_BATCH per transaction with
+ * Writes a snapshot (spec 075 scope 3): the replaced sessions' roles, a clear, the tiles TILE_BATCH per transaction with
  * a yield after each, the record (with copyMissing while a copy is due), then the mask copy and the record again
  * without the flag. So a failing copy never blocks tiles. Then evicts other rasters' exported sessions past
  * MAX_SESSIONS. Resolves with the savedAt written; with no labels it deletes the session if `owned` and resolves null.

@@ -74,7 +74,7 @@ export async function download(page: Page, selector: string): Promise<Buffer> {
   return readFile((await dl.path())!);
 }
 
-/** Before page scripts run: no folder picker (nor Save dialog), so exports download (ADR 0001's path, spec 055 scope 6). */
+/** Before page scripts run: no folder picker (nor Save dialog), so exports download (ADR 0001's path, spec 074 scope 6). */
 export const noSavePicker = (page: Page) => page.addInitScript(() => {
   delete (window as { showSaveFilePicker?: unknown }).showSaveFilePicker;
   delete (window as { showDirectoryPicker?: unknown }).showDirectoryPicker;
@@ -124,7 +124,7 @@ export function expectNoNodata(tiles: Map<string, Uint8Array>, width: number, no
   expect(bad).toBe(0);
 }
 
-/** Holds the session lookup (IndexedDB `get` and, since spec 056, `getAll` on store sessions) and `getAll`/`getAllKeys` on store tiles until each gate opens. */
+/** Holds the session lookup (IndexedDB `get` and, since spec 075, `getAll` on store sessions) and `getAll`/`getAllKeys` on store tiles until each gate opens. */
 export const holdIdb = () => {
   const w = window as any;
   const gate = () => { let open!: () => void; const p = new Promise<void>((r) => { open = r; }); return { p, open }; };

@@ -4,7 +4,7 @@ import { jumpTo, message, openApp, openRaster, paintMode, path, RGB_GRID, rgbFix
 import { at, effectiveTiles, importFile, maskFile, tileDiff, upload } from "./seeding";
 import { writeFile } from "../unit/helpers/labelFiles";
 
-// Spec 056 criterion 7: an import keeps the labels it replaces, and the restore prompt offers them back.
+// Spec 075 criterion 7: an import keeps the labels it replaces, and the restore prompt offers them back.
 
 /** A second mask on rgbFixture's grid, its 16 px blocks shifted by one class from maskFile's. */
 function maskB() {

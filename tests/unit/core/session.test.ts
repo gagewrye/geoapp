@@ -36,7 +36,7 @@ describe("batches", () => {
   });
 });
 
-// Spec 056 criterion 1.
+// Spec 075 criterion 1.
 describe("evict", () => {
   const raster = (i: number, exported: boolean | "stale") =>
     ({ id: `r${i}`, savedAt: 100 + i, exportedAt: exported === true ? 100 + i : exported === "stale" ? 99 + i : null });

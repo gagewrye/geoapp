@@ -36,7 +36,7 @@ test("export then import restores every tile byte for byte and the class list, w
   const file = await download(page, "#export-labels");
   await expect(message(page)).toHaveText("Labels exported.");
 
-  // Close these labels?, then spec 056's two steps to decline the saved session: Cancel the restore, OK the delete
+  // Close these labels?, then spec 075's two steps to decline the saved session: Cancel the restore, OK the delete
   const answers = [true, false, true], asked: string[] = [];
   const answer = (d: Dialog) => { asked.push(d.message()); if (answers.shift()) void d.accept(); else void d.dismiss(); if (!answers.length) page.off("dialog", answer); };
   page.on("dialog", answer);

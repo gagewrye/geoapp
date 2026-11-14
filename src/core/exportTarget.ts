@@ -1,4 +1,4 @@
-/** Export's file-name and target rules (spec 055): the typed name, and what a chosen target allows. */
+/** Export's file-name and target rules (spec 074): the typed name, and what a chosen target allows. */
 
 // Names Windows refuses as a file's stem, whatever the extension
 const RESERVED = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])$/i;

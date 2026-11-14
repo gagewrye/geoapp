@@ -5,13 +5,13 @@ type DirPicker = (o: { mode: "readwrite"; startIn?: FileSystemHandle }) => Promi
 
 const dirPicker = () => (globalThis as unknown as { showDirectoryPicker?: DirPicker }).showDirectoryPicker;
 
-/** A sink whose written size can be read back once closed (spec 055 scope 4). */
+/** A sink whose written size can be read back once closed (spec 074 scope 4). */
 export type SizedSink = Sink & { size(): Promise<number> };
 
-/** True where the browser has showDirectoryPicker (Chromium): Export writes into a chosen folder (ADR 0035). */
+/** True where the browser has showDirectoryPicker (Chromium): Export writes into a chosen folder (ADR 0040). */
 export const canPickFolder = (): boolean => typeof dirPicker() === "function";
 
-/** A folder chosen for writing, opened in `startIn`'s folder when given (ADRs 0034, 0035); null if the picker was cancelled. */
+/** A folder chosen for writing, opened in `startIn`'s folder when given (ADRs 0034, 0040); null if the picker was cancelled. */
 export async function pickFolder(startIn?: FileSystemHandle): Promise<FileSystemDirectoryHandle | null> {
   const picker = dirPicker() as DirPicker;
   try {

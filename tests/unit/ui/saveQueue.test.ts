@@ -5,7 +5,7 @@ import { newSession, type Session } from "../../../src/ui/sessionState";
 import type { Snapshot } from "../../../src/ui/snapshot";
 import { fakeSessionStore } from "../helpers/sessionStore";
 
-// Spec 056: a raster's snapshot pending from an earlier open is never written over the session that opened it again.
+// Spec 075: a raster's snapshot pending from an earlier open is never written over the session that opened it again.
 const G: Grid = { width: 512, height: 512, epsg: 32633, gt: [0, 1, 0, 0, 0, -1] };
 const snap = (id: string, raster: string): Snapshot => ({
   id, tiles: [["0,0", new Uint8Array(4).fill(1).buffer]], clear: false, file: null, savedAt: null, labelled: true, demote: null, drop: [],

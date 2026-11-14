@@ -10,7 +10,7 @@ import { MESSAGES } from "../../../src/ui/messages";
 import { initPersist, SAVE_DELAY_MS, type PersistLabels } from "../../../src/ui/persist";
 import { fakeSessionStore } from "../helpers/sessionStore";
 
-// Spec 056 criteria 2-5 and scope 6, with the fake store and fake timers.
+// Spec 075 criteria 2-5 and scope 6, with the fake store and fake timers.
 const G: Grid = { width: 1000, height: 700, epsg: 32633, gt: [500000, 0.1, 0, 4000000, 0, -0.1] };
 const SIZE = 4321, KEY = rasterKey(SIZE, G);
 const tile = (v: number) => new Uint8Array(256 * 256).fill(v);
@@ -355,7 +355,7 @@ describe("a raster with a snapshot still to write (scope 4)", () => {
   });
 });
 
-describe("a raster reopened while its save is still on the way, which then fails (spec 056 criterion 9)", () => {
+describe("a raster reopened while its save is still on the way, which then fails (spec 075 criterion 9)", () => {
   /** A imports and paints 256,0 = 1; B opens (A's save starts, its copy held), A reopens, and the copy fails: A's snapshot is pending. */
   async function reopened(answers: boolean[]) {
     const t = setup(fakeSessionStore(), answers);
@@ -378,7 +378,7 @@ describe("a raster reopened while its save is still on the way, which then fails
     expect(await back).toBe(MESSAGES.restored);
     expect(t.store().tiles.get("256,0")![0]).toBe(1);
     expect(t.base()!.count).toBe(5); // from the import's own file: its copy was never written
-    expect(await t.p.maskUncopied()!.text()).toBe("mask 5"); // so Export must not write over it (spec 055 scope 3)
+    expect(await t.p.maskUncopied()!.text()).toBe("mask 5"); // so Export must not write over it (spec 074 scope 3)
     t.tick(60_000);
     t.paint("256,0", 2);
     t.classes[0]!.name = "Roads"; t.p.record();
@@ -414,7 +414,7 @@ describe("a raster reopened while its save is still on the way, which then fails
   });
 });
 
-describe("a decline with a stray while an unexported replaced session is stored (spec 056 criterion 9)", () => {
+describe("a decline with a stray while an unexported replaced session is stored (spec 075 criterion 9)", () => {
   it("Cancel, Cancel, OK: the session is restored with the stray laid over; R stays the only replaced session, still offered", async () => {
     const t = setup(fakeSessionStore(), [false, false, true]);
     await t.open();
@@ -447,7 +447,7 @@ describe("a decline with a stray while an unexported replaced session is stored 
   });
 });
 
-describe("a current session and two replaced ones, R1 older than R2 (spec 056 criterion 10)", () => {
+describe("a current session and two replaced ones, R1 older than R2 (spec 075 criterion 10)", () => {
   /** C current (tile value 1), R1 (2) and R2 (3) replaced; `exported` ids were exported after their last change. */
   async function three(exported: string[] = []) {
     const fake = await saved();
@@ -510,7 +510,7 @@ describe("a current session and two replaced ones, R1 older than R2 (spec 056 cr
   });
 });
 
-describe("tester: maskUncopied never goes stale (spec 055 scope 3)", () => {
+describe("tester: maskUncopied never goes stale (spec 074 scope 3)", () => {
   async function restoredStray() {
     const t = setup(fakeSessionStore(), []);
     let release!: () => void;

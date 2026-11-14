@@ -158,7 +158,7 @@ describe("the unsaved guard (criterion 4)", () => {
 });
 
 describe("replace, Cancel and eviction (criterion 5)", () => {
-  it("a replace keeps the old session as the replaced one, writes the new one's tiles, record and copy, and copies the mask file once (spec 056)", async () => {
+  it("a replace keeps the old session as the replaced one, writes the new one's tiles, record and copy, and copies the mask file once (spec 075)", async () => {
     const t = setup();
     await t.ready();
     t.paint("0,0", 1);
@@ -207,7 +207,7 @@ describe("replace, Cancel and eviction (criterion 5)", () => {
     expect(got.base!.preview.corners).toHaveLength(4);
     expect(b.fake.log).toEqual([]); // a restore saves nothing back
 
-    // spec 056 scope 1: Cancel, then OK on the delete question
+    // spec 075 scope 1: Cancel, then OK on the delete question
     const c = setup({ confirm: [false, true] });
     for (const [k, v] of a.fake.records) c.fake.records.set(k, v);
     for (const [k, v] of a.fake.tiles) c.fake.tiles.set(k, v);
@@ -230,7 +230,7 @@ describe("replace, Cancel and eviction (criterion 5)", () => {
     expect(t.get().store.tiles.size).toBe(1);
   });
 
-  it("a ninth raster evicts the least recently saved exported one and its mask copy (spec 056 scope 4)", async () => {
+  it("a ninth raster evicts the least recently saved exported one and its mask copy (spec 075 scope 4)", async () => {
     const t = setup();
     for (let i = 0; i < MAX_SESSIONS; i++) {
       const key = `old${i}`, savedAt = 100 + (i === 3 ? -50 : i === 5 ? -60 : i);

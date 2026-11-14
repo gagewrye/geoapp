@@ -46,7 +46,7 @@ describe("labels cancel a pick still reading (spec 039 scope 6)", () => {
   });
 });
 
-// Spec 055 criterion 4 (ADR 0036): the base reads the app's copy once swapped, and only while it is still the base.
+// Spec 074 criterion 4 (ADR 0041): the base reads the app's copy once swapped, and only while it is still the base.
 describe("useCopy", () => {
   const source = { meta: { width: 100, height: 100, epsg: 4326, gt: [0, 1, 0, 0, 0, -1] } } as unknown as RasterSource;
   const base = (file: unknown) => ({ file, lut: new Uint8Array(256), count: 1, windows: new Set<string>(), preview: {} }) as unknown as MaskBase;

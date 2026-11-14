@@ -43,7 +43,7 @@ type Deps = {
   win: Pick<EventTarget, "addEventListener" | "removeEventListener">;
   doc: Pick<EventTarget, "addEventListener"> & { visibilityState: string };
   confirm: (text: string) => boolean;
-  /** #message: a save that fails says so there (spec 056 scope 5). */
+  /** #message: a save that fails says so there (spec 075 scope 5). */
   say?: (text: string, kind?: MessageKind) => void;
   yieldTask?: () => Promise<void>;
   now?: () => number;
@@ -55,7 +55,7 @@ type Deps = {
 };
 
 
-/** Saves the labels in this browser as they change and offers them back on reopening the raster (specs 031, 056, ADRs 0025, 0037). */
+/** Saves the labels in this browser as they change and offers them back on reopening the raster (specs 031, 075, ADRs 0025, 0042). */
 // Changes mark tile keys and the record dirty; a save copies them (a snapshot) and writes it, one save at a time,
 // after any pending snapshots.
 export function initPersist(d: Deps) {
@@ -64,7 +64,7 @@ export function initPersist(d: Deps) {
   const time = d.time ?? ((ms) => new Date(ms).toLocaleTimeString());
   const dateTime = d.dateTime ?? ((ms) => new Date(ms).toLocaleString());
   let db: Promise<SessionStore> | null = null;
-  // every delete (a drop, an eviction, a declined restore, labels gone) also drops that session's pending snapshots (spec 056)
+  // every delete (a drop, an eviction, a declined restore, labels gone) also drops that session's pending snapshots (spec 075)
   const watched = (s: SessionStore): SessionStore => new Proxy(s, {
     get: (t, k) => {
       if (k === "delete") return async (id: string) => { await t.delete(id); q.deleted(id); };
@@ -74,7 +74,7 @@ export function initPersist(d: Deps) {
   });
   const store = () => (db ??= d.open().then(watched));
   let current: Session | null = null;
-  // a restore that laid a stray's import over reads the user's own file: never swapped for the copy (spec 055 scope 3)
+  // a restore that laid a stray's import over reads the user's own file: never swapped for the copy (spec 074 scope 3)
   let adopted: { base: MaskBase; file: Blob } | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let applying = false, guarded = false;
@@ -210,7 +210,7 @@ export function initPersist(d: Deps) {
       current.record = true;
       changed(current);
     },
-    /** Why an import may not replace the labels now: a stored replaced session it would drop isn't exported since its last change (spec 056 scope 2). */
+    /** Why an import may not replace the labels now: a stored replaced session it would drop isn't exported since its last change (spec 075 scope 2). */
     replaceRefused(): string | null {
       return current?.replaced.some((r) => !exportedSince(r)) ? MESSAGES.replacedFirst : null;
     },
@@ -218,7 +218,7 @@ export function initPersist(d: Deps) {
     flush(): void { save(true); },
     /**
      * The labels were replaced (an import). Saved labels become the raster's replaced session, and the exported ones
-     * before them are dropped (ADR 0037); the new labels start a new current session, every tile of it written.
+     * before them are dropped (ADR 0042); the new labels start a new current session, every tile of it written.
      */
     replaced(): void {
       const s = current;
@@ -228,7 +228,7 @@ export function initPersist(d: Deps) {
         // replaceRefused keeps an unexported one from getting here; were one to, it stays, as another replaced session
         s.drop = [...s.drop, ...gone.map((r) => r.id)];
         s.demote = s.id;
-        // its last change, saved or not (a flush may still be writing, or have failed): spec 056 drops it only if exported after
+        // its last change, saved or not (a flush may still be writing, or have failed): spec 075 drops it only if exported after
         s.replaced = [...old.filter((r) => !gone.includes(r)), { id: s.id, savedAt: Math.max(s.savedAt ?? now(), s.lastChange), exportedAt: s.exportedAt }];
         if (s.failed) {
           q.hold({ s, snap: { ...s.failed, record: { ...s.failed.record, role: "replaced" } }, reason: q.failed() || "not saved yet" });
@@ -242,7 +242,7 @@ export function initPersist(d: Deps) {
       s.tiles = new Set(labels.store().tiles.keys());
       changed(s);
     },
-    /** An import loaded this mask file: it is copied once, with the next save; `use` gets the copy once written whole (ADR 0036). */
+    /** An import loaded this mask file: it is copied once, with the next save; `use` gets the copy once written whole (ADR 0041). */
     imported(file: Blob, use?: (copy: Blob) => Promise<void>): void {
       if (!current) return;
       if (use) q.uses.set(file, use);
@@ -252,7 +252,7 @@ export function initPersist(d: Deps) {
       current.copied = false;
       changed(current);
     },
-    /** Resolves once the current import's mask copy is written or has failed; at once when none is due (spec 055 scope 1). */
+    /** Resolves once the current import's mask copy is written or has failed; at once when none is due (spec 074 scope 1). */
     async waitCopy(): Promise<void> {
       const s = current;
       if (!s || s.copied || s.noCopy || s.copyFails > 0 || !s.ready) return;
@@ -260,7 +260,7 @@ export function initPersist(d: Deps) {
       await q.idle();
     },
     /**
-     * A verified export of the labels finished at `at` (spec 056 scope 6): the session records it, saved now. Edits were
+     * A verified export of the labels finished at `at` (spec 075 scope 6): the session records it, saved now. Edits were
      * locked from the export's click, so any change not saved yet is in the file: it is saved as of the export.
      */
     exported(at: number): void {

@@ -14,23 +14,23 @@ import type { MessageKind } from "./messages";
 type Deps = {
   labels: ReturnType<typeof initLabels>;
   imagery: () => RasterSource | undefined;
-  /** The open raster's file handle, if it came through the open picker: Export's folder picker and Import labels' picker start in its folder (specs 050, 053, 055). */
+  /** The open raster's file handle, if it came through the open picker: Export's folder picker and Import labels' picker start in its folder (specs 050, 053, 074). */
   folder: () => FileSystemHandle | null;
-  /** The open raster's file, which Export refuses to write over (spec 055). */
+  /** The open raster's file, which Export refuses to write over (spec 074). */
   imageryFile: () => KnownFile | null;
   say: (text: string, kind?: MessageKind) => void;
   /** Shows an error the way main's other actions do. */
   error: (e: unknown) => string;
   /** e2e hook: sees each opened label file before it is read. */
   opened: (file: LabelSource) => void;
-  /** Spec 031's saved session, which an import and an export report to (specs 055, 056). */
+  /** Spec 031's saved session, which an import and an export report to (specs 074, 075). */
   session: SessionHooks;
 };
 
 /**
- * What Import and Export tell the saved session: an import's mask file and base (copied, then read from the copy: ADR 0036);
- * why an import may not replace the labels (spec 056 scope 2); a flush of unsaved changes before a replace; a wait for
- * the import's copy, which resolves once written or failed (spec 055 scope 1); and a verified export's time (spec 056 scope 6).
+ * What Import and Export tell the saved session: an import's mask file and base (copied, then read from the copy: ADR 0041);
+ * why an import may not replace the labels (spec 075 scope 2); a flush of unsaved changes before a replace; a wait for
+ * the import's copy, which resolves once written or failed (spec 074 scope 1); and a verified export's time (spec 075 scope 6).
  */
 export type SessionHooks = {
   imported(file: File, base: MaskBase): void; replaceRefused(): string | null; flush(): void;
@@ -59,7 +59,7 @@ export function initSeeding({ labels, imagery, folder, imageryFile, say, error, 
   let cancelled = false; // the running import's Cancel was pressed
   let exporting: RasterSource | null = null; // the imagery an export started on
   // the last import's own file (its handle when spec 053's picker gave one), and the base and LabelSource it made:
-  // Export refuses to write over it until the base reads the app's copy instead (spec 055 scope 3, ADR 0036)
+  // Export refuses to write over it until the base reads the app's copy instead (spec 074 scope 3, ADR 0041)
   let mask: { known: KnownFile; base: MaskBase; source: LabelSource } | null = null;
 
   const seeding = () => running !== null && running === imagery();
@@ -135,7 +135,7 @@ export function initSeeding({ labels, imagery, folder, imageryFile, say, error, 
     const refused = labels.hasLabels() ? session.replaceRefused() : null;
     if (refused) { say(refused, "error"); return; }
     if (!replaceConfirmed()) return;
-    session.flush(); // before the run: the old labels' last changes are saved as theirs (spec 056)
+    session.flush(); // before the run: the old labels' last changes are saved as theirs (spec 075)
     void runImport(s, tif, handle);
   }
 
@@ -188,7 +188,7 @@ export function initSeeding({ labels, imagery, folder, imageryFile, say, error, 
     say(m.text, m.kind);
   });
 
-  /** The imported mask's own file while it is the base, copied once the base reads the app's copy (ADR 0036); else a restored base's uncopied one. */
+  /** The imported mask's own file while it is the base, copied once the base reads the app's copy (ADR 0041); else a restored base's uncopied one. */
   const maskFile = () => maskTarget(mask, labels.base(), session.maskUncopied());
 
   exportBtn.addEventListener("click", async () => {

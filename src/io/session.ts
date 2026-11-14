@@ -2,8 +2,8 @@ import type { LabelClass } from "../core/classes";
 import { keyHash } from "../core/session";
 
 /** A saved label session (spec 031): the record; its edit tiles and mask copy are stored apart, under its id. */
-// ADR 0037: a raster has at most one current session (the labels on the map) and one replaced one (the labels an
-// import replaced). exportedAt: when a verified export last wrote them (spec 056), null if never.
+// ADR 0042: a raster has at most one current session (the labels on the map) and one replaced one (the labels an
+// import replaced). exportedAt: when a verified export last wrote them (spec 075), null if never.
 export type SessionRecord = {
   id: string; raster: string; role: "current" | "replaced"; exportedAt: number | null;
   name: string; savedAt: number;
@@ -34,7 +34,7 @@ export interface SessionStore {
   deleteBase(id: string): Promise<void>;
 }
 
-/** A stored record as this version reads it: spec 031's, keyed by rasterKey alone, is that raster's current session, never exported (ADR 0037). */
+/** A stored record as this version reads it: spec 031's, keyed by rasterKey alone, is that raster's current session, never exported (ADR 0042). */
 export function readRecord(stored: object): SessionRecord {
   const r = stored as Partial<SessionRecord> & { key: string };
   const { key, ...rest } = r;
@@ -46,7 +46,7 @@ const done = (t: IDBTransaction) => new Promise<void>((resolve, reject) => { t.o
 // [key] sorts before every [key, tile], and [key, []] after them: arrays sort after strings
 const all = (key: string) => IDBKeyRange.bound([key], [key, []]);
 
-/** The browser's session store (ADRs 0025, 0037): database geoplatform v1 with stores sessions (keyPath key, the id) and tiles ([id, tile]), mask copies in OPFS bases/. */
+/** The browser's session store (ADRs 0025, 0042): database geoplatform v1 with stores sessions (keyPath key, the id) and tiles ([id, tile]), mask copies in OPFS bases/. */
 export async function openSessionStore(): Promise<SessionStore> {
   const open = indexedDB.open("geoplatform", 1);
   open.onupgradeneeded = () => {

@@ -33,7 +33,7 @@ export const MESSAGES = {
   restored: "Labels restored.",
   pendingDiscard: (name: string, reason: string) => `Labels for ${name} couldn't be saved (${reason}). Discard them?`,
   restoredNoMask: "Labels restored without the imported mask, whose saved copy can't be read. Import it again.",
-  // spec 056 scope 1: a decline kept nothing apart, so as not to hide R behind a second replaced session
+  // spec 075 scope 1: a decline kept nothing apart, so as not to hide R behind a second replaced session
   restoredStray: "Labels restored: they have unsaved changes, and the earlier replaced labels aren't exported.",
   // spec 038
   picked: (name: string) => `Picked ${name}.`,
@@ -48,7 +48,7 @@ export const MESSAGES = {
   fillSame: "This area already has the selected class.",
   fillNodata: "There is no imagery to label here.",
   polygonTooLarge: "A polygon can span 2048 px at most. Fill this one first, or zoom in.",
-  // spec 055
+  // spec 074
   saveAs: "Save labels as",
   badName: "That name can't be used. Leave out / \\ : * ? \" < > | and names Windows reserves, such as con.",
   exportImagery: "That is the imagery file. Choose another name.",
@@ -57,7 +57,7 @@ export const MESSAGES = {
   exportedTo: (name: string, bytes: number) => `Labels exported to ${name} (${(bytes / 1e6).toFixed(1)} MB).`,
   exportShort: (name: string, got: number, want: number) => `${name} was written with ${got} bytes, not ${want}. Export it again.`,
   nothingOverwritten: "Nothing was overwritten.",
-  // spec 056
+  // spec 075
   restoreDelete: (savedAt: string, name: string) => `Delete the labels saved ${savedAt} for ${name}? This can't be undone. Cancel restores them.`,
   restoreReplaced: (time: string) => `Restore the labels replaced on ${time} instead? The newer labels are kept.`,
   replacedFirst: "Export or restore the earlier replaced labels first.",

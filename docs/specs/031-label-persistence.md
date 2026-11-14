@@ -1,6 +1,6 @@
 # 031: Labels survive a reload
 
-**Status:** Approved by Gage 2026-10-30, with the draft answers to its questions. Amended 2026-10-30 after testing: scope 4 (lock), scope 8 (pending snapshot), scope 9 (lint), criteria 11–14. Amended by spec 056 (2026-11-14): sessions per labelling run, scopes 3 and 4 and criterion 5. **ADRs:** 0025. **Amends:**
+**Status:** Approved by Gage 2026-10-30, with the draft answers to its questions. Amended 2026-10-30 after testing: scope 4 (lock), scope 8 (pending snapshot), scope 9 (lint), criteria 11–14. Amended by spec 075 (2026-11-14): sessions per labelling run, scopes 3 and 4 and criterion 5. **ADRs:** 0025. **Amends:**
 - Spec 016's "Opacity isn't saved across reloads": a restored session brings its opacity back. Without a restore, a reload still reads 60, so 016's criterion 3 stands.
 - README's "labels live in memory until you export them".
 

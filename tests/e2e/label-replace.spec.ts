@@ -52,7 +52,7 @@ test("with painted tiles an import confirms: Cancel keeps labels and classes, OK
   expect(await classList(page)).toEqual(["Class 0", "Class 3", "Class 7"].map((name, i) => ({ name, colour: paletteColour(i) })));
   expect(new Set((await labels(page)).values())).toEqual(new Set([1, 2, 3]));
   await expect(page.locator("#undo")).toBeDisabled();
-  // spec 056: a second import would drop the painted labels, kept as the replaced session and never exported, so it is refused
+  // spec 075: a second import would drop the painted labels, kept as the replaced session and never exported, so it is refused
   const imported = await labels(page);
   await importFile(page, classes());
   await expect(message(page)).toHaveText(MESSAGES.replacedFirst);

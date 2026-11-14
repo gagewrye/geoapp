@@ -6,7 +6,7 @@ import type { Choice } from "./restoreOffer";
 import type { Pending, Session } from "./sessionState";
 import { mergeSnapshots, type Snapshot } from "./snapshot";
 
-// Spec 056: a raster's snapshot still pending when the raster opens again (its save was on the way at the open, then
+// Spec 075: a raster's snapshot still pending when the raster opens again (its save was on the way at the open, then
 // failed). It is never written over the session that opens: if that restores its id, its labels go on the map and
 // save with the session; else it keeps its own id as a replaced session, which the restore offer still reaches.
 // It never deletes, demotes or clears anything: those were its earlier open's, made before the user chose this time.

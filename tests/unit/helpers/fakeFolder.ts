@@ -1,4 +1,4 @@
-// A FileSystemDirectoryHandle fake (spec 055): createWritable writes a swap buffer that replaces the file only on close, as WHATWG says.
+// A FileSystemDirectoryHandle fake (spec 074): createWritable writes a swap buffer that replaces the file only on close, as WHATWG says.
 type Entry = { bytes: Uint8Array };
 
 export function fakeFolder(files: Record<string, Uint8Array> = {}, opts: { failAfter?: number } = {}) {

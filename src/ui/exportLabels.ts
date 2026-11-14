@@ -8,11 +8,11 @@ import { canPickFolder, downloadSink, existingFile, folderSink, pickFolder, same
 import type { RasterSource } from "../io/source";
 import { MESSAGES, type MessageKind } from "./messages";
 
-/** A user file Export must recognise (spec 055 scope 3): its handle when the app holds one, else its name and size. */
+/** A user file Export must recognise (spec 074 scope 3): its handle when the app holds one, else its name and size. */
 export type KnownFile = { handle: FileSystemHandle | null; name: string; size: number };
 
 /**
- * The mask Export must not write over while uncopied (spec 055 scope 3): this page's import while the base is it, else
+ * The mask Export must not write over while uncopied (spec 074 scope 3): this page's import while the base is it, else
  * the user's file a restored base still reads, its copy not written (a stray's import: ui/strays.ts).
  */
 export function maskTarget(own: { known: KnownFile; base: MaskBase; source: LabelSource } | null, base: MaskBase | null, uncopied: Blob | null): (KnownFile & { copied: boolean }) | null {
@@ -27,15 +27,15 @@ export type ExportDeps = {
   /** Spec 050's handle: the folder picker starts in its folder. */
   startIn: FileSystemHandle | null;
   imageryFile: KnownFile | null;
-  /** The imported mask's own file while it is the base, and whether the base now reads the app's copy instead (ADR 0036). */
+  /** The imported mask's own file while it is the base, and whether the base now reads the app's copy instead (ADR 0041). */
   mask: () => (KnownFile & { copied: boolean }) | null;
-  /** Resolves once the import's copy is written, or has failed (spec 055 scope 1). */
+  /** Resolves once the import's copy is written, or has failed (spec 074 scope 1). */
   waitCopy: () => Promise<unknown>;
   prompt: (text: string, value: string) => string | null;
   confirm: (text: string) => boolean;
   say: (text: string, kind?: MessageKind) => void;
   error: (e: unknown) => string;
-  /** A verified export finished (spec 056 scope 6). */
+  /** A verified export finished (spec 075 scope 6). */
   exported: (at: number) => void;
   now?: () => number;
 };
@@ -72,8 +72,8 @@ async function folderTarget(d: ExportDeps, picked: Promise<FileSystemDirectoryHa
 }
 
 /**
- * Export labels (specs 004, 055): on Chromium into a chosen folder through createWritable, which changes no file until
- * close (ADR 0035), else ADR 0001's download. The written size is checked; a failure aborts and overwrites nothing.
+ * Export labels (specs 004, 074): on Chromium into a chosen folder through createWritable, which changes no file until
+ * close (ADR 0040), else ADR 0001's download. The written size is checked; a failure aborts and overwrites nothing.
  */
 export async function runExport(d: ExportDeps): Promise<void> {
   const now = d.now ?? Date.now;

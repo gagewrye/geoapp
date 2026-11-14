@@ -2,15 +2,15 @@ import type { Grid } from "../core/types";
 import type { SessionRecord } from "../io/session";
 import { CopyFailed, type Snapshot } from "./snapshot";
 
-// The open raster's saved-session state that ui/persist.ts keeps, and how a failed save's error reads (specs 031, 032, 056)
+// The open raster's saved-session state that ui/persist.ts keeps, and how a failed save's error reads (specs 031, 032, 075)
 
-/** A session's export state, enough to know whether it may be dropped (spec 056). */
+/** A session's export state, enough to know whether it may be dropped (spec 075). */
 export type Summary = { id: string; savedAt: number; exportedAt: number | null };
 
 /** The open raster's session: what changed since its last save, and whether it may save yet. */
 export type Session = {
   raster: string; name: string; grid: Grid;
-  /** The session the labels on the map save to (ADR 0037), and the raster's stored replaced ones (normally at most one). */
+  /** The session the labels on the map save to (ADR 0042), and the raster's stored replaced ones (normally at most one). */
   id: string; replaced: Summary[];
   /** The saved sessions' lookup, started at open; settled once it resolves (a failed one resolves []). */
   lookup: Promise<SessionRecord[]>; settled: boolean; found: boolean;
@@ -27,7 +27,7 @@ export type Session = {
   lastChange: number;
   savedAt: number | null; exportedAt: number | null;
   demote: string | null; drop: string[];
-  /** The mask copy is left out until the next import: a quota error, or COPY_RETRIES failed retries (specs 032, 056). */
+  /** The mask copy is left out until the next import: a quota error, or COPY_RETRIES failed retries (specs 032, 075). */
   noCopy: boolean;
   copyFails: number;
   /** The current import's mask copy is written (true too with no import since open or restore). */

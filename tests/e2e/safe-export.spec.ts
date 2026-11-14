@@ -3,7 +3,7 @@ import { MESSAGES } from "../../src/ui/messages";
 import { jumpTo, message, openApp, openRaster, paintMode, paintTwoClasses, path, rgbFixture, stroke, toScreen } from "./helpers";
 import { effectiveTiles, importFile, maskFile, storeTiles, tileDiff } from "./seeding";
 
-// Spec 055 criteria 5-8 and spec 056 criterion 6: Export writes through a folder handle and never destroys a file.
+// Spec 074 criteria 5-8 and spec 075 criterion 6: Export writes through a folder handle and never destroys a file.
 
 /**
  * Before page scripts run: the pickers work on the OPFS folder work/. The open picker returns work/<__f.next>; the folder
@@ -24,7 +24,7 @@ const fakeFolder = (page: Page) => page.addInitScript(() => {
     const dir = await work();
     if (g.failAt === null) return dir;
     const n = g.failAt;
-    // the folder's getFileHandle wrapped: its handles' writables reject on write n (spec 055 criterion 7)
+    // the folder's getFileHandle wrapped: its handles' writables reject on write n (spec 074 criterion 7)
     const get = dir.getFileHandle.bind(dir);
     (dir as any).getFileHandle = async (name: string, o?: FileSystemGetFileOptions) => {
       const h = await get(name, o);
@@ -180,7 +180,7 @@ test("criterion 6: exporting with the imagery's file name is refused, and the im
   expect((await bytesOf(page, "rgb4326.tif"))!.equals(rgbFixture().buffer)).toBe(true);
 });
 
-test("criterion 7 and spec 056 criterion 6: a write that fails midway keeps the old labels.tif, and a reload restores the same tiles; a good export marks the session", async ({ page }) => {
+test("criterion 7 and spec 075 criterion 6: a write that fails midway keeps the old labels.tif, and a reload restores the same tiles; a good export marks the session", async ({ page }) => {
   test.setTimeout(180_000);
   await fakeFolder(page);
   const dialogs = answer(page);

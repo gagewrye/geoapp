@@ -12,7 +12,7 @@ import { fakeFolder } from "../helpers/fakeFolder";
 import { fakeSessionStore } from "../helpers/sessionStore";
 import { fakeSource } from "../helpers/sources";
 
-// Tester: adversarial cases for specs 055 and 056 beyond the implementer's tests.
+// Tester: adversarial cases for specs 074 and 075 beyond the implementer's tests.
 
 const G: Grid = { width: 1000, height: 700, epsg: 32633, gt: [500000, 0.1, 0, 4000000, 0, -0.1] };
 const tile = (v: number) => new Uint8Array(256 * 256).fill(v);
@@ -49,7 +49,7 @@ function persistSetup(fake = fakeSessionStore(), answers: boolean[] = []) {
   return { fake, p, paint, flush, importMask, open: async () => { p.open("a.tif", 4321, G); return p.offer(); }, now: () => clock, prompts };
 }
 
-describe("spec 056 scope 2: a replaced session changed after its export is never dropped", () => {
+describe("spec 075 scope 2: a replaced session changed after its export is never dropped", () => {
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
 
@@ -104,7 +104,7 @@ describe("spec 056 scope 2: a replaced session changed after its export is never
   });
 });
 
-describe("spec 056 scope 3: a replaced session's pending copy failures don't use up the new import's copy retries", () => {
+describe("spec 075 scope 3: a replaced session's pending copy failures don't use up the new import's copy retries", () => {
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
 
@@ -134,7 +134,7 @@ describe("spec 056 scope 3: a replaced session's pending copy failures don't use
   });
 });
 
-describe("spec 056 scope 2 with c1c1d6c's queue order: a dropped replaced session is not written back by its own retry", () => {
+describe("spec 075 scope 2 with c1c1d6c's queue order: a dropped replaced session is not written back by its own retry", () => {
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
 
@@ -258,7 +258,7 @@ describe("c8d884f: ids and roles over many imports, exports, failing saves and r
   });
 });
 
-// Spec 055 scope 3: on Windows, folder names are case-insensitive, so ORTHO.tif opens the imagery ortho.tif
+// Spec 074 scope 3: on Windows, folder names are case-insensitive, so ORTHO.tif opens the imagery ortho.tif
 function caseInsensitive(f: ReturnType<typeof fakeFolder>) {
   const real = f.dir.getFileHandle.bind(f.dir);
   f.dir.getFileHandle = (async (n: string, o?: { create?: boolean }) => {
@@ -270,7 +270,7 @@ function caseInsensitive(f: ReturnType<typeof fakeFolder>) {
   return f;
 }
 
-describe("spec 055 scope 3: the imagery and the uncopied mask are refused whatever the name's case", () => {
+describe("spec 074 scope 3: the imagery and the uncopied mask are refused whatever the name's case", () => {
   const { source } = fakeSource({ width: 600, height: 300 }, () => 1);
   afterEach(() => { vi.unstubAllGlobals(); });
 

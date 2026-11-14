@@ -5,7 +5,7 @@ import { CopyFailed, mergeSnapshots, writeSnapshot, type Snapshot } from "./snap
 
 /** While a snapshot is pending or failed (spec 031 scope 8, spec 032), a save is tried this often. */
 export const RETRY_MS = 30_000;
-/** Spec 056 scope 3: a mask copy failing for another reason than the quota is tried this many times more, then left out. */
+/** Spec 075 scope 3: a mask copy failing for another reason than the quota is tried this many times more, then left out. */
 export const COPY_RETRIES = 3;
 
 type Deps = {
@@ -23,7 +23,7 @@ type Deps = {
   persistStorage?: () => void;
 };
 
-/** Spec 031's writes, one at a time: pending snapshots first, retries, the mask copy's use (ADR 0036) and the failure message (spec 056 scope 5). */
+/** Spec 031's writes, one at a time: pending snapshots first, retries, the mask copy's use (ADR 0041) and the failure message (spec 075 scope 5). */
 export function saveQueue(d: Deps) {
   let pending: Pending[] = [];
   let retry: ReturnType<typeof setTimeout> | null = null;
@@ -63,7 +63,7 @@ export function saveQueue(d: Deps) {
   /**
    * A snapshot that wasn't written: the current session's is dirty again (only its file, when just its copy failed);
    * another session's becomes (or joins) a pending one. Either is tried again after RETRY_MS. After a quota error, or
-   * COPY_RETRIES failed copy retries, the mask copy is left out until the next import (specs 032, 056).
+   * COPY_RETRIES failed copy retries, the mask copy is left out until the next import (specs 032, 075).
    */
   function lost(s: Session, snap: Snapshot, e: unknown): void {
     const quota = isQuota(e), copy = e instanceof CopyFailed;
@@ -129,7 +129,7 @@ export function saveQueue(d: Deps) {
       return reason;
     }).then((reason) => {
       failed = reason;
-      // spec 056 scope 5: said on the first failure, and again only after a save succeeded
+      // spec 075 scope 5: said on the first failure, and again only after a save succeeded
       if (reason && loud) { loud = false; d.say?.(MESSAGES.notSaving(reason), "error"); }
       if (!reason && !pending.length) { loud = true; saved = `Saved ${d.time(d.now())}`; }
       if (!reason && !pending.length && retry) { clearTimeout(retry); retry = null; }

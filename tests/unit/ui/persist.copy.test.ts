@@ -7,7 +7,7 @@ import { initPersist, type PersistLabels } from "../../../src/ui/persist";
 import { CLASS_GRID, classFile } from "../helpers/labelFiles";
 import { fakeSessionStore } from "../helpers/sessionStore";
 
-// Spec 055 criterion 4 (ADR 0036): once the copy is written whole, the base reads it and never the user's file again.
+// Spec 074 criterion 4 (ADR 0041): once the copy is written whole, the base reads it and never the user's file again.
 const G: Grid = CLASS_GRID;
 
 /** The user's file: counts reads, and fails them as Chrome does once it changed on disk. */

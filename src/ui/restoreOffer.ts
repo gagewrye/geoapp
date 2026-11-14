@@ -7,7 +7,7 @@ import type { Session } from "./sessionState";
 export type Choice = { restore: SessionRecord | null; replaced: SessionRecord | null; deleted: string[] };
 
 /**
- * Spec 056's restore questions for a raster's saved sessions. The current one (else the newest replaced one) is offered;
+ * Spec 075's restore questions for a raster's saved sessions. The current one (else the newest replaced one) is offered;
  * a Cancel offers each replaced one instead, newest first, then asks to delete; only an OK there deletes, so no single
  * Cancel loses labels. A restored replaced session swaps roles with the current one (`replaced`, to demote).
  */

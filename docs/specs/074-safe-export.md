@@ -1,6 +1,6 @@
-# 055: Export never destroys a file
+# 074: Export never destroys a file
 
-**Status:** Approved by Gage in advance, 2026-11-14 ("I dont care what it needs. make absolutely sure labels are never lost. approve any adr or spec"), as relayed by the orchestrator. **ADRs:** 0035, 0036. **Amends:** ADR 0001 and spec 050 (the save path), ADR 0018 ("the mask must stay unchanged on disk"), and README step 5. **Sibling:** spec 056 (sessions).
+**Status:** Approved by Gage in advance, 2026-11-14 ("I dont care what it needs. make absolutely sure labels are never lost. approve any adr or spec"), as relayed by the orchestrator. **ADRs:** 0040, 0041. **Amends:** ADR 0001 and spec 050 (the save path), ADR 0018 ("the mask must stay unchanged on disk"), and README step 5. **Sibling:** spec 075 (sessions).
 
 **Request** (Gage, 2026-11-14): "fix this on the geoapp. I lost 2 hours." He exported over the imported `labels_merged.tif` and got a 0-byte file. The same happened to 3 other label files.
 
@@ -10,24 +10,24 @@
 3. That file is the one the picker just emptied, so the first read fails with `NotReadableError` (`labelFile.ts:86`). `seeding.ts:185` aborts the writable, which discards its swap file. The emptied file stays at 0 bytes, and `seeding.ts:190` says "Import it again", which is now impossible.
 
 ## Scope
-1. **Mask read from the app's copy.** Once spec 031's OPFS copy of an import is written and its size matches the source, the live base's `file` becomes that copy (ADR 0036). After that the app never reads the user's file again.
+1. **Mask read from the app's copy.** Once spec 031's OPFS copy of an import is written and its size matches the source, the live base's `file` becomes that copy (ADR 0041). After that the app never reads the user's file again.
    - Export waits while the copy is in progress. It does not wait when the copy has failed (spec 032 `noCopy`).
-2. **Folder-based save on Chromium (ADR 0035).** Export labels runs these steps:
+2. **Folder-based save on Chromium (ADR 0040).** Export labels runs these steps:
    - `showDirectoryPicker({ mode: "readwrite", startIn })`, with spec 050's handle as `startIn`.
    - `prompt("Save labels as", "labels.tif")`. A missing `.tif` is added. A name with a path separator or a character Windows refuses is refused with a message.
    - `getFileHandle(name, { create: true })`, then `createWritable()`. No byte reaches the file until `close()` (WHATWG File System).
    - Picking no folder or cancelling the prompt does nothing and shows no message.
 3. **Target checks**, done after the prompt and before the file handle is created. They use `isSameEntry` when the app holds a handle. Without a handle, a file with the same name and size counts as a match.
    - **The open imagery:** refused with `That is the imagery file. Choose another name.`
-   - **The imported mask, before the app's copy exists:** refused with `That is the imported mask, and this browser couldn't keep a copy of it. Choose another name.` This includes a restored session whose mask still reads the user's file (spec 056 strays); that name stays refused until the raster is reopened.
+   - **The imported mask, before the app's copy exists:** refused with `That is the imported mask, and this browser couldn't keep a copy of it. Choose another name.` This includes a restored session whose mask still reads the user's file (spec 075 strays); that name stays refused until the raster is reopened.
    - **Any other existing file, including the imported mask once copied:** `confirm("Replace <name>? It stays as it is until the new file is complete.")`. Cancel writes nothing.
 4. **Verify.** After `close()`, the written file's size must equal `tiffLayout().totalBytes`. Then the message is `Labels exported to <name> (<MB> MB).`. A size mismatch shows an error that names the file.
-5. **Failure.** Any error before `close()` aborts the writable, and the target keeps its old bytes. The labels, the mask, Undo and the session are unchanged (spec 056 criterion 6). The message is the error, plus `Nothing was overwritten.`
+5. **Failure.** Any error before `close()` aborts the writable, and the target keeps its old bytes. The labels, the mask, Undo and the session are unchanged (spec 075 criterion 6). The message is the error, plus `Nothing was overwritten.`
 6. **Other browsers** keep ADR 0001's OPFS-then-download path. A download never overwrites a file.
 7. **Docs:**
    - README step 5 says export writes into a chosen folder, never overwrites a file until the new file is complete, and refuses the imagery.
    - README line 29 says the app stops reading the imported file once its copy is saved.
-   - ADR 0001 and ADR 0018's Status lines name ADRs 0035 and 0036.
+   - ADR 0001 and ADR 0018's Status lines name ADRs 0040 and 0041.
 
 **Out of scope:** export cancel button, compression, BigTIFF.
 

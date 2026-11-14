@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { anotherRaster, message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture } from "./helpers";
 
-// Spec 050 criteria 3-5: on Chromium the open picker replaces the input's chooser, and Export's folder picker (spec 055, ADR 0035) starts in the open raster's folder.
+// Spec 050 criteria 3-5: on Chromium the open picker replaces the input's chooser, and Export's folder picker (spec 074, ADR 0040) starts in the open raster's folder.
 
 type Next = "A" | "B" | "bad" | "abort";
 
