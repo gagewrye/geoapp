@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { tiledGeotiffBuffer } from "../unit/helpers/tiledTiff";
-import { jumpTo, mapIdle, message, openApp, openRaster, overlaysIdle, paintMode, rgbFixture, stroke, toScreen } from "./helpers";
+import { jumpTo, mapIdle, message, openApp, openRaster, overlaysIdle, paintMode, rgbFixture, settled, stroke, toScreen } from "./helpers";
 
 // TEMPORARY (spec 072 step 0): times openApp, the open, jumpTo at zoom 7 and one stroke for three fixtures; reverted before merge.
 const value = (px: number) => (b: number, c: number, r: number) => {
