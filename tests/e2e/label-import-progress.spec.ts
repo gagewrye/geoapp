@@ -2,17 +2,19 @@ import { expect, test, type Page } from "@playwright/test";
 import { writeFile } from "../unit/helpers/labelFiles";
 import { MESSAGES } from "../../src/ui/messages";
 import { collectErrors, jumpTo, message, openApp, openRaster, paintMode, path, RGB_GRID, rgbFixture, stroke, tileKeysStored, toScreen } from "./helpers";
-import { at, classList, effectiveTiles, importFile, maskFile, upload } from "./seeding";
+import { at, classList, countOps, effectiveTiles, importFile, maskFile, opsCounted, upload } from "./seeding";
 
 // Spec 021 criteria 2-8: the import's bar and Cancel, the old labels off the map while it runs, and restores.
 
 const seeded = /^Seeded \d+ pixels in \d+ classes\.$/;
 const GEOG = { GTModelTypeGeoKey: 2, GTRasterTypeGeoKey: 1, GeographicTypeGeoKey: 4326 };
-/** A label file on rgbFixture's grid, f per pixel, GDAL_NODATA 0, no class table: 16 windows, one pass (spec 024), one file read per window. */
+/** A 500 x 500 label file on rgbFixture's pixel grid from its corner, f per pixel, GDAL_NODATA 0, no class table: 4 windows, one pass (spec 024), one file read per window. */
+// spec 072: was 1000 x 1000 (16 windows); 512 x 512 would touch a third row and column of windows, so 9
+const SIDE = 500;
 function sameGrid(name: string, f: (c: number, r: number) => number) {
-  const v = new Uint8Array(1000 * 1000);
-  for (let r = 0; r < 1000; r++) for (let c = 0; c < 1000; c++) v[r * 1000 + c] = f(c, r);
-  return upload(name, writeFile(RGB_GRID, 1, v, "0", GEOG));
+  const v = new Uint8Array(SIDE * SIDE);
+  for (let r = 0; r < SIDE; r++) for (let c = 0; c < SIDE; c++) v[r * SIDE + c] = f(c, r);
+  return upload(name, writeFile({ ...RGB_GRID, width: SIDE, height: SIDE }, 1, v, "0", GEOG));
 }
 const other = () => sameGrid("other.tif", (c, r) => 1 + (((c >> 6) + (r >> 6)) % 2));
 const empty = () => sameGrid("empty.tif", () => 0);
@@ -76,7 +78,6 @@ async function startImport(page: Page, file: ReturnType<typeof upload>, failAt =
 }
 
 test("the bar counts windows, Cancel shows, the old labels leave the map; Cancel at window k restores everything (criteria 2, 3, 5)", async ({ page }) => {
-  test.setTimeout(120_000);
   const errors = collectErrors(page);
   await withLabels(page);
   const before = await snapshot(page);
@@ -87,9 +88,9 @@ test("the bar counts windows, Cancel shows, the old labels leave the map; Cancel
   await page.click("#show-labels");
   await page.click("#show-labels");
   expect(await labelLayers(page)).toEqual([]);
-  await allow(page, 3);
-  await expect.poll(() => barValue(page)).toBe("3");
-  expect(await bar(page).evaluate((b: HTMLProgressElement) => b.max)).toBe(16); // one pass (spec 024)
+  await allow(page, 2); // k = 2 of the file's 4 windows
+  await expect.poll(() => barValue(page)).toBe("2");
+  expect(await bar(page).evaluate((b: HTMLProgressElement) => b.max)).toBe(4); // one pass (spec 024)
   await expect(cancel(page)).toBeVisible();
   await expect(message(page)).toHaveText("Importing labels…");
   await page.click("#import-cancel");
@@ -97,13 +98,12 @@ test("the bar counts windows, Cancel shows, the old labels leave the map; Cancel
   await expect(message(page)).toHaveText(MESSAGES.importCancelled);
   await expect(bar(page)).toBeHidden();
   await expect(cancel(page)).toBeHidden();
-  expect((await readsLogged(page)).length).toBeLessThanOrEqual(4); // window k + 1 at most
+  expect((await readsLogged(page)).length).toBeLessThanOrEqual(3); // window k + 1 at most
   await expectRestored(page, before);
   expect(errors).toEqual([]);
 });
 
 test("a read failure partway and an empty import restore the old labels, with their usual messages (criterion 6)", async ({ page }) => {
-  test.setTimeout(120_000);
   await withLabels(page);
   const before = await snapshot(page);
   await startImport(page, other(), 3);
@@ -119,7 +119,6 @@ test("a read failure partway and an empty import restore the old labels, with th
 });
 
 test("during an import edits are disabled or ignored, and Opacity and Show labels still apply (criterion 8)", async ({ page }) => {
-  test.setTimeout(120_000);
   await withLabels(page);
   const keys = await tileKeysStored(page);
   const classes = await classList(page);
@@ -128,11 +127,12 @@ test("during an import edits are disabled or ignored, and Opacity and Show label
   // a Paint stroke is ignored
   await page.click("#mode-paint");
   const a = await toScreen(page, at(700.5, 700.5));
+  await countOps(page);
   await page.mouse.move(a.x, a.y);
   await page.mouse.down();
   await page.mouse.move(a.x + 40, a.y + 10);
   await page.mouse.up();
-  await page.waitForTimeout(200);
+  expect(await opsCounted(page)).toBe(0); // a locked stroke makes no op, at once (spec 072: no fixed wait)
   expect(await tileKeysStored(page)).toEqual(keys);
   for (const id of ["#undo", "#import-labels", "#class-map", "#export-labels", "#class-add"]) await expect(page.locator(id)).toBeDisabled();
   await expect(page.locator("#classes .class-rename").first()).toBeDisabled();
