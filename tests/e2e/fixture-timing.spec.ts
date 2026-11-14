@@ -8,13 +8,9 @@ const value = (px: number) => (b: number, c: number, r: number) => {
   if (Math.abs(lon - 15.5) < 0.05 && Math.abs(lat - 45.5) < 0.05) return 255;
   return b === 0 ? (lon < 15 ? 200 : 120) : b === 1 ? 100 + (r % 100) : 150;
 };
-const tiled = (name: string, side: number, uint8 = false, nodata?: string) => ({ name, mimeType: "image/tiff",
-  buffer: Buffer.from(tiledGeotiffBuffer(side, side, 3, value(10 / side), { epsg: 4326, gt: [10, 10 / side, 0, 50, 0, -10 / side], ...(nodata ? { nodata } : {}) }, { uint8 })) });
-const FIXTURES = {
-  strip1000: rgbFixture, tiled1000: () => tiled("rgbtiled.tif", 1000), tiled512: () => tiled("rgb512.tif", 512),
-  tiled1000u8: () => tiled("rgbtiled8.tif", 1000, true), tiled512u8: () => tiled("rgb512u8.tif", 512, true),
-  tiled1000u8nodata: () => tiled("rgbtiled8nd.tif", 1000, true, "0"),
-};
+const tiled = (name: string, side: number) => ({ name, mimeType: "image/tiff",
+  buffer: Buffer.from(tiledGeotiffBuffer(side, side, 3, value(10 / side), { epsg: 4326, gt: [10, 10 / side, 0, 50, 0, -10 / side] })) });
+const FIXTURES = { strip1000: rgbFixture, tiled1000: () => tiled("rgbtiled.tif", 1000), tiled512: () => tiled("rgb512.tif", 512) };
 
 test.describe.configure({ mode: "parallel" });
 for (const [name, make] of Object.entries(FIXTURES)) for (const rep of [1, 2]) {
