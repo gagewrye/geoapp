@@ -43,6 +43,8 @@
    - An unexported session is never evicted. When nothing can be evicted, everything is kept.
 5. **Loud failure (E).** When a save first fails, and again on each failure after a successful save, `#message` shows the error `Labels aren't being saved (<reason>). Export them to keep a copy.` The guard stays on as now.
 6. **Export marks the session.** A verified export (spec 055 scope 4) sets `exportedAt` and saves the record. A failed export changes nothing in the session.
+   - Only a folder export marks it. A download doesn't, since it may be cancelled. Any later label, class or view change makes the session unexported again.
+   - So on Firefox and Safari (download only) no session is ever evictable, and the quota is the limit (ADR 0037).
 
 **Out of scope:**
 - A session manager UI.
