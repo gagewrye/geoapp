@@ -1,6 +1,7 @@
-import { offers } from "../core/session";
-import type { SessionRecord } from "../io/session";
+import { offers, sessionId } from "../core/session";
+import type { SessionRecord, SessionStore } from "../io/session";
 import { MESSAGES } from "./messages";
+import type { Session } from "./sessionState";
 
 /** What the restore questions decided: the session to restore, the one left as replaced, and the ones to delete. */
 export type Choice = { restore: SessionRecord | null; replaced: SessionRecord | null; deleted: string[] };
@@ -20,4 +21,16 @@ export function chooseSession(records: SessionRecord[], ask: (text: string) => b
   if (other && ask(MESSAGES.restoreReplaced(dateTime(other.savedAt)))) return { restore: other, replaced: first, deleted: [] };
   if (ask(MESSAGES.restoreDelete(dateTime(first.savedAt), first.name))) return { restore: null, replaced: other, deleted: [first.id] };
   return { restore: first, replaced: other, deleted: [] };
+}
+
+/** Applies a choice to the store (deletes, then role swaps) and to the session: which id the labels save to, and its replaced one. */
+export async function settle(s: Session, sessions: SessionStore, c: Choice, records: SessionRecord[]): Promise<SessionRecord | null> {
+  for (const id of c.deleted) await sessions.delete(id);
+  if (c.replaced && c.replaced.role !== "replaced") await sessions.putRecord({ ...c.replaced, role: "replaced" });
+  if (c.restore && c.restore.role !== "current") await sessions.putRecord({ ...c.restore, role: "current" });
+  s.replaced = c.replaced && { id: c.replaced.id, savedAt: c.replaced.savedAt, exportedAt: c.replaced.exportedAt };
+  const left = records.filter((r) => !c.deleted.includes(r.id)).map((r) => r.id);
+  s.id = c.restore?.id ?? sessionId(s.raster, left);
+  if (c.restore) { s.savedAt = c.restore.savedAt; s.exportedAt = c.restore.exportedAt; }
+  return c.restore;
 }

@@ -232,3 +232,18 @@ describe("export marks the session (scope 6)", () => {
     expect(r.savedAt).toBeGreaterThan(r.exportedAt!);
   });
 });
+
+describe("an export covering unsaved changes (scope 6)", () => {
+  it("changes made before the export's click and not saved yet are saved as of the export, so the session counts as exported", async () => {
+    const t = setup();
+    await t.open();
+    t.paint("0,0", 1); await t.flush();
+    t.paint("256,0", 2); // not saved yet when Export is clicked
+    t.tick(100);
+    t.p.exported(5000);
+    await t.p.idle();
+    const r = t.fake.records.get(KEY)!;
+    expect([...t.fake.tiles.get(KEY)!.keys()].sort()).toEqual(["0,0", "256,0"]);
+    expect(r).toMatchObject({ savedAt: 5000, exportedAt: 5000 });
+  });
+});

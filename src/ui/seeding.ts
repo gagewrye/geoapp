@@ -24,24 +24,18 @@ type Deps = {
   /** e2e hook: sees each opened label file before it is read. */
   opened: (file: LabelSource) => void;
   /** Spec 031's saved session, which an import and an export report to (specs 055, 056). */
-  session?: SessionHooks;
+  session: SessionHooks;
 };
 
-/** What Import and Export tell the saved session. */
+/**
+ * What Import and Export tell the saved session: an import's mask file and base (copied, then read from the copy: ADR 0036);
+ * why an import may not replace the labels (spec 056 scope 2); a flush of unsaved changes before a replace; a wait for
+ * the import's copy, which resolves once written or failed (spec 055 scope 1); and a verified export's time (spec 056 scope 6).
+ */
 export type SessionHooks = {
-  /** An import replaced the labels with this file's mask, now `base`: the session copies it (ADRs 0025, 0036). */
-  imported(file: File, base: MaskBase): void;
-  /** Why an import may not replace the labels now (spec 056 scope 2), else null. */
-  replaceRefused(): string | null;
-  /** The labels are about to be replaced: their unsaved changes are saved first, under the session they belong to. */
-  flush(): void;
-  /** Resolves once the import's mask copy is written, or has failed (spec 055 scope 1). */
-  waitCopy(): Promise<unknown>;
-  /** A verified export finished at this time (spec 056 scope 6). */
-  exported(at: number): void;
+  imported(file: File, base: MaskBase): void; replaceRefused(): string | null; flush(): void;
+  waitCopy(): Promise<unknown>; exported(at: number): void;
 };
-
-const NO_SESSION: SessionHooks = { imported() {}, replaceRefused: () => null, flush() {}, waitCopy: async () => {}, exported() {} };
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -54,7 +48,7 @@ export function controlsDisabled(o: { imagery: boolean; seeding: boolean; queued
 /** Import labels and Export labels (spec 004), with the import's progress and Cancel (spec 021), and Apply class map (spec 047). */
 // A run belongs to the imagery it started on: once another raster opens it sets no labels and no
 // message (spec 003's rule for replaced rasters), and the new raster's controls are free at once.
-export function initSeeding({ labels, imagery, folder, imageryFile, say, error, opened, session = NO_SESSION }: Deps) {
+export function initSeeding({ labels, imagery, folder, imageryFile, say, error, opened, session }: Deps) {
   const importInput = $<HTMLInputElement>("import-labels"), classMap = $<HTMLInputElement>("class-map");
   const exportBtn = $<HTMLButtonElement>("export-labels"), cancelBtn = $<HTMLButtonElement>("import-cancel");
   // its own bar, so an open and an import don't hide each other's (spec 021)

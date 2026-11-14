@@ -7,7 +7,8 @@ import type { MaskBase } from "../io/maskBase";
 import type { SessionRecord, SessionStore } from "../io/session";
 import { yieldToBrowser } from "../io/yieldTask";
 import { MESSAGES, type MessageKind } from "./messages";
-import { chooseSession } from "./restoreOffer";
+import { chooseSession, settle } from "./restoreOffer";
+import { isQuota, newSession, reasonOf, withoutCopy, type Pending, type Session } from "./sessionState";
 import { CopyFailed, loadSession, mergeSnapshots, writeSnapshot, type Snapshot } from "./snapshot";
 
 export { MAX_SESSIONS, TILE_BATCH } from "./snapshot";
@@ -53,45 +54,6 @@ type Deps = {
   dateTime?: (ms: number) => string;
 };
 
-/** A session's export state, enough to know whether it may be dropped (spec 056). */
-type Summary = { id: string; savedAt: number; exportedAt: number | null };
-
-/** The open raster's session: what changed since its last save, and whether it may save yet. */
-type Session = {
-  raster: string; name: string; grid: Grid;
-  /** The session the labels on the map save to (ADR 0037), and the raster's replaced one, if any. */
-  id: string; replaced: Summary | null;
-  /** The saved sessions' lookup, started at open; settled once it resolves (a failed one resolves []). */
-  lookup: Promise<SessionRecord[]>; settled: boolean; found: boolean;
-  /** Its restore offer has been answered (or there was none): until then nothing saves over the saved one. */
-  ready: boolean;
-  /** A record of it is saved from this page, so labels going to none delete it. */
-  owned: boolean;
-  /** Its labels are saved, or on their way: an import then keeps them as the replaced session. */
-  kept: boolean;
-  tiles: Set<string>; record: boolean; clear: boolean; file: Blob | null;
-  /** Something besides an export changed since the last snapshot, so the next save is a new savedAt. */
-  touched: boolean;
-  savedAt: number | null; exportedAt: number | null;
-  demote: string | null; drop: string | null;
-  /** The mask copy is left out until the next import: a quota error, or COPY_RETRIES failed retries (specs 032, 056). */
-  noCopy: boolean;
-  copyFails: number;
-  /** The current import's mask copy is written (true too with no import since open or restore). */
-  copied: boolean;
-  /** Its failed snapshots' tiles not yet written since: if an import replaces the labels first, they are saved as the replaced session. */
-  failed: Snapshot | null;
-};
-
-/** A snapshot whose write failed (spec 031 scope 8): kept and written before anything else. */
-type Pending = { s: Session; snap: Snapshot; reason: string };
-
-/** A snapshot whose mask copy is left out: its record says the copy is missing. */
-const withoutCopy = (p: Snapshot): Snapshot =>
-  p.file ? { ...p, file: null, record: { ...p.record, base: p.record.base && { ...p.record.base, copyMissing: true } } } : p;
-const cause = (e: unknown) => (e instanceof CopyFailed ? e.reason : e);
-const isQuota = (e: unknown) => cause(e) instanceof DOMException && (cause(e) as DOMException).name === "QuotaExceededError";
-const reasonOf = (e: unknown) => isQuota(e) ? "the browser's storage is full" : e instanceof Error && e.message ? e.message : String(e);
 
 /** Saves the labels in this browser as they change and offers them back on reopening the raster (specs 031, 056, ADRs 0025, 0037). */
 // Changes mark tile keys and the record dirty; a save copies them (a snapshot) and writes it, one save at a time,
@@ -238,19 +200,6 @@ export function initPersist(d: Deps) {
   doc.addEventListener("visibilitychange", () => { if (doc.visibilityState === "hidden") save(true); });
   win.addEventListener("pagehide", () => save(true));
 
-  /** The restore questions' outcome on the store: deletes, role swaps, and the session the labels save to. */
-  async function settle(s: Session, sessions: SessionStore, records: SessionRecord[]): Promise<SessionRecord | null> {
-    const c = chooseSession(records, d.confirm, dateTime);
-    for (const id of c.deleted) await sessions.delete(id);
-    if (c.replaced && c.replaced.role !== "replaced") await sessions.putRecord({ ...c.replaced, role: "replaced" });
-    if (c.restore && c.restore.role !== "current") await sessions.putRecord({ ...c.restore, role: "current" });
-    s.replaced = c.replaced && { id: c.replaced.id, savedAt: c.replaced.savedAt, exportedAt: c.replaced.exportedAt };
-    const left = records.filter((r) => !c.deleted.includes(r.id)).map((r) => r.id);
-    s.id = c.restore?.id ?? sessionId(s.raster, left);
-    if (c.restore) { s.savedAt = c.restore.savedAt; s.exportedAt = c.restore.exportedAt; }
-    return c.restore;
-  }
-
   return {
     /**
      * A raster is about to open (before the labels switch to it). With a snapshot pending, first asks to discard it;
@@ -269,8 +218,7 @@ export function initPersist(d: Deps) {
       }
       if (current) save(true);
       const raster = rasterKey(size, grid);
-      const s: Session = { raster, name, grid, id: raster, replaced: null, lookup: Promise.resolve([]), settled: false, found: false, ready: false, owned: false, kept: false,
-        tiles: new Set(), record: false, clear: false, file: null, touched: false, savedAt: null, exportedAt: null, demote: null, drop: null, noCopy: false, copyFails: 0, copied: true, failed: null };
+      const s = newSession(raster, name, grid);
       // a failed lookup counts as no session
       s.lookup = store().then((db) => db.forRaster(raster)).catch(() => []).then((r) => { s.settled = true; s.found = r.length > 0; return r; });
       current = s;
@@ -287,7 +235,7 @@ export function initPersist(d: Deps) {
         const records = await s.lookup;
         if (s !== current || !records.length) return null;
         const sessions = await store();
-        const r = await settle(s, sessions, records);
+        const r = await settle(s, sessions, chooseSession(records, d.confirm, dateTime), records);
         if (!r) return null;
         const { tiles, base, missing } = await loadSession(sessions, r, s.grid, d.openBase ?? openLabelFile);
         if (s !== current) return null;
@@ -373,14 +321,17 @@ export function initPersist(d: Deps) {
       save(true);
       await chain;
     },
-    /** A verified export of the labels finished at `at` (spec 056 scope 6): the session records it, its savedAt unchanged. */
+    /**
+     * A verified export of the labels finished at `at` (spec 056 scope 6): the session records it, saved now. Edits were
+     * locked from the export's click, so any change not saved yet is in the file: it is saved as of the export.
+     */
     exported(at: number): void {
       const s = current;
       if (!s || !s.ready) return;
       s.exportedAt = at;
+      if (s.touched) { s.touched = false; s.savedAt = at; }
       s.record = true;
-      schedule();
-      sync();
+      save(false);
     },
     /** The saves started so far have ended (tests). */
     idle: () => chain,
