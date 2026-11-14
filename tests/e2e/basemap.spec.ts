@@ -117,12 +117,13 @@ test.describe("privacy (criterion 5)", () => {
     expect(urls[0]).toBe(urls[1]);
   });
 
-  for (const [i, place] of ([[13, 23], [-120, -40]] as LngLat[]).entries()) {
-    test(`privacy: after load, moving across zoom 1..14 from ${place} makes no request (criterion 5, session ${i})`, async ({ page, baseURL }) => {
+  // each session's jumps across zoom 1..14, in two halves
+  for (const [i, place] of ([[13, 23], [-120, -40]] as LngLat[]).entries()) for (const [z0, z1] of [[1, 7], [8, 14]]) {
+    test(`privacy: after load, moving across zoom ${z0}..${z1} from ${place} makes no request (criterion 5, session ${i})`, async ({ page, baseURL }) => {
       const log = logRequests(page);
       await basemapRequest(page, log, baseURL);
       const before = log.length;
-      for (let z = 1; z <= 14; z++) await jumpTo(page, [place[0] + z * 0.37 * (i ? -1 : 1), place[1] + z * 0.21], z);
+      for (let z = z0!; z <= z1!; z++) await jumpTo(page, [place[0] + z * 0.37 * (i ? -1 : 1), place[1] + z * 0.21], z);
       expect(network(log.slice(before)), `session ${i}`).toEqual([]);
     });
   }
