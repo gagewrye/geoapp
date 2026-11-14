@@ -10,7 +10,7 @@ import { yieldToBrowser } from "../io/yieldTask";
 import { MESSAGES, type MessageKind } from "./messages";
 import { chooseSession, settle } from "./restoreOffer";
 import { saveQueue } from "./saveQueue";
-import { adopt, keepApart, strays } from "./strays";
+import { adopt, keepApart, spare, strays } from "./strays";
 import { newSession, type Session } from "./sessionState";
 import { loadSession, type Snapshot } from "./snapshot";
 
@@ -162,8 +162,8 @@ export function initPersist(d: Deps) {
         if (s !== current || (!records.length && !loose.length)) return null;
         const sessions = await store();
         const c = records.length ? chooseSession(records, d.confirm, dateTime) : { restore: null, replaced: null, deleted: [] };
-        // a session with a stray is never deleted: the question showed only its stored labels, not the stray's newer ones
-        const r = await settle(s, sessions, { ...c, deleted: c.deleted.filter((id) => !ids.includes(id)) }, records, ids);
+        const { choice, laidOver } = spare(c, records, ids);
+        const r = await settle(s, sessions, choice, records, ids);
         for (const p of loose) if (p.snap.id !== r?.id) await keepApart(s, p, records, sessions);
         if (!r) return null;
         const openBase = d.openBase ?? openLabelFile;
@@ -178,7 +178,8 @@ export function initPersist(d: Deps) {
         } finally { applying = false; }
         s.owned = s.kept = true;
         if (missing) s.record = true; // saved again without the mask
-        return missing ? MESSAGES.restoredNoMask : MESSAGES.restored;
+        const said = missing ? MESSAGES.restoredNoMask : MESSAGES.restored;
+        return laidOver ? (missing ? `${MESSAGES.restoredStray} ${MESSAGES.restoredNoMask}` : MESSAGES.restoredStray) : said;
       } finally {
         // another raster's open has unlocked the labels already, and may hold its own lock
         if (s === current) {

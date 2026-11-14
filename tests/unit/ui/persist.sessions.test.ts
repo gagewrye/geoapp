@@ -412,3 +412,36 @@ describe("a raster reopened while its save is still on the way, which then fails
     expect(again.store().tiles.get("0,0")![0]).toBe(1);
   });
 });
+
+describe("a decline with a stray while an unexported replaced session is stored (spec 056 criterion 9)", () => {
+  it("Cancel, Cancel, OK: the session is restored with the stray laid over; R stays the only replaced session, still offered", async () => {
+    const t = setup(fakeSessionStore(), [false, false, true]);
+    await t.open();
+    await t.importMask(3, "0,256", 7); await t.flush(); // R, with its mask copy
+    let release!: () => void;
+    const held = new Promise<void>((r) => { release = r; });
+    t.fake.store.saveBase = async () => { await held; throw new DOMException("The file changed.", "NotReadableError"); };
+    expect(await t.importMask(5, "0,0", 1)).toBe(null); // R becomes replaced, not exported
+    t.paint("256,0", 1);
+    t.p.open("b.tif", SIZE + 1, G);
+    void t.p.offer();
+    t.reset();
+    const back = t.open();
+    release();
+    expect(await back).toBe(MESSAGES.restoredStray);
+    expect(t.prompts[1]).toMatch(/instead\?/);
+    expect(t.store().tiles.get("0,0")![0]).toBe(1);
+    expect(t.store().tiles.get("256,0")![0]).toBe(1);
+    t.paint("512,0", 2);
+    for (let ms = 0; ms < 10 * 60_000; ms += 5000) await t.flush(5000);
+    const reps = role(t.fake, "replaced"), cur = role(t.fake, "current");
+    expect(reps.map((r) => r.id)).toEqual([KEY]);
+    expect([...t.fake.tiles.get(KEY)!.keys()]).toEqual(["0,256"]);
+    expect(await t.fake.bases.get(KEY)!.text()).toBe("mask 3");
+    expect(cur).toHaveLength(1);
+    expect([...t.fake.tiles.get(cur[0]!.id)!.keys()].sort()).toEqual(["0,0", "256,0", "512,0"]);
+    const again = setup(t.fake, [false, true]); // Cancel, then OK on "…instead?"
+    expect(await again.open()).toBe(MESSAGES.restored);
+    expect([...again.store().tiles.keys()]).toEqual(["0,256"]);
+  });
+});

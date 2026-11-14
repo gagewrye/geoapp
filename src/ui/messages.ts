@@ -33,6 +33,8 @@ export const MESSAGES = {
   restored: "Labels restored.",
   pendingDiscard: (name: string, reason: string) => `Labels for ${name} couldn't be saved (${reason}). Discard them?`,
   restoredNoMask: "Labels restored without the imported mask, whose saved copy can't be read. Import it again.",
+  // spec 056 scope 1: a decline kept nothing apart, so as not to hide R behind a second replaced session
+  restoredStray: "Labels restored: they have unsaved changes, and the earlier replaced labels aren't exported.",
   // spec 038
   picked: (name: string) => `Picked ${name}.`,
   noLabel: "No label here.",
