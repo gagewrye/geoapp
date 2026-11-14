@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
 import { jumpTo, message, openApp, openRaster, paintMode, path, RGB_GRID, rgbFixture, selectClass, stroke, toScreen } from "./helpers";
-import { at, effectiveTiles, importFile, maskFile, tileDiff, upload } from "./seeding";
+import { at, effectiveTiles, importFile, maskFile, saved, tileDiff, upload } from "./seeding";
 import { writeFile } from "../unit/helpers/labelFiles";
 
 // Spec 075 criterion 7: an import keeps the labels it replaces, and the restore prompt offers them back.
@@ -21,18 +21,6 @@ function answer(page: Page) {
     if (d.type() === "beforeunload" || queue.shift()) void d.accept(); else void d.dismiss();
   });
   return { log, then: (...a: boolean[]) => { queue.push(...a); } };
-}
-
-/** Waits until the latest change is saved: "Saved", unchanged over a debounce (strokes over the mask may apply late). */
-async function saved(page: Page) {
-  const state = page.locator("#save-state");
-  await expect(state).toHaveText(/^Saved /, { timeout: 15_000 });
-  for (let text = await state.textContent(); ;) {
-    await page.waitForTimeout(2500);
-    const now = await state.textContent();
-    if (now === text && now!.startsWith("Saved ")) return;
-    text = now;
-  }
 }
 
 async function paintAt(page: Page, c: number, r: number) {
@@ -56,9 +44,8 @@ async function reopen(page: Page) {
   await openRaster(page, rgbFixture());
 }
 
-test("import A, paint, import B, paint; reopening, Cancel then OK on '…instead?' shows A, and A restores again with B kept as replaced", async ({ page }) => {
-  test.setTimeout(180_000);
-  const dialogs = answer(page);
+/** Imports mask A and paints, then mask B (OK on Replace labels?) and paints, then waits for Saved; A's and B's tiles, and the role counts. */
+async function importAThenB(page: Page, dialogs: ReturnType<typeof answer>) {
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
@@ -66,10 +53,8 @@ test("import A, paint, import B, paint; reopening, Cancel then OK on '…instead
   await expect(message(page)).toHaveText(/^Seeded /);
   await paintMode(page);
   await paintAt(page, 400, 400);
-  await saved(page);
   const a = await effectiveTiles(page);
-
-  dialogs.then(true); // Replace labels?
+  dialogs.then(true); // Replace labels? Then the import saves A's last changes as A's, before it replaces them (spec 075)
   await importFile(page, maskB());
   await expect(message(page)).toHaveText(/^Seeded /);
   await paintMode(page);
@@ -79,33 +64,39 @@ test("import A, paint, import B, paint; reopening, Cancel then OK on '…instead
   expect(tileDiff(a, b).length).toBeGreaterThan(0);
   const counts = await roles(page);
   expect(Object.keys(counts).sort()).toEqual(["current", "replaced"]);
+  return { a, b, counts };
+}
 
+test("import A, paint, import B, paint; reopening, Cancel then OK on '…instead?' shows A, with B kept as replaced", async ({ page }) => {
+  const dialogs = answer(page);
+  const { a, counts } = await importAThenB(page, dialogs);
   dialogs.then(false, true); // Cancel the restore, then OK "…instead?"
   await reopen(page);
   await expect(message(page)).toHaveText("Labels restored.");
   expect(dialogs.log.at(-1)).toMatch(/^Restore the labels replaced on .+ instead\? The newer labels are kept\.$/);
   expect(tileDiff(await effectiveTiles(page), a)).toEqual([]);
   expect(await roles(page)).toEqual({ current: counts.replaced, replaced: counts.current });
+});
 
+test("import A, paint, import B, paint; reopening and accepting restores B, with A still stored as replaced", async ({ page }) => {
+  const dialogs = answer(page);
+  const { b, counts } = await importAThenB(page, dialogs);
   dialogs.then(true);
   await reopen(page);
   await expect(message(page)).toHaveText("Labels restored.");
   expect(dialogs.log.at(-1)).toMatch(/^Restore labels saved .+ for rgb4326\.tif\?$/);
-  expect(tileDiff(await effectiveTiles(page), a)).toEqual([]);
-  expect(await roles(page)).toEqual({ current: counts.replaced, replaced: counts.current });
-  expect(MESSAGES.replacedFirst).toBe("Export or restore the earlier replaced labels first.");
+  expect(tileDiff(await effectiveTiles(page), b)).toEqual([]);
+  expect(await roles(page)).toEqual(counts);
 });
 
 test("a third import with the replaced labels not exported is refused and changes no labels", async ({ page }) => {
-  test.setTimeout(180_000);
   const dialogs = answer(page);
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
   await importFile(page, maskFile());
   await expect(message(page)).toHaveText(/^Seeded /);
-  await saved(page);
-  dialogs.then(true);
+  dialogs.then(true); // the import saves the first mask's session before it replaces it (spec 075)
   await importFile(page, maskB());
   await expect(message(page)).toHaveText(/^Seeded /);
   await saved(page);

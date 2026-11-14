@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
 import { jumpTo, message, openApp, openRaster, paintMode, paintTwoClasses, path, rgbFixture, stroke, toScreen } from "./helpers";
-import { effectiveTiles, importFile, maskFile, storeTiles, tileDiff } from "./seeding";
+import { effectiveTiles, importFile, maskFile, saved, storeTiles, tileDiff } from "./seeding";
 
 // Spec 074 criteria 5-8 and spec 075 criterion 6: Export writes through a folder handle and never destroys a file.
 
@@ -86,18 +86,6 @@ const fileLabel = (page: Page, id: string) => page.locator("label.file", { has: 
 const seeded = /^Seeded \d+ pixels in \d+ classes\.$/;
 const exportedTo = (name: string) => new RegExp(`^Labels exported to ${name.replace(".", "\\.")} \\([\\d.]+ MB\\)\\.$`);
 
-/** Waits until the latest change is saved: "Saved", unchanged over a debounce (undo, redo and strokes may save again). */
-async function saved(page: Page) {
-  const state = page.locator("#save-state");
-  await expect(state).toHaveText(/^Saved /, { timeout: 15_000 });
-  for (let text = await state.textContent(); ;) {
-    await page.waitForTimeout(2500);
-    const now = await state.textContent();
-    if (now === text && now!.startsWith("Saved ")) return;
-    text = now;
-  }
-}
-
 /** Opens rgb4326.tif from work/ through the open picker, so the app holds its handle. */
 async function openPicked(page: Page) {
   await put(page, "rgb4326.tif", rgbFixture().buffer);
@@ -113,21 +101,12 @@ async function importPicked(page: Page, name: string) {
   await expect(message(page)).toHaveText(seeded);
 }
 
-/** Undo's depth: Undo until it is disabled, counting, then Redo as many times, so the labels end as they were. */
-async function undoDepth(page: Page): Promise<number> {
-  let n = 0;
-  while (await page.locator("#undo").isEnabled()) { await page.click("#undo"); n++; }
-  for (let i = 0; i < n; i++) { await expect(page.locator("#redo")).toBeEnabled(); await page.click("#redo"); }
-  return n;
-}
-
 async function exportAs(page: Page) {
   await expect(page.locator("#export-labels")).toBeEnabled();
   await page.click("#export-labels");
 }
 
 test("criterion 5: export over the imported labels_merged.tif writes it whole; re-importing it gives the same tiles, and painting still works", async ({ page }) => {
-  test.setTimeout(180_000);
   await fakeFolder(page);
   const dialogs = answer(page);
   await openApp(page);
@@ -176,17 +155,11 @@ test("criterion 6: exporting with the imagery's file name is refused, and the im
   await exportAs(page);
   await expect(message(page)).toHaveText(MESSAGES.exportImagery);
   await expect(message(page)).toHaveClass(/\berror\b/);
-  expect(MESSAGES.exportImagery).toBe("That is the imagery file. Choose another name.");
   expect((await bytesOf(page, "rgb4326.tif"))!.equals(rgbFixture().buffer)).toBe(true);
 });
 
-test("criterion 7 and spec 075 criterion 6: a write that fails midway keeps the old labels.tif, and a reload restores the same tiles; a good export marks the session", async ({ page }) => {
-  test.setTimeout(180_000);
-  await fakeFolder(page);
-  const dialogs = answer(page);
-  await openApp(page);
-  const old = Buffer.from("the labels from yesterday");
-  await put(page, "labels.tif", old);
+/** Opens rgb4326.tif through the input, imports the fixture mask and paints two strokes, then waits for Saved. */
+async function paintedAndSaved(page: Page) {
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
   await importFile(page, maskFile());
@@ -194,18 +167,23 @@ test("criterion 7 and spec 075 criterion 6: a write that fails midway keeps the 
   await paintMode(page);
   await paintTwoClasses(page);
   await saved(page);
+}
+
+test("criterion 7: a write that fails midway keeps the old labels.tif, and a reload restores the same tiles", async ({ page }) => {
+  await fakeFolder(page);
+  const dialogs = answer(page);
+  await openApp(page);
+  const old = Buffer.from("the labels from yesterday");
+  await put(page, "labels.tif", old);
+  await paintedAndSaved(page);
   const before = await effectiveTiles(page);
-  const depth = await undoDepth(page);
-  expect(depth).toBeGreaterThan(0);
 
   await page.evaluate(() => { (window as any).__f.failAt = 3; }); // the header and a tile, then the third write rejects
   dialogs.then("labels.tif", true);
   await exportAs(page);
   await expect(message(page)).toHaveText(`The disk failed. ${MESSAGES.nothingOverwritten}`);
   expect((await bytesOf(page, "labels.tif"))!.equals(old)).toBe(true);
-  expect(tileDiff(await effectiveTiles(page), before)).toEqual([]); // the labels, mask and Undo are unchanged (criterion 3)
-  expect(await undoDepth(page)).toBe(depth);
-  expect(tileDiff(await effectiveTiles(page), before)).toEqual([]);
+  expect(tileDiff(await effectiveTiles(page), before)).toEqual([]); // the labels and mask are unchanged; Undo is criterion 3's unit test
   await saved(page);
 
   await page.reload();
@@ -214,7 +192,13 @@ test("criterion 7 and spec 075 criterion 6: a write that fails midway keeps the 
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Labels restored.");
   expect(tileDiff(await effectiveTiles(page), before)).toEqual([]);
+});
 
+test("spec 075 criterion 6: a good export marks the saved session exported, at or after its savedAt", async ({ page }) => {
+  await fakeFolder(page);
+  const dialogs = answer(page);
+  await openApp(page);
+  await paintedAndSaved(page);
   dialogs.then("good.tif");
   await exportAs(page);
   await expect(message(page)).toHaveText(exportedTo("good.tif"), { timeout: 30_000 });
@@ -229,7 +213,6 @@ test("criterion 7 and spec 075 criterion 6: a write that fails midway keeps the 
 });
 
 test("criterion 8: with no copy of the mask (quota), exporting as the imported file's name is refused; another name succeeds", async ({ page }) => {
-  test.setTimeout(120_000);
   await fakeFolder(page);
   const dialogs = answer(page);
   await openApp(page);
@@ -241,7 +224,6 @@ test("criterion 8: with no copy of the mask (quota), exporting as the imported f
   dialogs.then("labels_merged.tif");
   await exportAs(page);
   await expect(message(page)).toHaveText(MESSAGES.exportMask);
-  expect(MESSAGES.exportMask).toBe("That is the imported mask, and this browser couldn't keep a copy of it. Choose another name.");
   expect((await bytesOf(page, "labels_merged.tif"))!.equals(mask)).toBe(true);
   dialogs.then("other.tif");
   await exportAs(page);

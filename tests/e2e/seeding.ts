@@ -65,6 +65,16 @@ export async function effectiveTiles(page: Page): Promise<Map<string, Uint8Array
 export const tileDiff = (a: Map<string, Uint8Array>, b: Map<string, Uint8Array>): string[] =>
   [...new Set([...a.keys(), ...b.keys()])].filter((k) => !a.has(k) || !b.has(k) || !Buffer.from(a.get(k)!).equals(Buffer.from(b.get(k)!))).sort();
 
+/**
+ * Waits until every change is saved in this browser: persist's beforeunload guard is off (nothing dirty, no save in
+ * flight, failed or pending) and #save-state says Saved. Call it after strokes settle (stroke() waits for that).
+ */
+export const saved = (page: Page) => expect.poll(() => page.evaluate(() => {
+  const e = new Event("beforeunload", { cancelable: true });
+  window.dispatchEvent(e);
+  return !e.defaultPrevented && document.getElementById("save-state")!.textContent!.startsWith("Saved ");
+}), { timeout: 10_000 }).toBe(true);
+
 export const classList = (page: Page): Promise<LabelClass[]> =>
   page.evaluate(() => (window as any).__geoapp.labels.classes.map((c: LabelClass) => ({ ...c })));
 
