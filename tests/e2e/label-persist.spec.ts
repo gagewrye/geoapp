@@ -21,12 +21,10 @@ async function open(page: Page, file = rgbFixture()) {
   await expect(message(page)).toHaveText("Raster opened.");
 }
 
-/** Waits until the latest change is saved: "Saved", and no save follows in the next debounce. */
+/** Waits until the latest change is saved: no save scheduled or in flight (spec 072), and "Saved". */
 async function saved(page: Page) {
-  await expect(saveState(page)).toHaveText(/^Saved /, { timeout: 15_000 });
-  const text = await saveState(page).textContent();
-  await page.waitForTimeout(2500);
-  await expect(saveState(page)).toHaveText(text!);
+  await expect.poll(() => page.evaluate(() => (window as any).__geoapp.saving()), { timeout: 15_000 }).toBe(false);
+  await expect(saveState(page)).toHaveText(/^Saved /);
 }
 
 async function reload(page: Page) {
@@ -36,23 +34,20 @@ async function reload(page: Page) {
 
 const selected = (page: Page) => page.locator("#classes li[aria-selected=true]").evaluate((li) => [...li.parentElement!.children].indexOf(li));
 
-test("paint, rename, opacity 30%: after Saved and a reload, accepting the restore brings back the tiles, classes, selection and opacity; paint still works (criterion 6)", async ({ page }) => {
-  test.setTimeout(120_000);
+// Criterion 6 is split in two (spec 072): each part has one Saved and one reload.
+test("criterion 6, tiles and classes: paint and rename; after Saved and a reload, accepting the restore brings back the tiles and classes; paint still works", async ({ page }) => {
   const log = dialogs(page);
   await openApp(page);
   await open(page);
   await paintMode(page);
   await paintTwoClasses(page, ["Mangrove", "Water"]);
-  await page.locator("#label-opacity").fill("30");
   await saved(page);
   const tiles = await storeTiles(page);
   expect(tiles.size).toBeGreaterThan(0);
   const classes = await classList(page);
-  expect(await selected(page)).toBe(1);
 
   await reload(page);
   expect(log).toEqual([]); // nothing unsaved: no beforeunload
-  await expect(page.locator("#label-opacity")).toHaveValue("60"); // spec 016 criterion 3 without a restore
   await open(page, { ...rgbFixture(), name: "renamed.tif" });
   await expect(message(page)).toHaveText("Labels restored.");
   expect(log).toHaveLength(1);
@@ -62,9 +57,6 @@ test("paint, rename, opacity 30%: after Saved and a reload, accepting the restor
   expect([...back.keys()].sort()).toEqual([...tiles.keys()].sort());
   for (const [k, t] of tiles) expect(Buffer.from(back.get(k)!).equals(Buffer.from(t)), k).toBe(true);
   expect(await classList(page)).toEqual(classes);
-  expect(await selected(page)).toBe(1);
-  await expect(page.locator("#label-opacity")).toHaveValue("30");
-  await expect(page.locator("#label-opacity-text")).toHaveText("30%");
 
   await paintMode(page);
   await jumpTo(page, [15, 45], 6);
@@ -73,8 +65,32 @@ test("paint, rename, opacity 30%: after Saved and a reload, accepting the restor
   expect((await tileKeysStored(page)).length).toBeGreaterThan(tiles.size);
 });
 
+test("criterion 6, selection and opacity: class 2 selected and opacity 30%; after Saved and a reload, accepting the restore brings both back", async ({ page }) => {
+  const log = dialogs(page);
+  await openApp(page);
+  await open(page);
+  await paintMode(page);
+  await jumpTo(page, [15, 45], 6);
+  await selectClass(page, 1);
+  const a = await toScreen(page, [18.005, 45.005]);
+  await stroke(page, [a, { x: a.x + 40, y: a.y }]); // a label, so the session saves (spec 031)
+  await page.locator("#label-opacity").fill("30");
+  await saved(page);
+  expect(await selected(page)).toBe(1);
+
+  await reload(page);
+  expect(log).toEqual([]); // nothing unsaved: no beforeunload
+  await expect(page.locator("#label-opacity")).toHaveValue("60"); // spec 016 criterion 3 without a restore
+  await open(page, { ...rgbFixture(), name: "renamed.tif" });
+  await expect(message(page)).toHaveText("Labels restored.");
+  expect(log).toHaveLength(1);
+  expect(log[0]!.slice(9)).toMatch(restorePrompt);
+  expect(await selected(page)).toBe(1);
+  await expect(page.locator("#label-opacity")).toHaveValue("30");
+  await expect(page.locator("#label-opacity-text")).toHaveText("30%");
+});
+
 test("an imported mask plus a stroke: after the restore the mask and the stroke show, and an Export equals one made before the reload (criterion 7)", async ({ page }) => {
-  test.setTimeout(180_000);
   await noSavePicker(page);
   const log = dialogs(page);
   await openApp(page);
@@ -102,7 +118,6 @@ test("an imported mask plus a stroke: after the restore the mask and the stroke 
 });
 
 test("opening a different raster after a save shows no prompt, and the first raster's session still restores afterwards (criterion 8)", async ({ page }) => {
-  test.setTimeout(120_000);
   const log = dialogs(page);
   await openApp(page);
   await open(page);
@@ -121,7 +136,6 @@ test("opening a different raster after a save shows no prompt, and the first ras
 });
 
 test("a reload within 2 s of a stroke raises a beforeunload dialog; after Saved a reload raises none (criterion 9)", async ({ page }) => {
-  test.setTimeout(120_000);
   const log = dialogs(page);
   await openApp(page);
   await open(page);
