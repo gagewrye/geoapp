@@ -125,6 +125,13 @@ export function* labelled(tiles: Map<string, Uint8Array>, width: number): Genera
   }
 }
 
+/** Counts the paint ops strokes make from now on (window.__ops), through spec 023's paintOp hook; a locked stroke makes none, synchronously. */
+export const countOps = (page: Page) => page.evaluate(() => { const w = window as any; w.__ops = 0; w.__geoapp.paintOp = () => { w.__ops++; }; });
+export const opsCounted = (page: Page): Promise<number> => page.evaluate(() => (window as any).__ops);
+
+/** The non-zero values of these tiles. */
+export const valuesOf = (tiles: Map<string, Uint8Array>, width = 1000) => new Set([...labelled(tiles, width)].map(([, , v]) => v));
+
 /** Every stored pixel is off imagery nodata. */
 export function expectNoNodata(tiles: Map<string, Uint8Array>, width: number, nodata: (c: number, r: number) => boolean): void {
   let bad = 0;

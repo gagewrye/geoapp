@@ -2,8 +2,10 @@ import { expect, test, type Page } from "@playwright/test";
 import { paletteColour } from "../../src/core/classes";
 import { MESSAGES } from "../../src/ui/messages";
 import { classFile } from "../unit/helpers/labelFiles";
-import { hoverFeatures, jumpTo, labels, message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture, rgbNodataFixture, settled, toScreen } from "./helpers";
-import { classList, holdMasks, importFile, openFileGate, openImageryGate, pauseImagery, pauseLabelFile, storeTiles, upload } from "./seeding";
+import { hoverFeatures, jumpTo, message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture, rgbNodataFixture, settled, toScreen } from "./helpers";
+import {
+  classList, countOps, effectiveTiles, holdMasks, importFile, openFileGate, openImageryGate, opsCounted, pauseImagery, pauseLabelFile, storeTiles, tileDiff, upload, valuesOf,
+} from "./seeding";
 
 // Spec 004 criterion 16 (as amended) and spec 017 criterion 5: every import replaces, after a confirm when labels exist,
 // and what's disabled while seeding or painting.
@@ -33,7 +35,8 @@ test("there is no Seed mode; with no labels an import shows no confirm, and Undo
   await expect(page.locator("#undo")).toBeDisabled();
 });
 
-test("with painted tiles an import confirms: Cancel keeps labels and classes, OK replaces them and disables Undo", async ({ page }) => {
+// Spec 072: the confirm's Cancel and OK are two tests, each from its own painted tiles.
+test("with painted tiles an import confirms: Cancel keeps labels and classes", async ({ page }) => {
   await setup(page);
   await paintTwoClasses(page);
   await expect(page.locator("#undo")).toBeEnabled();
@@ -41,30 +44,36 @@ test("with painted tiles an import confirms: Cancel keeps labels and classes, OK
   const asked: string[] = [];
   page.once("dialog", (d) => { asked.push(d.message()); void d.dismiss(); });
   await importFile(page, classes());
-  await expect.poll(() => asked).toEqual([MESSAGES.replace]);
-  await page.waitForTimeout(300);
+  await expect.poll(() => asked).toEqual([MESSAGES.replace]); // dismissed: the import stops at once (no fixed wait)
   expect(await storeTiles(page)).toEqual(before.tiles);
   expect(await classList(page)).toEqual(before.list);
+});
+
+test("with painted tiles an import confirms: OK replaces labels and classes and disables Undo; a second import replaces them too", async ({ page }) => {
+  await setup(page);
+  await paintTwoClasses(page);
+  await expect(page.locator("#undo")).toBeEnabled();
+  const asked: string[] = [];
   page.once("dialog", (d) => { asked.push(d.message()); void d.accept(); });
   await page.setInputFiles("#import-labels", classes());
   await expect(message(page)).toHaveText(seeded);
-  expect(asked).toEqual([MESSAGES.replace, MESSAGES.replace]);
+  expect(asked).toEqual([MESSAGES.replace]);
   expect(await classList(page)).toEqual(["Class 0", "Class 3", "Class 7"].map((name, i) => ({ name, colour: paletteColour(i) })));
-  expect(new Set((await labels(page)).values())).toEqual(new Set([1, 2, 3]));
+  expect(valuesOf(await effectiveTiles(page))).toEqual(new Set([1, 2, 3]));
   await expect(page.locator("#undo")).toBeDisabled();
   // a second import, over imported labels only, replaces them too (spec 014 criterion 10 covers a mask-only store)
   page.once("dialog", (d) => { asked.push(d.message()); void d.accept(); });
   await importFile(page, classes());
-  await expect.poll(() => asked.length).toBe(3);
+  await expect.poll(() => asked.length).toBe(2);
   await expect(message(page)).toHaveText(seeded);
   expect(await classList(page)).toEqual(["Class 0", "Class 3", "Class 7"].map((name, i) => ({ name, colour: paletteColour(i) })));
-  expect(new Set((await labels(page)).values())).toEqual(new Set([1, 2, 3]));
+  expect(valuesOf(await effectiveTiles(page))).toEqual(new Set([1, 2, 3]));
 });
 
 test("while an import runs the brush and class edits are disabled; while mask reads are pending Import labels and Export labels are", async ({ page }) => {
   await setup(page, rgbNodataFixture()); // its masks need reads (spec 023 F2)
   await paintTwoClasses(page);
-  const before = await labels(page);
+  const before = await effectiveTiles(page);
   await pauseLabelFile(page);
   page.once("dialog", (d) => void d.accept()); // "Replace labels?": every import replaces (spec 017)
   await importFile(page, classes());
@@ -74,13 +83,14 @@ test("while an import runs the brush and class edits are disabled; while mask re
   // a drag paints nothing and shows no footprint
   await jumpTo(page, [15, 45], 6);
   const a = await toScreen(page, [16.005, 45.505]);
+  await countOps(page);
   await page.mouse.move(a.x, a.y);
   await page.mouse.down();
   await page.mouse.move(a.x + 40, a.y + 10);
   expect(await hoverFeatures(page)).toEqual([]);
   await page.mouse.up();
-  await page.waitForTimeout(200);
-  expect(await labels(page)).toEqual(before);
+  expect(await opsCounted(page)).toBe(0); // a locked move makes no op, at once (spec 072: no fixed wait)
+  expect(tileDiff(await effectiveTiles(page), before)).toEqual([]);
   await openFileGate(page);
   await expect(message(page)).toHaveText(seeded);
   // unlocked, the same point shows the footprint again once Paint is chosen (an import selects Pan: spec 014 Tests)
