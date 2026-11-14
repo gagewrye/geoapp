@@ -50,7 +50,7 @@ describe("UndoHistory with the paint queue (spec 010 What an edit is / Undo)", (
     await idle(t.q);
     expect(t.history.size).toBe(1);
     expect(t.store().tiles.size).toBe(3);
-    expect(t.history.undo()).toEqual(["0,0", "256,0", "512,512"]);
+    expect(t.history.undo()).toEqual({ tiles: ["0,0", "256,0", "512,512"], boxes: [] });
     expect(snapshot(t.store())).toEqual(before);
     expect(t.history.size).toBe(0);
     expect(t.history.undo()).toBeNull();
@@ -95,7 +95,7 @@ describe("UndoHistory with the paint queue (spec 010 What an edit is / Undo)", (
       await idle(t.q);
     }
     expect(t.history.size).toBe(24);
-    expect(t.history.entries().every((e) => editBytes(e) === MiB)).toBe(true);
+    expect(t.history.entries().every((e) => editBytes(e.tiles) === MiB)).toBe(true);
     const oldest16 = t.history.entries().slice(8);
     // the big stroke, checking the budget after every cell
     const s = t.history.begin();
@@ -111,7 +111,7 @@ describe("UndoHistory with the paint queue (spec 010 What an edit is / Undo)", (
     const e = t.history.entries();
     expect(e).toHaveLength(17);
     e.slice(0, 16).forEach((x, i) => expect(x).toBe(oldest16[i]));
-    expect(e[16]!.size).toBe(256);
-    expect(editBytes(e[16]!)).toBe(16 * MiB);
+    expect(e[16]!.tiles.size).toBe(256);
+    expect(editBytes(e[16]!.tiles)).toBe(16 * MiB);
   });
 });

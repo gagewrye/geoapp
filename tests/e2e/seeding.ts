@@ -13,9 +13,9 @@ export const upload = (name: string, data: ArrayBuffer | string) =>
 
 /** The generated mask on rgbFixture's grid: 16 x 16 px blocks of 0..3, GDAL_NODATA 0, so classes 1, 2, 3 are values 1, 2, 3 (spec 014 tests). */
 export const maskValue = (c: number, r: number) => ((c >> 4) + (r >> 4)) % 4;
-export function maskFile() {
+export function maskFile(value: (c: number, r: number) => number = maskValue) {
   const v = new Uint8Array(1000 * 1000);
-  for (let r = 0; r < 1000; r++) for (let c = 0; c < 1000; c++) v[r * 1000 + c] = maskValue(c, r);
+  for (let r = 0; r < 1000; r++) for (let c = 0; c < 1000; c++) v[r * 1000 + c] = value(c, r);
   return upload("mask.tif", writeFile(RGB_GRID, 1, v, "0", { GTModelTypeGeoKey: 2, GTRasterTypeGeoKey: 1, GeographicTypeGeoKey: 4326 }));
 }
 /** Lon/lat of rgbFixture pixel position (col, row may be fractional). */
@@ -59,12 +59,6 @@ export async function effectiveTiles(page: Page): Promise<Map<string, Uint8Array
     return out;
   });
   return new Map(entries.map(([k, b]) => [k, new Uint8Array(Buffer.from(b, "base64"))]));
-}
-
-/** The label at (c, r) in effectiveTiles' result on a grid `width` px wide; 0 where no tile is listed. */
-export function labelAt(tiles: Map<string, Uint8Array>, width: number, c: number, r: number): number {
-  const x0 = c - (c % 256), y0 = r - (r % 256), t = tiles.get(`${x0},${y0}`);
-  return t ? t[(r - y0) * Math.min(256, width - x0) + c - x0]! : 0;
 }
 
 /** Keys whose tiles differ between two effectiveTiles results (byte compare, far cheaper than labels() on a full mask: spec 052). */

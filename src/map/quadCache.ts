@@ -24,6 +24,9 @@ export class QuadCache {
 
   constructor(private readonly grid: Grid, private readonly idle: IdleScheduler = defaultIdle) {}
 
+  /** Prefetched tiles are still queued. */
+  get busy(): boolean { return this.queue.length > 0; }
+
   /** The tile's quads, computed now if no idle callback did. */
   get(key: string): Quad[] {
     let q = this.quads.get(key);

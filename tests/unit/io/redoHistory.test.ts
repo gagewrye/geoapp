@@ -40,10 +40,10 @@ describe("UndoHistory redo", () => {
     t.history.undo();
     expect(t.store.tiles.size).toBe(0);
     expect(t.history.redoSize).toBe(2);
-    expect(t.history.redo()).toEqual(["0,0", "256,0"]);
+    expect(t.history.redo()).toEqual({ tiles: ["0,0", "256,0"], boxes: [] });
     expect(snapshot(t.store)).toEqual(afterA);
     expect(t.history.size).toBe(1);
-    expect(t.history.redo()).toEqual(["256,0", "512,512"]);
+    expect(t.history.redo()).toEqual({ tiles: ["256,0", "512,512"], boxes: [] });
     expect(snapshot(t.store)).toEqual(afterB);
     expect(t.history.redo()).toBeNull();
     expect([t.history.size, t.history.redoSize]).toEqual([2, 0]);

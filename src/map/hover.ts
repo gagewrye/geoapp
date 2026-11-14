@@ -6,6 +6,8 @@ const FILL = `${HOVER}-fill`, LINE = `${HOVER}-line`;
 
 // Erase mode's ring is dashed so it can be told from Paint's (spec 033)
 const DASH = [2, 2];
+/** Erase mode's footprint colour: Erase removes any label, so it shows no class colour (spec 058). */
+export const ERASE_COLOUR = "#ffffff";
 
 /** Show the brush footprint (a lon/lat ring) as one feature in `colour`, dashed or not, or hide it with null. */
 export function showHover(map: MapLibreMap, ring: [number, number][] | null, colour: string, dashed = false): void {

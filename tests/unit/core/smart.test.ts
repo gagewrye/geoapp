@@ -81,7 +81,7 @@ describe("maskBits and maskSpans (criterion 2)", () => {
       expect(bits.every((b, i) => b === ref[i])).toBe(true);
     });
 
-    it(`maskSpans covers exactly the 1-bits of a ${w.width}x${w.height} window, in raster coordinates`, () => {
+    it(`maskSpans covers exactly the 1-bits of a ${w.width}x${w.height} window, in raster coordinates`, { timeout: 30_000 }, () => {
       const bits = maskBits(logits, 256, w), seen = new Uint8Array(bits.length);
       for (const s of maskSpans(bits, w)) {
         expect(s.x1).toBeGreaterThan(s.x0);

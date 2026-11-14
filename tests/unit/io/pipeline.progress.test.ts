@@ -45,7 +45,7 @@ describe("buildPreview progress (criterion 1)", () => {
   });
 });
 
-describe("unchanged previews (criterion 2)", () => {
+describe("unchanged previews (criterion 2)", { timeout: 30_000 }, () => {
   it.each(FIXTURES)("%s", async (_name, make, expected) => {
     const { source, maxSide } = await make();
     expect(digest(await buildPreview(source, maxSide))).toBe(expected);

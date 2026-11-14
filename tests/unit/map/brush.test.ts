@@ -1,14 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createBrush, type BrushMode } from "../../../src/map/brush";
+import type { Erase } from "../../../src/core/labelStore";
 import { BRUSH_GRID, fakeBrushMap } from "../helpers/fakeBrushMap";
 
 vi.mock("maplibre-gl", () => ({ Point: class { constructor(readonly x: number, readonly y: number) {} } }));
-vi.mock("../../../src/map/hover", () => ({ showHover: () => {} }));
+vi.mock("../../../src/map/hover", () => ({ ERASE_COLOUR: "#ffffff", showHover: () => {} }));
 afterEach(() => { vi.unstubAllGlobals(); });
 
 function setup(mode: BrushMode, onStroke: (active: boolean) => void = () => {}) {
   const { map, pointer } = fakeBrushMap(vi.stubGlobal);
-  const calls: boolean[] = [];
+  const calls: Erase[] = [];
   const brush = createBrush(map, {
     side: () => 1, colour: () => "#ff0000", cells: (_c, _s, erase) => { calls.push(erase); }, onStroke: (a) => onStroke(a), panning: () => false,
   });
@@ -17,18 +18,18 @@ function setup(mode: BrushMode, onStroke: (active: boolean) => void = () => {}) 
   return { brush, pointer, calls };
 }
 
-// Spec 033 criterion 1.
+// Spec 033 criterion 1, as amended by spec 058 criterion 2: Erase mode erases any label.
 describe("brush modes", () => {
-  it("in Erase mode a left press erases, and so does a right press", () => {
+  it("in Erase mode a left press erases any label, and so does a right press", () => {
     const { pointer, calls } = setup("erase");
     pointer("pointerdown", 10, 10, 0);
     pointer("pointerup", 10, 10, 0);
     pointer("pointerdown", 12, 12, 2);
     pointer("pointerup", 12, 12, 2);
-    expect(calls).toEqual([true, true]);
+    expect(calls).toEqual(["any", "any"]);
   });
 
-  it("in Paint mode a left press paints and a right press erases", () => {
+  it("in Paint mode a left press paints and a right press erases the selected class", () => {
     const { pointer, calls } = setup("paint");
     pointer("pointerdown", 10, 10, 0);
     pointer("pointerup", 10, 10, 0);
@@ -64,7 +65,7 @@ describe("setBlocked", () => {
 describe("Alt+left press picks", () => {
   function picking(mode: BrushMode) {
     const { map, pointer } = fakeBrushMap(vi.stubGlobal);
-    const picks: [number, number][] = [], strokes: boolean[] = [], cells: boolean[] = [];
+    const picks: [number, number][] = [], strokes: boolean[] = [], cells: Erase[] = [];
     const brush = createBrush(map, {
       side: () => 1, colour: () => "#ff0000", cells: (_c, _s, erase) => { cells.push(erase); }, onStroke: (a) => strokes.push(a),
       panning: () => false, pick: (cell) => picks.push(cell),
@@ -134,7 +135,7 @@ describe("Alt+left press picks", () => {
 describe("Smart mode clicks", () => {
   function smart(mode: BrushMode = "smart") {
     const { map, pointer } = fakeBrushMap(vi.stubGlobal);
-    const clicks: [[number, number], boolean][] = [], cells: boolean[] = [];
+    const clicks: [[number, number], boolean][] = [], cells: Erase[] = [];
     let discards = 0;
     const brush = createBrush(map, {
       side: () => 1, colour: () => "#ff0000", cells: (_c, _s, erase) => { cells.push(erase); }, onStroke: () => {}, panning: () => false,

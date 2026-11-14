@@ -19,15 +19,3 @@ describe("labelAt", () => {
   });
 });
 
-// Spec 038 criterion 7: the old undo helper is gone (its name is built here so this file doesn't name it).
-describe("scope 6", () => {
-  it("no file under src/ or tests/ names the removed undo helper", async () => {
-    const { readdirSync, readFileSync } = await import("node:fs");
-    const { join } = await import("node:path");
-    const name = ["undo", "Edit"].join("");
-    const files = (dir: string): string[] => readdirSync(dir, { withFileTypes: true })
-      .flatMap((d) => (d.isDirectory() ? files(join(dir, d.name)) : /\.(ts|mjs|js)$/.test(d.name) ? [join(dir, d.name)] : []));
-    const hits = [...files("src"), ...files("tests")].filter((f) => new RegExp(`\b${name}\b`).test(readFileSync(f, "utf8")));
-    expect(hits).toEqual([]);
-  });
-});

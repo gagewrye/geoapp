@@ -1,23 +1,21 @@
-import { expect, type CDPSession, type Page, type Request } from "@playwright/test";
+import { expect, type Page, type Request } from "@playwright/test";
 import { geotiffBuffer, type Value } from "../unit/helpers/sources";
-import { uint8Tiff } from "../unit/helpers/tiffFixtures";
 import type { Affine, Grid } from "../../src/core/types";
+import { SHORTCUTS } from "../../src/ui/shortcuts";
 
 export type LngLat = [number, number];
 export type Xy = { x: number; y: number };
+
+/** The hint line SHORTCUTS gives a button's title (spec 057). */
+export const hintOf = (id: string) => SHORTCUTS.find((s) => s.id === id)!.hint!;
 
 /** Fixture GeoTIFF as a Playwright upload payload. */
 export function tiff(name: string, width: number, height: number, nb: number, f: Value, geo: { epsg: number; gt: Affine; nodata?: string }) {
   return { name, mimeType: "image/tiff", buffer: Buffer.from(geotiffBuffer(width, height, nb, f, geo)) };
 }
 
-/** Like tiff(), but 8-bit in 256 px tiles: spec 020's preview reads a file block by block, and tiff()'s single strip is one read. */
-export function tiledTiff(name: string, width: number, height: number, nb: number, f: Value, geo: { epsg: number; gt: Affine }) {
-  return { name, mimeType: "image/tiff", buffer: Buffer.from(uint8Tiff([{ width, height, bands: nb, value: f, layout: { tile: [256, 256] } }], geo)) };
-}
-
 /** 10x10 degree RGB raster at 10..20E, 40..50N; a white block marks 15.5E 45.5N. */
-export const FEATURE: LngLat = [15.5, 45.5];
+const FEATURE: LngLat = [15.5, 45.5];
 const rgbValue: Value = (b, c, r) => {
   const lon = 10 + (c + 0.5) * 0.01, lat = 50 - (r + 0.5) * 0.01;
   if (Math.abs(lon - FEATURE[0]) < 0.05 && Math.abs(lat - FEATURE[1]) < 0.05) return 255;
@@ -28,8 +26,6 @@ export const rgbFixture = () => tiff("rgb4326.tif", 1000, 1000, 3, rgbValue, { e
 export const rgbNodataFixture = () => tiff("rgbtall.tif", 1000, 1300, 3, rgbValue, { epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01], nodata: "0" });
 /** rgbFixture with 16 more bytes at its end: the same grid and pixels, but another raster to spec 031, so it offers no saved labels. */
 export const anotherRaster = (name = "other.tif") => { const f = rgbFixture(); return { ...f, name, buffer: Buffer.concat([f.buffer, Buffer.alloc(16)]) }; };
-/** rgbFixture's pixels in 16 tiles, so its preview takes 16 reads (spec 019's bar and read gates). */
-export const rgbTiled = () => tiledTiff("rgb4326.tif", 1000, 1000, 3, rgbValue, { epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01] });
 
 export async function openApp(page: Page): Promise<void> {
   await page.goto("/");
@@ -61,10 +57,19 @@ export async function hideImagery(page: Page): Promise<void> {
   });
 }
 
-/** Adds `<select id="test-select">` (options a, b) to #panel: the app has no select since spec 017, but specs 003 and 009 keep select rules. */
-export const addTestSelect = (page: Page) => page.evaluate(() => {
-  document.getElementById("panel")!.insertAdjacentHTML("beforeend", `<select id="test-select"><option value="a">A</option><option value="b">B</option></select>`);
-});
+/** Resolves once no label-overlay redraw is scheduled and no quads are queued (spec 071). */
+export const overlaysIdle = (page: Page): Promise<void> => page.evaluate(() => (window as any).__geoapp.overlaysIdle());
+
+/** Waits for the map's next idle. */
+export const mapIdle = (page: Page): Promise<void> => page.evaluate(() => new Promise<void>((r) => {
+  const { map } = (window as any).__geoapp;
+  map.once("idle", () => r());
+  map.triggerRepaint();
+}));
+
+/** Tile keys of the `label-` overlay layers on the map, sorted. */
+export const overlayKeysShown = (page: Page): Promise<string[]> => page.evaluate(() =>
+  [...new Set(((window as any).__geoapp.map.getLayersOrder() as string[]).flatMap((id) => /^label-(\d+,\d+)/.exec(id)?.[1] ?? []))].sort());
 
 /** Select Paint: an open or a successful import selects Pan (spec 016 Tests), so tests that paint after one call this. */
 export async function paintMode(page: Page): Promise<void> {
@@ -132,7 +137,7 @@ export async function clickAt(page: Page, p: Xy): Promise<void> {
 
 export const message = (page: Page) => page.locator("#message");
 
-export const lerp = (a: Xy, b: Xy, t: number): Xy => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+const lerp = (a: Xy, b: Xy, t: number): Xy => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
 
 
 /** Uncaught page errors, collected from now on. */
@@ -140,29 +145,6 @@ export function collectErrors(page: Page): string[] {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   return errors;
-}
-
-/** Mouse path a -> b in `steps` moves, button state unchanged. */
-export async function moveTo(page: Page, a: Xy, b: Xy, steps = 20): Promise<void> {
-  for (let i = 1; i <= steps; i++) await page.mouse.move(a.x + ((b.x - a.x) * i) / steps, a.y + ((b.y - a.y) * i) / steps);
-}
-
-/** Raw CDP touch: each point is [id, xy]; an empty list ends (or cancels) every touch. */
-export function toucher(cdp: CDPSession) {
-  return (type: "touchStart" | "touchMove" | "touchEnd" | "touchCancel", pts: [number, Xy][] = []) =>
-    cdp.send("Input.dispatchTouchEvent", { type, touchPoints: pts.map(([id, p]) => ({ id, x: p.x, y: p.y })) });
-}
-
-/**
- * Raw CDP mouse or pen, so coordinates may lie outside the viewport. `held` false sends buttons 0
- * (a lost release when no mouseReleased came). A pen's barrel button is "right".
- */
-export function rawPointer(cdp: CDPSession, pointerType: "mouse" | "pen" = "mouse", button: "left" | "right" = "left") {
-  return (type: "mousePressed" | "mouseMoved" | "mouseReleased", p: Xy, held: boolean) =>
-    cdp.send("Input.dispatchMouseEvent", {
-      type, x: p.x, y: p.y, pointerType,
-      button: type === "mouseMoved" && !held ? "none" : button, buttons: held ? (button === "left" ? 1 : 2) : 0, clickCount: type === "mouseMoved" ? 0 : 1,
-    });
 }
 
 /** rgbFixture's grid. */

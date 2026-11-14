@@ -2,6 +2,8 @@
 
 **Status:** Approved (Gage, 2026-10-30: "approve all"). **ADRs:** none (no dependency, no new architecture). Amended by spec 047 (2026-11-01): there is no class map; "too many" comes before the pass only when the file's table alone has over 255 entries, else after it.
 
+**Amended by spec 061 (2026-11-12):** `label-import-progress.tester.spec.ts` is deleted, and `label-import-progress.spec.ts` loses its tests of criterion 4 (a refused file), criterion 5's Cancel then a failed read, criterion 7 (an open during an import) and the success case of criteria 2 and 3. It keeps the Cancel-at-window-k (criteria 2, 3, 5), read-failure (6) and edits-during-import (8) tests; `label-mask` covers a replace and `label-import` 40 the refusals. Criterion 7 has no e2e test left. Lost: an open during an import, Cancel then a failed read, the next import not pre-cancelled, and restored labels taking settings changed mid-import.
+
 **Request** (Gage, 2026-10-30): "Loading labels in the web app needs a loading bar", and "remove the current label mask when loading new labels as well". Gage's label files are uint8 GeoTIFFs of 6,500² to 11,000² px at 0.1 m, with `GEOAPP_CLASSES`.
 
 Amends specs 004 (the run message) and 014/017 (when the old labels leave the map).

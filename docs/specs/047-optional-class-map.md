@@ -2,6 +2,8 @@
 
 **Status:** Approved by Gage 2026-11-01, with the recommended answers. **ADRs:** none (no dependency, no architecture change; the base's saved `lut` already links raw values to classes). **Amends:** spec 004 (Classes rule, *Class map* and *Strings* in Settled in build, criteria 3 and 12's class-map clauses), spec 014's "use a class map that leaves 0 out", spec 017's "Cancel keeps the chosen class map", spec 021/024's "too many before the pass with a class map", spec 035 scope 2's order, spec 044 scope 5 (draft: Use labels imports, then calls `applyClassMap` with the item's classes).
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): e2e `class-map.tester` and `label-classmap-names.tester`; unit `core/classTable.tester`, `io/seedImport.tester`, and `io/classMap.tester`'s other edge cases (renamed `io/classMap.test.ts`, three cases kept). `io/seedTable.gdal.tester` is renamed `io/seedTable.gdal.test.ts`. `class-map` stays.
+
 **Request** (Gage, 2026-11-01): "why does the app require a class map? that should be optional and the labels should import even if it is wrong. Label import first".
 
 ## Settled (Gage, 2026-11-01)

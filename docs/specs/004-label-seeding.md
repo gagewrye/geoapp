@@ -11,6 +11,8 @@ Amended by spec 047 (2026-11-01): Import labels takes no class map, and a bad cl
 
 Amended by spec 048 (2026-11-01): there is no tile cap (ADR 0033). Decided's "the 256-tile cap stays", Out's "raising `MAX_LABEL_TILES`" and criterion 8's cap clause lapse; `putTile` always applies.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): e2e `label-edit` 10 (criterion 13), `label-classmap-names.tester` (16), `label-controls.tester`, `label-export-snapshot.tester` (Export labels, 11), `label-lock-export.tester` (the shared lock) and `undo-seed.tester`; unit `core/classTable.tester`, `core/seed.tester`, `io/labelExport.tester` (9–11), `io/seedImport.tester` (12, 13 and 15), and `io/seedBuild.tester`'s N and K case (renamed `io/seedBuild.test.ts`, three cases kept). The import, seed and saved-data e2e stay.
+
 **Decided (Gage, 2026-10-26)**, besides what Scope and Rules state: the 256-tile cap stays in v1 (an OPFS store or view-only seeding can follow); spec 001's classification export doesn't write the class table.
 
 ## Scope

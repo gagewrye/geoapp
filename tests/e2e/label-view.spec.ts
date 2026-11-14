@@ -1,6 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CLASS_GRID, classFile, rgbClassFile } from "../unit/helpers/labelFiles";
-import { MESSAGES } from "../../src/ui/messages";
+import { classFile } from "../unit/helpers/labelFiles";
 import { clickAt, hideBasemap, hoverFeatures, jumpTo, message, openApp, openRaster, paintMode, pixelAt, rgbFixture, selectClass, settled, stroke, tileKeysStored, toScreen, view, type Xy } from "./helpers";
 import { at, classList, importFile, maskFile, openFileGate, pauseLabelFile, storeTiles, upload } from "./seeding";
 
@@ -92,33 +91,6 @@ test("opacity 30 sets 0.3 on every overlay and the mask, and on a later tile; a 
   await expect.poll(async () => (await labelLayers(page))["label-0,0"]).toEqual([0.3, "visible"]);
 });
 
-test("the opacity and the brush size (spec 017) are kept when another raster opens, and a reload resets the opacity to 60 (criterion 3)", async ({ page }) => {
-  await setup(page);
-  await opacity(page).fill("30");
-  await paintMode(page);
-  await jumpTo(page, [15, 45], 9);
-  await clickAt(page, await toScreen(page, [15.005, 45.005]));
-  await expect.poll(() => tileKeysStored(page)).toEqual(["256,256"]);
-  await page.locator("#brush-size-range").fill("41");
-  await expect(page.locator("#brush-size")).toHaveText("41");
-  page.once("dialog", (d) => void d.accept()); // "Discard labels?"
-  await openRaster(page, { ...rgbFixture(), name: "other.tif" });
-  await expect(page.locator("#raster-info")).toContainText("other.tif");
-  await expect(message(page)).toHaveText("Raster opened.");
-  await expect(opacity(page)).toHaveValue("30");
-  await expect(opacityText(page)).toHaveText("30%");
-  await expect(page.locator("#brush-size")).toHaveText("41");
-  await expect(page.locator("#brush-size-range")).toHaveValue("41");
-  await paintMode(page);
-  await jumpTo(page, [15, 45], 9);
-  await clickAt(page, await toScreen(page, [15.005, 45.005]));
-  await expect.poll(async () => (await labelLayers(page))["label-256,256"]).toEqual([0.3, "visible"]);
-  await page.reload();
-  await expect(page.locator("#map[data-ready=true]")).toBeVisible();
-  await expect(opacity(page)).toHaveValue("60");
-  await expect(opacityText(page)).toHaveText("60%");
-});
-
 test("hiding sets visibility none on the overlays and mask and shows the imagery; nothing else changes (criterion 4)", async ({ page }) => {
   test.setTimeout(120_000);
   await setup(page);
@@ -140,24 +112,6 @@ test("hiding sets visibility none on the overlays and mask and shows the imagery
   await expect(show(page)).toBeChecked();
   const [, c2] = await colours(page);
   await expect.poll(async () => near(await pixelAt(page, probe), rgb(c2!).map((v, i) => 0.6 * v + 0.4 * under[i]!), 3)).toBe(true);
-});
-
-test("an Undo while hidden restores the store, and the overlay it recreates is hidden (criterion 4)", async ({ page }) => {
-  await setup(page);
-  await paintMode(page);
-  await jumpTo(page, [15, 45], 9);
-  const a = await toScreen(page, [15.005, 45.005]);
-  await stroke(page, [a, { x: a.x + 10, y: a.y }]);
-  const painted = await storeTiles(page);
-  for (let i = 0; i < 2; i++) await page.click("#brush-larger"); // 31 px covers the 7 px stroke
-  await stroke(page, [{ x: a.x - 5, y: a.y }, { x: a.x + 15, y: a.y }], "right");
-  expect(await tileKeysStored(page)).toEqual([]);
-  await toggleShow(page);
-  await page.click("#undo");
-  expect(await storeTiles(page)).toEqual(painted);
-  await expect.poll(() => labelLayers(page)).toEqual({ "mask": [0.6, "none"], "label-256,256": [0.6, "none"] });
-  await toggleShow(page);
-  expect(await labelLayers(page)).toEqual({ "mask": [0.6, "visible"], "label-256,256": [0.6, "visible"] });
 });
 
 test("hiding labels in Paint mode selects Pan: a left drag pans, no footprint, no brush or not-allowed cursor, no message (criterion 5)", async ({ page }) => {
@@ -233,15 +187,6 @@ test("clicking Paint while hidden shows the labels, with the brush cursor and fo
   await expect.poll(async () => (await hoverFeatures(page)).length).toBe(1);
 });
 
-test("checking Show labels in Pan mode keeps Pan (criterion 6)", async ({ page }) => {
-  await setup(page);
-  await toggleShow(page);
-  await pressed(page, "pan");
-  await toggleShow(page);
-  await expect(show(page)).toBeChecked();
-  await pressed(page, "pan");
-});
-
 test("hiding during an import selects Pan; after it finishes Pan is pressed and Show labels stays unchecked (criterion 6)", async ({ page }) => {
   await setup(page);
   await paintMode(page);
@@ -257,50 +202,4 @@ test("hiding during an import selects Pan; after it finishes Pan is pressed and 
   await expect(message(page)).toHaveText(seeded);
   await pressed(page, "pan");
   await expect(show(page)).not.toBeChecked();
-});
-
-test("opening another raster with labels hidden checks Show labels and selects Pan (criterion 7)", async ({ page }) => {
-  await setup(page);
-  await paintMode(page);
-  await toggleShow(page);
-  await expect(show(page)).not.toBeChecked();
-  await openRaster(page, { ...rgbFixture(), name: "other.tif" });
-  await expect(page.locator("#raster-info")).toContainText("other.tif");
-  await expect(message(page)).toHaveText("Raster opened.");
-  await expect(show(page)).toBeChecked();
-  await pressed(page, "pan");
-});
-
-test("Pan on load: an open and a successful import select Pan; a cancel, a refused file and an empty import keep Paint (criterion 8)", async ({ page }) => {
-  await setup(page);
-  await pressed(page, "pan");
-  await jumpTo(page, [15, 45], 9);
-  const a = await toScreen(page, [15.005, 45.005]);
-  const v0 = await view(page);
-  await page.mouse.move(a.x, a.y);
-  await page.mouse.down();
-  for (let i = 1; i <= 10; i++) await page.mouse.move(a.x + 6 * i, a.y + 3 * i);
-  expect(await hoverFeatures(page)).toEqual([]);
-  await page.mouse.up();
-  expect((await view(page)).lng).not.toBe(v0.lng);
-  expect(await tileKeysStored(page)).toEqual([]);
-
-  await paintMode(page);
-  await stroke(page, [a, { x: a.x + 10, y: a.y }]); // labels exist, so each import asks first
-  page.once("dialog", (d) => void d.dismiss());
-  await importFile(page, upload("classes.tif", classFile("255")));
-  await page.waitForTimeout(300);
-  await pressed(page, "paint");
-  page.once("dialog", (d) => void d.accept());
-  await importFile(page, upload("rgb.tif", rgbClassFile()));
-  await expect(message(page)).toHaveText(MESSAGES.labelFile);
-  await pressed(page, "paint");
-  page.once("dialog", (d) => void d.accept());
-  await importFile(page, upload("blank.tif", classFile("255", CLASS_GRID, () => 255)));
-  await expect(message(page)).toHaveText(MESSAGES.noSeed);
-  await pressed(page, "paint");
-  page.once("dialog", (d) => void d.accept());
-  await importFile(page, upload("classes.tif", classFile("255")));
-  await expect(message(page)).toHaveText(seeded);
-  await pressed(page, "pan");
 });

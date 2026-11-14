@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { emptyStore, type LabelStore } from "../../../src/core/labelStore";
 import { TILE_SIZE } from "../../../src/core/types";
-import { swapEdit, trimHistory, type Edit } from "../../../src/core/undo";
+import { swapEdit, trimHistory, type Edit, type Entry } from "../../../src/core/undo";
 
 // Spec 037 criterion 1 and scope 4's trim order.
 const TILE = TILE_SIZE * TILE_SIZE;
@@ -38,7 +38,8 @@ describe("swapEdit", () => {
 });
 
 describe("trimHistory with a redo stack", () => {
-  const one = () => new Map([["0,0", tile(1)]]) as Edit;
+  // trimHistory takes whole entries (spec 063); these hold tiles only
+  const one = (): Entry => ({ tiles: new Map([["0,0", tile(1)]]), boxes: new Map() });
   it("drops the redo stack's oldest-undone entries before any history entry", () => {
     const history = [one(), one(), one()], redo = [one(), one()];
     const [, top] = redo, keep = [...history];
@@ -61,7 +62,7 @@ describe("trimHistory with a redo stack", () => {
 
 // Spec 048 criterion 6 (scope 4): the entry just appended or pushed stays, whatever its size.
 describe("trimHistory never drops keep", () => {
-  const many = (n: number) => new Map(Array.from({ length: n }, (_, i) => [`${i * 256},0`, tile(1)] as const)) as Edit;
+  const many = (n: number): Entry => ({ tiles: new Map(Array.from({ length: n }, (_, i) => [`${i * 256},0`, tile(1)] as const)), boxes: new Map() });
   it("keeps an oversized newest history entry and drops every other", () => {
     const big = many(10), history = [many(1), many(1), big];
     trimHistory(history, 4 * TILE, 50, [], big);

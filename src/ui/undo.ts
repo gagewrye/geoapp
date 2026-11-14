@@ -1,34 +1,37 @@
+import type { BoxStore } from "../core/boxes";
 import type { LabelStore } from "../core/labelStore";
-import { UndoHistory, type StrokeEdit } from "../io/undoHistory";
+import { UndoHistory, type Changed, type StrokeEdit } from "../io/undoHistory";
 import { IS_MAC } from "./shortcuts";
 
 type Deps = {
   button: HTMLButtonElement;
   redoButton: HTMLButtonElement;
   store: () => LabelStore;
+  /** The boxes undo covers with the tiles (spec 063); a store of the history's own without it. */
+  boxes?: () => BoxStore;
   /** Undo and redo must wait: labels locked, a stroke in progress, or stroke cells queued. */
   blocked: () => boolean;
   /** Ctrl+Z and the redo keys are the app's: imagery is open and focus isn't in a text field (which keeps its own). */
   shortcut: () => boolean;
-  /** An undo or redo changed these tiles. */
-  undone: (keys: Iterable<string>) => void;
+  /** An undo or redo changed these tiles and boxes. */
+  undone: (changed: Changed) => void;
   /** Cmd, not Ctrl, is the undo modifier: IS_MAC unless a test says otherwise. */
   mac?: boolean;
 };
 
-/** Paint undo's wiring (specs 010, 037, 045): Undo and Mod+Z; Redo, Mod+Shift+Z and Ctrl+Y, and Ctrl+Shift+Z on Mac too. */
-export function initUndo({ button, redoButton, store, blocked, shortcut, undone, mac = IS_MAC }: Deps) {
-  const history = new UndoHistory(store);
+/** Label undo's wiring (specs 010, 037, 045, 063): Undo and Mod+Z; Redo, Mod+Shift+Z and Ctrl+Y, and Ctrl+Shift+Z on Mac too. */
+export function initUndo({ button, redoButton, store, boxes, blocked, shortcut, undone, mac = IS_MAC }: Deps) {
+  const history = new UndoHistory(store, boxes);
   let current: StrokeEdit | null = null;
 
   // blocked while locked: an export must write the tiles as they were at its click, and a seed builds on the store it started from
   const canUndo = () => history.size > 0 && !blocked();
   const canRedo = () => history.redoSize > 0 && !blocked();
   const sync = () => { button.disabled = !canUndo(); redoButton.disabled = !canRedo(); };
-  const run = (can: () => boolean, step: () => string[] | null) => () => {
+  const run = (can: () => boolean, step: () => Changed | null) => () => {
     if (!can()) return;
-    const keys = step();
-    if (keys) undone(keys);
+    const changed = step();
+    if (changed) undone(changed);
     sync();
   };
   const undo = run(canUndo, () => history.undo()), redo = run(canRedo, () => history.redo());

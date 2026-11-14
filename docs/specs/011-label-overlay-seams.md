@@ -4,6 +4,8 @@
 
 **Status:** Approved (Gage, 2026-10-27); revised 2026-10-28: the shared grid is kept with its residual hairlines and no GPU layer, and the pitch follows the finest pixel, accepting seam overlap, larger canvases and a slower open (Gage: "we need labelling precision, even if there is overlap. slow opening is fine"; "your recommendations are good"). **ADRs:** 0016 shared overlay grid (Accepted; amends 0010). Amends spec 003's `overlayIndex` interface and Display rule. Superseded by spec 018 and ADR 0019 (2026-10-29): the shared grid goes, criteria 1-5 lapse, and criterion 6 holds.
 
+**Amended by spec 061 (2026-11-12):** criterion 6 loses its only e2e test, `label-seams.spec.ts`. The unit `labelQuads.lattice*` tests check the quad geometry; nothing checks the seam colour on screen.
+
 **Open question (Gage, unanswered; doesn't block this fix).** What CRS is your imagery, and do the strips sit on the 256-pixel tile grid? Irregular bands may instead be imagery nodata, which is never labelled (spec 003).
 
 ## Defect

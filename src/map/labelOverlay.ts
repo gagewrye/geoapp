@@ -36,6 +36,9 @@ export class LabelOverlays {
   /** Computes these tiles' quads in idle time, so drawing them later projects nothing. */
   prefetch(keys: string[]): void { this.quads.prefetch(keys); }
 
+  /** Quads are still queued for idle time. */
+  get busy(): boolean { return this.quads.busy; }
+
   /** Redraw one tile: create its overlay, repaint it, or remove it when the tile is gone. */
   update(key: string, labels: Uint8Array | undefined, colours: string[]): void {
     let o = this.overlays.get(key);

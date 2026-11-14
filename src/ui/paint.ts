@@ -1,5 +1,5 @@
 import type { Window } from "../core/grid";
-import { keysAround, type LabelStore } from "../core/labelStore";
+import { keysAround, type Erase, type LabelStore } from "../core/labelStore";
 import { spansBox, sweptSpans } from "../core/spans";
 import { TILE_SIZE } from "../core/types";
 import type { MaskBase } from "../io/maskBase";
@@ -56,7 +56,7 @@ export function initPaint(d: Deps) {
       }, d.history, d.base, cache);
     },
     /** One pointer move's stroke cells: a single op over the union of their footprints (F6). */
-    cells(cells: [number, number][], side: number, erase: boolean): void {
+    cells(cells: [number, number][], side: number, erase: Erase): void {
       if (d.locked() || !queue) return;
       const stroke = d.stroke() ?? undefined, value = d.value(), store = d.store();
       for (const group of d.sweep?.() === false ? cells.map((c) => [c]) : [cells]) {

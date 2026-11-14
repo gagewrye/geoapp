@@ -13,7 +13,7 @@ import { fakeLabelSource } from "../helpers/labelFiles";
 import { idle } from "../helpers/paintQueue";
 import { fakeSource } from "../helpers/sources";
 
-// Spec 054 criteria 3 and 4.
+// Spec 054 criteria 3 and 4, as amended by spec 059 (holes of at most 2 px are filled too).
 type Px = (c: number, r: number) => number;
 const cells = (spans: Span[]) => new Set(spans.flatMap((s) => Array.from({ length: s.x1 - s.x0 }, (_, i) => `${s.x0 + i},${s.row}`)));
 
@@ -47,6 +47,30 @@ function reference(dims: { width: number; height: number }, [c0, r0]: [number, n
   return out;
 }
 
+/** reference plus its holes: patches outside it of at most 2 valid pixels touching neither the raster's edge nor anything but it, minus pixels of `value`. */
+function withHoles(dims: { width: number; height: number }, cell: [number, number], label: Px, value: number, valid: Px = () => 1): Set<string> {
+  const R = reference(dims, cell, label, valid), out = new Set(R), w = dims.width;
+  const inR = new Uint8Array(w * dims.height);
+  for (const k of R) { const [c, r] = k.split(",").map(Number) as [number, number]; inR[r * w + c] = 1; }
+  const sides = (c: number, r: number) => [[c - 1, r], [c + 1, r], [c, r - 1], [c, r + 1]] as [number, number][];
+  const off = (c: number, r: number) => c < 0 || r < 0 || c >= w || r >= dims.height;
+  for (let r = 0; r < dims.height; r++) for (let c = 0; c < w; c++) {
+    if (inR[r * w + c]) continue;
+    // grow the patch past 2 px or to the edge, whichever comes first
+    const patch: [number, number][] = [[c, r]];
+    let edge = false;
+    for (let n = 0; n < patch.length && !edge && patch.length <= 2; n++) {
+      for (const [x, y] of sides(...patch[n]!)) {
+        if (off(x, y)) { edge = true; break; }
+        if (!inR[y * w + x] && !patch.some(([a, b]) => a === x && b === y)) patch.push([x, y]);
+      }
+    }
+    if (edge || patch.length > 2 || patch.some(([x, y]) => !valid(x, y))) continue;
+    if (label(c, r) !== value) out.add(`${c},${r}`);
+  }
+  return out;
+}
+
 const DIMS = { width: 700, height: 600 }; // 3 x 3 tiles, the last column and row partial
 /** A ring of label 2 around (350, 300), a spiral-ish comb of 3s inside it, 1 elsewhere. */
 const rings: Px = (c, r) => {
@@ -56,7 +80,37 @@ const rings: Px = (c, r) => {
   return 1;
 };
 
+/** Specks in rings' regions, some on seams: 1, 2 and 3 px, one diagonal pair across a four-tile corner, one already of the fill's value 9. */
+const SPECKS = new Map<string, number>([
+  ["255,300", 0], ["256,300", 0], ["300,255", 2], ["300,256", 0], ["310,320", 2], ["330,330", 0], ["331,330", 0], ["332,330", 0], ["420,300", 9],
+  ["511,511", 0], ["512,512", 0], ["100,100", 0], ["101,100", 0], ["100,101", 0], ["600,400", 0], ["600,401", 0], ["256,256", 7],
+]);
+const specked: Px = (c, r) => SPECKS.get(`${c},${r}`) ?? rings(c, r);
+
 describe("floodFill", () => {
+  // five whole-raster references take a few seconds
+  it("equals a whole-raster flood fill plus its holes, reading the same tiles as with no specks", { timeout: 20_000 }, async () => {
+    const got = new Map<string, Set<string>>();
+    for (const cell of [[350, 300], [5, 5], [556, 300], [699, 599], [362, 300]] as [number, number][]) {
+      const { read, reads } = reader(specked), plain = reader(rings);
+      const r = (await floodFill(DIMS, cell, 9, read)) as FillResult;
+      await floodFill(DIMS, cell, 9, plain.read);
+      const want = withHoles(DIMS, cell, specked, 9);
+      got.set(String(cell), cells(r.spans));
+      expect(got.get(String(cell)), String(cell)).toEqual(want);
+      expect(r.pixels).toBe(want.size);
+      expect(reads.map((w) => `${w.x0},${w.y0}`).sort()).toEqual(plain.reads.map((w) => `${w.x0},${w.y0}`).sort());
+      expect(new Set(reads.map((w) => `${w.x0},${w.y0}`)).size).toBe(reads.length);
+    }
+    // the specks the inner and outer regions enclose are filled, but not the 3 px ones or the one already 9
+    const inner = got.get("350,300")!;
+    expect(["255,300", "256,300", "300,255", "300,256", "310,320", "256,256"].every((k) => inner.has(k))).toBe(true);
+    expect(["330,330", "331,330", "332,330", "420,300"].some((k) => inner.has(k))).toBe(false);
+    const outer = got.get("5,5")!;
+    expect(["511,511", "512,512", "600,400", "600,401"].every((k) => outer.has(k))).toBe(true);
+    expect(["100,100", "101,100", "100,101"].some((k) => outer.has(k))).toBe(false);
+  });
+
   it("equals a whole-raster flood fill for regions that cross tiles and partial edge tiles", async () => {
     for (const cell of [[350, 300], [5, 5], [556, 300], [699, 599], [362, 300]] as [number, number][]) {
       const { read } = reader(rings);
@@ -104,6 +158,16 @@ describe("floodFill", () => {
     expect(c.pixels).toBe(600 * 600);
   });
 
+  it("leaves a speck by the outermost column of the reach, and fills it one column in", async () => {
+    const dims = { width: 256 * 14, height: 256 * 14 }, last = 256 * 12 - 1;
+    const { read, reads } = reader((c, r) => ((c === last && r === 2000) || (c === last - 1 && r === 2100) ? 5 : 0));
+    const r = (await floodFill(dims, [256 * 7 + 3, 256 * 7 + 9], 1, read)) as FillResult;
+    expect(reads).toHaveLength(81);
+    const has = (c: number, row: number) => r.spans.some((s) => s.row === row && s.x0 <= c && c < s.x1);
+    expect([has(last, 2000), has(last - 1, 2100), has(last, 2001)]).toEqual([false, true, true]);
+    expect(r.pixels).toBe((256 * 9) ** 2 - 1);
+  });
+
   it("gives null once stop turns true, without further reads", async () => {
     const { read, reads } = reader(() => 0);
     let stop = false;
@@ -121,16 +185,16 @@ describe("floodFill", () => {
 const gt: Affine = [500000, 10, 0, 5000000, 0, -10];
 const grid: Grid = { width: 600, height: 520, epsg: 32633, gt };
 /** File value 4 (label 1) in a disc around (300, 260), else 6 (label 2); imagery nodata (0) left of column 40. */
-const fileValue = (c: number, r: number) => (Math.hypot(c - 300, r - 260) < 180 ? 4 : 6);
+const discValue = (c: number, r: number) => (Math.hypot(c - 300, r - 260) < 180 ? 4 : 6);
 
-async function withBase() {
+async function withBase(fileValue: Px = discValue) {
   const imagery = fakeSource({ ...grid, bandCount: 1, nodata: 0, float: false }, (_b, c) => (c < 40 ? 0 : 1));
   const file = fakeLabelSource(grid, fileValue);
   const r = await importLabels(imagery.source, file.source, [{ value: 4, name: "four" }, { value: 6, name: "six" }, { value: 9, name: "nine" }]);
   if (typeof r === "string") throw new Error(r);
   const store: LabelStore = r.store, history = new UndoHistory(() => store);
   const q = new PaintQueue(imagery.source, () => store, { applied: () => {}, busy: () => {}, error: (e) => { throw e; } }, history, () => r.base);
-  const label: Px = (c, rr) => (c < 40 ? 0 : fileValue(c, rr) === 4 ? 1 : 2);
+  const label: Px = (c, rr) => (c < 40 ? 0 : [0, 4, 6, 9].indexOf(fileValue(c, rr)));
   const fill = async (cell: [number, number], value: number) => {
     const res = await floodFill(store, cell, value, fillReader(imagery.source, store, r.base, q.cache));
     if (res && typeof res !== "string") {
@@ -169,5 +233,20 @@ describe("fillReader with a mask base", () => {
     t.history.undo();
     expect(t.store.tiles.size).toBe(0);
     expect(await t.fill([10, 10], 1)).toBe("nodata");
+  });
+});
+
+describe("fillReader with a mask base and a speck (spec 059)", () => {
+  it("labels a 1 px speck the filled region encloses, and one undo restores it and leaves no stored tile", async () => {
+    // a value-6 (label 2) speck inside the label-1 disc
+    const t = await withBase((c, r) => (c === 300 && r === 200 ? 6 : discValue(c, r)));
+    const res = (await t.fill([300, 260], 3)) as FillResult;
+    expect(res.pixels).toBe(reference(grid, [300, 260], t.label, (c) => (c < 40 ? 0 : 1)).size + 1);
+    let at = await t.labels();
+    expect([at(300, 200), at(300, 201), at(300, 260)]).toEqual([3, 3, 3]);
+    t.history.undo();
+    expect(t.store.tiles.size).toBe(0);
+    at = await t.labels();
+    expect([at(300, 200), at(300, 201)]).toEqual([2, 1]);
   });
 });

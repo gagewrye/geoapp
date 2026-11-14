@@ -2,6 +2,8 @@
 
 **Status:** Approved under Gage's 2026-10-30 perf delegation. **ADR:** 0024. **Builds on specs 025 and 026** (coalesced reads, lattice quads) and on spec 023's background mask reads.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): unit `core/blocks.tester` (criterion 7), `io/rawReader.tester` (1 and 2), `io/imageryLoader.decimate` and `io/imageryLoader.draws` (3), `io/maskCache.task` (3, scope 3) and the `.hold` files (item 2).
+
 **Goal:** At mid zoom, no main-thread task over 50 ms while tiles load, on all three baseline chunks, with last-tile time no worse than today.
 
 ## Evidence (spec 026's measurement, with 025 in)

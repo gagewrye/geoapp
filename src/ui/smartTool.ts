@@ -52,7 +52,7 @@ export function initSmartTool(d: Deps) {
   /** M or the Smart button: Smart is selected once the model is loaded, if WebGPU allows it. */
   const choose = async (): Promise<void> => {
     const r = await d.load.ensure();
-    if (r === "no-webgpu") { d.modes.smartOff(MESSAGES.noWebGpu); d.say(MESSAGES.noWebGpu, "info"); }
+    if (r === "no-webgpu") d.modes.smartOff(MESSAGES.smartUnavailable); // ensure() showed the popup
     else if (r === "ok" && d.modes.canSmart()) d.modes.request("smart");
   };
 

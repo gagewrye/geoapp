@@ -2,6 +2,8 @@
 
 **Status:** Approved under Gage's 2026-10-30 perf delegation. **ADR:** 0022. Independent of 023; it touches only `io/geotiffSource.ts`, `io/labelFile.ts`, a new `io/blobSource.ts` and the preview's read loop in `io/pipeline.ts`.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): unit `io/blobSource.tester` and `io/pipeline.parallel` (scope 3). `io/blobSource.test.ts` stays.
+
 **Goal:** Cut the fixed cost of every strip or tile read, which is the largest remaining cost in open, zoom and every read-heavy path.
 
 ## Evidence (perf/baseline.md §1, §3)

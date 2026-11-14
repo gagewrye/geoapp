@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { addBox, emptyBoxes } from "../../../src/core/boxes";
 import { emptyStore } from "../../../src/core/labelStore";
 import { initUndo } from "../../../src/ui/undo";
 
@@ -42,7 +43,7 @@ describe("redo keys and button", () => {
       const e = t.press(k);
       expect(e.preventDefault).toHaveBeenCalled();
       expect(t.store.tiles.has("0,0")).toBe(true);
-      expect(t.undone).toHaveBeenCalledWith(["0,0"]);
+      expect(t.undone).toHaveBeenCalledWith({ tiles: ["0,0"], boxes: [] });
       expect(t.redoButton.disabled).toBe(true);
       expect(t.button.disabled).toBe(false);
     });
@@ -104,5 +105,26 @@ describe("Mac redo keys", () => {
     expect(t.store.tiles.size).toBe(1);
     t.press({ key: "z", metaKey: true });
     expect(t.store.tiles.size).toBe(0);
+  });
+});
+
+// Spec 063 scope 5: undone receives what changed, boxes included.
+describe("box entries", () => {
+  it("an undo of a box entry passes its id and no tiles to undone", () => {
+    vi.stubGlobal("window", { addEventListener: () => {} });
+    const store = emptyStore(256, 256), boxes = emptyBoxes(), undone = vi.fn();
+    const button = new Button(), redoButton = new Button();
+    const u = initUndo({ button: button as unknown as HTMLButtonElement, redoButton: redoButton as unknown as HTMLButtonElement,
+      store: () => store, boxes: () => boxes, blocked: () => false, shortcut: () => true, undone, mac: false });
+    const s = u.history.begin();
+    u.history.recordBoxes(s, [boxes.next]);
+    const { id } = addBox(boxes, { x0: 0, y0: 0, x1: 2, y1: 2 }, 1);
+    u.history.end(s);
+    u.sync();
+    button.click();
+    expect(undone).toHaveBeenCalledWith({ tiles: [], boxes: [id] });
+    expect(boxes.boxes.size).toBe(0);
+    redoButton.click();
+    expect(boxes.boxes.get(id)).toEqual({ id, value: 1, x0: 0, y0: 0, x1: 2, y1: 2 });
   });
 });

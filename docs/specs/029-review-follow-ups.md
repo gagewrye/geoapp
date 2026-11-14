@@ -2,6 +2,8 @@
 
 **Status:** Approved under Gage's 2026-10-30 perf delegation. **ADRs:** none. Written against main with specs 021–023 and 025–027.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): unit `core/labelQuads.nan.tester` (criterion 1).
+
 **Goal:** Close the non-blocking review findings, and make `npm run check` and the e2e suite reliable.
 
 **Out of scope:** the spec 022 question of an alpha band combined with nodata 255, which is Gage's to decide.

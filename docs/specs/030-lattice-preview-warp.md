@@ -2,6 +2,8 @@
 
 **Status:** Approved under Gage's 2026-10-30 perf delegation. **ADRs:** none. This extends ADR 0023's self-checked lattice to preview sampling, with results kept exact. Written against main b86d6d8.
 
+**Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): unit `core/lattice.tester` (criterion 1) and `io/pipeline.yield`.
+
 **Goal:** Opening a raster and importing labels lose their remaining long tasks, and the typical preview draws sooner, with no change to any output pixel.
 
 ## Evidence (perf/results/typical-final2, largest-final2; main b86d6d8)

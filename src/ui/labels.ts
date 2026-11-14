@@ -1,4 +1,5 @@
 import type { Map as MapLibreMap } from "maplibre-gl";
+import { emptyBoxes, type BoxStore } from "../core/boxes";
 import type { LabelClass } from "../core/classes";
 import { emptyStore, tileWindow, type LabelStore } from "../core/labelStore";
 import { pixelAt } from "../core/pixel";
@@ -55,7 +56,7 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
   // labels) or a restore offer (spec 031); each holds it under its own name, and it lifts once neither does
   const holders = new Set<"run" | "restore">();
   let locked = false;
-  let store: LabelStore = emptyStore(0, 0);
+  let store: LabelStore = emptyStore(0, 0), boxes: BoxStore = emptyBoxes(); // boxes (spec 063): replace() keeps them, open() empties them
   let imagery: RasterSource | null = null;
   let base: MaskBase | null = null; // an imported mask under the stored tiles (spec 014)
   // the Classes section (spec 036)
@@ -73,11 +74,11 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
   }
   const display = labelDisplay(map, () => store, () => panel.classes().map((c) => c.colour), tile); // tile: local change, for full-resolution mask overlays
   const redraw = display.redraw;
-  // Paint undo and redo (specs 010, 037): one entry per stroke; opening a raster or replacing the store clears it
+  // Undo and redo (specs 010, 037, 063): one entry per stroke or box edit; opening a raster or replacing the store clears it
   const undo = initUndo({
-    button: $<HTMLButtonElement>("undo"), redoButton: $<HTMLButtonElement>("redo"), store: () => store,
+    button: $<HTMLButtonElement>("undo"), redoButton: $<HTMLButtonElement>("redo"), store: () => store, boxes: () => boxes,
     blocked: () => locked || brush.stroking() || paint.size() > 0 || tools.filling(), shortcut: () => open && !inTextField(document.activeElement),
-    undone: (keys) => { keys = [...keys]; edits.tiles(keys); redraw(keys); onChange(); }, // Import and Export follow the store (spec 004)
+    undone: ({ tiles: keys }) => { edits.tiles(keys); redraw(keys); onChange(); }, // Import and Export follow the store (spec 004); boxes aren't drawn until spec 064
   });
 
   const paint = initPaint({
@@ -123,7 +124,7 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
       base = null; picker.cancel(); // opening a raster drops the mask, and a pick still reading the old one
       imagery = source;
       const { width, height, epsg, gt } = source.meta, grid = { width, height, epsg, gt };
-      store = emptyStore(width, height);
+      store = emptyStore(width, height); boxes = emptyBoxes();
       holders.clear(); // the old raster's run or offer no longer holds these labels
       apply();
       view.reset();
@@ -171,7 +172,7 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
     /** A restore offer holds the lock (a run's own controls follow the run). */
     restoring: () => holders.has("restore"),
     /** Paint is offered only once the imagery is drawn (spec 019); Pan stays selected until the user picks Paint. Spec 027's settled view moves the overlays (spec 048). */
-    imageryReady: modes.ready, viewSettled: display.settled,
+    imageryReady: modes.ready, viewSettled: display.settled, overlaysIdle: display.idle,
     /** Starts reading every valid mask in the background, from the view's centre band (spec 023 F3; after "Raster opened."). */
     startMasks(): void {
       if (!imagery) return;
@@ -192,7 +193,6 @@ export function initLabels({ map, say, toolChanged = () => {}, onBusy, onChange,
     hasLabels: () => store.tiles.size > 0 || (base?.count ?? 0) > 0,
     /** Pointer moves are waiting for valid masks, or a fill is being read. */
     busy: () => paint.size() > 0 || tools.filling(),
-    store: () => store,
-    classes: panel.classes, setClasses: panel.setClasses,
+    store: () => store, boxes: () => boxes, classes: panel.classes, setClasses: panel.setClasses,
   };
 }

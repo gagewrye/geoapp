@@ -1,5 +1,6 @@
 import { edgeSeeds, fillTile, inReach } from "../core/fill";
 import type { Window } from "../core/grid";
+import { holePixels, regionView } from "../core/holes";
 import { tileWindow, type LabelStore } from "../core/labelStore";
 import { maskSpans } from "../core/smart";
 import type { Span } from "../core/spans";
@@ -15,7 +16,7 @@ export type FillRead = (key: string, t: Window) => Promise<FillTile>;
 /** A fill's region as spans with its pixel count, the label value it had, and whether it reached FILL_REACH (so may go on past it). */
 export type FillResult = { spans: Span[]; pixels: number; target: number; clipped: boolean };
 
-/** The region a fill of `value` from `cell` covers (spec 054); "nodata": the cell has no imagery; "same": it already holds `value`; null: `stop` turned true after a read. */
+/** The region a fill of `value` from `cell` covers (spec 054) plus the small holes it encloses (spec 059); "nodata": the cell has no imagery; "same": it already holds `value`; null: `stop` turned true after a read. */
 // The valid pixels 4-connected to the cell that share its label, read tile by tile as the fill reaches them, within FILL_REACH.
 export async function floodFill(dims: { width: number; height: number }, cell: [number, number], value: number, read: FillRead,
   stop: () => boolean = () => false): Promise<FillResult | "nodata" | "same" | null> {
@@ -51,6 +52,9 @@ export async function floodFill(dims: { width: number; height: number }, cell: [
       }
     }
   }
+  // holes are found against the region alone, so all are collected before any bit is set
+  const view = regionView(dims, (k) => tiles.get(k)), holes = [...tiles.values()].map((h) => [h.bits, holePixels(h.t, view, value)] as const);
+  for (const [bits, list] of holes) for (const i of list) bits[i] = 1;
   const spans: Span[] = [];
   let pixels = 0;
   for (const { t, bits } of tiles.values()) for (const s of maskSpans(bits, t)) { spans.push(s); pixels += s.x1 - s.x0; }

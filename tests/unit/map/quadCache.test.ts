@@ -79,3 +79,18 @@ describe("QuadCache (criterion 8)", () => {
     expect(idle).toHaveLength(1);
   });
 });
+
+describe("QuadCache.busy (spec 071 criterion 5)", () => {
+  it("is true while prefetched tiles are queued, and false once they are computed or dropped", () => {
+    const idle: ((d: { timeRemaining(): number }) => void)[] = [];
+    const cache = new QuadCache(GRID, (cb) => { idle.push(cb); });
+    expect(cache.busy).toBe(false);
+    cache.prefetch(["0,0", "256,0"]);
+    expect(cache.busy).toBe(true);
+    while (idle.length) idle.shift()!({ timeRemaining: () => 50 });
+    expect(cache.busy).toBe(false);
+    cache.prefetch(["512,0"]);
+    cache.prefetch([]);
+    expect(cache.busy).toBe(false);
+  });
+});

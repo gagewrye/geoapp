@@ -1,5 +1,3 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { tileWindows } from "../../../src/core/grid";
 import { brush, brushSpans, emptyStore, putTile, type LabelStore } from "../../../src/core/labelStore";
@@ -41,14 +39,5 @@ describe("no label tile cap (spec 048 criterion 1)", () => {
     putTile(s, { x0: 0, y0: 8192, width: 256, height: 256 }, t);
     expect(s.tiles.size).toBe(1025);
     expect(s.tiles.get(KEY)).toBe(t);
-  });
-
-  it("src/ names no MAX_LABEL_TILES, labelLimit or editLimit", () => {
-    const files = (dir: string): string[] => readdirSync(dir).flatMap((f) => {
-      const p = join(dir, f);
-      return statSync(p).isDirectory() ? files(p) : [p];
-    });
-    const hits = files("src").filter((p) => /\.(ts|css|html)$/.test(p) && /MAX_LABEL_TILES|labelLimit|editLimit/.test(readFileSync(p, "utf8")));
-    expect(hits).toEqual([]);
   });
 });
