@@ -16,16 +16,16 @@ import type { MessageKind } from "./messages";
 type Deps = {
   labels: ReturnType<typeof initLabels>;
   imagery: () => RasterSource | undefined;
-  /** The open raster's file handle, if it came through the open picker: Export's folder picker and Import labels' picker start in its folder (specs 050, 053, 074). */
+  /** The open raster's file handle, if it came through the open picker: Export's folder picker and Import labels' picker start in its folder (specs 050, 053, 076). */
   folder: () => FileSystemHandle | null;
-  /** The open raster's file, which Export refuses to write over (spec 074). */
+  /** The open raster's file, which Export refuses to write over (spec 076). */
   imageryFile: () => KnownFile | null;
   say: (text: string, kind?: MessageKind) => void;
   /** Shows an error the way main's other actions do. */
   error: (e: unknown) => string;
   /** e2e hook: sees each opened label file before it is read. */
   opened: (file: LabelSource) => void;
-  /** Spec 031's saved session, which an import and an export report to (specs 074, 075). */
+  /** Spec 031's saved session, which an import and an export report to (specs 076, 075). */
   session: SessionHooks;
 };
 
@@ -49,7 +49,7 @@ export function initSeeding({ labels, imagery, folder, imageryFile, say, error, 
   let cancelled = false; // the running import's Cancel was pressed
   let exporting: RasterSource | null = null; // the imagery an export started on
   // the last import's own file (its handle when spec 053's picker gave one), and the base and LabelSource it made:
-  // Export refuses to write over it until the base reads the app's copy instead (spec 074 scope 3, ADR 0041)
+  // Export refuses to write over it until the base reads the app's copy instead (spec 076 scope 3, ADR 0041)
   let mask: { known: KnownFile; base: MaskBase; source: LabelSource } | null = null;
 
   const seeding = () => running !== null && running === imagery();

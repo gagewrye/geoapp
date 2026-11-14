@@ -48,7 +48,7 @@ export const MESSAGES = {
   fillSame: "This area already has the selected class.",
   fillNodata: "There is no imagery to label here.",
   polygonTooLarge: "A polygon can span 2048 px at most. Fill this one first, or zoom in.",
-  // spec 074
+  // spec 076
   saveAs: "Save labels as",
   badName: "That name can't be used. Leave out / \\ : * ? \" < > | and names Windows reserves, such as con.",
   exportImagery: "That is the imagery file. Choose another name.",

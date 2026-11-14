@@ -11,7 +11,7 @@ import { fakeFolder } from "../helpers/fakeFolder";
 import { fakeSessionStore } from "../helpers/sessionStore";
 import { fakeSource } from "../helpers/sources";
 
-// Specs 074 and 075: regression cases for the data-loss bugs found while verifying them, each named by its fix where it has one.
+// Specs 076 and 075: regression cases for the data-loss bugs found while verifying them, each named by its fix where it has one.
 
 const G: Grid = { width: 1000, height: 700, epsg: 32633, gt: [500000, 0.1, 0, 4000000, 0, -0.1] };
 const tile = (v: number) => new Uint8Array(256 * 256).fill(v);
@@ -257,7 +257,7 @@ describe("c8d884f: ids and roles over many imports, exports, failing saves and r
   });
 });
 
-// Spec 074 scope 3: on Windows, folder names are case-insensitive, so ORTHO.tif opens the imagery ortho.tif
+// Spec 076 scope 3: on Windows, folder names are case-insensitive, so ORTHO.tif opens the imagery ortho.tif
 function caseInsensitive(f: ReturnType<typeof fakeFolder>) {
   const real = f.dir.getFileHandle.bind(f.dir);
   f.dir.getFileHandle = (async (n: string, o?: { create?: boolean }) => {
@@ -269,7 +269,7 @@ function caseInsensitive(f: ReturnType<typeof fakeFolder>) {
   return f;
 }
 
-describe("spec 074 scope 3: the imagery and the uncopied mask are refused whatever the name's case", () => {
+describe("spec 076 scope 3: the imagery and the uncopied mask are refused whatever the name's case", () => {
   const { source } = fakeSource({ width: 600, height: 300 }, () => 1);
   afterEach(() => { vi.unstubAllGlobals(); });
 

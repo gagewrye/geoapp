@@ -4,7 +4,7 @@ import { rgbFixture } from "./fixtures";
 import { jumpTo, message, openApp, openRaster, paintMode, paintTwoClasses, path, stroke, toScreen } from "./helpers";
 import { effectiveTiles, importFile, maskFile, saved, storeTiles, tileDiff } from "./seeding";
 
-// Spec 074 criteria 5-8 and spec 075 criterion 6: Export writes through a folder handle and never destroys a file.
+// Spec 076 criteria 5-8 and spec 075 criterion 6: Export writes through a folder handle and never destroys a file.
 
 /**
  * Before page scripts run: the pickers work on the OPFS folder work/. The open picker returns work/<__f.next>; the folder
@@ -25,7 +25,7 @@ const fakeFolder = (page: Page) => page.addInitScript(() => {
     const dir = await work();
     if (g.failAt === null) return dir;
     const n = g.failAt;
-    // the folder's getFileHandle wrapped: its handles' writables reject on write n (spec 074 criterion 7)
+    // the folder's getFileHandle wrapped: its handles' writables reject on write n (spec 076 criterion 7)
     const get = dir.getFileHandle.bind(dir);
     (dir as any).getFileHandle = async (name: string, o?: FileSystemGetFileOptions) => {
       const h = await get(name, o);

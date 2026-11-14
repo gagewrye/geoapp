@@ -8,7 +8,7 @@ import { MESSAGES } from "../../../src/ui/messages";
 import { fakeFolder } from "../helpers/fakeFolder";
 import { fakeSource } from "../helpers/sources";
 
-// Spec 074 criteria 2 and 3, and scope 3's target checks, with fake handles.
+// Spec 076 criteria 2 and 3, and scope 3's target checks, with fake handles.
 const { source } = fakeSource({ width: 600, height: 300 }, () => 1);
 const TOTAL = checkLabelExport(source, initialClasses()).totalBytes;
 
@@ -142,7 +142,7 @@ describe("a write that fails (criterion 3)", () => {
   });
 });
 
-describe("the mask Export refuses (spec 074 scope 3)", () => {
+describe("the mask Export refuses (spec 076 scope 3)", () => {
   const base = (file: unknown) => ({ file }) as unknown as MaskBase;
   const known = { handle: null, name: "mask.tif", size: 9 };
 

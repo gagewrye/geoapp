@@ -4,7 +4,7 @@ import { emptyStore } from "../../../src/core/labelStore";
 import { runExport } from "../../../src/ui/exportLabels";
 import { fakeSource } from "../helpers/sources";
 
-// Spec 074 scope 6 with spec 075 scope 6: a download may be cancelled or lost, so it never marks the session exported.
+// Spec 076 scope 6 with spec 075 scope 6: a download may be cancelled or lost, so it never marks the session exported.
 const written: number[] = [];
 vi.mock("../../../src/io/sink", async (orig) => ({
   ...(await orig<typeof import("../../../src/io/sink")>()),

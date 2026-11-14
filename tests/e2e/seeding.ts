@@ -87,7 +87,7 @@ export async function download(page: Page, selector: string): Promise<Buffer> {
   return readFile((await dl.path())!);
 }
 
-/** Before page scripts run: no folder picker (nor Save dialog), so exports download (ADR 0001's path, spec 074 scope 6). */
+/** Before page scripts run: no folder picker (nor Save dialog), so exports download (ADR 0001's path, spec 076 scope 6). */
 export const noSavePicker = (page: Page) => page.addInitScript(() => {
   delete (window as { showSaveFilePicker?: unknown }).showSaveFilePicker;
   delete (window as { showDirectoryPicker?: unknown }).showDirectoryPicker;

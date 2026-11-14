@@ -74,7 +74,7 @@ export function initPersist(d: Deps) {
   });
   const store = () => (db ??= d.open().then(watched));
   let current: Session | null = null;
-  // a restore that laid a stray's import over reads the user's own file: never swapped for the copy (spec 074 scope 3)
+  // a restore that laid a stray's import over reads the user's own file: never swapped for the copy (spec 076 scope 3)
   let adopted: { base: MaskBase; file: Blob } | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let applying = false, guarded = false;
@@ -252,7 +252,7 @@ export function initPersist(d: Deps) {
       current.copied = false;
       changed(current);
     },
-    /** Resolves once the current import's mask copy is written or has failed; at once when none is due (spec 074 scope 1). */
+    /** Resolves once the current import's mask copy is written or has failed; at once when none is due (spec 076 scope 1). */
     async waitCopy(): Promise<void> {
       const s = current;
       if (!s || s.copied || s.noCopy || s.copyFails > 0 || !s.ready) return;

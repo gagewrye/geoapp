@@ -1,4 +1,4 @@
-# 074: Export never destroys a file
+# 076: Export never destroys a file
 
 **Status:** Approved by Gage in advance, 2026-11-14 ("I dont care what it needs. make absolutely sure labels are never lost. approve any adr or spec"), as relayed by the orchestrator. **ADRs:** 0040, 0041. **Amends:** ADR 0001 and spec 050 (the save path), ADR 0018 ("the mask must stay unchanged on disk"), and README step 5. **Sibling:** spec 075 (sessions).
 

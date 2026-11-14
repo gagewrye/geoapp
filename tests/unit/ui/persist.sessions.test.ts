@@ -378,7 +378,7 @@ describe("a raster reopened while its save is still on the way, which then fails
     expect(await back).toBe(MESSAGES.restored);
     expect(t.store().tiles.get("256,0")![0]).toBe(1);
     expect(t.base()!.count).toBe(5); // from the import's own file: its copy was never written
-    expect(await t.p.maskUncopied()!.text()).toBe("mask 5"); // so Export must not write over it (spec 074 scope 3)
+    expect(await t.p.maskUncopied()!.text()).toBe("mask 5"); // so Export must not write over it (spec 076 scope 3)
     t.tick(60_000);
     t.paint("256,0", 2);
     t.classes[0]!.name = "Roads"; t.p.record();
@@ -510,7 +510,7 @@ describe("a current session and two replaced ones, R1 older than R2 (spec 075 cr
   });
 });
 
-describe("maskUncopied never goes stale (spec 074 scope 3)", () => {
+describe("maskUncopied never goes stale (spec 076 scope 3)", () => {
   async function restoredStray() {
     const t = setup(fakeSessionStore(), []);
     let release!: () => void;

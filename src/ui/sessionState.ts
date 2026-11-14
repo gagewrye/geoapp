@@ -58,7 +58,7 @@ export const newSession = (raster: string, name: string, grid: Grid): Session =>
 /**
  * What Import and Export tell the saved session: an import's mask file and base (copied, then read from the copy: ADR 0041);
  * why an import may not replace the labels (spec 075 scope 2); a flush of unsaved changes before a replace; a wait for
- * the import's copy, which resolves once written or failed (spec 074 scope 1); and a verified export's time (spec 075 scope 6).
+ * the import's copy, which resolves once written or failed (spec 076 scope 1); and a verified export's time (spec 075 scope 6).
  */
 export type SessionHooks = {
   imported(file: File, base: MaskBase): void; replaceRefused(): string | null; flush(): void;

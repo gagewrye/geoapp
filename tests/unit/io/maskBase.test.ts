@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { LabelSource } from "../../../src/io/labelFile";
 import { useCopy, type MaskBase } from "../../../src/io/maskBase";
 
-// Spec 074 criterion 4 (ADR 0041): the base reads the app's copy once swapped, and only while it is still the base.
+// Spec 076 criterion 4 (ADR 0041): the base reads the app's copy once swapped, and only while it is still the base.
 describe("useCopy", () => {
   const base = (file: unknown) => ({ file, lut: new Uint8Array(256), count: 1, windows: new Set<string>(), preview: {} }) as unknown as MaskBase;
 

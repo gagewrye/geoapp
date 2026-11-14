@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { exportName, targetAction } from "../../../src/core/exportTarget";
 
-// Spec 074 criterion 1.
+// Spec 076 criterion 1.
 describe("exportName", () => {
   it("adds a missing .tif, keeps the user's case and trims", () => {
     expect(exportName("a")).toBe("a.tif");

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { canPickFolder, existingFile, folderSink, pickFolder, sameFile } from "../../../src/io/sink";
 import { fakeFolder } from "../helpers/fakeFolder";
 
-// Spec 074 (ADR 0040): the folder picker, with spec 050's startIn, and a sink that changes a file only on close.
+// Spec 076 (ADR 0040): the folder picker, with spec 050's startIn, and a sink that changes a file only on close.
 describe("pickFolder", () => {
   afterEach(() => { vi.unstubAllGlobals(); });
 

@@ -5,7 +5,7 @@ type DirPicker = (o: { mode: "readwrite"; startIn?: FileSystemHandle }) => Promi
 
 const dirPicker = () => (globalThis as unknown as { showDirectoryPicker?: DirPicker }).showDirectoryPicker;
 
-/** A sink whose written size can be read back once closed (spec 074 scope 4). */
+/** A sink whose written size can be read back once closed (spec 076 scope 4). */
 export type SizedSink = Sink & { size(): Promise<number> };
 
 /** True where the browser has showDirectoryPicker (Chromium): Export writes into a chosen folder (ADR 0040). */
