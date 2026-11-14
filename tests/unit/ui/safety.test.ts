@@ -12,7 +12,7 @@ import { fakeFolder } from "../helpers/fakeFolder";
 import { fakeSessionStore } from "../helpers/sessionStore";
 import { fakeSource } from "../helpers/sources";
 
-// Tester: adversarial cases for specs 074 and 075 beyond the implementer's tests.
+// Specs 074 and 075: regression cases for the data-loss bugs found while verifying them, each named by its fix where it has one.
 
 const G: Grid = { width: 1000, height: 700, epsg: 32633, gt: [500000, 0.1, 0, 4000000, 0, -0.1] };
 const tile = (v: number) => new Uint8Array(256 * 256).fill(v);
