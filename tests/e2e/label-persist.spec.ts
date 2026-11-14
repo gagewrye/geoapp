@@ -100,7 +100,7 @@ test("an imported mask plus a stroke: after the restore the mask and the stroke 
   await paintMode(page);
   await jumpTo(page, at(400, 400), 10);
   await selectClass(page, 2);
-  await stroke(page, path(await toScreen(page, at(380.5, 400.5)), await toScreen(page, at(420.5, 410.5)), 8));
+  await stroke(page, path(await toScreen(page, at(380.5, 400.5)), await toScreen(page, at(420.5, 410.5)), 3)); // a straight stroke: its moves are joined (spec 023 F6)
   await saved(page);
   const before = await effectiveTiles(page);
   const exported = await download(page, "#export-labels");

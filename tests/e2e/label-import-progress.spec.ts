@@ -50,7 +50,7 @@ async function withLabels(page: Page) {
   await expect(message(page)).toHaveText(seeded);
   await paintMode(page);
   await jumpTo(page, at(256, 256), 10);
-  await stroke(page, path(await toScreen(page, at(250.5, 256.5)), await toScreen(page, at(262.5, 256.5)), 8));
+  await stroke(page, path(await toScreen(page, at(250.5, 256.5)), await toScreen(page, at(262.5, 256.5)), 3)); // its moves are joined (spec 023 F6)
   expect((await tileKeysStored(page)).length).toBeGreaterThan(0);
   await expect.poll(() => labelLayers(page)).toContain("mask");
   expect((await labelLayers(page)).some((id) => id.startsWith("label-"))).toBe(true);

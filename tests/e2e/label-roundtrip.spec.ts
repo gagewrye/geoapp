@@ -16,7 +16,7 @@ test("export then import restores every tile byte for byte and the class list, w
   // three classes, each stroke crossing the nodata block (14.0..14.6E, 45.5..46.0N)
   for (const [i, lat] of [[0, 45.9], [1, 45.75], [2, 45.6]] as const) {
     await selectClass(page, i);
-    await stroke(page, path(await toScreen(page, [13.8, lat]), await toScreen(page, [14.8, lat]), 12));
+    await stroke(page, path(await toScreen(page, [13.8, lat]), await toScreen(page, [14.8, lat]), 3)); // a straight stroke: its moves are joined (spec 023 F6)
   }
   await page.click("#class-add"); // Class 4, unused
   await renameClass(page, 1, "Mangrove & <salt>");
