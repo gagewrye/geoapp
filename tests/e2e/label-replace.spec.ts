@@ -36,7 +36,7 @@ test("there is no Seed mode; with no labels an import shows no confirm, and Undo
 });
 
 // Spec 072: the confirm's Cancel and OK are two tests, each from its own painted tiles.
-test("with painted tiles an import confirms: Cancel keeps labels and classes", async ({ page }) => {
+test("with painted tiles an import confirms: Cancel keeps labels and classes (spec 004 criterion 16)", async ({ page }) => {
   await setup(page);
   await paintOne(page);
   await expect(page.locator("#undo")).toBeEnabled();
@@ -49,7 +49,7 @@ test("with painted tiles an import confirms: Cancel keeps labels and classes", a
   expect(await classList(page)).toEqual(before.list);
 });
 
-test("with painted tiles an import confirms: OK replaces labels and classes and disables Undo", async ({ page }) => {
+test("with painted tiles an import confirms: OK replaces labels and classes and disables Undo (spec 004 criterion 16)", async ({ page }) => {
   await setup(page);
   await paintOne(page);
   await expect(page.locator("#undo")).toBeEnabled();
@@ -64,7 +64,7 @@ test("with painted tiles an import confirms: OK replaces labels and classes and 
 });
 
 // spec 072: split from the OK test; its first import has no labels to replace, so it asks nothing
-test("with imported labels only, a second import confirms and replaces them too", async ({ page }) => {
+test("with imported labels only, a second import confirms and replaces them too (spec 004 criterion 16)", async ({ page }) => {
   await setup(page);
   const asked: string[] = [];
   page.on("dialog", (d) => { asked.push(d.message()); void d.accept(); });
@@ -81,7 +81,7 @@ test("with imported labels only, a second import confirms and replaces them too"
 });
 
 // Spec 072: the import's lock and the pending mask reads are two tests.
-test("while an import runs the brush and class edits are disabled", async ({ page }) => {
+test("while an import runs the brush and class edits are disabled (spec 004 criterion 16)", async ({ page }) => {
   await setup(page, rgbNodataFixture()); // its masks need reads (spec 023 F2)
   await paintOne(page); // labels, so the import replaces them (spec 072: one stroke)
   const before = await effectiveTiles(page);
@@ -111,7 +111,7 @@ test("while an import runs the brush and class edits are disabled", async ({ pag
   await expect(page.locator("#classes .class-rename").first()).toBeEnabled();
 });
 
-test("while mask reads are pending Import labels and Export labels are disabled", async ({ page }) => {
+test("while mask reads are pending Import labels and Export labels are disabled (spec 004 criterion 16)", async ({ page }) => {
   await setup(page, rgbNodataFixture()); // its masks need reads (spec 023 F2), and setup holds the background reads
   // a dab on row band 4 waits for its read: the background is held, and nothing has read bands near 38.5N
   await pauseImagery(page);

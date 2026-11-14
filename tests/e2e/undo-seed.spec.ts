@@ -77,7 +77,7 @@ test("while an import runs (paused file) Undo is disabled and Ctrl+Z changes not
 });
 
 // Spec 072: split in two, the export's lock and file, then the history after an export.
-test("while Export labels runs (paused sink) Undo is disabled; the file holds the store at its click", async ({ page }) => {
+test("while Export labels runs (paused sink) Undo is disabled; the file holds the store at its click (spec 010 criterion 5)", async ({ page }) => {
   await noSavePicker(page);
   await gateWrites(page);
   await twoClasses(page);
@@ -92,7 +92,7 @@ test("while Export labels runs (paused sink) Undo is disabled; the file holds th
   await expectFileHolds((await dl.path())!, atClick, ["left", "right"]);
 });
 
-test("after Export labels the history is intact: one Undo removes the last stroke and leaves the first", async ({ page }) => {
+test("after Export labels the history is intact: one Undo removes the last stroke and leaves the first (spec 010 criterion 5)", async ({ page }) => {
   await noSavePicker(page);
   await twoClasses(page);
   const painted = await snapshot(page);
