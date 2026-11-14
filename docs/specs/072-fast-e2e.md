@@ -1,6 +1,6 @@
 # 072: Every e2e test runs in 15 s or less on CI
 
-**Status:** Accepted under Gage's standing rule (2026-11-12): "Keep this as a rule for testing. I want quick iterations since this is not a production system currently." **ADRs:** none. **Builds on:** spec 052 (precedent), spec 071 (its helpers `labelsIn`, `labelCount` and `overlaysIdle`, and its tests). **Lands after:** spec 071. Scope items 1 and 2 come first. Criteria 3 and 6 (the 15 s target and the CI timeout) moved to spec 074 (Gage, 2026-11-14). The table runs past one page because it lists every test.
+**Status:** Accepted under Gage's standing rule (2026-11-12): "Keep this as a rule for testing. I want quick iterations since this is not a production system currently." **ADRs:** none. **Builds on:** spec 052 (precedent), spec 071 (its helpers `labelCount` and `overlaysIdle`, and its tests). **Lands after:** spec 071. Scope items 1 and 2 come first. Criteria 3 and 6 (the 15 s target and the CI timeout) moved to spec 074 (Gage, 2026-11-14). The table runs past one page because it lists every test.
 
 **Shrunk by spec 073 (2026-11-12; order 061 → 062 → 073 → 071 → 072).**
 - **Superseded rows,** deleted by 073:
@@ -9,7 +9,7 @@
 - **The 17 tests left:** `label-persist` 76, 39, 104 and 123; `label-roundtrip` 7; `undo-seed` 76; `undo` 49 and 17; `label-replace` 36 and 64; `save-folder` 91; `class-map` 111; `label-import-progress` 78, 105 and 121; and `import-folder` 86.
 - **Also kept, since Gage said no to their 073 P rows (2026-11-12):** `basemap` 95 (now 93) and `label-edit` 29 (now 10, its only test). That makes 19 tests, all still on main (checked 2026-11-13). Any other kept test over 15 s on current main is added at build time under the standing rule.
 - **The superseded `*.tester` rows stay deleted:** Gage answered Q1 "delete".
-- **Unchanged:** Step 0 and the 15 s CI timeout. Spec 072 also takes `labelsIn` and `labelCount` from 071.
+- **Unchanged:** Step 0. Spec 072 takes `labelCount` from 071; the CI timeout moved to spec 074.
 
 **Amended after spec 071 merged (main 1f40296, 2026-11-13):**
 - The 071 reviewer found two gaps in `overlaysIdle()`, so making it safe is now this spec's first scope item and criterion.
@@ -39,7 +39,7 @@ Per fixture, two cases per run, in ms: building the fixture in Node, the open, `
 - **Uint8 1000² tiled:** build 50–70, open 1,300–1,750, stroke 100. **The same with GDAL_NODATA 0:** open 1,360–1,520, stroke 140.
 - **512² tiled:** Float32 open 1,000–1,330, Uint8 open 420–450, strokes 110–140.
 
-**Decision:** `rgbFixture` (and `rgbNodataFixture`, `nodataImagery`) become Uint8 in 256 px tiles with GDAL_NODATA 0, which no pixel holds. Each is built once per worker. They save about 3.5 s per open and keep the grid, every position and the mask reads (spec 023) that a Uint8 file with no nodata would skip. 512² would save about 1 s more per open but changes the grid under about 60 tests, so it isn't the default. `nodataImagery`'s nodata becomes 0. No kept e2e test needs the strip layout, so there is no `rgbStrip`.
+**Decision:** `rgbFixture` (and `rgbNodataFixture`, `nodataImagery`) become Uint8 in 256 px tiles with GDAL_NODATA 0, which no pixel holds. Each is built once per worker. They save about 3.5 s per open and keep the grid, every position and the mask reads (spec 023) that a Uint8 file with no nodata would skip. 512² would save about 1 s more per open but changes the grid under about 60 tests, so it isn't the default. `nodataImagery`'s nodata becomes 0. `rgbStrip` (the old Float32 strip) is kept for `label-edit` 10 only; see Build notes.
 
 **Also over 15 s on current main** (run 43491180826), so added under the standing rule: `layout` 50, `label-view` 71, 142 and 94, `label-lock-edits` 7, `save-folder` 82 and 72, `redo` 13, `undo-seed` 64, 44 and 54, `shelf` 18 and `label-stale` 23. The two runs differ by up to 7 s per test, so the target is about 10 s.
 
@@ -48,7 +48,6 @@ Per fixture, two cases per run, in ms: building the fixture in Node, the open, `
 - **label-import-progress:** its files are 500 × 500, not 512 × 512. 512 touches a third row and column of raster windows, so 9 windows instead of 4. Cancel is at window 2 of 4.
 - **label-edit 10** opens `rgbStrip`, the old Float32 strip. Opening a raster the raw reader reads leaves geotiff.js's `raw` and `basedecoder` chunks to the first label import, which fetches them from the app's origin. Criterion 19 counts those requests. This is app behaviour, not changed here.
 - **Also over 15 s during the build, added under the standing rule:** `label-import` 40, split into formats and grids.
-- **Why 15 s isn't met yet:** on CI, two workers share 4 vCPUs on SwiftShader. Creating a browser context takes 2–9 s while the other worker runs, and about 0 s once it has finished. A test's own work runs 4–8 times slower than on a quiet laptop. The slowest tests come out at 13–21 s in each run, and a different few go over 15 s each time. Criterion 3 needs Gage to decide between finer splits and a change to ADR 0036's shards or workers. Criterion 6's timeout is not committed until then.
 
 ## Result and Gage's decision (amendment, 2026-11-14, PR #16)
 **Per-test CI times:**
@@ -69,8 +68,7 @@ Per fixture, two cases per run, in ms: building the fixture in Node, the open, `
 1. **geotiff.js chunk loading:** should the app load geotiff.js's decoder chunks at the open, so the first import makes no requests and `label-edit` 10 can use the default fixture? That would change app behaviour, so it needs its own spec. Or should criterion 19 count only cross-origin requests?
 
 ## Open questions
-1. **Which fixture is the cheap default?** Step 0 decides by measurement (see Levers). The implementer records the result in this spec as an amendment before changing any test.
-2. **Is 15 s a hard limit?** Recommended: yes, as the CI test timeout (criterion 6), so a slower test fails and CLAUDE.md's rule sends it back to be refactored. Local runs keep 60 s.
+Both answered: Step 0 (fixture); Gage 2026-11-14 (15 s limit moves to 074).
 
 ## Root cause shared by most of the list
 - **The evidence:** in run 43347647402, two cases of the same matrix file differ only in opening `rgbFixture`. "no imagery" took 4.8 s, and "Paint after Space released" took 14.4 s. So the open costs about 10 s on CI.
@@ -83,7 +81,7 @@ Per fixture, two cases per run, in ms: building the fixture in Node, the open, `
   - **Tests that need the strip layout** (spec 020's block limit, read counts) switch to a renamed `rgbStrip`.
   - **Positions:** lon/lat positions stay valid, because the extent is unchanged. Cell maths uses the fixture's own grid constant.
 - **R: read only what is checked.**
-  - `labels()` becomes `labelsIn` or `labelCount`.
+  - `labels()` becomes `labelCount`, `effectiveTiles` or `tileDiff`.
   - Whole-store comparisons use `effectiveTiles()` bytes, or the stored keys.
   - A file is compared by its tiles, not decoded pixel by pixel.
 - **W: wait on state.**
