@@ -312,3 +312,45 @@ describe("a previous raster's snapshot that keeps failing (spec 031 scope 8)", (
     expect(t.fake.records.has(KEY)).toBe(true);
   });
 });
+
+describe("a raster with a snapshot still to write (scope 4)", () => {
+  it("is never evicted, even when its stored session was exported, and its newer labels are written once the store recovers", async () => {
+    const fake = await saved();
+    const r = fake.records.get(KEY)!;
+    fake.records.set(KEY, { ...r, savedAt: 5, exportedAt: 5 }); // the oldest raster, exported
+    for (let i = 0; i < 8; i++) {
+      const id = `old${i}`;
+      fake.records.set(id, { ...r, id, raster: id, savedAt: 10 + i, exportedAt: 10 + i });
+    }
+    const t = setup(fake);
+    let failA = true;
+    const putTiles = fake.store.putTiles.bind(fake.store);
+    fake.store.putTiles = async (id, list) => { if (id === KEY && failA) throw new Error("A's tiles fail"); return putTiles(id, list); };
+    expect(await t.open()).toBe(MESSAGES.restored);
+    t.paint("256,0", 3); // newer than the export, not yet stored
+    t.p.open("b.tif", SIZE + 1, G); // A's save fails: pending
+    await t.p.idle(); await t.p.offer();
+    t.paint("512,0", 4);
+    await t.flush(); // B's save evicts past 8 rasters, but never A
+    expect(fake.records.has(KEY)).toBe(true);
+    expect(fake.records.has("old0")).toBe(false);
+    failA = false;
+    await t.flush(30_000);
+    expect([...fake.tiles.get(KEY)!.keys()].sort()).toEqual(["0,0", "256,0"]);
+  });
+
+  it("a session deleted because its labels went to none never gets an older pending snapshot written back", async () => {
+    const t = setup();
+    await t.open();
+    t.paint("0,0", 1); await t.flush();
+    t.fake.failWith(new Error("disk"));
+    t.paint("256,0", 2); await t.flush(); // fails: dirty again
+    t.fake.failWith(null);
+    t.store().tiles.clear(); t.p.tiles(["0,0", "256,0"]); // erased to none
+    await t.flush(30_000);
+    expect(t.fake.records.has(KEY)).toBe(false);
+    for (let ms = 0; ms < 5 * 60_000; ms += 5000) await t.flush(5000);
+    expect(t.fake.records.has(KEY)).toBe(false);
+    expect(t.fake.tiles.get(KEY)?.size ?? 0).toBe(0);
+  });
+});

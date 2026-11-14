@@ -23,6 +23,8 @@ export type Snapshot = {
   /** An import replaced session `demote`, which becomes the raster's replaced one; `drop`, the replaced one before it, is deleted (ADR 0037). */
   demote: string | null;
   drop: string | null;
+  /** When it was copied, on the save queue's clock: a session deleted after that never gets it written back. */
+  taken?: number;
 };
 
 /** The mask copy failed after the tiles and record were written (spec 056 scope 3). */
@@ -48,7 +50,9 @@ export function mergeSnapshots(a: Snapshot, b: Snapshot): Snapshot {
  * without the flag. So a failing copy never blocks tiles. Then evicts other rasters' exported sessions past
  * MAX_SESSIONS. Resolves with the savedAt written; with no labels it deletes the session if `owned` and resolves null.
  */
-export async function writeSnapshot(sessions: SessionStore, p: Snapshot, owned: boolean, now: () => number, yieldTask: () => Promise<void>): Promise<number | null> {
+// keep: rasters with snapshots still to write, whose newer labels the store doesn't show yet, so never evicted
+export async function writeSnapshot(sessions: SessionStore, p: Snapshot, owned: boolean, now: () => number, yieldTask: () => Promise<void>,
+  keep: Iterable<string> = []): Promise<number | null> {
   if (p.drop) await sessions.delete(p.drop);
   if (p.demote) {
     const old = (await sessions.forRaster(p.record.raster)).find((r) => r.id === p.demote);
@@ -76,13 +80,15 @@ export async function writeSnapshot(sessions: SessionStore, p: Snapshot, owned: 
     }
     await sessions.putRecord(record);
   } else if (base?.copyMissing) await sessions.deleteBase(p.id).catch(() => {}); // an older import's copy goes, if the disk lets it
-  await evictOthers(sessions, p.record.raster);
+  await evictOthers(sessions, p.record.raster, new Set(keep));
   return savedAt;
 }
 
 /** Deletes every session of the rasters evict picks among the others: the open raster's are never evicted. */
-async function evictOthers(sessions: SessionStore, raster: string): Promise<void> {
-  const others = (await sessions.list()).filter((x) => x.raster !== raster);
+async function evictOthers(sessions: SessionStore, raster: string, keep: Set<string>): Promise<void> {
+  const all = (await sessions.list()).filter((x) => x.raster !== raster);
+  // a kept raster still counts towards the limit, but is never picked
+  const others = all.map((x) => (keep.has(x.raster) ? { ...x, exportedAt: null } : x));
   for (const r of evict(byRaster(others), MAX_SESSIONS - 1)) {
     for (const x of others) if (x.raster === r) await sessions.delete(x.id);
   }

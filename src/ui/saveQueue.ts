@@ -29,6 +29,10 @@ export function saveQueue(d: Deps) {
   let retry: ReturnType<typeof setTimeout> | null = null;
   let chain: Promise<void> = Promise.resolve();
   let inFlight = 0, failed = "", saved = "", persisted = false, loud = true;
+  // the queue's clock, and when each session id was last deleted: a snapshot copied before its session's delete is never written
+  let clock = 0;
+  const deletedAt = new Map<string, number>();
+  const stale = (snap: Snapshot) => (snap.taken ?? 0) < (deletedAt.get(snap.id) ?? 0);
   // an import's file, and what to do with its copy once written
   const uses = new WeakMap<Blob, (copy: Blob) => Promise<void>>();
 
@@ -38,7 +42,7 @@ export function saveQueue(d: Deps) {
     // decided now, not when copied: saves run one at a time, so every earlier copy attempt has ended and `copied` is
     // accurate. A record saved without its import's copy says so, so a restore never opens an older copy (spec 032)
     if (snap.record.base && !snap.file && !s.copied) snap.record.base.copyMissing = true;
-    const at = await writeSnapshot(sessions, snap, s.owned && snap.id === s.id, d.now, d.yieldTask);
+    const at = await writeSnapshot(sessions, snap, s.owned && snap.id === s.id, d.now, d.yieldTask, pending.map((p) => p.snap.record.raster));
     if (snap.id !== s.id) return;
     if (s.failed) {
       const done = new Set(snap.tiles.map(([k]) => k));
@@ -76,6 +80,7 @@ export function saveQueue(d: Deps) {
         s.failed = s.failed ? mergeSnapshots(s.failed, snap) : snap; // the tiles as they were, should an import replace them
       }
     } else {
+      if (stale(snap)) return; // its session was deleted meanwhile
       // a session an import replaced while its save was on the way is the replaced one now
       if (s.replaced?.id === snap.id) snap = { ...snap, record: { ...snap.record, role: "replaced" } };
       const i = pending.findIndex((p) => p.s === s && p.snap.id === snap.id);
@@ -98,6 +103,8 @@ export function saveQueue(d: Deps) {
     chain = chain.then(async () => {
       let reason = "";
       for (const p of [...pending]) {
+        if (!pending.includes(p)) continue; // dropped by a delete meanwhile
+        if (stale(p.snap)) { pending = pending.filter((x) => x !== p); continue; }
         try {
           await write(p.s, p.snap);
           pending = pending.filter((x) => x !== p);
@@ -127,6 +134,13 @@ export function saveQueue(d: Deps) {
 
   return {
     enqueue, uses,
+    /** The next tick of the queue's clock, which stamps each snapshot when copied. */
+    tick: () => ++clock,
+    /** Session `id` was deleted: its pending snapshots go, and none copied before now is ever written. */
+    deleted(id: string): void {
+      deletedAt.set(id, ++clock);
+      pending = pending.filter((p) => p.snap.id !== id);
+    },
     pending: () => pending,
     /** Keeps a snapshot to write before anything else. */
     hold: (p: Pending) => { pending.push(p); },

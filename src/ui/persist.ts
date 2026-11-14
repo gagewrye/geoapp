@@ -63,7 +63,11 @@ export function initPersist(d: Deps) {
   const time = d.time ?? ((ms) => new Date(ms).toLocaleTimeString());
   const dateTime = d.dateTime ?? ((ms) => new Date(ms).toLocaleString());
   let db: Promise<SessionStore> | null = null;
-  const store = () => (db ??= d.open());
+  // every delete (a drop, an eviction, a declined restore, labels gone) also drops that session's pending snapshots (spec 056)
+  const watched = (s: SessionStore): SessionStore => new Proxy(s, {
+    get: (t, k) => (k === "delete" ? async (id: string) => { await t.delete(id); q.deleted(id); } : t[k as keyof SessionStore]),
+  });
+  const store = () => (db ??= d.open().then(watched));
   let current: Session | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let applying = false, guarded = false;
@@ -101,7 +105,7 @@ export function initPersist(d: Deps) {
       base: base && { lut: base.lut.slice(), count: base.count, windows: [...base.windows], values: base.preview.values.slice() },
     };
     const labelled = labels.hasLabels();
-    const snap: Snapshot = { id: s.id, tiles, clear: s.clear, file: s.noCopy ? null : s.file, record, savedAt: s.touched ? null : s.savedAt, labelled, demote: s.demote, drop: s.drop };
+    const snap: Snapshot = { id: s.id, tiles, clear: s.clear, file: s.noCopy ? null : s.file, record, savedAt: s.touched ? null : s.savedAt, labelled, demote: s.demote, drop: s.drop, taken: q.tick() };
     s.tiles = new Set(); s.record = false; s.clear = false; s.file = null; s.touched = false; s.demote = null; s.drop = null;
     s.kept = labelled;
     return snap;
