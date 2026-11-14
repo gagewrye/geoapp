@@ -10,6 +10,7 @@ import { yieldToBrowser } from "../io/yieldTask";
 import { MESSAGES, type MessageKind } from "./messages";
 import { chooseSession, settle } from "./restoreOffer";
 import { saveQueue } from "./saveQueue";
+import { adopt, keepApart, strays } from "./strays";
 import { newSession, type Session } from "./sessionState";
 import { loadSession, type Snapshot } from "./snapshot";
 
@@ -143,8 +144,8 @@ export function initPersist(d: Deps) {
       if (current) save(true);
       const raster = rasterKey(size, grid);
       const s = newSession(raster, name, grid);
-      // a failed lookup counts as no session
-      s.lookup = store().then((db) => db.forRaster(raster)).catch(() => []).then((r) => { s.settled = true; s.found = r.length > 0; return r; });
+      // after the writes on the way, so the offer sees them (and their failures, kept as strays); a failed lookup counts as no session
+      s.lookup = q.idle().then(store).then((db) => db.forRaster(raster)).catch(() => []).then((r) => { s.settled = true; s.found = r.length > 0; return r; });
       current = s;
       sync();
       return true;
@@ -157,15 +158,23 @@ export function initPersist(d: Deps) {
       if (locked) labels.restoreLock?.(true);
       try {
         const records = await s.lookup;
-        if (s !== current || !records.length) return null;
+        const loose = strays(q.pending(), s), ids = loose.map((p) => p.snap.id);
+        if (s !== current || (!records.length && !loose.length)) return null;
         const sessions = await store();
-        const r = await settle(s, sessions, chooseSession(records, d.confirm, dateTime), records);
+        const c = records.length ? chooseSession(records, d.confirm, dateTime) : { restore: null, replaced: null, deleted: [] };
+        // a session with a stray is never deleted: the question showed only its stored labels, not the stray's newer ones
+        const r = await settle(s, sessions, { ...c, deleted: c.deleted.filter((id) => !ids.includes(id)) }, records, ids);
+        for (const p of loose) if (p.snap.id !== r?.id) await keepApart(s, p, records, sessions);
         if (!r) return null;
-        const { tiles, base, missing } = await loadSession(sessions, r, s.grid, d.openBase ?? openLabelFile);
+        const openBase = d.openBase ?? openLabelFile;
+        const loaded = await loadSession(sessions, r, s.grid, openBase);
         if (s !== current) return null;
+        const mine = loose.filter((p) => p.snap.id === r.id);
+        const { tiles, base, missing, record: v } = mine.length ? await adopt(s, mine, loaded, openBase) : { ...loaded, record: r };
+        q.forget(mine);
         applying = true;
         try {
-          labels.restoreSession({ width: s.grid.width, height: s.grid.height, tiles, base: base !== null }, r.classes, base, r.selected, { opacity: r.opacity, visible: r.visible });
+          labels.restoreSession({ width: s.grid.width, height: s.grid.height, tiles, base: base !== null }, v.classes, base, v.selected, { opacity: v.opacity, visible: v.visible });
         } finally { applying = false; }
         s.owned = s.kept = true;
         if (missing) s.record = true; // saved again without the mask

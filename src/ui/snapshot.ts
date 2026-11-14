@@ -27,9 +27,9 @@ export type Snapshot = {
   taken?: number;
 };
 
-/** The mask copy failed after the tiles and record were written (spec 056 scope 3). */
+/** The mask copy failed after the tiles and the record, saved at `savedAt`, were written (spec 056 scope 3). */
 export class CopyFailed extends Error {
-  constructor(readonly reason: unknown) {
+  constructor(readonly reason: unknown, readonly savedAt = 0) {
     super(reason instanceof Error ? reason.message : String(reason));
     this.name = "CopyFailed";
   }
@@ -76,7 +76,7 @@ export async function writeSnapshot(sessions: SessionStore, p: Snapshot, owned: 
     try {
       await sessions.saveBase(p.id, p.file);
     } catch (e) {
-      throw new CopyFailed(e);
+      throw new CopyFailed(e, savedAt);
     }
     await sessions.putRecord(record);
   } else if (base?.copyMissing) await sessions.deleteBase(p.id).catch(() => {}); // an older import's copy goes, if the disk lets it

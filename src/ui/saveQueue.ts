@@ -72,7 +72,8 @@ export function saveQueue(d: Deps) {
     if (own && copy && ++s.copyFails > COPY_RETRIES) s.noCopy = true;
     if (own && quota) s.noCopy = true;
     if (own) {
-      if (copy) s.file ??= snap.file;
+      // its tiles and record are written: the retry keeps that savedAt, never an older one that an export may be after
+      if (copy) { s.file ??= snap.file; s.owned = true; s.savedAt = (e as CopyFailed).savedAt; }
       else {
         for (const [k] of snap.tiles) s.tiles.add(k);
         s.record = true; s.clear ||= snap.clear; s.file ??= snap.file; s.demote ??= snap.demote; s.drop ??= snap.drop;
@@ -104,6 +105,9 @@ export function saveQueue(d: Deps) {
       let reason = "";
       for (const p of [...pending]) {
         if (!pending.includes(p)) continue; // dropped by a delete meanwhile
+        // the open raster's own strays wait for its offer (persist.ts): never written over the session that opened it
+        const cur = d.current();
+        if (cur && p.s !== cur && p.snap.record.raster === cur.raster && (!cur.ready || p.snap.id === cur.id)) continue;
         if (stale(p.snap)) { pending = pending.filter((x) => x !== p); continue; }
         try {
           await write(p.s, p.snap);
@@ -142,6 +146,8 @@ export function saveQueue(d: Deps) {
       pending = pending.filter((p) => p.snap.id !== id);
     },
     pending: () => pending,
+    /** These pending snapshots are the open session's now (its restore adopted them). */
+    forget: (ps: Pending[]) => { pending = pending.filter((p) => !ps.includes(p)); },
     /** Keeps a snapshot to write before anything else. */
     hold: (p: Pending) => { pending.push(p); },
     /** Drops every pending snapshot and the failure they caused (the user discarded them). */

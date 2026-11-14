@@ -44,7 +44,7 @@ function setup(fake = fakeSessionStore(), answers: boolean[] = []) {
     return null;
   };
   const open = async () => { p.open("a.tif", SIZE, G); return p.offer(); };
-  return { fake, p, prompts, said, paint, flush, importMask, open, store: () => store, base: () => base, tick: (ms: number) => { clock += ms; } };
+  return { fake, p, prompts, said, paint, flush, importMask, open, classes, reset: () => { store = emptyStore(G.width, G.height); base = null; }, store: () => store, base: () => base, tick: (ms: number) => { clock += ms; } };
 }
 const role = (f: ReturnType<typeof fakeSessionStore>, r: string) => [...f.records.values()].filter((x) => x.role === r);
 
@@ -352,5 +352,63 @@ describe("a raster with a snapshot still to write (scope 4)", () => {
     for (let ms = 0; ms < 5 * 60_000; ms += 5000) await t.flush(5000);
     expect(t.fake.records.has(KEY)).toBe(false);
     expect(t.fake.tiles.get(KEY)?.size ?? 0).toBe(0);
+  });
+});
+
+describe("a raster reopened while its save is still on the way, which then fails (spec 056)", () => {
+  /** A imports and paints 256,0 = 1; B opens (A's save starts, its copy held), A reopens, and the copy fails: A's snapshot is pending. */
+  async function reopened(answers: boolean[]) {
+    const t = setup(fakeSessionStore(), answers);
+    let release!: () => void;
+    const held = new Promise<void>((r) => { release = r; });
+    t.fake.store.saveBase = async () => { await held; throw new DOMException("The file changed.", "NotReadableError"); };
+    await t.open();
+    await t.importMask(5, "0,0", 1);
+    t.paint("256,0", 1);
+    t.p.open("b.tif", SIZE + 1, G);
+    void t.p.offer();
+    t.reset(); // as opening a raster does
+    const back = t.open(); // the pending check at open sees nothing yet
+    release();
+    return { t, back };
+  }
+
+  it("restored: its labels are on the map, and its retries never roll back the newer edits", async () => {
+    const { t, back } = await reopened([]);
+    expect(await back).toBe(MESSAGES.restored);
+    expect(t.store().tiles.get("256,0")![0]).toBe(1);
+    expect(t.base()!.count).toBe(5); // from the import's own file: its copy was never written
+    t.tick(60_000);
+    t.paint("256,0", 2);
+    t.classes[0]!.name = "Roads"; t.p.record();
+    const painted = 1000 + 60_000;
+    for (let ms = 0; ms < 10 * 60_000; ms += 5000) await t.flush(5000);
+    const r = t.fake.records.get(KEY)!;
+    expect(new Uint8Array(t.fake.tiles.get(KEY)!.get("256,0")!)[0]).toBe(2);
+    expect(new Uint8Array(t.fake.tiles.get(KEY)!.get("0,0")!)[0]).toBe(1);
+    expect(r.classes[0]!.name).toBe("Roads");
+    expect(r.savedAt).toBeGreaterThan(painted);
+    expect(r.role).toBe("current");
+    expect(t.fake.records.size).toBe(1);
+  });
+
+  it("declined (Cancel, then OK to delete): its labels are kept apart as the replaced session, which the next open offers", async () => {
+    const { t, back } = await reopened([false, true]);
+    expect(await back).toBe(null);
+    expect(t.store().tiles.size).toBe(0);
+    t.paint("256,0", 2);
+    for (let ms = 0; ms < 10 * 60_000; ms += 5000) await t.flush(5000);
+    const old = t.fake.records.get(KEY)!, cur = role(t.fake, "current");
+    expect(old.role).toBe("replaced");
+    expect(new Uint8Array(t.fake.tiles.get(KEY)!.get("256,0")!)[0]).toBe(1);
+    expect(cur).toHaveLength(1);
+    expect(cur[0]!.id).not.toBe(KEY);
+    expect(new Uint8Array(t.fake.tiles.get(cur[0]!.id)!.get("256,0")!)[0]).toBe(2);
+    // the newer labels have no export, so an import can't drop the kept ones
+    expect(await t.importMask(9, "512,256", 3)).toBe(MESSAGES.replacedFirst);
+    const again = setup(t.fake, [false, true]); // Cancel, then OK on "…instead?"
+    expect(await again.open()).toBe(MESSAGES.restoredNoMask); // its copy failed every time, so was left out
+    expect(again.store().tiles.get("256,0")![0]).toBe(1);
+    expect(again.store().tiles.get("0,0")![0]).toBe(1);
   });
 });

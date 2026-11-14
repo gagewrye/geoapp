@@ -23,14 +23,14 @@ export function chooseSession(records: SessionRecord[], ask: (text: string) => b
   return { restore: first, replaced: other, deleted: [] };
 }
 
-/** Applies a choice to the store (deletes, then role swaps) and to the session: which id the labels save to, and its replaced one. */
-export async function settle(s: Session, sessions: SessionStore, c: Choice, records: SessionRecord[]): Promise<SessionRecord | null> {
+/** Applies a choice to the store (deletes, then role swaps) and to the session: which id the labels save to (none of `taken`), and its replaced one. */
+export async function settle(s: Session, sessions: SessionStore, c: Choice, records: SessionRecord[], taken: string[] = []): Promise<SessionRecord | null> {
   for (const id of c.deleted) await sessions.delete(id);
   if (c.replaced && c.replaced.role !== "replaced") await sessions.putRecord({ ...c.replaced, role: "replaced" });
   if (c.restore && c.restore.role !== "current") await sessions.putRecord({ ...c.restore, role: "current" });
   s.replaced = c.replaced && { id: c.replaced.id, savedAt: c.replaced.savedAt, exportedAt: c.replaced.exportedAt };
   const left = records.filter((r) => !c.deleted.includes(r.id)).map((r) => r.id);
-  s.id = c.restore?.id ?? sessionId(s.raster, left);
+  s.id = c.restore?.id ?? sessionId(s.raster, [...left, ...taken]);
   if (c.restore) { s.savedAt = c.restore.savedAt; s.exportedAt = c.restore.exportedAt; }
   return c.restore;
 }
