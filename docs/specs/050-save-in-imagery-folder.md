@@ -1,6 +1,6 @@
 # 050: Export labels into the imagery's folder
 
-**Status:** Approved (Gage waived review, 2026-11-02, as relayed by the orchestrator), with the recommended answers. **ADRs:** 0034 (Accepted). **Builds on specs 004 and 019, and ADR 0001.** Draft spec 044 calls `openSink` with no folder and is unaffected. A raster opened by draft spec 040 (remote) has no folder.
+**Status:** Approved (Gage waived review, 2026-11-02, as relayed by the orchestrator), with the recommended answers. **ADRs:** 0034 (Accepted). **Builds on specs 004 and 019, and ADR 0001.** Draft spec 044 calls `openSink` with no folder and is unaffected. Amended by spec 055 (2026-11-14, ADR 0035): Export uses the folder picker, which gets the `startIn` of scope 3; criteria 1, 3, 4 and 8 check the folder picker's `startIn` and README's folder note. A raster opened by draft spec 040 (remote) has no folder.
 
 **Request** (Gage, 2026-11-02): "There is an issue where the web app opens a different folder than the one you pulled the tif from. I might have saved a label_final there on accident." Each chunk has its own folder (`ChunkX_Y.tif`, `labels.tif`, `labels_final.tif`).
 
