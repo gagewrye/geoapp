@@ -116,6 +116,15 @@ export const nodataImagery = once(() => ({ name: "nodata4326.tif", mimeType: "im
   (b, c, r) => (b === 1 && inNodata(c, r) ? 0 : b === 0 ? (c < 500 ? 200 : 120) : b === 1 ? 100 + (r % 100) : 150),
   { epsg: 4326, gt: ND_GRID.gt, nodata: "0" }, { uint8: true })) }));
 
+/** Each labelled pixel of these tiles (stored or effective, keyed "x0,y0") as [col, row, value], computed in Node (spec 072: no labels() scan). */
+export function* labelled(tiles: Map<string, Uint8Array>, width: number): Generator<[number, number, number]> {
+  for (const [key, t] of tiles) {
+    const [x0, y0] = key.split(",").map(Number) as [number, number];
+    const w = Math.min(256, width - x0);
+    for (let i = 0; i < t.length; i++) if (t[i]) yield [x0 + (i % w), y0 + Math.floor(i / w), t[i]!];
+  }
+}
+
 /** Every stored pixel is off imagery nodata. */
 export function expectNoNodata(tiles: Map<string, Uint8Array>, width: number, nodata: (c: number, r: number) => boolean): void {
   let bad = 0;
