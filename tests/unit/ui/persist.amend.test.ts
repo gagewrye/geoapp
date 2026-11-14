@@ -45,7 +45,8 @@ function setup() {
   const flush = async (ms = SAVE_DELAY_MS) => { await vi.advanceTimersByTimeAsync(ms); await p.idle(); };
   /** Opens a raster as main does: the labels switch to an empty store after persist.open says yes. */
   const open = (name: string, size: number) => { const ok = p.open(name, size, G); if (ok) store = emptyStore(G.width, G.height); return ok; };
-  const record = (size: number): SessionRecord => ({ key: KEY(size), name: "a.tif", savedAt: 1, classes, selected: 0, opacity: 0.6, visible: true, base: null });
+  // spec 031's shape, keyed by rasterKey, as a store from before spec 056 holds it
+  const record = (size: number) => ({ key: KEY(size), name: "a.tif", savedAt: 1, classes, selected: 0, opacity: 0.6, visible: true, base: null }) as unknown as SessionRecord;
   return { fake, p, lock, answers, prompts, state, guarded, paint, flush, open, record, store: () => store };
 }
 
@@ -57,9 +58,9 @@ describe("the restore lock (criterion 11)", () => {
     const t = setup();
     t.fake.records.set(KEY(1), t.record(1));
     t.fake.tiles.set(KEY(1), new Map([["0,0", tile(3).buffer]]));
-    const get = deferred<SessionRecord | null>(), tiles = deferred<[string, ArrayBuffer][]>();
-    const realGet = t.fake.store.get.bind(t.fake.store), realTiles = t.fake.store.tiles.bind(t.fake.store);
-    t.fake.store.get = async (k) => { await get.promise; return realGet(k); };
+    const get = deferred<null>(), tiles = deferred<[string, ArrayBuffer][]>();
+    const realGet = t.fake.store.forRaster.bind(t.fake.store), realTiles = t.fake.store.tiles.bind(t.fake.store);
+    t.fake.store.forRaster = async (k) => { await get.promise; return realGet(k); };
     t.fake.store.tiles = async (...a) => { await tiles.promise; return realTiles(...a); };
     t.open("a.tif", 1);
     const offered = t.p.offer(); // "Raster opened."
@@ -97,13 +98,13 @@ describe("the restore lock (criterion 11)", () => {
 
   it("with no session: locked only until get settles, and not at all when it settled before the offer; a failed get counts as none", async () => {
     const a = setup();
-    const get = deferred<null>();
-    a.fake.store.get = () => get.promise;
+    const get = deferred<SessionRecord[]>();
+    a.fake.store.forRaster = () => get.promise;
     a.open("a.tif", 1);
     const offered = a.p.offer();
     await vi.advanceTimersByTimeAsync(0);
     expect(a.lock.on).toBe(true);
-    get.resolve(null);
+    get.resolve([]);
     expect(await offered).toBe(null);
     expect(a.lock.log).toEqual([true, false]);
 
@@ -114,7 +115,7 @@ describe("the restore lock (criterion 11)", () => {
     expect(b.lock.log).toEqual([]);
 
     const c = setup();
-    c.fake.store.get = async () => { throw new Error("no IndexedDB"); };
+    c.fake.store.forRaster = async () => { throw new Error("no IndexedDB"); };
     c.open("a.tif", 1);
     await vi.advanceTimersByTimeAsync(0);
     expect(await c.p.offer()).toBe(null);

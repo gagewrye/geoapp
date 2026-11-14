@@ -82,6 +82,6 @@ describe("restored preview (spec 048 criterion 8)", () => {
     runFrames();
     expect(b.store.tiles.size).toBe(300);
     expect(b.display.previewValues()).toEqual(before);
-    expect(rasterKey(SIZE, G)).toBe(record.key);
+    expect(rasterKey(SIZE, G)).toBe(record.id);
   });
 });
