@@ -216,6 +216,48 @@ describe("cb8adf5's strays: a stray kept apart never deletes or demotes the sess
   });
 });
 
+describe("c8d884f: ids and roles over many imports, exports, failing saves and reopens", () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  const roles = (f: ReturnType<typeof fakeSessionStore>) => [...f.records.values()].map((r) => [r.role, r.base!.count] as const);
+
+  it("8 rounds of import, export, with every other round's save failing until the next export: one current, the newest labels, no lost unexported session", async () => {
+    const t = persistSetup();
+    await t.open();
+    for (let n = 1; n <= 8; n++) {
+      const fail = n % 2 === 0;
+      if (fail) t.fake.failWith(new Error("disk"));
+      expect(await t.importMask(n, "0,0", n)).toBe(null);
+      t.paint(`${256 * n},0`, n);
+      await t.flush();
+      t.p.exported(t.now()); // a folder export of the labels on the map
+      t.fake.failWith(null);
+      for (let ms = 0; ms < 60_000; ms += 5000) await t.flush(5000);
+      const r = roles(t.fake);
+      expect(r.filter(([x]) => x === "current"), `round ${n}`).toEqual([["current", n]]);
+      expect(r.filter(([x]) => x === "replaced").length, `round ${n}`).toBeLessThanOrEqual(1);
+      const cur = [...t.fake.records.values()].find((x) => x.role === "current")!;
+      expect([...t.fake.tiles.get(cur.id)!.keys()].sort(), `round ${n}`).toEqual(["0,0", `${256 * n},0`].sort());
+    }
+  });
+
+  it("after a reopen that restores the older replaced session and more imports, every stored id is distinct and one is current", async () => {
+    const t = persistSetup(fakeSessionStore(), [false, true]); // the reopen: Cancel, OK '…instead?'
+    await t.open();
+    await t.importMask(1, "0,0", 1); await t.flush(); t.p.exported(t.now()); await t.flush();
+    await t.importMask(2, "0,0", 2); await t.flush();
+    t.p.open("a.tif", 4321, G); await t.p.idle();
+    expect(await t.p.offer()).toBe(MESSAGES.restored); // mask 1 is current again, mask 2 replaced (unexported)
+    expect(roles(t.fake).sort()).toEqual([["current", 1], ["replaced", 2]]);
+    expect(await t.importMask(3, "0,0", 3)).toBe(MESSAGES.replacedFirst);
+    t.p.open("a.tif", 4321, G); await t.p.idle();
+    expect(await t.p.offer()).toBe(MESSAGES.restored); // accept: mask 1
+    await t.flush();
+    expect(roles(t.fake).sort()).toEqual([["current", 1], ["replaced", 2]]);
+  });
+});
+
 // Spec 055 scope 3: on Windows, folder names are case-insensitive, so ORTHO.tif opens the imagery ortho.tif
 function caseInsensitive(f: ReturnType<typeof fakeFolder>) {
   const real = f.dir.getFileHandle.bind(f.dir);
