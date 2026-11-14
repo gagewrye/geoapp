@@ -111,7 +111,7 @@ export function initPersist(d: Deps) {
     };
     const labelled = labels.hasLabels();
     const snap: Snapshot = { id: s.id, tiles, clear: s.clear, file: s.noCopy ? null : s.file, record, savedAt: s.touched ? null : s.savedAt, labelled, demote: s.demote, drop: s.drop, taken: q.tick() };
-    s.tiles = new Set(); s.record = false; s.clear = false; s.file = null; s.touched = false; s.demote = null; s.drop = null;
+    s.tiles = new Set(); s.record = false; s.clear = false; s.file = null; s.touched = false; s.demote = null; s.drop = [];
     s.kept = labelled;
     return snap;
   }
@@ -206,32 +206,31 @@ export function initPersist(d: Deps) {
       current.record = true;
       changed(current);
     },
-    /** Why an import may not replace the labels now: the replaced session it would drop isn't exported since its last change (spec 056 scope 2). */
+    /** Why an import may not replace the labels now: a stored replaced session it would drop isn't exported since its last change (spec 056 scope 2). */
     replaceRefused(): string | null {
-      const r = current?.replaced;
-      return r && !exportedSince(r) ? MESSAGES.replacedFirst : null;
+      return current?.replaced.some((r) => !exportedSince(r)) ? MESSAGES.replacedFirst : null;
     },
     /** The labels are about to be replaced: their unsaved changes are copied and saved now, under their own session. */
     flush(): void { save(true); },
     /**
-     * The labels were replaced (an import). Saved labels become the raster's replaced session, and the exported one
-     * before them is dropped (ADR 0037); the new labels start a new current session, every tile of it written.
+     * The labels were replaced (an import). Saved labels become the raster's replaced session, and the exported ones
+     * before them are dropped (ADR 0037); the new labels start a new current session, every tile of it written.
      */
     replaced(): void {
       const s = current;
       if (applying || !s) return;
       if (s.kept) {
-        const old = s.replaced;
-        // replaceRefused keeps an unexported one from getting here; were one to, it stays, as a second replaced session
-        if (old && exportedSince(old)) s.drop = old.id;
+        const old = s.replaced, gone = old.filter(exportedSince);
+        // replaceRefused keeps an unexported one from getting here; were one to, it stays, as another replaced session
+        s.drop = [...s.drop, ...gone.map((r) => r.id)];
         s.demote = s.id;
         // its last change, saved or not (a flush may still be writing, or have failed): spec 056 drops it only if exported after
-        s.replaced = { id: s.id, savedAt: Math.max(s.savedAt ?? now(), s.lastChange), exportedAt: s.exportedAt };
+        s.replaced = [...old.filter((r) => !gone.includes(r)), { id: s.id, savedAt: Math.max(s.savedAt ?? now(), s.lastChange), exportedAt: s.exportedAt }];
         if (s.failed) {
           q.hold({ s, snap: { ...s.failed, record: { ...s.failed.record, role: "replaced" } }, reason: q.failed() || "not saved yet" });
           s.failed = null;
         }
-        s.id = sessionId(s.raster, [s.id, ...(old ? [old.id] : [])]);
+        s.id = sessionId(s.raster, [s.id, ...old.map((r) => r.id)]);
         s.owned = s.kept = false; s.savedAt = s.exportedAt = null;
       }
       s.clear = true;

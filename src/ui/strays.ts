@@ -15,7 +15,7 @@ import { mergeSnapshots, type Snapshot } from "./snapshot";
 export const strays = (pending: readonly Pending[], s: Session): Pending[] =>
   pending.filter((p) => p.s !== s && p.snap.record.raster === s.raster);
 
-const inert = (snap: Snapshot): Snapshot => ({ ...snap, clear: false, demote: null, drop: null });
+const inert = (snap: Snapshot): Snapshot => ({ ...snap, clear: false, demote: null, drop: [] });
 
 /**
  * The choice with the strays' sessions spared: a decline (Cancel, then OK to delete) of one is kept as the replaced
@@ -33,7 +33,7 @@ export function spare(c: Choice, records: SessionRecord[], ids: string[]): { cho
 /** A stray the opening session doesn't restore: written as the replaced session, its stored record demoted now. */
 export async function keepApart(s: Session, p: Pending, records: SessionRecord[], sessions: SessionStore): Promise<void> {
   p.snap = { ...inert(p.snap), record: { ...p.snap.record, role: "replaced" } };
-  s.replaced ??= { id: p.snap.id, savedAt: Math.max(p.s.lastChange, p.s.savedAt ?? 0), exportedAt: p.snap.record.exportedAt };
+  if (!s.replaced.some((r) => r.id === p.snap.id)) s.replaced.push({ id: p.snap.id, savedAt: Math.max(p.s.lastChange, p.s.savedAt ?? 0), exportedAt: p.snap.record.exportedAt });
   const r = records.find((x) => x.id === p.snap.id);
   // so it is never a second current session, which no offer reaches; failing, its snapshot's record does it when written
   if (r && r.role !== "replaced") await sessions.putRecord({ ...r, role: "replaced" }).catch(() => {});

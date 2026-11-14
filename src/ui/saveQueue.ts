@@ -76,14 +76,14 @@ export function saveQueue(d: Deps) {
       if (copy) { s.file ??= snap.file; s.owned = true; s.savedAt = (e as CopyFailed).savedAt; }
       else {
         for (const [k] of snap.tiles) s.tiles.add(k);
-        s.record = true; s.clear ||= snap.clear; s.file ??= snap.file; s.demote ??= snap.demote; s.drop ??= snap.drop;
+        s.record = true; s.clear ||= snap.clear; s.file ??= snap.file; s.demote ??= snap.demote; s.drop = [...new Set([...s.drop, ...snap.drop])];
         if (snap.savedAt === null) s.touched = true;
         s.failed = s.failed ? mergeSnapshots(s.failed, snap) : snap; // the tiles as they were, should an import replace them
       }
     } else {
       if (stale(snap)) return; // its session was deleted meanwhile
       // a session an import replaced while its save was on the way is the replaced one now
-      if (s.replaced?.id === snap.id) snap = { ...snap, record: { ...snap.record, role: "replaced" } };
+      if (s.replaced.some((r) => r.id === snap.id)) snap = { ...snap, record: { ...snap.record, role: "replaced" } };
       const i = pending.findIndex((p) => p.s === s && p.snap.id === snap.id);
       const merged = i >= 0 ? mergeSnapshots(pending[i]!.snap, snap) : snap;
       const copyFails = (i >= 0 ? pending[i]!.copyFails ?? 0 : 0) + (copy ? 1 : 0);

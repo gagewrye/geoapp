@@ -20,9 +20,9 @@ export type Snapshot = {
   savedAt: number | null;
   /** Labels existed when copied; with none, a saved session is deleted instead. */
   labelled: boolean;
-  /** An import replaced session `demote`, which becomes the raster's replaced one; `drop`, the replaced one before it, is deleted (ADR 0037). */
+  /** An import replaced session `demote`, which becomes the raster's replaced one; `drop`, the replaced ones before it, are deleted (ADR 0037). */
   demote: string | null;
-  drop: string | null;
+  drop: string[];
   /** When it was copied, on the save queue's clock: a session deleted after that never gets it written back. */
   taken?: number;
 };
@@ -37,7 +37,7 @@ export class CopyFailed extends Error {
 
 /** a then b, as one snapshot of the same session: b's tiles and record win, and b's clear drops a's tiles. */
 export function mergeSnapshots(a: Snapshot, b: Snapshot): Snapshot {
-  const keep = { file: b.file ?? a.file, savedAt: a.savedAt === null ? null : b.savedAt, demote: b.demote ?? a.demote, drop: b.drop ?? a.drop };
+  const keep = { file: b.file ?? a.file, savedAt: a.savedAt === null ? null : b.savedAt, demote: b.demote ?? a.demote, drop: [...new Set([...a.drop, ...b.drop])] };
   if (b.clear) return { ...b, ...keep };
   const tiles = new Map(a.tiles);
   for (const [k, t] of b.tiles) tiles.set(k, t);
@@ -53,7 +53,7 @@ export function mergeSnapshots(a: Snapshot, b: Snapshot): Snapshot {
 // keep: rasters with snapshots still to write, whose newer labels the store doesn't show yet, so never evicted
 export async function writeSnapshot(sessions: SessionStore, p: Snapshot, owned: boolean, now: () => number, yieldTask: () => Promise<void>,
   keep: Iterable<string> = []): Promise<number | null> {
-  if (p.drop) await sessions.delete(p.drop);
+  for (const id of p.drop) await sessions.delete(id);
   if (p.demote) {
     const old = (await sessions.forRaster(p.record.raster)).find((r) => r.id === p.demote);
     if (old) await sessions.putRecord({ ...old, role: "replaced" });

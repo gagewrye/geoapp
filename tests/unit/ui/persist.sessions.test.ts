@@ -445,3 +445,66 @@ describe("a decline with a stray while an unexported replaced session is stored 
     expect([...again.store().tiles.keys()]).toEqual(["0,256"]);
   });
 });
+
+describe("a current session and two replaced ones, R1 older than R2 (spec 056 criterion 10)", () => {
+  /** C current (tile value 1), R1 (2) and R2 (3) replaced; `exported` ids were exported after their last change. */
+  async function three(exported: string[] = []) {
+    const fake = await saved();
+    const c = fake.records.get(KEY)!;
+    const put = (id: string, role: string, savedAt: number, v: number) => {
+      fake.records.set(id, { ...c, id, role, savedAt, exportedAt: exported.includes(id) ? savedAt + 1 : null } as SessionRecord);
+      fake.tiles.set(id, new Map([[`${v * 256},0`, tile(v).buffer]]));
+    };
+    put(KEY, "current", 3000, 1); put(`${KEY}#1`, "replaced", 1500, 2); put(`${KEY}#2`, "replaced", 2500, 3);
+    return fake;
+  }
+
+  it("Cancel, Cancel on R2's '…instead?', OK on R1's: R1 is restored and current; R2 and the old current are replaced", async () => {
+    const fake = await three();
+    const t = setup(fake, [false, false, true]);
+    expect(await t.open()).toBe(MESSAGES.restored);
+    expect(t.prompts).toEqual([MESSAGES.restore("t3000", "a.tif"), MESSAGES.restoreReplaced("t2500"), MESSAGES.restoreReplaced("t1500")]);
+    expect([...t.store().tiles.keys()]).toEqual(["512,0"]);
+    expect(fake.records.get(`${KEY}#1`)!.role).toBe("current");
+    expect(fake.records.get(`${KEY}#2`)!.role).toBe("replaced");
+    expect(fake.records.get(KEY)!.role).toBe("replaced");
+    t.paint("0,256", 4); await t.flush();
+    expect([...fake.tiles.get(`${KEY}#1`)!.keys()].sort()).toEqual(["0,256", "512,0"]);
+  });
+
+  it("Cancel on every '…instead?' goes on to the delete question", async () => {
+    const t = setup(await three(), [false, false, false, false]);
+    expect(await t.open()).toBe(MESSAGES.restored);
+    expect(t.prompts.at(-1)).toBe(MESSAGES.restoreDelete("t3000", "a.tif"));
+    expect([...t.store().tiles.keys()]).toEqual(["256,0"]);
+  });
+
+  it("with no current session, the newest replaced one gets the normal prompt and the older follows", async () => {
+    const fake = await three();
+    fake.records.delete(KEY);
+    const t = setup(fake, [false, true]);
+    expect(await t.open()).toBe(MESSAGES.restored);
+    expect(t.prompts).toEqual([MESSAGES.restore("t2500", "a.tif"), MESSAGES.restoreReplaced("t1500")]);
+    expect(fake.records.get(`${KEY}#1`)!.role).toBe("current");
+    expect(fake.records.get(`${KEY}#2`)!.role).toBe("replaced");
+  });
+
+  it("an import is refused while R1 is unexported, even after R2 is exported", async () => {
+    const t = setup(await three([KEY]), [false, true]); // Cancel C, OK on R2's '…instead?'
+    expect(await t.open()).toBe(MESSAGES.restored);
+    expect(t.fake.records.get(`${KEY}#2`)!.role).toBe("current");
+    t.tick(10); t.p.exported(1000 + 10); await t.flush(); // R2 exported; C, now replaced, was already
+    expect(await t.importMask(9, "512,256", 3)).toBe(MESSAGES.replacedFirst);
+    expect(t.fake.records.size).toBe(3);
+  });
+
+  it("with every replaced session exported, an import deletes them all and keeps the open labels as the replaced one", async () => {
+    const t = setup(await three([`${KEY}#1`, `${KEY}#2`]));
+    expect(await t.open()).toBe(MESSAGES.restored);
+    expect(await t.importMask(9, "512,256", 3)).toBe(null);
+    await t.flush();
+    expect(role(t.fake, "replaced").map((r) => r.id)).toEqual([KEY]);
+    expect(role(t.fake, "current")).toHaveLength(1);
+    expect(t.fake.records.size).toBe(2);
+  });
+});

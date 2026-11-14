@@ -10,8 +10,8 @@ export type Summary = { id: string; savedAt: number; exportedAt: number | null }
 /** The open raster's session: what changed since its last save, and whether it may save yet. */
 export type Session = {
   raster: string; name: string; grid: Grid;
-  /** The session the labels on the map save to (ADR 0037), and the raster's replaced one, if any. */
-  id: string; replaced: Summary | null;
+  /** The session the labels on the map save to (ADR 0037), and the raster's stored replaced ones (normally at most one). */
+  id: string; replaced: Summary[];
   /** The saved sessions' lookup, started at open; settled once it resolves (a failed one resolves []). */
   lookup: Promise<SessionRecord[]>; settled: boolean; found: boolean;
   /** Its restore offer has been answered (or there was none): until then nothing saves over the saved one. */
@@ -26,7 +26,7 @@ export type Session = {
   /** When the labels last changed (besides an export), saved or not: a replaced session is exported only if after it. */
   lastChange: number;
   savedAt: number | null; exportedAt: number | null;
-  demote: string | null; drop: string | null;
+  demote: string | null; drop: string[];
   /** The mask copy is left out until the next import: a quota error, or COPY_RETRIES failed retries (specs 032, 056). */
   noCopy: boolean;
   copyFails: number;
@@ -49,7 +49,7 @@ export const reasonOf = (e: unknown) => isQuota(e) ? "the browser's storage is f
 
 /** A raster's session as opened: no saved session found yet, nothing changed, and nothing may save until its offer settles. */
 export const newSession = (raster: string, name: string, grid: Grid): Session => ({
-  raster, name, grid, id: raster, replaced: null, lookup: Promise.resolve([]), settled: false, found: false, ready: false, owned: false, kept: false,
-  tiles: new Set(), record: false, clear: false, file: null, touched: false, savedAt: null, exportedAt: null, demote: null, drop: null,
+  raster, name, grid, id: raster, replaced: [], lookup: Promise.resolve([]), settled: false, found: false, ready: false, owned: false, kept: false,
+  tiles: new Set(), record: false, clear: false, file: null, touched: false, savedAt: null, exportedAt: null, demote: null, drop: [],
   noCopy: false, copyFails: 0, copied: true, failed: null, lastChange: 0,
 });
