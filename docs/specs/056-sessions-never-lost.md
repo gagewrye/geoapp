@@ -19,8 +19,14 @@
 
 ## Scope
 1. **Restore decline (A).** A Cancel on the restore prompt asks `Delete the labels saved <time> for <name>? This can't be undone. Cancel restores them.`
-   - OK deletes the session.
+   - OK deletes the session, except with a stray (below).
    - Cancel restores it.
+   - A **stray** is a pending (failed, still-queued) snapshot of this raster from an earlier open, e.g. its save failed after the raster was reopened. The offer waits for in-flight saves before it looks up sessions.
+   - On restore, the stray's newer labels are laid over the restored ones and saved.
+   - On decline with a stray, the session is not deleted but kept as the raster's `replaced` one (except as in the next bullet), because the delete question showed only the stored labels, not the stray's newer ones.
+   - If the raster already has an unexported `replaced` session, a decline with a stray neither deletes nor demotes. The session is restored with the stray laid over, and `#message` shows `Labels restored: they have unsaved changes, and the earlier replaced labels aren't exported.`
+   - These two cases are the only exceptions to "OK deletes".
+   - If the mask copy can no longer be read, the labels are restored without it (`Labels restored without the imported mask…`) and the tiles are kept.
 2. **Replaced labels are kept (B, ADR 0037).**
    - A session gets its own `id`. Records gain `raster` (the rasterKey), `role` (`"current"` or `"replaced"`) and `exportedAt: number | null`.
    - Tiles are keyed `[id, tile]`. The mask copy is `bases/<keyHash(id)>.tif`.
@@ -62,7 +68,7 @@
 
 ## Acceptance criteria
 1. **Unit:** `evict` never returns an id whose `exportedAt` is null or less than `savedAt`. With 10 rasters all unexported it returns `[]`. With 10 rasters of which 3 are exported it returns the 2 oldest exported ones. `offers` follows its docstring.
-2. **Unit, fake store:**
+2. **Unit, fake store (no stray):**
    - Cancel, then Cancel restores the session.
    - Cancel, then OK deletes it.
    - Neither path deletes on a single Cancel.
@@ -83,3 +89,7 @@
    - Cancel the prompt, then OK `…instead?`: A's labels show.
    - Reload, open and accept: A's labels again, with B's still stored as `replaced`.
 8. `npm run check` passes. Spec 031's criteria 6–8 pass with the new prompts.
+9. **Unit, strays (scope 1):** raster A imports a mask and paints `256,0` = 1. B opens while A's copy is held. A reopens, then the copy fails with `NotReadableError`.
+   - Restore, paint `256,0` = 2, rename the class, run 10 minutes of flushes: the stored tile is 2, the classes and `savedAt` are the new session's, and there is one `current` record.
+   - Cancel, then OK to delete: the old session is kept as `replaced` with tile 1, and a new `current` session with another id has tile 2. An import is refused. A new open offers the kept labels through `…instead?` and restores them without the mask.
+   - With an unexported `replaced` session R stored first, Cancel, Cancel, OK: the session is restored with the stray laid over and scope 1's message shows. R is still the only `replaced` session and is still offered through `…instead?`. No stored or stray tile is lost.
