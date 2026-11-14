@@ -2,10 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Map as MapLibreMap } from "maplibre-gl";
 import { viewBox } from "../../../src/core/imagery";
 import { emptyStore, type LabelStore } from "../../../src/core/labelStore";
-import { previewCells, PREVIEW_MAX_SIDE } from "../../../src/core/maskPreview";
+import { previewCells, PREVIEW_MAX_SIDE, type MaskPreview } from "../../../src/core/maskPreview";
 import { LABEL_OVERLAYS, overlayKeys } from "../../../src/core/overlays";
 import type { Grid } from "../../../src/core/types";
-import { labelDisplay } from "../../../src/ui/labelDisplay";
+import { SETTLE_MS } from "../../../src/map/navigation";
+import { initImagery } from "../../../src/ui/imagery";
+import { labelDisplay, overlaysIdle } from "../../../src/ui/labelDisplay";
 
 // Spec 048 criterion 5: at most LABEL_OVERLAYS overlays, the nearest wanted, the least recently wanted evicted,
 // and the mask preview showing every other stored tile.
@@ -41,6 +43,31 @@ function fakeMap(view: { b: Bounds }) {
   };
   const overlaid = () => new Set(layers.filter((id) => id.startsWith("label-")).map((id) => id.slice(6)));
   return { map: map as unknown as MapLibreMap, layers, sources, overlaid };
+}
+
+/** Runs the animation frames pending now, once each (those they request wait for the next step). */
+function step() {
+  for (const [id, f] of [...frames]) { frames.delete(id); f(); }
+}
+
+/** Everything fake timers fake here but frames and idle callbacks, which stay on the stubs. */
+const FAKED: NonNullable<Parameters<typeof vi.useFakeTimers>[0]>["toFake"] = ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "setImmediate", "clearImmediate", "Date", "performance"];
+
+/** fakeMap, plus what initImagery and the zoomed-in density need: events and a 1024 px wide view of view.b. */
+function zoomMap(view: { b: Bounds }) {
+  const m = fakeMap(view);
+  const on = new Map<string, (() => void)[]>();
+  const W = 1024, H = 768;
+  const lng = (x: number) => view.b[0] + (x / W) * (view.b[2] - view.b[0]), lat = (y: number) => view.b[3] - (y / H) * (view.b[3] - view.b[1]);
+  Object.assign(m.map, {
+    on: (e: string, f: () => void) => { on.set(e, [...(on.get(e) ?? []), f]); },
+    isMoving: () => false,
+    getContainer: () => ({ clientWidth: W, clientHeight: H }),
+    getCenter: () => ({ lng: lng(W / 2), lat: lat(H / 2) }),
+    project: (p: { lng: number; lat: number }) => ({ x: ((p.lng - view.b[0]) / (view.b[2] - view.b[0])) * W, y: ((view.b[3] - p.lat) / (view.b[3] - view.b[1])) * H }),
+    unproject: ([x, y]: [number, number]) => ({ lng: lng(x), lat: lat(y) }),
+  });
+  return { ...m, fire: (e: string) => on.get(e)?.forEach((f) => f()) };
 }
 
 /** Runs animation frames until none is pending, checking the overlay count after each. */
@@ -171,19 +198,87 @@ describe("idle (spec 071 criterion 5)", () => {
     expect(m.overlaid()).toEqual(new Set(["0,0"]));
   });
 
+  // Spec 072 criterion 2: vi.useFakeTimers() with no list also fakes the stubbed requestAnimationFrame, and
+  // runAllTimersAsync then ran the idle loop's frames between real setTimeout yields. Only timers and clocks are
+  // faked here, frames stay on the stub and idle callbacks on idles, so nothing waits on real time.
   it("waits for queued quad prefetches", async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: FAKED });
+    const idles: ((d: { timeRemaining(): number; didTimeout?: boolean }) => void)[] = [];
+    vi.stubGlobal("requestIdleCallback", (cb: (typeof idles)[number]) => idles.push(cb));
     try {
       const m = fakeMap({ b: bounds(0, 0, 512, 512) });
       const display = labelDisplay(m.map, () => emptyStore(512, 512), () => COLOURS);
       display.open(SMALL);
       display.prefetch(["0,0", "256,0"]);
       const idle = display.idle();
-      runFrames(m.overlaid);
+      step();
       expect(await settledYet(idle)).toBe(false);
-      await vi.runAllTimersAsync(); // no requestIdleCallback here: the cache's timeouts
-      runFrames(m.overlaid);
+      for (let i = 0; i < 2; i++) { // a timed-out idle callback computes one tile
+        expect(idles).toHaveLength(1);
+        idles.shift()!({ timeRemaining: () => 0, didTimeout: true });
+        step();
+      }
       expect(await settledYet(idle)).toBe(true);
+      expect(idles).toHaveLength(0);
+      expect(vi.getTimerCount()).toBe(0);
     } finally { vi.useRealTimers(); }
+  });
+});
+
+describe("overlaysIdle is safe to wait on (spec 072 criterion 1)", () => {
+  const settledYet = async (p: Promise<void>) => { let done = false; void p.then(() => { done = true; }); for (let i = 0; i < 4; i++) await Promise.resolve(); return done; };
+  const TILE = bounds(10 * 256 + 64, 10 * 256 + 64, 10 * 256 + 192, 10 * 256 + 192); // inside tile 2560,2560: zoomed in, one wanted key
+  const preview = () => ({ values: new Uint8Array(4), width: 2, height: 2, corners: [], buckets: undefined }) as unknown as MaskPreview;
+
+  /** A display over a mask whose tile reads wait until the test resolves them. */
+  function zoomedIn() {
+    const view = { b: TILE };
+    const m = zoomMap(view);
+    const reads = new Map<string, (t: Uint8Array | null) => void>();
+    const display = labelDisplay(m.map, () => emptyStore(SIDE, SIDE), () => COLOURS,
+      (key) => new Promise((resolve) => { reads.set(key, resolve); }));
+    display.open(GRID);
+    display.setMask(preview());
+    return { ...m, display, reads };
+  }
+
+  beforeEach(() => { vi.useFakeTimers({ toFake: FAKED }); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("idle() stays unresolved while a mask tile read is in flight, and resolves once it is read and its fill ran", async () => {
+    const t = zoomedIn();
+    t.display.settled();
+    expect([...t.reads.keys()]).toEqual(["2560,2560"]);
+    const idle = t.display.idle();
+    step();
+    expect(await settledYet(idle)).toBe(false);
+    t.reads.get("2560,2560")!(new Uint8Array(65536).fill(2));
+    await Promise.resolve(); // the read's then
+    expect(await settledYet(idle)).toBe(false); // its fill is a frame away
+    step();
+    step();
+    expect(await settledYet(idle)).toBe(true);
+    expect(t.overlaid()).toEqual(new Set(["2560,2560"]));
+  });
+
+  it("the overlaysIdle hook stays unresolved while a settle is pending, and resolves after the settle and idle()", async () => {
+    const t = zoomedIn();
+    const imagery = initImagery(t.map, () => {}, { moving: () => false, viewSettled: () => t.display.settled() });
+    t.fire("moveend");
+    expect(imagery.settling()).toBe(true);
+    const hook = overlaysIdle(imagery.settling, t.display.idle);
+    step();
+    expect(await settledYet(hook)).toBe(false); // the display alone is idle: nothing is planned for the new view yet
+    expect(t.reads.size).toBe(0);
+    vi.advanceTimersByTime(SETTLE_MS);
+    expect(imagery.settling()).toBe(false);
+    expect([...t.reads.keys()]).toEqual(["2560,2560"]);
+    step();
+    expect(await settledYet(hook)).toBe(false); // settled, but its mask read is in flight
+    t.reads.get("2560,2560")!(new Uint8Array(65536).fill(2));
+    await Promise.resolve();
+    for (let i = 0; i < 3; i++) step();
+    expect(await settledYet(hook)).toBe(true);
+    expect(t.overlaid()).toEqual(new Set(["2560,2560"]));
   });
 });

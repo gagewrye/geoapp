@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
-import { jumpTo, labels, message, openApp, openRaster, paintMode, renameClass, rgbFixture, selectClass, settled, toScreen } from "./helpers";
+import { rgbFixture } from "./fixtures";
+import { jumpTo, labels, message, openApp, openRaster, paintMode, renameClass, selectClass, settled, toScreen } from "./helpers";
 
 // Spec 003 criterion 14 (classes). Criterion 13 (brush size) went with spec 073.
 

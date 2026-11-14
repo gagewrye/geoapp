@@ -112,6 +112,26 @@ describe("debounced saves (criterion 2)", () => {
   });
 });
 
+describe("saving (spec 072: e2e waits on it, not on time)", () => {
+  it("is true from a change until its debounced save has written, and false once nothing is scheduled or in flight", async () => {
+    const t = setup();
+    await t.ready();
+    expect(t.p.saving()).toBe(false);
+    t.paint("0,0", 1);
+    expect(t.p.saving()).toBe(true); // scheduled
+    await vi.advanceTimersByTimeAsync(SAVE_DELAY_MS - 1);
+    t.p.record(); // a later change restarts the debounce
+    await vi.advanceTimersByTimeAsync(SAVE_DELAY_MS - 1);
+    expect(t.p.saving()).toBe(true);
+    expect(t.fake.log).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1);
+    await t.p.idle();
+    expect(t.fake.log).toEqual(["putTiles 1", "putRecord"]);
+    expect(t.p.saving()).toBe(false);
+    expect(t.state.textContent).toBe("Saved 12:00");
+  });
+});
+
 describe("hidden and closing tabs (criterion 3)", () => {
   it("a visibilitychange to hidden starts a save without waiting for the debounce, and so does pagehide", async () => {
     const t = setup();

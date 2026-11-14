@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { editName, hintOf, jumpTo, message, openApp, openRaster, rgbFixture } from "./helpers";
+import { rgbFixture } from "./fixtures";
+import { editName, hintOf, jumpTo, message, openApp, openRaster } from "./helpers";
 
 // Spec 035 criteria 1-5, at 1280x720.
 test.use({ viewport: { width: 1280, height: 720 } });

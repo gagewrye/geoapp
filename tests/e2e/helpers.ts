@@ -1,31 +1,12 @@
 import { expect, type Page, type Request } from "@playwright/test";
-import { geotiffBuffer, type Value } from "../unit/helpers/sources";
-import type { Affine, Grid } from "../../src/core/types";
 import { SHORTCUTS } from "../../src/ui/shortcuts";
+import type { tiff } from "./fixtures";
 
 export type LngLat = [number, number];
 export type Xy = { x: number; y: number };
 
 /** The hint line SHORTCUTS gives a button's title (spec 057). */
 export const hintOf = (id: string) => SHORTCUTS.find((s) => s.id === id)!.hint!;
-
-/** Fixture GeoTIFF as a Playwright upload payload. */
-export function tiff(name: string, width: number, height: number, nb: number, f: Value, geo: { epsg: number; gt: Affine; nodata?: string }) {
-  return { name, mimeType: "image/tiff", buffer: Buffer.from(geotiffBuffer(width, height, nb, f, geo)) };
-}
-
-/** 10x10 degree RGB raster at 10..20E, 40..50N; a white block marks 15.5E 45.5N. */
-const FEATURE: LngLat = [15.5, 45.5];
-const rgbValue: Value = (b, c, r) => {
-  const lon = 10 + (c + 0.5) * 0.01, lat = 50 - (r + 0.5) * 0.01;
-  if (Math.abs(lon - FEATURE[0]) < 0.05 && Math.abs(lat - FEATURE[1]) < 0.05) return 255;
-  return b === 0 ? (c < 500 ? 200 : 120) : b === 1 ? 100 + (r % 100) : 150;
-};
-export const rgbFixture = () => tiff("rgb4326.tif", 1000, 1000, 3, rgbValue, { epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01] });
-/** rgbFixture run on south to 37N (still one strip under the 16 MiB block limit), with a nodata value none of its pixels hold: its 6 row bands need mask reads (spec 023 F2), and band 4 lies far from paintTwoClasses' hovers. */
-export const rgbNodataFixture = () => tiff("rgbtall.tif", 1000, 1300, 3, rgbValue, { epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01], nodata: "0" });
-/** rgbFixture with 16 more bytes at its end: the same grid and pixels, but another raster to spec 031, so it offers no saved labels. */
-export const anotherRaster = (name = "other.tif") => { const f = rgbFixture(); return { ...f, name, buffer: Buffer.concat([f.buffer, Buffer.alloc(16)]) }; };
 
 export async function openApp(page: Page): Promise<void> {
   await page.goto("/");
@@ -128,11 +109,11 @@ export async function pixelAt(page: Page, p: Xy): Promise<number[]> {
   }, p);
 }
 
+/** A click at p; callers wait on the state it changes (spec 072: no fixed sleep). */
 export async function clickAt(page: Page, p: Xy): Promise<void> {
   await page.mouse.move(p.x, p.y);
   await page.mouse.down();
   await page.mouse.up();
-  await page.waitForTimeout(80);
 }
 
 export const message = (page: Page) => page.locator("#message");
@@ -147,8 +128,6 @@ export function collectErrors(page: Page): string[] {
   return errors;
 }
 
-/** rgbFixture's grid. */
-export const RGB_GRID: Grid = { width: 1000, height: 1000, epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01] };
 
 /** Effective labels through the e2e hook (stored tiles, else the mask's: spec 014's tile(key)), as "col,row" -> value (non-zero only). */
 export async function labels(page: Page): Promise<Map<string, number>> {
@@ -166,6 +145,17 @@ export async function labels(page: Page): Promise<Map<string, number>> {
   for (let i = 0; i < flat.length; i += 3) m.set(`${flat[i]},${flat[i + 1]}`, flat[i + 2]!);
   return m;
 }
+
+/** The number of non-zero effective labels, counted in the page (specs 071, 072: instead of labels().size). */
+export const labelCount = (page: Page): Promise<number> => page.evaluate(async () => {
+  const { store, tile } = (window as any).__geoapp.labels;
+  let n = 0;
+  for (let y0 = 0; y0 < store.height; y0 += 256) for (let x0 = 0; x0 < store.width; x0 += 256) {
+    const t: Uint8Array | null = await tile(`${x0},${y0}`);
+    t?.forEach((v) => { if (v) n++; });
+  }
+  return n;
+});
 
 /** Keys of the stored label tiles. */
 export const tileKeysStored = (page: Page): Promise<string[]> =>
@@ -222,6 +212,17 @@ export async function renameClass(page: Page, i: number, name: string): Promise<
   const field = await editName(page, i);
   await field.fill(name);
   await field.press("Enter");
+}
+
+/**
+ * On rgbFixture: one class 1 stroke west of 15E at zoom 6, for tests that need labels but not two classes (spec 072).
+ * With `name`, class 1 is renamed first, so a class list compared later isn't the defaults.
+ */
+export async function paintOne(page: Page, name?: string): Promise<void> {
+  if (name) await renameClass(page, 0, name);
+  await jumpTo(page, [15, 45], 6);
+  const a = await toScreen(page, [12.005, 45.005]);
+  await stroke(page, [a, { x: a.x + 30, y: a.y + 20 }, { x: a.x + 60, y: a.y }]);
 }
 
 /**

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { anotherRaster, message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture } from "./helpers";
+import { anotherRaster, rgbFixture } from "./fixtures";
+import { message, openApp, openRaster, paintMode, paintTwoClasses } from "./helpers";
 
 // Spec 050 criteria 3-5: on Chromium the open picker replaces the input's chooser, and Export's folder picker (spec 074, ADR 0040) starts in the open raster's folder.
 
@@ -97,8 +98,7 @@ test("criterion 4: after A, picking B but cancelling the close question gives A"
   page.once("dialog", (d) => { asked.push(d.message()); void d.dismiss(); });
   await pick(page, "B");
   await opener(page).click();
-  await expect.poll(() => asked.length).toBe(1);
-  await page.waitForTimeout(300);
+  await expect.poll(() => asked.length).toBe(1); // cancelled: the open stops as confirm returns (spec 072: no fixed wait)
   await expect(page.locator("#raster-info")).toContainText("rgb4326.tif");
   expect(await exportStartIn(page)).toBe("A");
 });
@@ -118,8 +118,7 @@ test("criterion 4: after A, a cancelled picker gives A and shows no message", as
   await openA(page);
   await pick(page, "abort");
   await opener(page).click();
-  await expect.poll(() => page.evaluate(() => (window as any).__pick.active.length)).toBe(2);
-  await page.waitForTimeout(300);
+  await expect.poll(() => page.evaluate(() => (window as any).__pick.active.length)).toBe(2); // the rejected picker is handled before the next evaluate (spec 072)
   await expect(message(page)).toHaveText("Raster opened.");
   await expect(message(page)).not.toHaveClass(/\berror\b/);
   expect(await exportStartIn(page)).toBe("A");

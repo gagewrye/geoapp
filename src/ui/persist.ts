@@ -275,5 +275,7 @@ export function initPersist(d: Deps) {
     maskUncopied: (): Blob | null => (adopted && labels.base() === adopted.base ? adopted.file : null),
     /** The saves started so far have ended (tests). */
     idle: () => q.idle(),
+    /** A save is scheduled or in flight (e2e: __geoapp.saving, spec 072). */
+    saving: () => timer !== null || q.writing(),
   };
 }

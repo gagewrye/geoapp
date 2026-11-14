@@ -162,6 +162,8 @@ export function saveQueue(d: Deps) {
       return { text: p ? `Not saved: ${p.snap.record.name}: ${p.reason}` : inFlight > 0 ? "Saving…" : failed ? `Not saved: ${failed}` : saved, busy: inFlight > 0 || failed !== "" || p !== undefined };
     },
     failed: () => failed,
+    /** A write is in flight. */
+    writing: () => inFlight > 0,
     /** The writes queued so far have ended. */
     idle: () => chain,
   };

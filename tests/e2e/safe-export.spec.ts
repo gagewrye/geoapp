@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
-import { jumpTo, message, openApp, openRaster, paintMode, paintTwoClasses, path, rgbFixture, stroke, toScreen } from "./helpers";
+import { rgbFixture } from "./fixtures";
+import { jumpTo, message, openApp, openRaster, paintMode, paintTwoClasses, path, stroke, toScreen } from "./helpers";
 import { effectiveTiles, importFile, maskFile, saved, storeTiles, tileDiff } from "./seeding";
 
 // Spec 074 criteria 5-8 and spec 075 criterion 6: Export writes through a folder handle and never destroys a file.

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
-import { jumpTo, message, openApp, openRaster, paintMode, path, RGB_GRID, rgbFixture, selectClass, stroke, toScreen } from "./helpers";
+import { RGB_GRID, rgbFixture } from "./fixtures";
+import { jumpTo, message, openApp, openRaster, paintMode, path, selectClass, stroke, toScreen } from "./helpers";
 import { at, effectiveTiles, importFile, maskFile, saved, tileDiff, upload } from "./seeding";
 import { writeFile } from "../unit/helpers/labelFiles";
 
