@@ -355,7 +355,7 @@ describe("a raster with a snapshot still to write (scope 4)", () => {
   });
 });
 
-describe("a raster reopened while its save is still on the way, which then fails (spec 056)", () => {
+describe("a raster reopened while its save is still on the way, which then fails (spec 056 criterion 9)", () => {
   /** A imports and paints 256,0 = 1; B opens (A's save starts, its copy held), A reopens, and the copy fails: A's snapshot is pending. */
   async function reopened(answers: boolean[]) {
     const t = setup(fakeSessionStore(), answers);
