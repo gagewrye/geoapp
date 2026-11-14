@@ -133,6 +133,34 @@ describe("spec 056 scope 3: a replaced session's pending copy failures don't use
   });
 });
 
+describe("spec 056 scope 2 with c1c1d6c's queue order: a dropped replaced session is not written back by its own retry", () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("A exported while its saves fail, B imported (A pending, its copy failing), C imported (drops A): A never comes back", async () => {
+    const t = persistSetup();
+    const save = t.fake.store.saveBase.bind(t.fake.store);
+    t.fake.store.saveBase = async (k, f) => {
+      if (await f.text() === "mask 5") throw new DOMException("The file changed.", "NotReadableError");
+      return save(k, f);
+    };
+    await t.open();
+    t.fake.failWith(new Error("disk"));
+    await t.importMask(5, "0,0", 1);
+    await t.flush(); // A's save fails
+    t.p.exported(t.now()); // a verified folder export of A
+    await t.flush();
+    await t.importMask(9, "512,256", 3); // A is replaced, its failed snapshot pending
+    t.fake.failWith(null);
+    await t.flush(30_000); // A's tiles and record are written, its copy fails: still pending; B is written
+    expect(await t.importMask(7, "0,256", 4)).toBe(null); // A was exported after its last change: C drops it
+    for (let ms = 0; ms < 10 * 60_000; ms += 5000) await t.flush(5000);
+    const counts = (r: string) => [...t.fake.records.values()].filter((x) => x.role === r).map((x) => x.base!.count);
+    expect(counts("current")).toEqual([7]);
+    expect(counts("replaced")).toEqual([9]); // only B; A, dropped, is not resurrected by its pending retry
+  });
+});
+
 // Spec 055 scope 3: on Windows, folder names are case-insensitive, so ORTHO.tif opens the imagery ortho.tif
 function caseInsensitive(f: ReturnType<typeof fakeFolder>) {
   const real = f.dir.getFileHandle.bind(f.dir);
