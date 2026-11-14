@@ -3,6 +3,7 @@ import { PREVIEW_MAX_SIDE } from "../core/maskPreview";
 import { canPickFiles, pickRaster } from "../io/filePick";
 import { openFile } from "../io/geotiffSource";
 import { openLabelFile } from "../io/labelFile";
+import { useCopy } from "../io/maskBase";
 import { buildPreview, openRaster } from "../io/pipeline";
 import { readSamInput } from "../io/samImagery";
 import type { Segmenter } from "../io/segmenter";
@@ -79,7 +80,7 @@ const persist = initPersist({ labels, open: openSessionStore, state: $("save-sta
 const seeding = initSeeding({ labels, imagery: () => source, folder: () => folder, imageryFile: () => imageryFile, say, error: errorText,
   opened: (f) => testHook("labelFile", f), session: {
     // ADR 0041: once the copy is written whole, the mask is read from it, never the user's file again
-    imported: (f, base) => persist.imported(f, async (copy) => { labels.useCopy(base, await openLabelFile(copy)); }),
+    imported: (f, base) => persist.imported(f, async (copy) => { useCopy(labels.base(), base, await openLabelFile(copy)); }),
     replaceRefused: persist.replaceRefused, flush: persist.flush, waitCopy: persist.waitCopy, exported: persist.exported, maskUncopied: persist.maskUncopied,
   } });
 // letters type in text fields and pick options in selects, so WASD leaves them alone (spec 009)
