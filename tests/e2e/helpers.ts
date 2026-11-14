@@ -181,29 +181,7 @@ export async function labels(page: Page): Promise<Map<string, number>> {
   return m;
 }
 
-type Win = { x0: number; y0: number; width: number; height: number };
-/** The effective labels in this window, row-major, read in the page through tile(key); off-raster cells are 0 (spec 071, 072). */
-export async function labelsIn(page: Page, w: Win): Promise<Uint8Array> {
-  const out: number[] = await page.evaluate(async (w) => {
-    const { store, tile } = (window as any).__geoapp.labels;
-    const v = new Array<number>(w.width * w.height).fill(0);
-    for (let y0 = Math.floor(w.y0 / 256) * 256; y0 < Math.min(w.y0 + w.height, store.height); y0 += 256) {
-      for (let x0 = Math.floor(w.x0 / 256) * 256; x0 < Math.min(w.x0 + w.width, store.width); x0 += 256) {
-        if (x0 < 0 || y0 < 0) continue;
-        const t: Uint8Array | null = await tile(`${x0},${y0}`);
-        if (!t) continue;
-        const tw = Math.min(256, store.width - x0), th = Math.min(256, store.height - y0);
-        for (let r = Math.max(y0, w.y0); r < Math.min(y0 + th, w.y0 + w.height); r++) {
-          for (let c = Math.max(x0, w.x0); c < Math.min(x0 + tw, w.x0 + w.width); c++) v[(r - w.y0) * w.width + (c - w.x0)] = t[(r - y0) * tw + (c - x0)]!;
-        }
-      }
-    }
-    return v;
-  }, w);
-  return Uint8Array.from(out);
-}
-
-/** The number of non-zero effective labels, counted in the page (spec 071, 072). */
+/** The number of non-zero effective labels, counted in the page (specs 071, 072: instead of labels().size). */
 export const labelCount = (page: Page): Promise<number> => page.evaluate(async () => {
   const { store, tile } = (window as any).__geoapp.labels;
   let n = 0;
