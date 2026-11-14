@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { anotherRaster, jumpTo, labels, message, openApp, openRaster, paintMode, rgbFixture, settled, stroke, toScreen } from "./helpers";
+import { anotherRaster, rgbFixture } from "./fixtures";
+import { jumpTo, labels, message, openApp, openRaster, paintMode, settled, stroke, toScreen } from "./helpers";
 
 // Spec 034 criteria 4-7.
 const pressed = (page: Page, id: "paint" | "erase" | "pan") => expect(page.locator(`#mode-${id}`)).toHaveAttribute("aria-pressed", "true");

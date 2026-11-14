@@ -3,7 +3,8 @@ import { expect, type Page } from "@playwright/test";
 import { fromArrayBuffer } from "geotiff";
 import { CLASS_ITEM, decodeClasses } from "../../src/core/classTable";
 import { tileWindows } from "../../src/core/grid";
-import { message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture } from "./helpers";
+import { rgbFixture } from "./fixtures";
+import { message, openApp, openRaster, paintMode, paintTwoClasses } from "./helpers";
 import { arrayBuffer, holdMasks } from "./seeding";
 
 // Helpers for smart-select and undo-seed (first written for spec 004's lock probes): an OPFS write gate, a two-class setup and a label file check.

@@ -2,7 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 import { pixelAt as cellAt } from "../../src/core/pixel";
 import { maskBits, maskSpans, promptPoints, samWindow } from "../../src/core/smart";
 import { MESSAGES } from "../../src/ui/messages";
-import { hintOf, jumpTo, labels, logRequests, message, openApp, openRaster, rgbFixture, settled, toLngLat, toScreen, view, type Xy } from "./helpers";
+import { rgbFixture } from "./fixtures";
+import { hintOf, jumpTo, labels, logRequests, message, openApp, openRaster, settled, toLngLat, toScreen, view, type Xy } from "./helpers";
 import { gateWrites, openWrite, writeHeld } from "./lockCombos";
 import { at, inNodata, ND_GRID, noSavePicker, nodataImagery } from "./seeding";
 

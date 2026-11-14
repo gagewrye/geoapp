@@ -1,11 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { jumpTo, labels, message, openApp, openRaster, paintMode, path, renameClass, selectClass, stroke, toScreen } from "./helpers";
-import { classList, download, effectiveTiles, expectNoNodata, importFile, inNodata, noSavePicker, nodataImagery, storeTiles, upload } from "./seeding";
+import { jumpTo, message, openApp, openRaster, paintMode, path, renameClass, selectClass, stroke, toScreen } from "./helpers";
+import { classList, download, effectiveTiles, expectNoNodata, importFile, inNodata, labelled, noSavePicker, nodataImagery, storeTiles, upload } from "./seeding";
 
 // Spec 004 criterion 11: Export labels, then Import labels, saves and loads labels exactly.
 
 test("export then import restores every tile byte for byte and the class list, with no label on imagery nodata", async ({ page }) => {
-  test.setTimeout(120_000);
   await noSavePicker(page);
   await openApp(page);
   await openRaster(page, nodataImagery());
@@ -17,7 +16,7 @@ test("export then import restores every tile byte for byte and the class list, w
   // three classes, each stroke crossing the nodata block (14.0..14.6E, 45.5..46.0N)
   for (const [i, lat] of [[0, 45.9], [1, 45.75], [2, 45.6]] as const) {
     await selectClass(page, i);
-    await stroke(page, path(await toScreen(page, [13.8, lat]), await toScreen(page, [14.8, lat]), 12));
+    await stroke(page, path(await toScreen(page, [13.8, lat]), await toScreen(page, [14.8, lat]), 3)); // a straight stroke: its moves are joined (spec 023 F6)
   }
   await page.click("#class-add"); // Class 4, unused
   await renameClass(page, 1, "Mangrove & <salt>");
@@ -26,10 +25,11 @@ test("export then import restores every tile byte for byte and the class list, w
   const list = await classList(page);
   expect(list.map((c) => c.name)).toEqual(["Class 1", "Mangrove & <salt>", "Class 3", "Class 4"]);
   expect(list[2]!.colour).toBe("#12ab34");
-  expect(new Set((await labels(page)).values())).toEqual(new Set([1, 2, 3]));
+  // before the import the labels are the stored tiles (spec 072: read once, not through labels())
+  expect(new Set([...labelled(tiles, 1000)].map(([, , v]) => v))).toEqual(new Set([1, 2, 3]));
   expectNoNodata(tiles, 1000, inNodata);
   // the strokes reach both sides of the block
-  const cols = [...(await labels(page)).keys()].map((k) => Number(k.split(",")[0]));
+  const cols = [...labelled(tiles, 1000)].map(([c]) => c);
   expect(Math.min(...cols)).toBeLessThan(400);
   expect(Math.max(...cols)).toBeGreaterThanOrEqual(460);
 

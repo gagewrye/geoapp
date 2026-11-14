@@ -49,6 +49,8 @@ export function initImagery(map: MapLibreMap, say: (text: string, kind?: Message
 
   return {
     limits,
+    /** A moveend's SETTLE_MS debounce is pending: the view isn't planned yet (e2e: overlaysIdle, spec 072). */
+    settling: () => debounce !== null,
     /** The open raster's tile reads are queued or in flight. */
     busy: () => open?.loader.busy() ?? false,
     /** The map is moving or moved under SETTLE_MS ago (spec 027): background mask reads wait. */

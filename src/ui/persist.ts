@@ -279,5 +279,7 @@ export function initPersist(d: Deps) {
     },
     /** The saves started so far have ended (tests). */
     idle: () => chain,
+    /** A save is scheduled or in flight (e2e: __geoapp.saving, spec 072). */
+    saving: () => timer !== null || inFlight > 0,
   };
 }

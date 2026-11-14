@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { classFile } from "../unit/helpers/labelFiles";
-import { jumpTo, logRequests, message, openApp, openRaster, paintMode, rgbFixture, settled, stroke, tiff, toScreen } from "./helpers";
+import { rgbFixture, tiff } from "./fixtures";
+import { jumpTo, logRequests, message, openApp, openRaster, overlaysIdle, paintMode, settled, stroke, toScreen } from "./helpers";
 import { download, importFile, noSavePicker, upload } from "./seeding";
 
 // Spec 013: AlphaEarth and training are shelved; the site only labels local imagery.
@@ -16,7 +17,6 @@ async function openAndPaint(page: Page) {
 }
 
 test("every request from load through open, paint, undo, import, export and another open stays on the app's origin (criterion 6)", async ({ page, baseURL }) => {
-  test.setTimeout(120_000);
   const log = logRequests(page);
   await noSavePicker(page);
   await openApp(page);
@@ -33,7 +33,8 @@ test("every request from load through open, paint, undo, import, export and anot
   await expect(page.locator("#raster-info")).toHaveText(/^other\.tif/);
   await expect(message(page)).toHaveText("Raster opened.");
   await paintMode(page);
-  await page.waitForTimeout(300);
+  await expect.poll(() => page.evaluate(() => (window as any).__geoapp.saving())).toBe(false); // the label saves have ended (spec 072: no fixed wait)
+  await overlaysIdle(page);
   const app = new URL(baseURL!);
   const urls = log.map((r) => r.url()).filter((u) => !u.startsWith("data:"));
   expect(urls.length).toBeGreaterThan(0);
