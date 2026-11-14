@@ -45,6 +45,13 @@ jobs:
       # browsers aren't cached: Playwright's docs advise against it (a restore takes about as long as the download)
       - run: npx playwright install --with-deps chromium
       - run: npx playwright test --shard=${{ matrix.shard }}/8
+      # TEMPORARY (spec 074 criterion 5): per-test durations as JSON; reverted before merge
+      - if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: e2e-times-${{ matrix.shard }}
+          path: e2e-times.json
+          retention-days: 14
       - if: failure()
         uses: actions/upload-artifact@v5
         with:

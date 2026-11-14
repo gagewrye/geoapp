@@ -65,7 +65,7 @@ describe("ci.yml jobs (spec 060 criterion 2)", () => {
     expect(upload).toContain("playwright-report/");
     expect(upload).toContain("test-results/");
     expect(upload).toContain("retention-days: 14");
-    expect(yml.match(/upload-artifact/g)).toHaveLength(1);
+    expect(yml.match(/upload-artifact/g)).toHaveLength(2); // TEMPORARY (spec 074): plus the JSON upload
   });
 
   it("has no Playwright browser cache step", () => {
@@ -107,7 +107,8 @@ describe("playwright config (spec 060 criteria 3-4, spec 074 criterion 2)", () =
     expect(config.forbidOnly).toBe(true);
     expect(config.retries).toBe(0);
     expect(config.globalTimeout).toBe(25 * 60_000);
-    expect(config.reporter).toEqual([["dot"], ["html", { open: "never" }]]);
+    // TEMPORARY (spec 074 criterion 5): plus the json timing reporter; reverted before merge
+    expect(config.reporter).toEqual([["dot"], ["html", { open: "never" }], ["json", { outputFile: "e2e-times.json" }]]);
   });
 
   it("has an e2e:changed script that runs the files changed against main", () => {
