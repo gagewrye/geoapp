@@ -1,11 +1,8 @@
-import { expect, test, type Page, type Request } from "@playwright/test";
+import { expect, type Page, type Request } from "@playwright/test";
 import { geotiffBuffer, type Value } from "../unit/helpers/sources";
 import { tiledGeotiffBuffer } from "../unit/helpers/tiledTiff";
 import type { Affine, Grid } from "../../src/core/types";
 import { SHORTCUTS } from "../../src/ui/shortcuts";
-
-// TEMPORARY (spec 072 experiment): unload the app after each test, so the step report times the unload apart from the next context; reverted
-test.afterEach(async ({ page }) => { await page.goto("about:blank"); });
 
 export type LngLat = [number, number];
 export type Xy = { x: number; y: number };
