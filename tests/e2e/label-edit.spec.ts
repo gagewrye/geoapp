@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { classFile } from "../unit/helpers/labelFiles";
-import { message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture } from "./helpers";
+import { message, openApp, openRaster, overlaysIdle, paintMode, paintTwoClasses, rgbStrip } from "./helpers";
 import { applyMap, download, importFile, noSavePicker, upload } from "./seeding";
 
 // Spec 004 criterion 19 (privacy). Criterion 13 went with spec 073; criterion 18 with label-mask (spec 052).
@@ -8,10 +8,10 @@ import { applyMap, download, importFile, noSavePicker, upload } from "./seeding"
 const seeded = /^Seeded \d+ pixels in \d+ classes\.$/;
 
 test("importing and exporting labels make no network requests (criterion 19)", async ({ page }) => {
-  test.setTimeout(120_000);
   await noSavePicker(page);
   await openApp(page);
-  await openRaster(page, rgbFixture());
+  // spec 072: the strip, as before; a raster read without geotiff.js's decoders leaves their chunks to the first import
+  await openRaster(page, rgbStrip());
   await expect(message(page)).toHaveText("Raster opened.");
   await paintMode(page);
   await paintTwoClasses(page);
@@ -24,6 +24,7 @@ test("importing and exporting labels make no network requests (criterion 19)", a
   await expect(message(page)).toHaveText("Class map applied to 1 classes.");
   await download(page, "#export-labels");
   await expect(message(page)).toHaveText("Labels exported.");
-  await page.waitForTimeout(300);
+  await expect.poll(() => page.evaluate(() => (window as any).__geoapp.saving())).toBe(false); // the label saves the import and the map started have ended
+  await overlaysIdle(page);
   expect(requests).toEqual([]);
 });

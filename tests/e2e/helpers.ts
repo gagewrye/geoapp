@@ -34,6 +34,8 @@ const rgbValue: Value = (b, c, r) => {
 };
 /** GDAL_NODATA 0, which no pixel holds, so its masks are read (spec 023) as the Float32 strip's were. */
 export const rgbFixture = once(() => rgbTiles("rgb4326.tif", 1000, rgbValue, "0"));
+/** rgbFixture as the Float32 single strip it was before spec 072: its open reads through geotiff.js's decoders, so they are loaded before any label import. */
+export const rgbStrip = once(() => tiff("rgb4326.tif", 1000, 1000, 3, rgbValue, { epsg: 4326, gt: [10, 0.01, 0, 50, 0, -0.01] }));
 /** rgbFixture run on south to 37N, with a nodata value none of its pixels hold: its 6 row bands need mask reads (spec 023 F2), and band 4 lies far from paintTwoClasses' hovers. */
 export const rgbNodataFixture = once(() => rgbTiles("rgbtall.tif", 1300, rgbValue, "0"));
 /** rgbFixture with 16 more bytes at its end: the same grid and pixels, but another raster to spec 031, so it offers no saved labels. */
