@@ -142,11 +142,11 @@ export async function pixelAt(page: Page, p: Xy): Promise<number[]> {
   }, p);
 }
 
+/** A click at p; callers wait on the state it changes (spec 072: no fixed sleep). */
 export async function clickAt(page: Page, p: Xy): Promise<void> {
   await page.mouse.move(p.x, p.y);
   await page.mouse.down();
   await page.mouse.up();
-  await page.waitForTimeout(80);
 }
 
 export const message = (page: Page) => page.locator("#message");
