@@ -35,7 +35,7 @@ async function reload(page: Page) {
 const selected = (page: Page) => page.locator("#classes li[aria-selected=true]").evaluate((li) => [...li.parentElement!.children].indexOf(li));
 
 test.beforeEach(async ({ page }) => { void page; console.log("BEFORE", Date.now()); }); // TEMPORARY
-test.afterEach(async ({ page }) => { void page; console.log("AFTER", Date.now()); }); // TEMPORARY
+test.afterEach(async ({ page }) => { console.log("AFTER", Date.now()); const t = Date.now(); await page.close(); console.log("CLOSE", Date.now() - t); const c = Date.now(); await page.context().close(); console.log("CTX", Date.now() - c); }); // TEMPORARY
 
 // Criterion 6 is split in three (spec 072): each part has one Saved and one reload.
 test("criterion 6, tiles: paint; after Saved and a reload, accepting the restore brings back the tiles; paint still works", async ({ page }) => {
