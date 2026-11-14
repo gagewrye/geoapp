@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { jumpTo, message, openApp, openRaster, paintMode, rgbFixture, settled, stroke, toScreen } from "./helpers";
+import { rgbFixture } from "./fixtures";
+import { jumpTo, message, openApp, openRaster, paintMode, settled, stroke, toScreen } from "./helpers";
 import { download, noSavePicker } from "./seeding";
 
 // Spec 037 criteria 6 and 8.

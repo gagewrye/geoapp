@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
-import { message, openApp, openRaster, paintMode, paintOne, rgbFixture } from "./helpers";
+import { rgbFixture } from "./fixtures";
+import { message, openApp, openRaster, paintMode, paintOne } from "./helpers";
 import { classList, effectiveTiles, importFile, maskFile, storeTiles, tileDiff } from "./seeding";
 
 // Spec 053 criteria 2-6: on Chromium, with the imagery's handle held, Import labels' picker starts in its folder.

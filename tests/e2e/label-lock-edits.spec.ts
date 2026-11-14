@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { message, openApp, openRaster, paintMode, paintOne, rgbFixture } from "./helpers";
+import { rgbFixture } from "./fixtures";
+import { message, openApp, openRaster, paintMode, paintOne } from "./helpers";
 import { classList } from "./seeding";
 
 // Spec 004 Locks: rename and recolour refuse while locked, even if their disabled inputs fire.

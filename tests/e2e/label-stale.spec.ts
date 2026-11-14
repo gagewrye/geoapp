@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { classFile } from "../unit/helpers/labelFiles";
-import { collectErrors, message, openApp, openRaster, rgbFixture } from "./helpers";
+import { rgbFixture } from "./fixtures";
+import { collectErrors, message, openApp, openRaster } from "./helpers";
 import { classList, importFile, openFileGate, pauseLabelFile, storeTiles, upload } from "./seeding";
 
 // Spec 003's rule for replaced rasters, applied to spec 004's Import labels:

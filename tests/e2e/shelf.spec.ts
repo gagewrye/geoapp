@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { classFile } from "../unit/helpers/labelFiles";
-import { jumpTo, logRequests, message, openApp, openRaster, overlaysIdle, paintMode, rgbFixture, settled, stroke, tiff, toScreen } from "./helpers";
+import { rgbFixture, tiff } from "./fixtures";
+import { jumpTo, logRequests, message, openApp, openRaster, overlaysIdle, paintMode, settled, stroke, toScreen } from "./helpers";
 import { download, importFile, noSavePicker, upload } from "./seeding";
 
 // Spec 013: AlphaEarth and training are shelved; the site only labels local imagery.

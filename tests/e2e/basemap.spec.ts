@@ -1,7 +1,6 @@
 import { expect, test, type Page, type Request } from "@playwright/test";
-import {
-  BACKGROUND, hideBasemap, jumpTo, logRequests, message, openApp, openRaster, paintMode, pixelAt, rgbFixture, stroke, toLngLat, toScreen, type LngLat, type Xy,
-} from "./helpers";
+import { rgbFixture } from "./fixtures";
+import { BACKGROUND, hideBasemap, jumpTo, logRequests, message, openApp, openRaster, paintMode, pixelAt, stroke, toLngLat, toScreen, type LngLat, type Xy } from "./helpers";
 
 // Spec 012: the bundled Natural Earth basemap, always shown as the bottom map layer.
 const bg = [1, 3, 5].map((i) => parseInt(BACKGROUND.slice(i, i + 2), 16));

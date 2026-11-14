@@ -1,7 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import { writeFile } from "../unit/helpers/labelFiles";
 import { MESSAGES } from "../../src/ui/messages";
-import { collectErrors, jumpTo, message, openApp, openRaster, paintMode, path, RGB_GRID, rgbFixture, stroke, tileKeysStored, toScreen } from "./helpers";
+import { RGB_GRID, rgbFixture } from "./fixtures";
+import { collectErrors, jumpTo, message, openApp, openRaster, paintMode, path, stroke, tileKeysStored, toScreen } from "./helpers";
 import { at, classList, countOps, effectiveTiles, importFile, maskValue, opsCounted, upload } from "./seeding";
 
 // Spec 021 criteria 2-8: the import's bar and Cancel, the old labels off the map while it runs, and restores.

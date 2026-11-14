@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { anotherRaster, jumpTo, labelCount, message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture, settled, toScreen } from "./helpers";
+import { anotherRaster, rgbFixture } from "./fixtures";
+import { jumpTo, labelCount, message, openApp, openRaster, paintMode, paintTwoClasses, settled, toScreen } from "./helpers";
 import { effectiveTiles, labelled, tileDiff } from "./seeding";
 
 // Spec 010: undo of paint strokes (button and Ctrl+Z). The brush cursor test went with spec 073.

@@ -5,7 +5,8 @@ import type { LabelStore } from "../../src/core/labelStore";
 import type { Grid } from "../../src/core/types";
 import { writeFile } from "../unit/helpers/labelFiles";
 import { tiledGeotiffBuffer } from "../unit/helpers/tiledTiff";
-import { once, RGB_GRID, type LngLat } from "./helpers";
+import { once, RGB_GRID } from "./fixtures";
+import { type LngLat } from "./helpers";
 
 // Spec 004 e2e helpers: label files as uploads, the store and list through the hook, downloads, gates.
 

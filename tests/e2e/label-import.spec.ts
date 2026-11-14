@@ -1,7 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
 import { aefShapedFile, classItemFile, ITEM_CLASSES, rgbClassFile, uint16ClassFile, writeFile } from "../unit/helpers/labelFiles";
-import { message, openApp, openRaster, paintMode, paintOne, rgbFixture } from "./helpers";
+import { rgbFixture } from "./fixtures";
+import { message, openApp, openRaster, paintMode, paintOne } from "./helpers";
 import { classList, importFile, storeTiles, upload } from "./seeding";
 
 // Spec 004 criteria 12 (classes) and 15 (refusals), on spec 001's EPSG:4326 fixture. The import-time class map's

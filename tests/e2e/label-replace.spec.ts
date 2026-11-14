@@ -2,7 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 import { paletteColour } from "../../src/core/classes";
 import { MESSAGES } from "../../src/ui/messages";
 import { classFile } from "../unit/helpers/labelFiles";
-import { hoverFeatures, jumpTo, message, openApp, openRaster, paintMode, paintOne, rgbFixture, rgbNodataFixture, settled, toScreen } from "./helpers";
+import { rgbFixture, rgbNodataFixture } from "./fixtures";
+import { hoverFeatures, jumpTo, message, openApp, openRaster, paintMode, paintOne, settled, toScreen } from "./helpers";
 import {
   classList, countOps, effectiveTiles, holdMasks, importFile, openFileGate, openImageryGate, opsCounted, pauseImagery, pauseLabelFile, storeTiles, tileDiff, upload, valuesOf,
 } from "./seeding";

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { anotherRaster, message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture } from "./helpers";
+import { anotherRaster, rgbFixture } from "./fixtures";
+import { message, openApp, openRaster, paintMode, paintTwoClasses } from "./helpers";
 
 // Spec 050 criteria 3-5: on Chromium the open picker replaces the input's chooser, and Export's Save dialog starts in the open raster's folder.
 

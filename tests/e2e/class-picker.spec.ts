@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { jumpTo, labels, message, openApp, openRaster, paintMode, rgbFixture, selectClass, settled, stroke, tileKeysStored, toScreen } from "./helpers";
+import { rgbFixture } from "./fixtures";
+import { jumpTo, labels, message, openApp, openRaster, paintMode, selectClass, settled, stroke, tileKeysStored, toScreen } from "./helpers";
 import { at, importFile, maskFile, maskValue } from "./seeding";
 
 // Spec 038 criteria 4 and 5.

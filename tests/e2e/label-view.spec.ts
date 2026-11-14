@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { classFile } from "../unit/helpers/labelFiles";
-import { clickAt, hideBasemap, hoverFeatures, jumpTo, message, openApp, openRaster, paintMode, pixelAt, rgbFixture, selectClass, settled, stroke, tileKeysStored, toScreen, view, type Xy } from "./helpers";
+import { rgbFixture } from "./fixtures";
+import { clickAt, hideBasemap, hoverFeatures, jumpTo, message, openApp, openRaster, paintMode, pixelAt, selectClass, settled, stroke, tileKeysStored, toScreen, view, type Xy } from "./helpers";
 import { at, classList, countOps, importFile, maskFile, openFileGate, opsCounted, pauseLabelFile, storeTiles, upload } from "./seeding";
 
 // Spec 016: label Opacity, Show labels, hiding selects Pan, and Pan on load.

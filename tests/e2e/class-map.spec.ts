@@ -2,7 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 import { paletteColour } from "../../src/core/classes";
 import { toLonLat } from "../../src/core/crs";
 import { CLASS_GRID, classFile, itemFile } from "../unit/helpers/labelFiles";
-import { hideBasemap, hideImagery, jumpTo, mapIdle, message, openApp, openRaster, overlayKeysShown, overlaysIdle, paintMode, pixelAt, rgbFixture, settled, tileKeysStored, toScreen, type LngLat } from "./helpers";
+import { rgbFixture } from "./fixtures";
+import { hideBasemap, hideImagery, jumpTo, mapIdle, message, openApp, openRaster, overlayKeysShown, overlaysIdle, paintMode, pixelAt, settled, tileKeysStored, toScreen, type LngLat } from "./helpers";
 import { applyMap, classList, effectiveTiles, holdIdb, importFile, openFileGate, pauseLabelFile, storeTiles, upload } from "./seeding";
 
 // Spec 047 criteria 6-10: Apply class map, after Import labels, renames and recolours the imported classes only.

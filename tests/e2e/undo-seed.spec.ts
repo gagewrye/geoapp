@@ -1,7 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import { CLASS_GRID, classFile } from "../unit/helpers/labelFiles";
 import { MESSAGES } from "../../src/ui/messages";
-import { jumpTo, message, openApp, openRaster, paintMode, rgbFixture, stroke, toScreen } from "./helpers";
+import { rgbFixture } from "./fixtures";
+import { jumpTo, message, openApp, openRaster, paintMode, stroke, toScreen } from "./helpers";
 import { expectFileHolds, gateWrites, openWrite, seeded, setup as twoClasses, writeHeld } from "./lockCombos";
 import { effectiveTiles, importFile, labelled, noSavePicker, openFileGate, pauseLabelFile, storeTiles, tileDiff, upload } from "./seeding";
 

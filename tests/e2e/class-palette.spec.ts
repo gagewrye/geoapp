@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { editName, message, openApp, openRaster, paintMode, rgbFixture } from "./helpers";
+import { rgbFixture } from "./fixtures";
+import { editName, message, openApp, openRaster, paintMode } from "./helpers";
 
 // Spec 036 criteria 5 and 6. Criterion 9 (Home in the slider): redo and layout (spec 052).
 async function setup(page: Page) {

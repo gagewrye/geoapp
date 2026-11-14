@@ -2,7 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 import { MODEL_CACHE } from "../../src/io/modelCache";
 import { MODEL_URLS } from "../../src/io/segmenter";
 import { MESSAGES } from "../../src/ui/messages";
-import { logRequests, message, openApp, openRaster, rgbFixture } from "./helpers";
+import { rgbFixture } from "./fixtures";
+import { logRequests, message, openApp, openRaster } from "./helpers";
 
 // Spec 055 criteria 7 and 9: Hugging Face answers with an HTML page where a model file should be.
 
