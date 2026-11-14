@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Map as MapLibreMap } from "maplibre-gl";
 import { emptyStore } from "../../../src/core/labelStore";
+import type { LabelSource } from "../../../src/io/labelFile";
+import type { MaskBase } from "../../../src/io/maskBase";
 import type { RasterSource } from "../../../src/io/source";
 import { initLabels } from "../../../src/ui/labels";
 
@@ -40,5 +42,26 @@ describe("labels cancel a pick still reading (spec 039 scope 6)", () => {
     const labels = setup();
     labels.replace(emptyStore(100, 100), [{ name: "Water", colour: "#0000ff" }]);
     expect(cancel.calls).toBe(1);
+  });
+});
+
+// Spec 055 criterion 4 (ADR 0036): the base reads the app's copy once swapped, and only while it is still the base.
+describe("useCopy", () => {
+  const source = { meta: { width: 100, height: 100, epsg: 4326, gt: [0, 1, 0, 0, 0, -1] } } as unknown as RasterSource;
+  const base = (file: unknown) => ({ file, lut: new Uint8Array(256), count: 1, windows: new Set<string>(), preview: {} }) as unknown as MaskBase;
+
+  it("swaps the live base's file in place, and nothing once another base replaced it", () => {
+    const labels = setup();
+    labels.open(source);
+    const user = { name: "user" } as unknown as LabelSource, copy = { name: "copy" } as unknown as LabelSource;
+    const a = base(user);
+    labels.replace(emptyStore(100, 100), [{ name: "Water", colour: "#0000ff" }], a);
+    expect(labels.useCopy(a, copy)).toBe(true);
+    expect(labels.base()).toBe(a);
+    expect(labels.base()!.file).toBe(copy);
+    const b = base(user);
+    labels.replace(emptyStore(100, 100), [{ name: "Water", colour: "#0000ff" }], b);
+    expect(labels.useCopy(a, copy)).toBe(false);
+    expect(b.file).toBe(user);
   });
 });
