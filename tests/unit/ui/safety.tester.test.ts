@@ -103,6 +103,36 @@ describe("spec 056 scope 2: a replaced session changed after its export is never
   });
 });
 
+describe("spec 056 scope 3: a replaced session's pending copy failures don't use up the new import's copy retries", () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it.each([0, 1])("A's save fails, B is imported, A's copy keeps failing; B's own copy fails %i time(s): B's copy is still written and B's record isn't copyMissing", async (fails) => {
+    const t = persistSetup();
+    const save = t.fake.store.saveBase.bind(t.fake.store);
+    let bFails = fails; // B's own copy fails this often, then works (well within its 3 retries)
+    t.fake.store.saveBase = async (k, f) => {
+      const text = await f.text();
+      if (text === "mask 5") throw new DOMException("The file changed.", "NotReadableError");
+      if (text === "mask 9" && bFails-- > 0) throw new DOMException("The file changed.", "NotReadableError");
+      return save(k, f);
+    };
+    await t.open();
+    t.fake.failWith(new Error("disk"));
+    await t.importMask(5, "0,0", 1);
+    await t.flush(); // A's first save fails: its tiles and copy are still due
+    await t.importMask(9, "512,256", 3); // A becomes the replaced session, pending with its copy
+    t.fake.failWith(null);
+    for (let ms = 0; ms < 10 * 60_000; ms += 5000) await t.flush(5000);
+    const b = [...t.fake.records.values()].find((r) => r.role === "current")!;
+    const a = [...t.fake.records.values()].find((r) => r.role === "replaced")!;
+    expect(a.base!.copyMissing).toBe(true);
+    expect([...t.fake.tiles.get(a.id)!.keys()]).toEqual(["0,0"]);
+    expect(b.base!.copyMissing).toBeUndefined();
+    expect(await t.fake.bases.get(b.id)?.text()).toBe("mask 9");
+  });
+});
+
 // Spec 055 scope 3: on Windows, folder names are case-insensitive, so ORTHO.tif opens the imagery ortho.tif
 function caseInsensitive(f: ReturnType<typeof fakeFolder>) {
   const real = f.dir.getFileHandle.bind(f.dir);
