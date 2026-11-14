@@ -38,7 +38,7 @@ test.describe("classes (criterion 12)", () => {
 
 /** Painted labels, and a check that the store and class list are as they were. */
 async function painted(page: Page) {
-  await paintOne(page);
+  await paintOne(page, "left"); // renamed, so "unchanged" can't be a reset to the defaults
   const before = { tiles: await storeTiles(page), list: await classList(page) };
   return async () => {
     expect(await storeTiles(page)).toEqual(before.tiles);

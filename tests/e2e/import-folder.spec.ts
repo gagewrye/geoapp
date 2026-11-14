@@ -86,7 +86,7 @@ test("criterion 2: Import labels picks within the click, starting in A, and impo
 test("criterion 3: a cancelled picker imports nothing and shows nothing; a dismissed replace confirm imports nothing", async ({ page }) => {
   await setup(page);
   await openA(page);
-  await paintOne(page); // labels, so the import asks to replace them (spec 072: one stroke)
+  await paintOne(page, "left"); // labels, so the import asks to replace them; class 1 renamed so the list isn't the defaults
   const before = { labels: await effectiveTiles(page), list: await classList(page) };
   const unchanged = async () => {
     expect(tileDiff(await effectiveTiles(page), before.labels)).toEqual([]);

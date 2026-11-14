@@ -16,7 +16,7 @@ test("while an export holds the Save dialog, a forced rename or recolour changes
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
   await paintMode(page);
-  await paintOne(page); // labels to export (spec 072: one stroke, not paintTwoClasses)
+  await paintOne(page, "left"); // labels to export, class 1 renamed so the list isn't the defaults
   const before = await classList(page);
   await page.click("#export-labels");
   await expect.poll(() => page.evaluate(() => (window as any).__save.opened)).toBe(1);

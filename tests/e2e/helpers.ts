@@ -249,8 +249,12 @@ export async function renameClass(page: Page, i: number, name: string): Promise<
   await field.press("Enter");
 }
 
-/** On rgbFixture: one class 1 stroke west of 15E at zoom 6, for tests that need labels but not two classes (spec 072). */
-export async function paintOne(page: Page): Promise<void> {
+/**
+ * On rgbFixture: one class 1 stroke west of 15E at zoom 6, for tests that need labels but not two classes (spec 072).
+ * With `name`, class 1 is renamed first, so a class list compared later isn't the defaults.
+ */
+export async function paintOne(page: Page, name?: string): Promise<void> {
+  if (name) await renameClass(page, 0, name);
   await jumpTo(page, [15, 45], 6);
   const a = await toScreen(page, [12.005, 45.005]);
   await stroke(page, [a, { x: a.x + 30, y: a.y + 20 }, { x: a.x + 60, y: a.y }]);
