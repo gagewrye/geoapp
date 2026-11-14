@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { paletteColour } from "../../src/core/classes";
 import { MESSAGES } from "../../src/ui/messages";
 import { classFile } from "../unit/helpers/labelFiles";
-import { hoverFeatures, jumpTo, message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture, rgbNodataFixture, settled, toScreen } from "./helpers";
+import { hoverFeatures, jumpTo, message, openApp, openRaster, paintMode, paintOne, rgbFixture, rgbNodataFixture, settled, toScreen } from "./helpers";
 import {
   classList, countOps, effectiveTiles, holdMasks, importFile, openFileGate, openImageryGate, opsCounted, pauseImagery, pauseLabelFile, storeTiles, tileDiff, upload, valuesOf,
 } from "./seeding";
@@ -38,7 +38,7 @@ test("there is no Seed mode; with no labels an import shows no confirm, and Undo
 // Spec 072: the confirm's Cancel and OK are two tests, each from its own painted tiles.
 test("with painted tiles an import confirms: Cancel keeps labels and classes", async ({ page }) => {
   await setup(page);
-  await paintTwoClasses(page);
+  await paintOne(page);
   await expect(page.locator("#undo")).toBeEnabled();
   const before = { tiles: await storeTiles(page), list: await classList(page) };
   const asked: string[] = [];
@@ -51,7 +51,7 @@ test("with painted tiles an import confirms: Cancel keeps labels and classes", a
 
 test("with painted tiles an import confirms: OK replaces labels and classes and disables Undo; a second import replaces them too", async ({ page }) => {
   await setup(page);
-  await paintTwoClasses(page);
+  await paintOne(page);
   await expect(page.locator("#undo")).toBeEnabled();
   const asked: string[] = [];
   page.once("dialog", (d) => { asked.push(d.message()); void d.accept(); });
@@ -72,7 +72,7 @@ test("with painted tiles an import confirms: OK replaces labels and classes and 
 
 test("while an import runs the brush and class edits are disabled; while mask reads are pending Import labels and Export labels are", async ({ page }) => {
   await setup(page, rgbNodataFixture()); // its masks need reads (spec 023 F2)
-  await paintTwoClasses(page);
+  await paintOne(page); // labels, so the import replaces them (spec 072: one stroke)
   const before = await effectiveTiles(page);
   await pauseLabelFile(page);
   page.once("dialog", (d) => void d.accept()); // "Replace labels?": every import replaces (spec 017)

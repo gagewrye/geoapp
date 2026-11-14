@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
-import { message, openApp, openRaster, paintMode, paintTwoClasses, rgbFixture } from "./helpers";
+import { message, openApp, openRaster, paintMode, paintOne, rgbFixture } from "./helpers";
 import { classList, effectiveTiles, importFile, maskFile, storeTiles, tileDiff } from "./seeding";
 
 // Spec 053 criteria 2-6: on Chromium, with the imagery's handle held, Import labels' picker starts in its folder.
@@ -86,7 +86,7 @@ test("criterion 2: Import labels picks within the click, starting in A, and impo
 test("criterion 3: a cancelled picker imports nothing and shows nothing; a dismissed replace confirm imports nothing", async ({ page }) => {
   await setup(page);
   await openA(page);
-  await paintTwoClasses(page);
+  await paintOne(page); // labels, so the import asks to replace them (spec 072: one stroke)
   const before = { labels: await effectiveTiles(page), list: await classList(page) };
   const unchanged = async () => {
     expect(tileDiff(await effectiveTiles(page), before.labels)).toEqual([]);
