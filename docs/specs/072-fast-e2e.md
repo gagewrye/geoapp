@@ -122,7 +122,7 @@ Line numbers are from the working tree on 2026-11-13. The implementer rechecks t
    Both run on faked timers and stubbed frames.
 2. **The prefetch test is deterministic (scope item 2).**
    - `labelDisplay.test.ts` "waits for queued quad prefetches" uses no real timer, frame, idle callback or clock. Its fakes and stubs cover all of them, and the commit names the wait it found.
-   - It passes 20 times in a row with `--repeat=20`, run alongside the other 2 files of the failing run while the CPU is busy. Its timeout is unchanged.
+   - It passes 20 times in a row with `--repeats=20` (Vitest's flag), run alongside the other 2 files of the failing run while the CPU is busy. Its timeout is unchanged.
 3. *Moved to spec 074 (Gage, 2026-11-14).* **Every listed test, and every test split from one, runs in ≤ 15 s on CI** in each of 3 consecutive runs of this spec's PR, read from a CI JSON report. The rest of the suite stays under 15 s too.
 4. **The criteria are kept.**
    - Each test, or the set of tests split from it, keeps every assertion of its original.
