@@ -117,8 +117,7 @@ test("criterion 4: after A, a cancelled picker gives A and shows no message", as
   await openA(page);
   await pick(page, "abort");
   await opener(page).click();
-  await expect.poll(() => page.evaluate(() => (window as any).__pick.active.length)).toBe(2);
-  await page.waitForTimeout(300);
+  await expect.poll(() => page.evaluate(() => (window as any).__pick.active.length)).toBe(2); // the rejected picker is handled before the next evaluate (spec 072)
   await expect(message(page)).toHaveText("Raster opened.");
   await expect(message(page)).not.toHaveClass(/\berror\b/);
   expect(await exportStartIn(page)).toBe("A");
