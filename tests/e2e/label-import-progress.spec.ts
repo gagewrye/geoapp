@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { writeFile } from "../unit/helpers/labelFiles";
 import { MESSAGES } from "../../src/ui/messages";
 import { collectErrors, jumpTo, message, openApp, openRaster, paintMode, path, RGB_GRID, rgbFixture, stroke, tileKeysStored, toScreen } from "./helpers";
-import { at, classList, countOps, effectiveTiles, importFile, maskFile, opsCounted, upload } from "./seeding";
+import { at, classList, countOps, effectiveTiles, importFile, maskValue, opsCounted, upload } from "./seeding";
 
 // Spec 021 criteria 2-8: the import's bar and Cancel, the old labels off the map while it runs, and restores.
 
@@ -46,7 +46,7 @@ async function withLabels(page: Page) {
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
-  await importFile(page, maskFile());
+  await importFile(page, sameGrid("mask.tif", maskValue)); // spec 072: 500 x 500, not maskFile's 1000 x 1000
   await expect(message(page)).toHaveText(seeded);
   await paintMode(page);
   await jumpTo(page, at(256, 256), 10);
