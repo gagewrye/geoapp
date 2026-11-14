@@ -75,6 +75,32 @@ describe("spec 056 scope 2: a replaced session changed after its export is never
     await t.flush();
     expect(await t.importMask(7, "0,256", 4)).toBe(MESSAGES.replacedFirst);
   });
+
+  it("an export covering unsaved changes still lets a third import drop A (the fix is not over-conservative)", async () => {
+    const t = persistSetup();
+    await t.open();
+    await t.importMask(5, "0,0", 1); await t.flush();
+    t.paint("256,0", 2); // unsaved at the export's click
+    t.p.exported(t.now() + 100);
+    await t.flush();
+    await t.importMask(9, "512,256", 3); await t.flush();
+    expect(await t.importMask(7, "0,256", 4)).toBe(null);
+  });
+
+  it("A exported, then a failed save of B's import, then a reload-free third import: A's post-export tile is stored before any drop", async () => {
+    const t = persistSetup();
+    await t.open();
+    await t.importMask(5, "0,0", 1); await t.flush();
+    t.p.exported(t.now()); await t.flush();
+    t.paint("256,0", 2);
+    t.fake.failWith(new Error("disk"));
+    await t.importMask(9, "512,256", 3);
+    t.fake.failWith(null);
+    await t.flush(30_000);
+    const a = [...t.fake.records.values()].find((r) => r.role === "replaced")!;
+    expect(a.savedAt).toBeGreaterThan(a.exportedAt!);
+    expect(t.fake.tiles.get(a.id)!.has("256,0")).toBe(true);
+  });
 });
 
 // Spec 055 scope 3: on Windows, folder names are case-insensitive, so ORTHO.tif opens the imagery ortho.tif
