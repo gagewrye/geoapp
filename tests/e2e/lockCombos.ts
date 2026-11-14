@@ -9,7 +9,7 @@ import { arrayBuffer, holdMasks } from "./seeding";
 // Helpers for the label-lock-*.tester specs.
 // Tester probe of spec 004's shared lock (Settled in build: Locks): while a seed or an Export labels
 // run is active on the open imagery, the brush and class add, rename and recolour are locked, and
-// only then. Exports, seeds and raster opens in combination; a cancelled Save dialog and a failed
+// only then. Exports, seeds and raster opens in combination; a cancelled folder picker and a failed
 // write must unlock.
 
 export const seeded = /^Seeded \d+ pixels in \d+ classes\.$/;

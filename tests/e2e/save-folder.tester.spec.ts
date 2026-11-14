@@ -1,11 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 import { anotherRaster, collectErrors, message, openApp, openRaster, rgbFixture } from "./helpers";
 
-// Spec 050, tester: edges around the open picker and the folder handle Export's Save dialog starts in.
+// Spec 050, tester: edges around the open picker and the folder handle Export's folder picker starts in (spec 055).
 
 type Next = "A" | "B" | "bad" | "gone" | "abort" | "security" | "empty" | "hold";
 
-/** Fakes both pickers. The save fake records startIn by handle key and writes to memory, so the export completes. */
+/** Fakes both pickers. The folder fake records startIn by handle key and returns an OPFS folder, so the export completes. */
 const fakePickers = (page: Page) => page.addInitScript(() => {
   const g = (window as any).__pick = { next: "A", handles: {} as Record<string, unknown>, active: [] as boolean[], saves: [] as string[],
     saveOpts: [] as Record<string, unknown>[], bytes: 0, release: null as null | ((k: string) => void) };
@@ -17,12 +17,10 @@ const fakePickers = (page: Page) => page.addInitScript(() => {
     if (g.next === "hold") return new Promise((r) => { g.release = (k: string) => r([g.handles[k]]); });
     return Promise.resolve([g.handles[g.next]]);
   };
-  (window as any).showSaveFilePicker = (o: Record<string, unknown>) => {
+  (window as any).showDirectoryPicker = async (o: Record<string, unknown>) => {
     g.saveOpts.push(o);
     g.saves.push("startIn" in o ? Object.keys(g.handles).find((k) => g.handles[k] === o.startIn) ?? "other" : "none");
-    return Promise.resolve({ createWritable: () => Promise.resolve({
-      write: (d: Uint8Array) => { g.bytes += d.byteLength; return Promise.resolve(); },
-      close: () => Promise.resolve(), abort: () => Promise.resolve() }) });
+    return (await navigator.storage.getDirectory()).getDirectoryHandle("export", { create: true });
   };
 });
 
@@ -33,7 +31,9 @@ async function makeHandles(page: Page) {
     await page.evaluate(([key, name, b64]) => {
       const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
       const file = new File([bytes], name, { type: "image/tiff" });
-      (window as any).__pick.handles[key] = { kind: "file", name, getFile: () => Promise.resolve(file) };
+      const h: Record<string, unknown> = { kind: "file", name, getFile: () => Promise.resolve(file) };
+      h.isSameEntry = (o: unknown) => Promise.resolve(o === h);
+      (window as any).__pick.handles[key] = h;
     }, [key, f.name, f.buffer.toString("base64")] as const);
   }
   await page.evaluate(() => {
@@ -52,7 +52,7 @@ async function exportStartIn(page: Page): Promise<string> {
   await expect(page.locator("#export-labels")).toBeEnabled();
   await page.click("#export-labels");
   await expect.poll(() => page.evaluate(() => (window as any).__pick.saves.length)).toBe(n + 1);
-  await expect(message(page)).toHaveText("Labels exported.");
+  await expect(message(page)).toHaveText(/^Labels exported to labels\.tif \([\d.]+ MB\)\.$/);
   return page.evaluate(() => (window as any).__pick.saves.at(-1) as string);
 }
 
@@ -60,6 +60,7 @@ let chooser = false;
 async function setup(page: Page) {
   chooser = false;
   page.on("filechooser", () => { chooser = true; });
+  page.on("dialog", (d) => { void d.accept(d.defaultValue()); }); // the name prompt's labels.tif, and the replace question
   await fakePickers(page);
   await openApp(page);
   await makeHandles(page);
