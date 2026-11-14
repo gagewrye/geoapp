@@ -11,7 +11,7 @@ export const IS_MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test
 
 const DIGITS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
-/** Every keyboard and mouse shortcut, by section (specs 003-054). */
+/** Every keyboard and mouse shortcut, by section (specs 003-064). */
 export const SHORTCUTS: readonly Shortcut[] = [
   { id: "paint", section: "Tools", keys: ["b"], action: "Paint", button: "mode-paint", hint: "Left Drag: paints the selected class\nRight Drag: removes the selected class" },
   { id: "erase", section: "Tools", keys: ["e"], action: "Erase", button: "mode-erase", hint: "Removes any label under the brush" },
@@ -28,6 +28,11 @@ export const SHORTCUTS: readonly Shortcut[] = [
   { id: "polygon-apply", section: "Tools", keys: ["Enter", "Double click"], action: "Fill the polygon" },
   { id: "polygon-back", section: "Tools", keys: ["Backspace", "Right click"], action: "Remove the last corner" },
   { id: "polygon-discard", section: "Tools", keys: ["Escape"], action: "Discard the polygon" },
+  { id: "box", section: "Tools", keys: ["r"], action: "Box", button: "mode-box" },
+  { id: "box-drag", section: "Tools", keys: ["Drag"], action: "Draw, move or resize a box" },
+  { id: "box-click", section: "Tools", keys: ["Click"], action: "Select a box (again: the next one under it)" },
+  { id: "box-delete", section: "Tools", keys: ["Delete", "Backspace"], action: "Delete the selected box" },
+  { id: "box-escape", section: "Tools", keys: ["Escape"], action: "Cancel the drag, or clear the box selection" },
   { id: "brush-smaller", section: "Brush", keys: ["["], action: "Smaller brush", button: "brush-smaller", hint: "Halves the brush (in raster pixels)." },
   { id: "brush-larger", section: "Brush", keys: ["]"], action: "Larger brush", button: "brush-larger", hint: "Doubles the brush (in raster pixels)." },
   { id: "right-erase", section: "Brush", keys: ["Right drag"], action: "Erase the selected class (Paint mode)" },
@@ -42,12 +47,12 @@ export const SHORTCUTS: readonly Shortcut[] = [
   { id: "move", section: "Navigation", keys: ["KeyW", "KeyA", "KeyS", "KeyD"], action: "Move the map" },
   { id: "middle-pan", section: "Navigation", keys: ["Middle drag"], action: "Move the map, in any mode" },
   { id: "wheel-zoom", section: "Navigation", keys: ["Mouse wheel"], action: "Zoom" },
-  { id: "undo", section: "Edit", keys: ["Mod+Z"], action: "Undo", button: "undo", hint: "Takes back the last stroke, fill or applied selection." },
+  { id: "undo", section: "Edit", keys: ["Mod+Z"], action: "Undo", button: "undo", hint: "Takes back the last stroke, fill, applied selection or box edit." },
   { id: "redo", section: "Edit", keys: ["Mod+Shift+Z", "Ctrl+Y"], action: "Redo", button: "redo", hint: "Puts back what you undid." },
 ];
 
-/** A key KEYMAP holds: not a chord ("+") or a mouse action (a space, or "Click"). */
-export const isSingleKey = (k: string) => !/[+ ]|^Click$/.test(k);
+/** A key KEYMAP holds: not a chord ("+") or a mouse action (a space, "Click" or "Drag"). */
+export const isSingleKey = (k: string) => !/[+ ]|^(Click|Drag)$/.test(k);
 
 const NAMES: Record<string, string> = { Backquote: "`", Backslash: "\\", Escape: "Esc" };
 const one = (k: string) => NAMES[k] ?? (/^Key[A-Z]$/.test(k) ? k.slice(3) : k.length === 1 ? k.toUpperCase() : k);

@@ -2,6 +2,8 @@
 
 **Status:** Approved by Gage 2026-10-31, with the recommended answers. **ADRs:** 0031 onnxruntime-web, 0032 SAM 2.1 Tiny weights (both Accepted). **Builds on specs 003, 010, 014, 019, 023, 033, 037, 038 and 039.** Amends spec 033 scope 3 (Escape) and takes up ADR 0012 option (i) for one small model. **Amended after merge (Gage, 2026-10-31):** which mask is shown, and a decode log. See Amendment A, which changes scope 6, the Interfaces and criterion 2. Amended by spec 048 (2026-11-01): there is no tile cap (ADR 0033), so scope 7's cap bullet lapses, and criterion 6's first bullet becomes "a commit touching a new tile with 256 stored labels it".
 
+**Amended by spec 064 (2026-11-12):** scope 6's slot order is now `label-`, `boxes`, `smart`, so boxes draw under the smart preview. Scope 3's Escape keeps its order: it discards a smart prompt first, then a polygon, then cancels a box drag or clears the box selection (spec 064), and only then selects Pan.
+
 **Amended by spec 055 (2026-11-11):** the weights come from Hugging Face (ADR 0035), not `npm run fetch-model`, so decision 6, scope 1 and 2, and criteria 4, 7, 8 and 11 change as spec 055 says; a load failure is one popup, `smartUnavailable`.
 
 **Amended by spec 056 (2026-11-11):** `#smart-apply` is hidden unless the mode is Smart; its `disabled` rule and Enter are unchanged.

@@ -10,12 +10,14 @@ type Deps = {
   locked: () => boolean;
   recoloured: () => void;
   selectedChanged: () => void;
+  /** A row click chose class i (after selectedChanged): spec 064 gives the selected box that class too. */
+  chosen?: (i: number) => void;
   /** A rename or Add changed the list (spec 031 saves it; the status bar shows the selected name). */
   edited: () => void;
 };
 
 /** The Classes section (specs 003, 036): the class list, the selected class, rename, recolour and Add class. */
-export function initClassPanel({ list, add, say, locked, recoloured, selectedChanged, edited }: Deps) {
+export function initClassPanel({ list, add, say, locked, recoloured, selectedChanged, chosen = () => {}, edited }: Deps) {
   const classes: LabelClass[] = initialClasses();
   let selected = 0;
   const select = (i: number) => {
@@ -25,7 +27,7 @@ export function initClassPanel({ list, add, say, locked, recoloured, selectedCha
   };
   const render = () => {
     renderClasses(list, classes, selected, locked(), {
-      select,
+      select: (i) => { select(i); chosen(i); },
       rename: (i, name) => {
         if (locked()) return classes[i]!.name;
         const ok = checkName(classes, i, name);

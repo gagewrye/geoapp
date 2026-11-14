@@ -3,20 +3,20 @@ import { deferMode } from "./deferMode";
 import { initKinds, KINDS } from "./kinds";
 import type { initLabelView } from "./labelView";
 
-const MODES: BrushMode[] = ["paint", "erase", "pan", "smart", "fill", "polygon"];
-const PAINTS: BrushMode[] = ["paint", "erase", "fill", "polygon"]; // offered together (specs 019, 054)
+const MODES: BrushMode[] = ["paint", "erase", "pan", "smart", "fill", "polygon", "box"];
+const PAINTS: BrushMode[] = ["paint", "erase", "fill", "polygon", "box"]; // offered together (specs 019, 054, 064)
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 type Deps = {
   brush: Pick<ReturnType<typeof createBrush>, "setMode" | "stroking" | "setBlocked">;
   view: Pick<ReturnType<typeof initLabelView>, "show" | "peek" | "peeking">;
-  /** The mode changed (spec 032's status bar). */
+  /** The mode or the label kind changed (spec 032's status bar, spec 064's box selection). */
   toolChanged: () => void;
   /** The Smart button was clicked: Smart is selected once its model loads (spec 046). */
   smart: () => void;
 };
 
-/** The Pan, Paint, Erase, Fill, Polygon and Smart buttons, mode keys held to a stroke's end, the peek's brush block and the label kind switch (specs 016, 033, 034, 046, 054, 062). */
+/** The Pan, Paint, Erase, Fill, Polygon, Box and Smart buttons, mode keys held to a stroke's end, the peek's brush block and the label kind switch (specs 016, 033, 034, 046, 054, 062). */
 export function initModes({ brush, view, toolChanged, smart }: Deps) {
   let mode: BrushMode = "pan";
   let noSmart = false; // no WebGPU: Smart stays off for this page's life
@@ -29,7 +29,7 @@ export function initModes({ brush, view, toolChanged, smart }: Deps) {
     for (const b of MODES) $(`mode-${b}`).setAttribute("aria-pressed", String(m === b));
     $("smart-apply").hidden = m !== "smart"; // Apply is Smart's alone (spec 056)
   };
-  const kinds = initKinds({ kinds: KINDS, mode: () => mode, setMode });
+  const kinds = initKinds({ kinds: KINDS, mode: () => mode, setMode, changed: toolChanged });
   // No tool but Pan applies to labels you can't see (specs 016, 033, 046, 054): hiding selects Pan, and each shows them first
   const choose = (m: BrushMode) => { if (m !== "pan") view.show(); setMode(m); };
   const keyed = deferMode(() => brush.stroking(), choose);
@@ -38,6 +38,7 @@ export function initModes({ brush, view, toolChanged, smart }: Deps) {
 
   return {
     mode: () => mode,
+    kind: () => kinds.kind(),
     setMode,
     /** A mode key: applies now, or when the stroke in progress ends. */
     request: keyed.request,

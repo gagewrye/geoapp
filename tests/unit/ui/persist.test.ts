@@ -21,11 +21,13 @@ function setup(opts: { confirm?: boolean } = {}) {
   let store: LabelStore = emptyStore(G.width, G.height);
   let classes: LabelClass[] = [{ name: "Class 1", colour: "#1f77b4" }, { name: "Class 2", colour: "#ff7f0e" }];
   let selected = 0, view = { opacity: 0.6, visible: true }, base: MaskBase | null = null;
-  const flags = { stroking: false };
+  const flags = { stroking: false, boxes: false };
   const restored: unknown[] = [];
-  const labels: PersistLabels = {
+  const hasMasks = () => store.tiles.size > 0 || (base?.count ?? 0) > 0;
+  // hasLabels as ui/labels gives it, which also counts boxes (spec 064); persist must read hasMasks
+  const labels: PersistLabels & { hasLabels(): boolean } = {
     store: () => store, classes: () => classes, selected: () => selected, view: () => view, base: () => base,
-    stroking: () => flags.stroking, hasLabels: () => store.tiles.size > 0 || (base?.count ?? 0) > 0,
+    stroking: () => flags.stroking, hasMasks, hasLabels: () => hasMasks() || flags.boxes,
     restoreSession(s, c, b, sel, v) { store = s; classes = c; base = b; selected = sel; view = v; restored.push({ s, c, b, sel, v }); },
   };
   const win = new EventTarget(), doc = Object.assign(new EventTarget(), { visibilityState: "visible" });
@@ -108,6 +110,16 @@ describe("debounced saves (criterion 2)", () => {
     await vi.advanceTimersByTimeAsync(SAVE_DELAY_MS); await t.p.idle();
     expect(t.fake.log).toEqual([]);
     expect(t.state.textContent).toBe("");
+    expect(t.guarded()).toBe(false);
+  });
+
+  it("with only boxes drawn, a record edit writes nothing: boxes aren't saved until spec 066 (spec 064)", async () => {
+    const t = setup();
+    await t.ready();
+    t.flags.boxes = true;
+    t.p.record(); // a class change, which reclasses a box too
+    await vi.advanceTimersByTimeAsync(SAVE_DELAY_MS); await t.p.idle();
+    expect(t.fake.log).toEqual([]);
     expect(t.guarded()).toBe(false);
   });
 });

@@ -12,8 +12,10 @@ const { auto, cancel } = vi.hoisted(() => {
 });
 vi.mock("../../../src/io/maskBase", () => ({ baseTile: () => {} }));
 vi.mock("../../../src/map/brush", () => ({ createBrush: auto }));
+vi.mock("../../../src/map/boxLayer", () => ({ boxLayer: auto }));
+vi.mock("../../../src/map/boxTool", () => ({ createBoxTool: auto }));
 vi.mock("../../../src/ui/brushSize", () => ({ initBrushSize: auto }));
-vi.mock("../../../src/ui/classPanel", () => ({ initClassPanel: auto }));
+vi.mock("../../../src/ui/classPanel", () => ({ initClassPanel: () => Object.assign(auto(), { classes: () => [] }) })); // the box layer reads its colours
 vi.mock("../../../src/ui/labelDisplay", () => ({ labelDisplay: auto }));
 vi.mock("../../../src/ui/labelKeys", () => ({ initLabelKeys: () => {}, inTextField: () => false }));
 vi.mock("../../../src/ui/labelView", () => ({ initLabelView: auto }));
