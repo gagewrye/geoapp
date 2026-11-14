@@ -172,7 +172,11 @@ export function initPersist(d: Deps) {
           await write(p.s, p.snap);
           pending = pending.filter((x) => x !== p);
         } catch (e) {
-          if (pending.includes(p)) { p.reason = reasonOf(e); if (isQuota(e)) p.snap = withoutCopy(p.snap); }
+          if (pending.includes(p)) {
+            p.reason = reasonOf(e);
+            // as for the open raster: the copy is left out after a quota error or COPY_RETRIES failed retries
+            if (isQuota(e) || (e instanceof CopyFailed && ++p.s.copyFails > COPY_RETRIES)) p.snap = withoutCopy(p.snap);
+          }
           if (s && snap) lost(s, snap, e);
           retryLater();
           return reasonOf(e);

@@ -247,3 +247,18 @@ describe("an export covering unsaved changes (scope 6)", () => {
     expect(r).toMatchObject({ savedAt: 5000, exportedAt: 5000 });
   });
 });
+
+describe("a previous raster's pending copy (scope 3)", () => {
+  it("is retried at most 3 times too, then its record is saved without it", async () => {
+    const t = setup();
+    let calls = 0;
+    t.fake.store.saveBase = async () => { calls++; throw new DOMException("The file changed.", "NotReadableError"); };
+    await t.open();
+    await t.importMask(5, "0,0", 1);
+    t.p.open("b.tif", SIZE + 1, G); // saved at once, and its copy fails: pending
+    await t.p.idle(); await t.p.offer();
+    for (let ms = 0; ms < 10 * 60_000; ms += 5000) await t.flush(5000);
+    expect(calls).toBeLessThanOrEqual(4);
+    expect(t.fake.records.get(KEY)!.base!.copyMissing).toBe(true);
+  });
+});
