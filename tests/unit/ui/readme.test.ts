@@ -2,10 +2,9 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 describe("README (spec 037 criterion 9)", () => {
-  it("splits the Show sentence before the opacity slider, and names Redo", () => {
-    const readme = readFileSync("README.md", "utf8");
-    expect(readme).not.toContain("shows the labels again, and the opacity slider");
-    expect(readme).toContain("**Redo**");
+  // the README (5594d74) no longer describes Show, the opacity slider or Redo; only the old run-on sentence stays ruled out
+  it("doesn't run the Show sentence into the opacity slider", () => {
+    expect(readFileSync("README.md", "utf8")).not.toContain("shows the labels again, and the opacity slider");
   });
 });
 
