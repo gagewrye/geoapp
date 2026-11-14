@@ -40,7 +40,7 @@
   - `folderSink(dir, name): Promise<Sink & { size(): Promise<number> }>`.
   - `downloadSink(name): Promise<Sink>`.
   - `sameFile(a: FileSystemHandle | null, b: FileSystemHandle): Promise<boolean>`.
-- `ui/seeding.ts` keeps the import's handle (spec 053's picker) next to the base. `ui/labels.ts` gains `useCopy(prev: MaskBase, file: LabelSource): boolean`, which swaps the file only while `base === prev`.
+- `ui/seeding.ts` keeps the import's handle (spec 053's picker) next to the base. `io/maskBase.ts` gains `useCopy(live: MaskBase | null, prev: MaskBase, file: LabelSource): boolean`, which swaps the file only while `live === prev` (main passes `labels.base()`).
 
 ## Acceptance criteria
 1. **Unit:** `exportName` gives `"a"`→`a.tif`, `"a.TIF"`→`a.TIF`, `" b.tif "`→`b.tif`, and null for `""`, `"x/y"`, `"x\\y"`, `"a:b"`, `"con"`. `targetAction` covers all 16 input combinations as scope 3 says.
