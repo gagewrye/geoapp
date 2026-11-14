@@ -74,6 +74,8 @@ export function initPersist(d: Deps) {
   });
   const store = () => (db ??= d.open().then(watched));
   let current: Session | null = null;
+  // a restore that laid a stray's import over reads the user's own file: never swapped for the copy (spec 055 scope 3)
+  let adopted: { base: MaskBase; file: Blob } | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let applying = false, guarded = false;
   const q = saveQueue({ store, current: () => current, save: () => save(false), sync: () => sync(), now, yieldTask, time, say: d.say, persistStorage: d.persistStorage });
@@ -147,6 +149,7 @@ export function initPersist(d: Deps) {
       // after the writes on the way, so the offer sees them (and their failures, kept as strays); a failed lookup counts as no session
       s.lookup = q.idle().then(store).then((db) => db.forRaster(raster)).catch(() => []).then((r) => { s.settled = true; s.found = r.length > 0; return r; });
       current = s;
+      adopted = null;
       sync();
       return true;
     },
@@ -172,6 +175,7 @@ export function initPersist(d: Deps) {
         const mine = loose.filter((p) => p.snap.id === r.id);
         const { tiles, base, missing, record: v } = mine.length ? await adopt(s, mine, loaded, openBase) : { ...loaded, record: r };
         q.forget(mine);
+        adopted = mine.length && base && s.file ? { base, file: s.file } : null;
         applying = true;
         try {
           labels.restoreSession({ width: s.grid.width, height: s.grid.height, tiles, base: base !== null }, v.classes, base, v.selected, { opacity: v.opacity, visible: v.visible });
@@ -267,6 +271,8 @@ export function initPersist(d: Deps) {
       s.record = true;
       save(false);
     },
+    /** The user's file the restored base reads in place of a copy (a stray's import), while it is the base; else null. */
+    maskUncopied: (): Blob | null => (adopted && labels.base() === adopted.base ? adopted.file : null),
     /** The saves started so far have ended (tests). */
     idle: () => q.idle(),
   };

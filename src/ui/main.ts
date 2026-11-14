@@ -80,7 +80,7 @@ const seeding = initSeeding({ labels, imagery: () => source, folder: () => folde
   opened: (f) => testHook("labelFile", f), session: {
     // ADR 0036: once the copy is written whole, the mask is read from it, never the user's file again
     imported: (f, base) => persist.imported(f, async (copy) => { labels.useCopy(base, await openLabelFile(copy)); }),
-    replaceRefused: persist.replaceRefused, flush: persist.flush, waitCopy: persist.waitCopy, exported: persist.exported,
+    replaceRefused: persist.replaceRefused, flush: persist.flush, waitCopy: persist.waitCopy, exported: persist.exported, maskUncopied: persist.maskUncopied,
   } });
 // letters type in text fields and pick options in selects, so WASD leaves them alone (spec 009)
 const nav = createNavigation(map, { typing: (el) => inTextField(el) || el instanceof HTMLSelectElement, stroking: labels.stroking });

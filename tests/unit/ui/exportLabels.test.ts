@@ -3,7 +3,7 @@ import { initialClasses } from "../../../src/core/classes";
 import { emptyStore } from "../../../src/core/labelStore";
 import { checkLabelExport } from "../../../src/io/labelExport";
 import type { MaskBase } from "../../../src/io/maskBase";
-import { runExport, type ExportDeps } from "../../../src/ui/exportLabels";
+import { maskTarget, runExport, type ExportDeps } from "../../../src/ui/exportLabels";
 import { MESSAGES } from "../../../src/ui/messages";
 import { fakeFolder } from "../helpers/fakeFolder";
 import { fakeSource } from "../helpers/sources";
@@ -139,5 +139,32 @@ describe("a write that fails (criterion 3)", () => {
     await t.run();
     expect(t.said.at(-1)).toEqual([MESSAGES.exportShort("labels.tif", 5, TOTAL), "error"]);
     expect(t.exports).toEqual([]);
+  });
+});
+
+describe("the mask Export refuses (spec 055 scope 3)", () => {
+  const base = (file: unknown) => ({ file }) as unknown as MaskBase;
+  const known = { handle: null, name: "mask.tif", size: 9 };
+
+  it("is this page's import while the base is it, copied once the base reads another file", () => {
+    const b = base("own");
+    expect(maskTarget({ known, base: b, source: b.file }, b, null)).toEqual({ ...known, copied: false });
+    const swapped = base("copy");
+    expect(maskTarget({ known, base: swapped, source: "own" as never }, swapped, null)).toEqual({ ...known, copied: true });
+  });
+
+  it("is a restored base's file that it still reads, uncopied, though this page imported another mask", () => {
+    const own = base("own"), restored = base("user file");
+    const f = new File([new Uint8Array(7)], "mask.tif");
+    expect(maskTarget({ known, base: own, source: own.file }, restored, f)).toEqual({ handle: null, name: "mask.tif", size: 7, copied: false });
+    expect(maskTarget(null, restored, f)).toEqual({ handle: null, name: "mask.tif", size: 7, copied: false });
+    expect(maskTarget(null, restored, null)).toBe(null);
+  });
+
+  it("refuses an export named as that restored mask", async () => {
+    const t = setup(fakeFolder({ "mask.tif": new Uint8Array(7) }), { answer: "mask.tif", mask: () => maskTarget(null, base("x"), new File([new Uint8Array(7)], "mask.tif")) });
+    await t.run();
+    expect(t.said.at(-1)).toEqual([MESSAGES.exportMask, "error"]);
+    expect(t.confirms).toEqual([]);
   });
 });
