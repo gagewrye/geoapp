@@ -1,6 +1,6 @@
 # 072: Every e2e test runs in 15 s or less on CI
 
-**Status:** Accepted under Gage's standing rule (2026-11-12): "Keep this as a rule for testing. I want quick iterations since this is not a production system currently." **ADRs:** none. **Builds on:** spec 052 (precedent), spec 071 (its helpers `labelsIn`, `labelCount` and `overlaysIdle`, and its tests). **Lands after:** spec 071. Scope items 1 and 2 come first. The CI timeout (criterion 6) is this spec's last commit. The table runs past one page because it lists every test.
+**Status:** Accepted under Gage's standing rule (2026-11-12): "Keep this as a rule for testing. I want quick iterations since this is not a production system currently." **ADRs:** none. **Builds on:** spec 052 (precedent), spec 071 (its helpers `labelsIn`, `labelCount` and `overlaysIdle`, and its tests). **Lands after:** spec 071. Scope items 1 and 2 come first. Criteria 3 and 6 (the 15 s target and the CI timeout) moved to spec 074 (Gage, 2026-11-14). The table runs past one page because it lists every test.
 
 **Shrunk by spec 073 (2026-11-12; order 061 → 062 → 073 → 071 → 072).**
 - **Superseded rows,** deleted by 073:
@@ -49,6 +49,24 @@ Per fixture, two cases per run, in ms: building the fixture in Node, the open, `
 - **label-edit 10** opens `rgbStrip`, the old Float32 strip. Opening a raster the raw reader reads leaves geotiff.js's `raw` and `basedecoder` chunks to the first label import, which fetches them from the app's origin. Criterion 19 counts those requests. This is app behaviour, not changed here.
 - **Also over 15 s during the build, added under the standing rule:** `label-import` 40, split into formats and grids.
 - **Why 15 s isn't met yet:** on CI, two workers share 4 vCPUs on SwiftShader. Creating a browser context takes 2–9 s while the other worker runs, and about 0 s once it has finished. A test's own work runs 4–8 times slower than on a quiet laptop. The slowest tests come out at 13–21 s in each run, and a different few go over 15 s each time. Criterion 3 needs Gage to decide between finer splits and a change to ADR 0036's shards or workers. Criterion 6's timeout is not committed until then.
+
+## Result and Gage's decision (amendment, 2026-11-14, PR #16)
+**Per-test CI times:**
+- **Before:** 29 tests over 15 s.
+- **After:** 3–9 tests over 15 s in each CI run, at 15–26 s. Which tests they are changes from run to run.
+- **The cause:** shared CPU, not the tests. On CI each shard runs 2 workers on 4 vCPUs with SwiftShader. "Create context" takes 2–9 s while the other worker is busy (0–1 s alone), and test work runs 4–8× slower than on the laptop (`label-replace` 73: 2.8 s locally, 22.7 s on CI).
+
+**Gage (2026-11-14): "Merge, then 1 browser/job".**
+- **Criterion 3** (every test ≤ 15 s in 3 runs) and **criterion 6** (the 15 s CI timeout and its `ci.test.ts` checks) move to spec 074, which runs 1 worker per CI job across 8 shards.
+- 072 merges with criteria 1, 2, 4, 5 and 7, its speed-ups and Step 0's fixtures.
+- The CLAUDE.md standing text below is applied when 074 commits the timeout.
+
+**A deviation, kept out of scope:** `label-edit` 10 opens `rgbStrip` (the old Float32 strip), not the new default fixture (see Build notes).
+- Opening a raster that the raw reader reads leaves geotiff.js's `raw` and `basedecoder` chunks to the first label import, which fetches them from the app's origin.
+- Criterion 19 of spec 004 counts those requests, so the test depends on which chunks have already loaded.
+
+## Follow-up questions (not in scope)
+1. **geotiff.js chunk loading:** should the app load geotiff.js's decoder chunks at the open, so the first import makes no requests and `label-edit` 10 can use the default fixture? That would change app behaviour, so it needs its own spec. Or should criterion 19 count only cross-origin requests?
 
 ## Open questions
 1. **Which fixture is the cheap default?** Step 0 decides by measurement (see Levers). The implementer records the result in this spec as an amendment before changing any test.
@@ -105,18 +123,18 @@ Line numbers are from the working tree on 2026-11-13. The implementer rechecks t
 2. **The prefetch test is deterministic (scope item 2).**
    - `labelDisplay.test.ts` "waits for queued quad prefetches" uses no real timer, frame, idle callback or clock. Its fakes and stubs cover all of them, and the commit names the wait it found.
    - It passes 20 times in a row with `--repeat=20`, run alongside the other 2 files of the failing run while the CPU is busy. Its timeout is unchanged.
-3. **Every listed test, and every test split from one, runs in ≤ 15 s on CI** in each of 3 consecutive runs of this spec's PR, read from a CI JSON report. The rest of the suite stays under 15 s too.
+3. *Moved to spec 074 (Gage, 2026-11-14).* **Every listed test, and every test split from one, runs in ≤ 15 s on CI** in each of 3 consecutive runs of this spec's PR, read from a CI JSON report. The rest of the suite stays under 15 s too.
 4. **The criteria are kept.**
    - Each test, or the set of tests split from it, keeps every assertion of its original.
    - A split test's titles name the original criterion.
    - The reviewer checks both against the diff.
    - `--list` shows each split as its listed parts.
 5. **No fixed waits** in the changed tests: no `waitForTimeout`, and no `labels(page)` (checked by grep in those files). Step 0's timings are recorded in this spec.
-6. **The rule is enforced.**
+6. *Moved to spec 074 (Gage, 2026-11-14).* **The rule is enforced.**
    - `playwright.config.ts` sets `timeout: process.env.CI ? 15_000 : 60_000`.
    - No file in `tests/e2e/` calls `test.setTimeout` above 15,000.
    - A `tests/unit/ci.test.ts` assertion checks both.
-7. **Docs:** a CHANGELOG entry, and README's Develop section notes the 15 s limit.
+7. **Docs:** a CHANGELOG entry. README's note of the 15 s limit moves to spec 074, with the timeout.
 
 ## Standing text for CLAUDE.md (Gage replaces lines 38–39 with this; it merges spec 071's text)
 > - Every e2e test runs in 15 s or less on CI; Playwright's CI timeout enforces it. A test that times out or runs slower is a badly made test, whatever the PR changed: the implementer refactors or splits it (cheaper fixture, read only what it checks, wait on app state or events rather than time or pixels, or independent smaller tests). Never skip, tag out or retry it. Fix it in the same PR if it is one or two tests; otherwise escalate to Gage.
