@@ -36,30 +36,46 @@ const selected = (page: Page) => page.locator("#classes li[aria-selected=true]")
 
 // Criterion 6 is split in three (spec 072): each part has one Saved and one reload.
 test("criterion 6, tiles: paint; after Saved and a reload, accepting the restore brings back the tiles; paint still works", async ({ page }) => {
+  const T0 = Date.now(); // TEMPORARY
   const log = dialogs(page);
+  console.log("T", Date.now() - T0, 'const log = dialogs(page);'); // TEMPORARY
   await openApp(page);
+  console.log("T", Date.now() - T0, 'await openApp(page);'); // TEMPORARY
   await open(page);
+  console.log("T", Date.now() - T0, 'await open(page);'); // TEMPORARY
   await paintMode(page);
+  console.log("T", Date.now() - T0, 'await paintMode(page);'); // TEMPORARY
   await paintOne(page);
+  console.log("T", Date.now() - T0, 'await paintOne(page);'); // TEMPORARY
   await saved(page);
+  console.log("T", Date.now() - T0, 'await saved(page);'); // TEMPORARY
   const tiles = await storeTiles(page);
+  console.log("T", Date.now() - T0, 'const tiles = await storeTiles(page);'); // TEMPORARY
   expect(tiles.size).toBeGreaterThan(0);
 
   await reload(page);
+  console.log("T", Date.now() - T0, 'await reload(page);'); // TEMPORARY
   expect(log).toEqual([]); // nothing unsaved: no beforeunload
   await open(page, { ...rgbFixture(), name: "renamed.tif" });
+  console.log("T", Date.now() - T0, 'await open(page, { ...rgbFixture(), name: "renamed'); // TEMPORARY
   await expect(message(page)).toHaveText("Labels restored.");
+  console.log("T", Date.now() - T0, 'await expect(message(page)).toHaveText("Labels res'); // TEMPORARY
   expect(log).toHaveLength(1);
   expect(log[0]).toMatch(/^confirm: /);
   expect(log[0]!.slice(9)).toMatch(restorePrompt);
   const back = await storeTiles(page);
+  console.log("T", Date.now() - T0, 'const back = await storeTiles(page);'); // TEMPORARY
   expect([...back.keys()].sort()).toEqual([...tiles.keys()].sort());
   for (const [k, t] of tiles) expect(Buffer.from(back.get(k)!).equals(Buffer.from(t)), k).toBe(true);
 
   await paintMode(page);
+  console.log("T", Date.now() - T0, 'await paintMode(page);'); // TEMPORARY
   await jumpTo(page, [15, 45], 6);
+  console.log("T", Date.now() - T0, 'await jumpTo(page, [15, 45], 6);'); // TEMPORARY
   const a = await toScreen(page, [15.005, 47.005]);
+  console.log("T", Date.now() - T0, 'const a = await toScreen(page, [15.005, 47.005]);'); // TEMPORARY
   await stroke(page, [a, { x: a.x + 40, y: a.y }]);
+  console.log("T", Date.now() - T0, 'await stroke(page, [a, { x: a.x + 40, y: a.y }]);'); // TEMPORARY
   expect((await tileKeysStored(page)).length).toBeGreaterThan(tiles.size);
 });
 
