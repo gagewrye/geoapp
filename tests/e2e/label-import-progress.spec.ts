@@ -3,7 +3,7 @@ import { writeFile } from "../unit/helpers/labelFiles";
 import { MESSAGES } from "../../src/ui/messages";
 import { rgbClassFile } from "../unit/helpers/labelFiles";
 import { collectErrors, jumpTo, message, openApp, openRaster, paintMode, path, RGB_GRID, rgbFixture, stroke, tileKeysStored, toScreen } from "./helpers";
-import { at, classList, download, effectiveTiles, importFile, maskFile, noSavePicker, upload } from "./seeding";
+import { at, classList, effectiveTiles, importFile, maskFile, upload } from "./seeding";
 
 // Spec 021 criteria 2-8: the import's bar and Cancel, the old labels off the map while it runs, and restores.
 
@@ -165,11 +165,15 @@ test("a read failure partway and an empty import restore the old labels, with th
 
 test("opening a raster during an import asks to discard: OK leaves no labels, bar or message; Cancel lets it finish (criterion 7)", async ({ page }) => {
   test.setTimeout(120_000);
-  await noSavePicker(page);
+  // Export writes into an OPFS folder: a download never marks the session exported (spec 056 scope 6)
+  await page.addInitScript(() => {
+    (window as any).showDirectoryPicker = async () => (await navigator.storage.getDirectory()).getDirectoryHandle("export", { create: true });
+  });
   await withLabels(page);
   // exported, so the second import below may drop them once the first keeps them as the replaced session (spec 056)
-  await download(page, "#export-labels");
-  await expect(message(page)).toHaveText("Labels exported.");
+  page.once("dialog", (d) => { void d.accept(d.defaultValue()); }); // the name prompt's labels.tif
+  await page.click("#export-labels");
+  await expect(message(page)).toHaveText(/^Labels exported to labels\.tif /);
   await startImport(page, other());
   await allow(page, 2);
   await expect.poll(() => barValue(page)).toBe("2");

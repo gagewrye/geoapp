@@ -31,11 +31,12 @@ export type ExportDeps = {
   now?: () => number;
 };
 
-/** Whether the target is this known file: isSameEntry with a handle, else the same name and size. */
+/** Whether the target is this known file: isSameEntry with a handle, or the same name in any case and the same size. */
+// Windows folders ignore case, so ORTHO.tif opens ortho.tif; isSameEntry alone may not see that, so both checks run
 async function isFile(known: KnownFile | null, target: FileSystemFileHandle): Promise<boolean> {
   if (!known) return false;
-  if (known.handle) return sameFile(known.handle, target);
-  return target.name === known.name && (await target.getFile()).size === known.size;
+  if (known.handle && await sameFile(known.handle, target)) return true;
+  return target.name.toLowerCase() === known.name.toLowerCase() && (await target.getFile()).size === known.size;
 }
 
 /** The folder sink for a checked target; null when the user picks nothing, cancels, or the target is refused (said). */
@@ -83,7 +84,8 @@ export async function runExport(d: ExportDeps): Promise<void> {
     }
     const size = await sink.size().catch(() => -1); // the file is replaced by now: no "Nothing was overwritten"
     if (size !== totalBytes) { d.say(MESSAGES.exportShort(name ?? "labels.tif", size, totalBytes), "error"); return; }
-    d.exported(now());
+    // a download may still be cancelled or lost, so only a file written into the folder marks the session exported
+    if (name) d.exported(now());
     d.say(name ? MESSAGES.exportedTo(name, size) : "Labels exported.");
   } catch (e) {
     d.say(`${maskReadFailed(e) ? MESSAGES.maskGone : d.error(e)} ${MESSAGES.nothingOverwritten}`, "error");

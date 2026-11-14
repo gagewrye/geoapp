@@ -23,6 +23,8 @@ export type Session = {
   tiles: Set<string>; record: boolean; clear: boolean; file: Blob | null;
   /** Something besides an export changed since the last snapshot, so the next save is a new savedAt. */
   touched: boolean;
+  /** When the labels last changed (besides an export), saved or not: a replaced session is exported only if after it. */
+  lastChange: number;
   savedAt: number | null; exportedAt: number | null;
   demote: string | null; drop: string | null;
   /** The mask copy is left out until the next import: a quota error, or COPY_RETRIES failed retries (specs 032, 056). */
@@ -48,5 +50,5 @@ export const reasonOf = (e: unknown) => isQuota(e) ? "the browser's storage is f
 export const newSession = (raster: string, name: string, grid: Grid): Session => ({
   raster, name, grid, id: raster, replaced: null, lookup: Promise.resolve([]), settled: false, found: false, ready: false, owned: false, kept: false,
   tiles: new Set(), record: false, clear: false, file: null, touched: false, savedAt: null, exportedAt: null, demote: null, drop: null,
-  noCopy: false, copyFails: 0, copied: true, failed: null,
+  noCopy: false, copyFails: 0, copied: true, failed: null, lastChange: 0,
 });

@@ -91,7 +91,7 @@ export function initPersist(d: Deps) {
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => { timer = null; save(false); }, SAVE_DELAY_MS);
   }
-  const changed = (s: Session) => { s.touched = true; if (s.ready) schedule(); sync(); };
+  const changed = (s: Session) => { s.touched = true; s.lastChange = now(); if (s.ready) schedule(); sync(); };
 
   /** Copies what changed in s now; null when nothing did or it may not save yet. */
   function take(s: Session): Snapshot | null {
@@ -295,7 +295,8 @@ export function initPersist(d: Deps) {
         // replaceRefused keeps an unexported one from getting here; were one to, it stays, as a second replaced session
         if (old && exportedSince(old)) s.drop = old.id;
         s.demote = s.id;
-        s.replaced = { id: s.id, savedAt: s.savedAt ?? now(), exportedAt: s.exportedAt };
+        // its last change, saved or not (a flush may still be writing, or have failed): spec 056 drops it only if exported after
+        s.replaced = { id: s.id, savedAt: Math.max(s.savedAt ?? now(), s.lastChange), exportedAt: s.exportedAt };
         if (s.failed) {
           pending.push({ s, snap: { ...s.failed, record: { ...s.failed.record, role: "replaced" } }, reason: failed || "not saved yet" });
           s.failed = null;
@@ -333,7 +334,7 @@ export function initPersist(d: Deps) {
       const s = current;
       if (!s || !s.ready) return;
       s.exportedAt = at;
-      if (s.touched) { s.touched = false; s.savedAt = at; }
+      if (s.touched) { s.touched = false; s.savedAt = at; s.lastChange = Math.min(s.lastChange, at); }
       s.record = true;
       save(false);
     },
