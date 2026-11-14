@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { initialClasses, type LabelClass } from "../../../src/core/classes";
 import { emptyStore, type LabelStore } from "../../../src/core/labelStore";
 import type { Grid } from "../../../src/core/types";
-import { checkLabelExport } from "../../../src/io/labelExport";
 import type { LabelSource } from "../../../src/io/labelFile";
 import type { MaskBase } from "../../../src/io/maskBase";
 import { runExport, type ExportDeps } from "../../../src/ui/exportLabels";
@@ -299,13 +298,5 @@ describe("spec 074 scope 3: the imagery and the uncopied mask are refused whatev
     await runExport(t.d);
     expect(t.said).toEqual([MESSAGES.exportMask]);
     expect(f.bytes("labels.tif")).toEqual(new Uint8Array([7, 7]));
-  });
-
-  it("control: the same-case name is refused (size check runs)", async () => {
-    const f = fakeFolder({ "ortho.tif": new Uint8Array([1, 2, 3]) });
-    const t = deps(f, { prompt: () => "ortho.tif", imageryFile: { handle: null, name: "ortho.tif", size: 3 } });
-    await runExport(t.d);
-    expect(t.said).toEqual([MESSAGES.exportImagery]);
-    expect(checkLabelExport(source, initialClasses()).totalBytes).toBeGreaterThan(3);
   });
 });

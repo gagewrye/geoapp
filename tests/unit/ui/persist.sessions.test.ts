@@ -510,7 +510,7 @@ describe("a current session and two replaced ones, R1 older than R2 (spec 075 cr
   });
 });
 
-describe("tester: maskUncopied never goes stale (spec 074 scope 3)", () => {
+describe("maskUncopied never goes stale (spec 074 scope 3)", () => {
   async function restoredStray() {
     const t = setup(fakeSessionStore(), []);
     let release!: () => void;
