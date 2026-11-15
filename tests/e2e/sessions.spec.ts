@@ -72,6 +72,26 @@ async function importAThenB(page: Page, dialogs: ReturnType<typeof answer>, pain
   return { a, counts };
 }
 
+// Spec 074: a shard's first test also starts the browser, so the cheapest test runs first.
+test("a third import with the replaced labels not exported is refused and changes no labels", async ({ page }) => {
+  const dialogs = answer(page);
+  await openApp(page);
+  await openRaster(page, rgbFixture());
+  await expect(message(page)).toHaveText("Raster opened.");
+  await importFile(page, maskFile());
+  await expect(message(page)).toHaveText(/^Seeded /);
+  dialogs.then(true); // the import saves the first mask's session before it replaces it (spec 075)
+  await importFile(page, maskB());
+  await expect(message(page)).toHaveText(/^Seeded /);
+  await saved(page);
+  const b = await effectiveTiles(page);
+  const asked = dialogs.log.length;
+  await importFile(page, maskFile());
+  await expect(message(page)).toHaveText(MESSAGES.replacedFirst);
+  expect(dialogs.log.length).toBe(asked); // refused before spec 017's confirm
+  expect(tileDiff(await effectiveTiles(page), b)).toEqual([]);
+});
+
 test("import A, paint, import B, paint; reopening, Cancel then OK on '…instead?' shows A, with B kept as replaced", async ({ page }) => {
   const dialogs = answer(page);
   const { a, counts } = await importAThenB(page, dialogs);
@@ -95,23 +115,4 @@ test("after the '…instead?' swap, a reload, open and accept restores A again, 
   expect(dialogs.log.at(-1)).toMatch(/^Restore labels saved .+ for rgb4326\.tif\?$/);
   expect(tileDiff(await effectiveTiles(page), a)).toEqual([]);
   expect(await roles(page)).toEqual({ current: counts.replaced, replaced: counts.current });
-});
-
-test("a third import with the replaced labels not exported is refused and changes no labels", async ({ page }) => {
-  const dialogs = answer(page);
-  await openApp(page);
-  await openRaster(page, rgbFixture());
-  await expect(message(page)).toHaveText("Raster opened.");
-  await importFile(page, maskFile());
-  await expect(message(page)).toHaveText(/^Seeded /);
-  dialogs.then(true); // the import saves the first mask's session before it replaces it (spec 075)
-  await importFile(page, maskB());
-  await expect(message(page)).toHaveText(/^Seeded /);
-  await saved(page);
-  const b = await effectiveTiles(page);
-  const asked = dialogs.log.length;
-  await importFile(page, maskFile());
-  await expect(message(page)).toHaveText(MESSAGES.replacedFirst);
-  expect(dialogs.log.length).toBe(asked); // refused before spec 017's confirm
-  expect(tileDiff(await effectiveTiles(page), b)).toEqual([]);
 });
