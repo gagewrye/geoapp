@@ -45,21 +45,25 @@ async function reopen(page: Page) {
   await openRaster(page, rgbFixture());
 }
 
-/** Imports mask A and paints, then mask B (OK on Replace labels?) and paints, then waits for Saved; A's tiles and the role counts. */
-async function importAThenB(page: Page, dialogs: ReturnType<typeof answer>) {
+/** Imports mask A and paints, then mask B (OK on Replace labels?) and paints, then waits for Saved; A's tiles and the role counts. paint false skips both strokes: the masks alone differ (spec 074). */
+async function importAThenB(page: Page, dialogs: ReturnType<typeof answer>, paint = true) {
   await openApp(page);
   await openRaster(page, rgbFixture());
   await expect(message(page)).toHaveText("Raster opened.");
   await importFile(page, maskFile());
   await expect(message(page)).toHaveText(/^Seeded /);
-  await paintMode(page);
-  await paintAt(page, 400, 400);
+  if (paint) {
+    await paintMode(page);
+    await paintAt(page, 400, 400);
+  }
   const a = await effectiveTiles(page);
   dialogs.then(true); // Replace labels? Then the import saves A's last changes as A's, before it replaces them (spec 075)
   await importFile(page, maskB());
   await expect(message(page)).toHaveText(/^Seeded /);
-  await paintMode(page);
-  await paintAt(page, 600, 300);
+  if (paint) {
+    await paintMode(page);
+    await paintAt(page, 600, 300);
+  }
   await saved(page);
   const b = await effectiveTiles(page);
   expect(tileDiff(a, b).length).toBeGreaterThan(0);
@@ -68,31 +72,7 @@ async function importAThenB(page: Page, dialogs: ReturnType<typeof answer>) {
   return { a, counts };
 }
 
-test("import A, paint, import B, paint; reopening, Cancel then OK on '…instead?' shows A, with B kept as replaced", async ({ page }) => {
-  const dialogs = answer(page);
-  const { a, counts } = await importAThenB(page, dialogs);
-  dialogs.then(false, true); // Cancel the restore, then OK "…instead?"
-  await reopen(page);
-  await expect(message(page)).toHaveText("Labels restored.");
-  expect(dialogs.log.at(-1)).toMatch(/^Restore the labels replaced on .+ instead\? The newer labels are kept\.$/);
-  expect(tileDiff(await effectiveTiles(page), a)).toEqual([]);
-  expect(await roles(page)).toEqual({ current: counts.replaced, replaced: counts.current });
-});
-
-test("after the '…instead?' swap, a reload, open and accept restores A again, with B still stored as replaced", async ({ page }) => {
-  const dialogs = answer(page);
-  const { a, counts } = await importAThenB(page, dialogs);
-  dialogs.then(false, true); // the swap: Cancel the restore, then OK "…instead?"
-  await reopen(page);
-  await expect(message(page)).toHaveText("Labels restored.");
-  dialogs.then(true);
-  await reopen(page);
-  await expect(message(page)).toHaveText("Labels restored.");
-  expect(dialogs.log.at(-1)).toMatch(/^Restore labels saved .+ for rgb4326\.tif\?$/);
-  expect(tileDiff(await effectiveTiles(page), a)).toEqual([]);
-  expect(await roles(page)).toEqual({ current: counts.replaced, replaced: counts.current });
-});
-
+// Spec 074: a shard's first test also starts the browser, so the cheapest test runs first.
 test("a third import with the replaced labels not exported is refused and changes no labels", async ({ page }) => {
   const dialogs = answer(page);
   await openApp(page);
@@ -110,4 +90,29 @@ test("a third import with the replaced labels not exported is refused and change
   await expect(message(page)).toHaveText(MESSAGES.replacedFirst);
   expect(dialogs.log.length).toBe(asked); // refused before spec 017's confirm
   expect(tileDiff(await effectiveTiles(page), b)).toEqual([]);
+});
+
+test("import A, paint, import B, paint; reopening, Cancel then OK on '…instead?' shows A, with B kept as replaced", async ({ page }) => {
+  const dialogs = answer(page);
+  const { a, counts } = await importAThenB(page, dialogs);
+  dialogs.then(false, true); // Cancel the restore, then OK "…instead?"
+  await reopen(page);
+  await expect(message(page)).toHaveText("Labels restored.");
+  expect(dialogs.log.at(-1)).toMatch(/^Restore the labels replaced on .+ instead\? The newer labels are kept\.$/);
+  expect(tileDiff(await effectiveTiles(page), a)).toEqual([]);
+  expect(await roles(page)).toEqual({ current: counts.replaced, replaced: counts.current });
+});
+
+test("after the '…instead?' swap, a reload, open and accept restores A again, with B still stored as replaced", async ({ page }) => {
+  const dialogs = answer(page);
+  const { a, counts } = await importAThenB(page, dialogs, false); // test 71 paints; this one checks the swap survives a reload (spec 074)
+  dialogs.then(false, true); // the swap: Cancel the restore, then OK "…instead?"
+  await reopen(page);
+  await expect(message(page)).toHaveText("Labels restored.");
+  dialogs.then(true);
+  await reopen(page);
+  await expect(message(page)).toHaveText("Labels restored.");
+  expect(dialogs.log.at(-1)).toMatch(/^Restore labels saved .+ for rgb4326\.tif\?$/);
+  expect(tileDiff(await effectiveTiles(page), a)).toEqual([]);
+  expect(await roles(page)).toEqual({ current: counts.replaced, replaced: counts.current });
 });

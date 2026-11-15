@@ -1,4 +1,4 @@
-# Spec 060, ADR 0036: check, then the full e2e suite in 4 shards, then one summary check to gate merges on.
+# Spec 060, ADR 0036: check, then the full e2e suite in 8 shards of 1 worker each (spec 074), then one summary check to gate merges on.
 name: ci
 
 on:
@@ -34,7 +34,7 @@ jobs:
       # every shard finishes, so one red run lists all the failures (spec 060 amendment)
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -44,7 +44,7 @@ jobs:
       - run: npm ci
       # browsers aren't cached: Playwright's docs advise against it (a restore takes about as long as the download)
       - run: npx playwright install --with-deps chromium
-      - run: npx playwright test --shard=${{ matrix.shard }}/4
+      - run: npx playwright test --shard=${{ matrix.shard }}/8
       - if: failure()
         uses: actions/upload-artifact@v5
         with:

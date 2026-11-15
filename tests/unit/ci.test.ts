@@ -45,16 +45,16 @@ describe("ci.yml jobs (spec 060 criterion 2)", () => {
     expect(check.indexOf("run: npm run check")).toBeGreaterThan(check.indexOf("run: npm ci"));
   });
 
-  it("e2e needs check and runs 4 shards of Playwright on Chromium", () => {
+  it("e2e needs check and runs 8 shards of Playwright on Chromium (spec 074 criterion 1)", () => {
     const e2e = job("e2e");
     expect(e2e).toContain("needs: check");
     expect(e2e).toContain("runs-on: ubuntu-latest");
-    expect(e2e).toContain("shard: [1, 2, 3, 4]");
+    expect(e2e).toContain("shard: [1, 2, 3, 4, 5, 6, 7, 8]");
     expect(e2e).toMatch(/strategy:\n(?: {6}#.*\n)? {6}fail-fast: false\n/); // a failing shard doesn't cancel the others
     expect(e2e).toContain("timeout-minutes: 30");
     expect(e2e).toContain("run: npx playwright install --with-deps chromium");
-    expect(e2e).toContain("run: npx playwright test --shard=${{ matrix.shard }}/4");
-    expect(yml.match(/--shard=[^\n]*/g)).toEqual(["--shard=${{ matrix.shard }}/4"]);
+    expect(e2e).toContain("run: npx playwright test --shard=${{ matrix.shard }}/8");
+    expect(yml.match(/--shard=[^\n]*/g)).toEqual(["--shard=${{ matrix.shard }}/8"]);
   });
 
   it("uploads the report only when a shard fails", () => {
@@ -83,7 +83,7 @@ describe("ci.yml jobs (spec 060 criterion 2)", () => {
   });
 });
 
-describe("playwright config (spec 060 criteria 3-4)", () => {
+describe("playwright config (spec 060 criteria 3-4, spec 074 criterion 2)", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.resetModules();
@@ -98,15 +98,17 @@ describe("playwright config (spec 060 criteria 3-4)", () => {
     expect(config.retries).toBeUndefined();
     expect(config.forbidOnly).toBeUndefined();
     expect(config.globalTimeout).toBeUndefined();
+    expect(config.timeout).toBe(60_000);
   });
 
-  it("on CI forbids .only, never retries, stops at 25 min and writes dot and html reports", async () => {
+  it("on CI uses 1 worker, forbids .only, never retries, stops at 25 min and writes dot and html reports", async () => {
     vi.stubEnv("CI", "true");
     const config = (await import("../../playwright.config")).default;
-    expect(config.workers).toBe(2);
+    expect(config.workers).toBe(1); // spec 074: 2 workers sharing 4 vCPUs made tests 4-8x slower
     expect(config.forbidOnly).toBe(true);
     expect(config.retries).toBe(0);
     expect(config.globalTimeout).toBe(25 * 60_000);
+    expect(config.timeout).toBe(20_000); // spec 074: 15 s target, 20 s timeout
     expect(config.reporter).toEqual([["dot"], ["html", { open: "never" }]]);
   });
 
@@ -132,6 +134,16 @@ describe("e2e tests (spec 060 criterion 7, spec 071 criterion 1)", () => {
       expect(titles.filter((t) => t!.includes(tag)), f).toEqual([]);
     }
     expect(n).toBeGreaterThan(50); // the title match finds the suite's tests
+  });
+
+  it("never set a test timeout above 20 s (spec 074 criterion 6)", () => {
+    for (const f of readdirSync("tests/e2e", { recursive: true, encoding: "utf8" })) {
+      if (!/\.[cm]?[jt]s$/.test(f)) continue;
+      const text = readFileSync(`tests/e2e/${f}`, "utf8");
+      for (const m of text.matchAll(/\.setTimeout\(\s*([^)]*)\)/g)) {
+        expect(Number(m[1]!.replace(/_/g, "")), `${f}: ${m[0]}`).toBeLessThanOrEqual(20_000);
+      }
+    }
   });
 
   it("never branch on the host OS", () => {
