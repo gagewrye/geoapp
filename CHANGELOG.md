@@ -2,6 +2,12 @@
 
 One entry per merge to main, newest first. Details are in the named spec.
 
+## 2026-11-15
+- **Spec 074:** CI runs the e2e suite in 8 shards with 1 Playwright worker each (ADR 0036 amended; local runs keep 2). Every e2e test is designed for 15 s or less on CI, and the CI timeout is 20 s (Gage, 2026-11-15: "15 s target, 20 s timeout"). No app behaviour changes.
+  - On CI, a page closed right after an unsaved stroke or an import delays the next test's page by up to about 3.7 s, and a shard's first test also starts the browser. So `label-persist`, `safe-export` and `sessions` run a cheap test first and keep slow tests after tests that end with nothing to save.
+  - Split: `label-persist` criterion 6's paint after a restore, and `safe-export` criterion 5 (the file; painting). `safe-export` criteria 5, 6 and 7 and spec 075's export paint one stroke rather than two classes, and `sessions` 82 imports its two masks without strokes. Every assertion is kept.
+  - In the last of 3 consecutive timing runs (run 43687265022, attempt 3), the shards took 90, 80, 172, 92, 91, 106, 135 and 80 s (shards 1 to 8, with setup), and the longest test was `sessions` "import A, paint, import B, paint…" at 13.2 s. No test took over 15 s in those 3 runs.
+
 ## 2026-11-14
 - **Merge:** The label-safety work is merged with main. Its specs and ADRs are renumbered past main's: spec 055 (safe export) is now 076 (074 is the CI one-worker spec), spec 056 (sessions never lost) is 075, and ADRs 0035, 0036 and 0037 (export through a folder handle, mask base from the app's copy, a session per labelling run) are 0040, 0041 and 0042. Its edits to tests that main's spec 073 deleted (the persist trims and tester, the README and CSS checks, the mask-labelling e2e and two e2e testers) are dropped with them; its own regression cases stay, `safety.tester.test.ts` renamed `safety.test.ts` as spec 073 did for sole-cover testers. No app behaviour changes.
 - **Fix (spec 076):** After restoring labels whose imported mask was never copied, Export refuses that mask's file name (it is still being read) until the raster is reopened, instead of offering to replace it.
