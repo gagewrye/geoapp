@@ -130,10 +130,10 @@ test.describe("Apply class map is disabled during an import, an export and a pen
     await expect(classMap(page)).toBeEnabled();
   });
 
-  test("criterion 10, export: disabled while an export holds the Save dialog, enabled after it", async ({ page }) => {
+  test("criterion 10, export: disabled while an export holds the folder picker, enabled after it", async ({ page }) => {
     await page.addInitScript(() => {
       const g = (window as any).__save = { cancel: null as null | (() => void) };
-      (window as any).showSaveFilePicker = () => new Promise((_, rej) => { g.cancel = () => rej(new DOMException("The user aborted a request.", "AbortError")); });
+      (window as any).showDirectoryPicker = () => new Promise((_, rej) => { g.cancel = () => rej(new DOMException("The user aborted a request.", "AbortError")); });
     });
     await setup(page);
     await importClasses(page);

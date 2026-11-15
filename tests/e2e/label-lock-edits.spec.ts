@@ -5,10 +5,10 @@ import { classList } from "./seeding";
 
 // Spec 004 Locks: rename and recolour refuse while locked, even if their disabled inputs fire.
 
-test("while an export holds the Save dialog, a forced rename or recolour changes no class", async ({ page }) => {
+test("while an export holds the folder picker, a forced rename or recolour changes no class", async ({ page }) => {
   await page.addInitScript(() => {
     const g = (window as any).__save = { opened: 0, cancel: null as null | (() => void) };
-    (window as any).showSaveFilePicker = () => new Promise((_, rej) => {
+    (window as any).showDirectoryPicker = () => new Promise((_, rej) => {
       g.opened++;
       g.cancel = () => rej(new DOMException("The user aborted a request.", "AbortError"));
     });

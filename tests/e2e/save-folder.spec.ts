@@ -2,11 +2,11 @@ import { expect, test, type Page } from "@playwright/test";
 import { anotherRaster, rgbFixture } from "./fixtures";
 import { message, openApp, openRaster, paintMode, paintTwoClasses } from "./helpers";
 
-// Spec 050 criteria 3-5: on Chromium the open picker replaces the input's chooser, and Export's Save dialog starts in the open raster's folder.
+// Spec 050 criteria 3-5: on Chromium the open picker replaces the input's chooser, and Export's folder picker (spec 076, ADR 0040) starts in the open raster's folder.
 
 type Next = "A" | "B" | "bad" | "abort";
 
-/** Before page scripts run: fake both pickers. The open fake returns __pick.next's handle and records the user activation; the save fake records its options and cancels. */
+/** Before page scripts run: fake both pickers. The open fake returns __pick.next's handle and records the user activation; the folder fake records its startIn and cancels. */
 const fakePickers = (page: Page) => page.addInitScript(() => {
   const g = (window as any).__pick = { next: "A", handles: {} as Record<string, unknown>, active: [] as boolean[], saves: [] as string[] };
   (window as any).showOpenFilePicker = () => {
@@ -14,7 +14,7 @@ const fakePickers = (page: Page) => page.addInitScript(() => {
     if (g.next === "abort") return Promise.reject(new DOMException("The user aborted a request.", "AbortError"));
     return Promise.resolve([g.handles[g.next]]);
   };
-  (window as any).showSaveFilePicker = (o: { startIn?: unknown }) => {
+  (window as any).showDirectoryPicker = (o: { startIn?: unknown }) => {
     // the held handle's name by identity; "none" with no startIn key
     g.saves.push("startIn" in o ? Object.keys(g.handles).find((k) => g.handles[k] === o.startIn) ?? "other" : "none");
     return Promise.reject(new DOMException("The user aborted a request.", "AbortError"));
@@ -36,7 +36,7 @@ async function makeHandles(page: Page) {
 const pick = (page: Page, next: Next) => page.evaluate((n) => { (window as any).__pick.next = n; }, next);
 const opener = (page: Page) => page.locator("label.file", { has: page.locator("#open-raster") });
 
-/** Clicks Export labels and returns what the save fake saw as startIn. */
+/** Clicks Export labels and returns what the folder fake saw as startIn. */
 async function exportStartIn(page: Page): Promise<string> {
   const n = await page.evaluate(() => (window as any).__pick.saves.length as number);
   await expect(page.locator("#export-labels")).toBeEnabled();

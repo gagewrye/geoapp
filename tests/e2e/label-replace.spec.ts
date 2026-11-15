@@ -66,6 +66,12 @@ test("with painted tiles an import confirms: OK replaces labels and classes and 
   expect(await classList(page)).toEqual(["Class 0", "Class 3", "Class 7"].map((name, i) => ({ name, colour: paletteColour(i) })));
   expect(valuesOf(await effectiveTiles(page))).toEqual(new Set([1, 2, 3]));
   await expect(page.locator("#undo")).toBeDisabled();
+  // spec 075: a further import would drop the painted labels, kept as the replaced session and never exported, so it is refused
+  const imported = await effectiveTiles(page);
+  await importFile(page, classes());
+  await expect(message(page)).toHaveText(MESSAGES.replacedFirst);
+  expect(asked).toHaveLength(1); // refused before the confirm
+  expect(tileDiff(await effectiveTiles(page), imported)).toEqual([]);
 });
 
 // spec 072: split from the OK test; its first import has no labels to replace, so it asks nothing
