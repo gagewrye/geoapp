@@ -5,9 +5,8 @@ export default defineConfig({
   timeout: 60_000,
   // 1 per CI shard, since 2 sharing 4 vCPUs on SwiftShader ran 4-8x slower (spec 074, ADR 0036); 2 locally, where more overloaded Gage's laptop (spec 060)
   workers: process.env.CI ? 1 : 2,
-  // TEMPORARY (spec 074 criterion 5): the json reporter gives per-test CI times; reverted before merge
   // on CI a flake fails the run instead of hiding behind a retry (spec 060)
-  ...(process.env.CI ? { forbidOnly: true, retries: 0, globalTimeout: 25 * 60_000, reporter: [["dot"], ["html", { open: "never" }], ["json", { outputFile: "e2e-times.json" }]] } : {}),
+  ...(process.env.CI ? { forbidOnly: true, retries: 0, globalTimeout: 25 * 60_000, reporter: [["dot"], ["html", { open: "never" }]] } : {}),
   use: {
     baseURL: "http://localhost:4173",
     ...devices["Desktop Chrome"],
