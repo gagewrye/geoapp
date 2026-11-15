@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MESSAGES } from "../../src/ui/messages";
 import { rgbFixture } from "./fixtures";
-import { jumpTo, message, openApp, openRaster, paintMode, paintOne, paintTwoClasses, path, stroke, toScreen } from "./helpers";
+import { jumpTo, message, openApp, openRaster, paintMode, paintOne, path, stroke, toScreen } from "./helpers";
 import { effectiveTiles, importFile, maskFile, saved, storeTiles, tileDiff } from "./seeding";
 
 // Spec 076 criteria 5-8 and spec 075 criterion 6: Export writes through a folder handle and never destroys a file.
@@ -130,9 +130,27 @@ async function importedAndSaved(page: Page, paint: boolean) {
   await saved(page);
 }
 
-// Spec 074: on CI, a page closed right after a stroke or an import delays the next test's page by up to 3 s. The order
-// keeps that off the slow tests: criterion 7 ends on a restore, and the two that end on an import or a stroke are each
-// followed by a cheap test (criteria 8 and 6).
+// Spec 074: on CI, a page closed right after a stroke or an import delays the next test's page by up to 3 s, and a
+// shard's first test also starts the browser. So the cheap criterion 8 runs first; criteria 7 and 5's file half follow
+// tests that end with nothing to save, and the rest end on a stroke or an import.
+test("criterion 8: with no copy of the mask (quota), exporting as the imported file's name is refused; another name succeeds", async ({ page }) => {
+  await fakeFolder(page);
+  const dialogs = answer(page);
+  await openApp(page);
+  await page.evaluate(() => { (window as any).__f.quota = true; });
+  const mask = maskFile().buffer;
+  await put(page, "labels_merged.tif", mask);
+  await openPicked(page);
+  await importPicked(page, "labels_merged.tif");
+  dialogs.then("labels_merged.tif");
+  await exportAs(page);
+  await expect(message(page)).toHaveText(MESSAGES.exportMask);
+  expect((await bytesOf(page, "labels_merged.tif"))!.equals(mask)).toBe(true);
+  dialogs.then("other.tif");
+  await exportAs(page);
+  await expect(message(page)).toHaveText(exportedTo("other.tif"), { timeout: 30_000 });
+});
+
 test("criterion 7: a write that fails midway keeps the old labels.tif, and a reload restores the same tiles", async ({ page }) => {
   await fakeFolder(page);
   const dialogs = answer(page);
@@ -182,22 +200,18 @@ test("criterion 5, the file: export over the imported labels_merged.tif writes i
   expect(tileDiff(await effectiveTiles(page), before)).toEqual([]);
 });
 
-test("criterion 8: with no copy of the mask (quota), exporting as the imported file's name is refused; another name succeeds", async ({ page }) => {
+test("criterion 6: exporting with the imagery's file name is refused, and the imagery is unchanged", async ({ page }) => {
   await fakeFolder(page);
   const dialogs = answer(page);
   await openApp(page);
-  await page.evaluate(() => { (window as any).__f.quota = true; });
-  const mask = maskFile().buffer;
-  await put(page, "labels_merged.tif", mask);
   await openPicked(page);
-  await importPicked(page, "labels_merged.tif");
-  dialogs.then("labels_merged.tif");
+  await paintMode(page);
+  await paintOne(page);
+  dialogs.then("rgb4326.tif");
   await exportAs(page);
-  await expect(message(page)).toHaveText(MESSAGES.exportMask);
-  expect((await bytesOf(page, "labels_merged.tif"))!.equals(mask)).toBe(true);
-  dialogs.then("other.tif");
-  await exportAs(page);
-  await expect(message(page)).toHaveText(exportedTo("other.tif"), { timeout: 30_000 });
+  await expect(message(page)).toHaveText(MESSAGES.exportImagery);
+  await expect(message(page)).toHaveClass(/\berror\b/);
+  expect((await bytesOf(page, "rgb4326.tif"))!.equals(rgbFixture().buffer)).toBe(true);
 });
 
 test("criterion 5, painting: after an export over the imported labels_merged.tif, a stroke on an unedited masked tile reads the mask from the app's copy", async ({ page }) => {
@@ -218,20 +232,6 @@ test("criterion 5, painting: after an export over the imported labels_merged.tif
   await stroke(page, path(a, b, 6));
   await expect.poll(async () => (await storeTiles(page)).has("0,768")).toBe(true);
   await expect(message(page)).not.toHaveClass(/\berror\b/);
-});
-
-test("criterion 6: exporting with the imagery's file name is refused, and the imagery is unchanged", async ({ page }) => {
-  await fakeFolder(page);
-  const dialogs = answer(page);
-  await openApp(page);
-  await openPicked(page);
-  await paintMode(page);
-  await paintTwoClasses(page);
-  dialogs.then("rgb4326.tif");
-  await exportAs(page);
-  await expect(message(page)).toHaveText(MESSAGES.exportImagery);
-  await expect(message(page)).toHaveClass(/\berror\b/);
-  expect((await bytesOf(page, "rgb4326.tif"))!.equals(rgbFixture().buffer)).toBe(true);
 });
 
 test("spec 075 criterion 6: a good export marks the saved session exported, at or after its savedAt", async ({ page }) => {
