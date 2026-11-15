@@ -1,8 +1,8 @@
-# 074: CI runs e2e with 1 worker per job across 8 shards, then enforces 15 s per test
+# 074: CI runs e2e with 1 worker per job across 8 shards: 15 s per test is the target, 20 s the timeout
 
 **Status:** Accepted on Gage's decision (2026-11-14): "Merge, then 1 browser/job". **ADR:** 0036, amended. **Builds on:** spec 072, whose criteria 3 and 6 move here. **Lands after:** spec 072 (PR #16).
 
-**Goal:** every e2e test runs in 15 s or less on CI, and CI's test timeout enforces it.
+**Goal:** every e2e test runs in 15 s or less on CI. CI's test timeout is 20 s, so slow-runner noise doesn't turn CI red (Gage, 2026-11-15: "15 s target, 20 s timeout").
 
 **Why one worker:** spec 072 found the remaining slowness is two workers sharing 4 vCPUs on SwiftShader.
 - "Create context" takes 2–9 s while the other worker is busy, and 0–1 s alone.
@@ -16,8 +16,8 @@
   - on CI, a JSON reporter (`["json", { outputFile: "e2e-times.json" }]`) is added to the reporters;
   - each shard uploads the file with `if: always()`.
 - **Last commit, 072's old criterion 6:**
-  - `timeout: process.env.CI ? 15_000 : 60_000`;
-  - no `test.setTimeout` above 15,000 in `tests/e2e/`;
+  - `timeout: process.env.CI ? 20_000 : 60_000`;
+  - no `test.setTimeout` above 20,000 in `tests/e2e/`;
   - `tests/unit/ci.test.ts` checks both.
 
   The draft is `crit6.py` in the scratchpad. Its paths point at the 072 worktree and its comments say "spec 072", so the implementer adapts both to this branch and to spec 074.
@@ -35,12 +35,13 @@
 2. **Workers.** `playwright.config.ts` gives `workers` 1 with `CI` set and 2 without. `ci.test.ts` asserts both, loading the config under each environment as it already does for `forbidOnly`.
 3. **Sharding is complete.** With `CI=1`, `--list --shard=k/8` for k = 1 to 8 lists every test exactly once in total. The tester compares the lists.
 4. **Timing data is temporary.** The JSON-reporter commit is reverted before merge: `git diff main...HEAD` adds no `json` reporter and no timing upload step, and `ci.test.ts`'s reporter assertion is unchanged.
-5. **Every test takes ≤ 15 s on CI** in each of 3 consecutive runs of this PR (the first, plus `gh run rerun` twice), read from those JSON files.
+5. **Every test takes ≤ 15 s on CI in the timing data, or is refactored; none takes over 20 s** in each of 3 consecutive runs of this PR (the first, plus `gh run rerun` twice), read from those JSON files.
    - **If a test is still over 15 s,** it is refactored or split under the standing rule (spec 072's levers), keeping every assertion. One or two such tests are fixed in this PR. More than two are escalated to Gage.
    - **Escalated, then approved (Gage, 2026-11-15: "Yes, fix them in 074"):** after PR #17 merged, three tests were over 15 s: `label-persist` criterion 6 (tiles) and `safe-export` criteria 5 and 7. All three are fixed in this PR.
+   - **Target and timeout (Gage, 2026-11-15: "15 s target, 20 s timeout"):** on slow runners `sessions` 82 took 16.2 s and `safe-export` criterion 7 15.1 s. Tests stay designed for 15 s, and any test over 15 s in CI timing data is refactored; the CI timeout is 20 s. `sessions` 82 drops its strokes; criterion 7 keeps its mask import.
 6. **Timeout last.** The final commit applies 072's old criterion 6 (see Scope). After it, `ci` is green. The CHANGELOG records each shard's wall time and the longest test from the last timing run.
 7. **Docs.**
    - **ADR 0036:** amended for 1 worker × 8 shards on CI.
-   - **README Develop:** says CI runs 1 worker per shard and that every e2e test must take 15 s or less there.
+   - **README Develop:** says CI runs 1 worker per shard, that every e2e test is designed to take 15 s or less there, and that the CI timeout is 20 s.
    - **CHANGELOG:** a dated entry.
    - **CLAUDE.md:** gets spec 072's standing text when the timeout lands. Gage edits it.
