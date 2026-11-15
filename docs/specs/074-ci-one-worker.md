@@ -37,6 +37,7 @@
 4. **Timing data is temporary.** The JSON-reporter commit is reverted before merge: `git diff main...HEAD` adds no `json` reporter and no timing upload step, and `ci.test.ts`'s reporter assertion is unchanged.
 5. **Every test takes ≤ 15 s on CI** in each of 3 consecutive runs of this PR (the first, plus `gh run rerun` twice), read from those JSON files.
    - **If a test is still over 15 s,** it is refactored or split under the standing rule (spec 072's levers), keeping every assertion. One or two such tests are fixed in this PR. More than two are escalated to Gage.
+   - **Escalated, then approved (Gage, 2026-11-15: "Yes, fix them in 074"):** after PR #17 merged, three tests were over 15 s: `label-persist` criterion 6 (tiles) and `safe-export` criteria 5 and 7. All three are fixed in this PR.
 6. **Timeout last.** The final commit applies 072's old criterion 6 (see Scope). After it, `ci` is green. The CHANGELOG records each shard's wall time and the longest test from the last timing run.
 7. **Docs.**
    - **ADR 0036:** amended for 1 worker × 8 shards on CI.
