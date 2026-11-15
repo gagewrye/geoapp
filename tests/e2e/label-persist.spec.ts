@@ -34,8 +34,22 @@ async function reload(page: Page) {
 
 const selected = (page: Page) => page.locator("#classes li[aria-selected=true]").evaluate((li) => [...li.parentElement!.children].indexOf(li));
 
-// Criterion 6 is split in three (spec 072): each part has one Saved and one reload.
-test("criterion 6, tiles: paint; after Saved and a reload, accepting the restore brings back the tiles; paint still works", async ({ page }) => {
+// Spec 074: on CI, a page closed right after an unsaved stroke delays the next test's page by about 3 s. So this cheap
+// test, which ends on a reload, runs first and takes any such delay from the file before; the one that ends on a stroke runs last.
+test("criterion 9: a reload within 2 s of a stroke raises a beforeunload dialog", async ({ page }) => {
+  const log = dialogs(page);
+  await openApp(page);
+  await open(page);
+  await paintMode(page);
+  await jumpTo(page, [15, 45], 6);
+  const a = await toScreen(page, [12.005, 45.005]);
+  await stroke(page, [a, { x: a.x + 40, y: a.y }]);
+  await reload(page);
+  expect(log).toEqual(["beforeunload: "]);
+});
+
+// Criterion 6 is split in four (specs 072 and 074): each part has one Saved and one reload.
+test("criterion 6, tiles: paint; after Saved and a reload, accepting the restore brings back the tiles", async ({ page }) => {
   const log = dialogs(page);
   await openApp(page);
   await open(page);
@@ -55,12 +69,6 @@ test("criterion 6, tiles: paint; after Saved and a reload, accepting the restore
   const back = await storeTiles(page);
   expect([...back.keys()].sort()).toEqual([...tiles.keys()].sort());
   for (const [k, t] of tiles) expect(Buffer.from(back.get(k)!).equals(Buffer.from(t)), k).toBe(true);
-
-  await paintMode(page);
-  await jumpTo(page, [15, 45], 6);
-  const a = await toScreen(page, [15.005, 47.005]);
-  await stroke(page, [a, { x: a.x + 40, y: a.y }]);
-  expect((await tileKeysStored(page)).length).toBeGreaterThan(tiles.size);
 });
 
 test("criterion 6, classes: rename both classes; after Saved and a reload, accepting the restore brings back the classes", async ({ page }) => {
@@ -155,19 +163,7 @@ test("opening a different raster after a save shows no prompt, and the first ras
   expect(await tileKeysStored(page)).toEqual(tiles);
 });
 
-// Spec 072: criterion 9's two reloads are two tests, each from a fresh page.
-test("criterion 9: a reload within 2 s of a stroke raises a beforeunload dialog", async ({ page }) => {
-  const log = dialogs(page);
-  await openApp(page);
-  await open(page);
-  await paintMode(page);
-  await jumpTo(page, [15, 45], 6);
-  const a = await toScreen(page, [12.005, 45.005]);
-  await stroke(page, [a, { x: a.x + 40, y: a.y }]);
-  await reload(page);
-  expect(log).toEqual(["beforeunload: "]);
-});
-
+// Spec 072: criterion 9's two reloads are two tests, each from a fresh page; the first is at the top of the file.
 test("criterion 9: after Saved a reload raises no dialog", async ({ page }) => {
   const log = dialogs(page);
   await openApp(page);
@@ -179,4 +175,23 @@ test("criterion 9: after Saved a reload raises no dialog", async ({ page }) => {
   await saved(page);
   await reload(page);
   expect(log).toEqual([]);
+});
+
+test("criterion 6, paint after a restore: after Saved, a reload and the restore, a stroke still stores new tiles", async ({ page }) => {
+  const log = dialogs(page);
+  await openApp(page);
+  await open(page);
+  await paintMode(page);
+  await paintOne(page);
+  await saved(page);
+  const tiles = await tileKeysStored(page);
+
+  await reload(page);
+  await open(page);
+  await expect(message(page)).toHaveText("Labels restored.");
+  expect(log).toHaveLength(1);
+  await paintMode(page);
+  const a = await toScreen(page, [15.005, 47.005]); // the opened view shows the whole raster
+  await stroke(page, [a, { x: a.x + 40, y: a.y }]);
+  expect((await tileKeysStored(page)).length).toBeGreaterThan(tiles.length);
 });
