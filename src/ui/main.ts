@@ -2,6 +2,8 @@ import "./style.css";
 import { PREVIEW_MAX_SIDE } from "../core/maskPreview";
 import { canPickFiles, pickRaster } from "../io/filePick";
 import { openFile } from "../io/geotiffSource";
+import { openLabelFile } from "../io/labelFile";
+import { useCopy } from "../io/maskBase";
 import { buildPreview, openRaster } from "../io/pipeline";
 import { readSamInput } from "../io/samImagery";
 import type { Segmenter } from "../io/segmenter";
@@ -45,8 +47,9 @@ const status = initStatus(map, () => (source ? source.meta : null));
 // nav and labels exist before any map event; a held pan key holds tile updates until it settles (spec 027)
 const fullRes = initImagery(map, say, { moving: () => nav.moving(), viewSettled: () => labels.viewSettled() });
 let source: RasterSource | undefined;
-// the open raster's file handle, so Export's Save dialog and Import labels' picker start in its folder; null when it came through the input (specs 050, 053)
+// the open raster's file handle, so Export's folder picker and Import labels' picker start in its folder; null when it came through the input (specs 050, 053, 076)
 let folder: FileSystemFileHandle | null = null;
+let imageryFile: { handle: FileSystemFileHandle | null; name: string; size: number } | null = null; // which Export refuses to write over (spec 076)
 // Opens are numbered so that an older open finishing late can't replace the raster a newer one opened
 let opens = 0;
 let opened = 0;
@@ -74,9 +77,13 @@ const labels = initLabels({ map, say, toolChanged: () => queueMicrotask(() => st
   edits: { tiles: (k) => persist.tiles(k), record: () => persist.record(), replaced: () => persist.replaced(), strokeEnded: () => persist.strokeEnded() } });
 // Spec 031: labels are kept in this browser as they change, and offered back when the raster is opened again
 const persist = initPersist({ labels, open: openSessionStore, state: $("save-state"), win: window, doc: document,
-  confirm: (t) => confirm(t), persistStorage: () => { void navigator.storage?.persist?.(); } });
-const seeding = initSeeding({ labels, imagery: () => source, folder: () => folder, say, error: errorText,
-  opened: (f) => testHook("labelFile", f), imported: (f) => persist.imported(f) });
+  confirm: (t) => confirm(t), say, persistStorage: () => { void navigator.storage?.persist?.(); } });
+const seeding = initSeeding({ labels, imagery: () => source, folder: () => folder, imageryFile: () => imageryFile, say, error: errorText,
+  opened: (f) => testHook("labelFile", f), session: {
+    // ADR 0041: once the copy is written whole, the mask is read from it, never the user's file again
+    imported: (f, base) => persist.imported(f, async (copy) => { useCopy(labels.base(), base, await openLabelFile(copy)); }),
+    replaceRefused: persist.replaceRefused, flush: persist.flush, waitCopy: persist.waitCopy, exported: persist.exported, maskUncopied: persist.maskUncopied,
+  } });
 // letters type in text fields and pick options in selects, so WASD leaves them alone (spec 009)
 const nav = createNavigation(map, { typing: (el) => inTextField(el) || el instanceof HTMLSelectElement, stroking: labels.stroking });
 nav.onSettle(fullRes.settle);
@@ -147,6 +154,7 @@ function openChosen(choose: () => Promise<Chosen>): Promise<void> {
     opened = req;
     source = s = f;
     folder = handle;
+    imageryFile = { handle, name: file.name, size: file.size };
     fullRes.clear();
     previewing?.abort(); // the replaced raster's preview reads stop
     const signal = (previewing = new AbortController()).signal;

@@ -18,7 +18,7 @@ const fakePickers = (page: Page) => page.addInitScript(() => {
     if (g.next === "abort") return Promise.reject(new DOMException("The user aborted a request.", "AbortError"));
     return Promise.resolve([g.handles[g.next]]);
   };
-  (window as any).showSaveFilePicker = (o: { startIn?: unknown }) => {
+  (window as any).showDirectoryPicker = (o: { startIn?: unknown }) => {
     g.saves.push(name(o));
     return Promise.reject(new DOMException("The user aborted a request.", "AbortError"));
   };

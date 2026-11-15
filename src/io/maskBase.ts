@@ -91,3 +91,10 @@ export async function effectiveTile(imagery: RasterSource, store: LabelStore, ba
   if (stored) return stored;
   return base ? (await baseTile(imagery, base, w)).labels : new Uint8Array(w.width * w.height);
 }
+
+/** ADR 0041: `prev` reads `file` (the app's copy) instead of the user's file if it is still the live base; swapped in place, so a held or exporting base reads it too. */
+export function useCopy(live: MaskBase | null, prev: MaskBase, file: LabelSource): boolean {
+  if (live !== prev) return false;
+  prev.file = file;
+  return true;
+}

@@ -1,6 +1,6 @@
 # 032: Status bar
 
-**Status:** Approved by Gage 2026-10-30, with the draft answers to its questions. **ADRs:** none. **Builds on spec 031** (`#save-state`). Amended by spec 048 (2026-11-01): the error kinds lose `labelLimit` and `editLimit`, which are gone with the tile cap.
+**Status:** Approved by Gage 2026-10-30, with the draft answers to its questions. **ADRs:** none. **Builds on spec 031** (`#save-state`). Amended by spec 048 (2026-11-01): the error kinds lose `labelLimit` and `editLimit`, which are gone with the tile cap. Amended by spec 075 (2026-11-14): scope 5, a failing copy is retried 3 times, after the tiles.
 
 **Amended by spec 073 (2026-11-12):** e2e/unit tests removed by spec 073 (stable or one-off): e2e `status-bar` (criteria 3–6); unit `ui/messageKind.callSites.tester` (2) and `ui/persist.retry` (7 and 8). `core/status` tests stay; no e2e test of the status bar is left.
 
