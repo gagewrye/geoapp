@@ -102,46 +102,30 @@ async function importPicked(page: Page, name: string) {
   await expect(message(page)).toHaveText(seeded);
 }
 
-test.beforeEach(async ({ page }) => { void page; console.log("BEFORE", Date.now()); }); // TEMPORARY
-test.afterEach(async ({ page }) => { console.log("AFTER", Date.now()); const t = Date.now(); await page.close(); console.log("CLOSE", Date.now() - t); const c = Date.now(); await page.context().close(); console.log("CTX", Date.now() - c); }); // TEMPORARY
-
 async function exportAs(page: Page) {
   await expect(page.locator("#export-labels")).toBeEnabled();
   await page.click("#export-labels");
 }
 
 test("criterion 5: export over the imported labels_merged.tif writes it whole; re-importing it gives the same tiles, and painting still works", async ({ page }) => {
-  const T0 = Date.now(); // TEMPORARY
   await fakeFolder(page);
-  console.log("T", Date.now() - T0, 'await fakeFolder(page);'); // TEMPORARY
   const dialogs = answer(page);
   await openApp(page);
-  console.log("T", Date.now() - T0, 'await openApp(page);'); // TEMPORARY
   await put(page, "labels_merged.tif", maskFile().buffer);
-  console.log("T", Date.now() - T0, 'await put(page, "labels_merged.tif", maskFile().buffer);'); // TEMPORARY
   await openPicked(page);
-  console.log("T", Date.now() - T0, 'await openPicked(page);'); // TEMPORARY
   await importPicked(page, "labels_merged.tif");
-  console.log("T", Date.now() - T0, 'await importPicked(page, "labels_merged.tif");'); // TEMPORARY
   await paintMode(page);
-  console.log("T", Date.now() - T0, 'await paintMode(page);'); // TEMPORARY
   await paintTwoClasses(page);
-  console.log("T", Date.now() - T0, 'await paintTwoClasses(page);'); // TEMPORARY
   await saved(page);
-  console.log("T", Date.now() - T0, 'await saved(page);'); // TEMPORARY
   const before = await effectiveTiles(page);
 
   dialogs.then("labels_merged.tif", true);
   await exportAs(page);
-  console.log("T", Date.now() - T0, 'await exportAs(page);'); // TEMPORARY
   await expect(message(page)).toHaveText(exportedTo("labels_merged.tif"), { timeout: 30_000 });
-  console.log("T", Date.now() - T0, 'await expect(message(page)).toHaveText(exportedTo("labels_me'); // TEMPORARY
   expect(dialogs.log).toContain(MESSAGES.exportReplace("labels_merged.tif"));
   dialogs.then("fresh.tif");
   await exportAs(page);
-  console.log("T", Date.now() - T0, 'await exportAs(page);'); // TEMPORARY
   await expect(message(page)).toHaveText(exportedTo("fresh.tif"), { timeout: 30_000 });
-  console.log("T", Date.now() - T0, 'await expect(message(page)).toHaveText(exportedTo("fresh.tif'); // TEMPORARY
   const merged = (await bytesOf(page, "labels_merged.tif"))!, fresh = (await bytesOf(page, "fresh.tif"))!;
   expect(merged.length).toBeGreaterThan(1000);
   expect(merged.equals(fresh)).toBe(true); // both verified at totalBytes, and the same labels
@@ -151,41 +135,27 @@ test("criterion 5: export over the imported labels_merged.tif writes it whole; r
   expect((await storeTiles(page)).has("0,768")).toBe(false);
   expect(before.has("0,768")).toBe(true);
   await jumpTo(page, [11.2, 41.2], 9);
-  console.log("T", Date.now() - T0, 'await jumpTo(page, [11.2, 41.2], 9);'); // TEMPORARY
   const a = await toScreen(page, [11.1, 41.2]), b = await toScreen(page, [11.3, 41.25]);
   await stroke(page, path(a, b, 6));
-  console.log("T", Date.now() - T0, 'await stroke(page, path(a, b, 6));'); // TEMPORARY
   await expect.poll(async () => (await storeTiles(page)).has("0,768")).toBe(true);
-  console.log("T", Date.now() - T0, 'await expect.poll(async () => (await storeTiles(page)).has("'); // TEMPORARY
   await expect(message(page)).not.toHaveClass(/\berror\b/);
-  console.log("T", Date.now() - T0, 'await expect(message(page)).not.toHaveClass(/\\berror\\b/);'); // TEMPORARY
 
   dialogs.then(true); // Replace labels?
   await importPicked(page, "labels_merged.tif");
-  console.log("T", Date.now() - T0, 'await importPicked(page, "labels_merged.tif");'); // TEMPORARY
   expect(tileDiff(await effectiveTiles(page), before)).toEqual([]);
 });
 
 test("criterion 6: exporting with the imagery's file name is refused, and the imagery is unchanged", async ({ page }) => {
-  const T0 = Date.now(); // TEMPORARY
   await fakeFolder(page);
-  console.log("T", Date.now() - T0, 'await fakeFolder(page);'); // TEMPORARY
   const dialogs = answer(page);
   await openApp(page);
-  console.log("T", Date.now() - T0, 'await openApp(page);'); // TEMPORARY
   await openPicked(page);
-  console.log("T", Date.now() - T0, 'await openPicked(page);'); // TEMPORARY
   await paintMode(page);
-  console.log("T", Date.now() - T0, 'await paintMode(page);'); // TEMPORARY
   await paintTwoClasses(page);
-  console.log("T", Date.now() - T0, 'await paintTwoClasses(page);'); // TEMPORARY
   dialogs.then("rgb4326.tif");
   await exportAs(page);
-  console.log("T", Date.now() - T0, 'await exportAs(page);'); // TEMPORARY
   await expect(message(page)).toHaveText(MESSAGES.exportImagery);
-  console.log("T", Date.now() - T0, 'await expect(message(page)).toHaveText(MESSAGES.exportImager'); // TEMPORARY
   await expect(message(page)).toHaveClass(/\berror\b/);
-  console.log("T", Date.now() - T0, 'await expect(message(page)).toHaveClass(/\\berror\\b/);'); // TEMPORARY
   expect((await bytesOf(page, "rgb4326.tif"))!.equals(rgbFixture().buffer)).toBe(true);
 });
 
@@ -201,56 +171,38 @@ async function paintedAndSaved(page: Page) {
 }
 
 test("criterion 7: a write that fails midway keeps the old labels.tif, and a reload restores the same tiles", async ({ page }) => {
-  const T0 = Date.now(); // TEMPORARY
   await fakeFolder(page);
-  console.log("T", Date.now() - T0, 'await fakeFolder(page);'); // TEMPORARY
   const dialogs = answer(page);
   await openApp(page);
-  console.log("T", Date.now() - T0, 'await openApp(page);'); // TEMPORARY
   const old = Buffer.from("the labels from yesterday");
   await put(page, "labels.tif", old);
-  console.log("T", Date.now() - T0, 'await put(page, "labels.tif", old);'); // TEMPORARY
   await paintedAndSaved(page);
-  console.log("T", Date.now() - T0, 'await paintedAndSaved(page);'); // TEMPORARY
   const before = await effectiveTiles(page);
 
   await page.evaluate(() => { (window as any).__f.failAt = 3; }); // the header and a tile, then the third write rejects
   dialogs.then("labels.tif", true);
   await exportAs(page);
-  console.log("T", Date.now() - T0, 'await exportAs(page);'); // TEMPORARY
   await expect(message(page)).toHaveText(`The disk failed. ${MESSAGES.nothingOverwritten}`);
-  console.log("T", Date.now() - T0, 'await expect(message(page)).toHaveText(`The disk failed. ${M'); // TEMPORARY
   expect((await bytesOf(page, "labels.tif"))!.equals(old)).toBe(true);
   expect(tileDiff(await effectiveTiles(page), before)).toEqual([]); // the labels and mask are unchanged; Undo is criterion 3's unit test
   await saved(page);
-  console.log("T", Date.now() - T0, 'await saved(page);'); // TEMPORARY
 
   await page.reload();
-  console.log("T", Date.now() - T0, 'await page.reload();'); // TEMPORARY
   await expect(page.locator("#map[data-ready=true]")).toBeVisible();
-  console.log("T", Date.now() - T0, 'await expect(page.locator("#map[data-ready=true]")).toBeVisi'); // TEMPORARY
   dialogs.then(true); // restore
   await openRaster(page, rgbFixture());
-  console.log("T", Date.now() - T0, 'await openRaster(page, rgbFixture());'); // TEMPORARY
   await expect(message(page)).toHaveText("Labels restored.");
-  console.log("T", Date.now() - T0, 'await expect(message(page)).toHaveText("Labels restored.");'); // TEMPORARY
   expect(tileDiff(await effectiveTiles(page), before)).toEqual([]);
 });
 
 test("spec 075 criterion 6: a good export marks the saved session exported, at or after its savedAt", async ({ page }) => {
-  const T0 = Date.now(); // TEMPORARY
   await fakeFolder(page);
-  console.log("T", Date.now() - T0, 'await fakeFolder(page);'); // TEMPORARY
   const dialogs = answer(page);
   await openApp(page);
-  console.log("T", Date.now() - T0, 'await openApp(page);'); // TEMPORARY
   await paintedAndSaved(page);
-  console.log("T", Date.now() - T0, 'await paintedAndSaved(page);'); // TEMPORARY
   dialogs.then("good.tif");
   await exportAs(page);
-  console.log("T", Date.now() - T0, 'await exportAs(page);'); // TEMPORARY
   await expect(message(page)).toHaveText(exportedTo("good.tif"), { timeout: 30_000 });
-  console.log("T", Date.now() - T0, 'await expect(message(page)).toHaveText(exportedTo("good.tif"'); // TEMPORARY
   await expect.poll(() => page.evaluate(() => new Promise<boolean>((resolve) => {
     const open = indexedDB.open("geoplatform");
     open.onsuccess = () => {
@@ -262,30 +214,19 @@ test("spec 075 criterion 6: a good export marks the saved session exported, at o
 });
 
 test("criterion 8: with no copy of the mask (quota), exporting as the imported file's name is refused; another name succeeds", async ({ page }) => {
-  const T0 = Date.now(); // TEMPORARY
   await fakeFolder(page);
-  console.log("T", Date.now() - T0, 'await fakeFolder(page);'); // TEMPORARY
   const dialogs = answer(page);
   await openApp(page);
-  console.log("T", Date.now() - T0, 'await openApp(page);'); // TEMPORARY
   await page.evaluate(() => { (window as any).__f.quota = true; });
-  console.log("T", Date.now() - T0, 'await page.evaluate(() => { (window as any).__f.quota = true'); // TEMPORARY
   const mask = maskFile().buffer;
   await put(page, "labels_merged.tif", mask);
-  console.log("T", Date.now() - T0, 'await put(page, "labels_merged.tif", mask);'); // TEMPORARY
   await openPicked(page);
-  console.log("T", Date.now() - T0, 'await openPicked(page);'); // TEMPORARY
   await importPicked(page, "labels_merged.tif");
-  console.log("T", Date.now() - T0, 'await importPicked(page, "labels_merged.tif");'); // TEMPORARY
   dialogs.then("labels_merged.tif");
   await exportAs(page);
-  console.log("T", Date.now() - T0, 'await exportAs(page);'); // TEMPORARY
   await expect(message(page)).toHaveText(MESSAGES.exportMask);
-  console.log("T", Date.now() - T0, 'await expect(message(page)).toHaveText(MESSAGES.exportMask);'); // TEMPORARY
   expect((await bytesOf(page, "labels_merged.tif"))!.equals(mask)).toBe(true);
   dialogs.then("other.tif");
   await exportAs(page);
-  console.log("T", Date.now() - T0, 'await exportAs(page);'); // TEMPORARY
   await expect(message(page)).toHaveText(exportedTo("other.tif"), { timeout: 30_000 });
-  console.log("T", Date.now() - T0, 'await expect(message(page)).toHaveText(exportedTo("other.tif'); // TEMPORARY
 });
