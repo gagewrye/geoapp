@@ -98,6 +98,7 @@ describe("playwright config (spec 060 criteria 3-4, spec 074 criterion 2)", () =
     expect(config.retries).toBeUndefined();
     expect(config.forbidOnly).toBeUndefined();
     expect(config.globalTimeout).toBeUndefined();
+    expect(config.timeout).toBe(60_000);
   });
 
   it("on CI uses 1 worker, forbids .only, never retries, stops at 25 min and writes dot and html reports", async () => {
@@ -107,6 +108,7 @@ describe("playwright config (spec 060 criteria 3-4, spec 074 criterion 2)", () =
     expect(config.forbidOnly).toBe(true);
     expect(config.retries).toBe(0);
     expect(config.globalTimeout).toBe(25 * 60_000);
+    expect(config.timeout).toBe(20_000); // spec 074: 15 s target, 20 s timeout
     expect(config.reporter).toEqual([["dot"], ["html", { open: "never" }]]);
   });
 
@@ -132,6 +134,16 @@ describe("e2e tests (spec 060 criterion 7, spec 071 criterion 1)", () => {
       expect(titles.filter((t) => t!.includes(tag)), f).toEqual([]);
     }
     expect(n).toBeGreaterThan(50); // the title match finds the suite's tests
+  });
+
+  it("never set a test timeout above 20 s (spec 074 criterion 6)", () => {
+    for (const f of readdirSync("tests/e2e", { recursive: true, encoding: "utf8" })) {
+      if (!/\.[cm]?[jt]s$/.test(f)) continue;
+      const text = readFileSync(`tests/e2e/${f}`, "utf8");
+      for (const m of text.matchAll(/\.setTimeout\(\s*([^)]*)\)/g)) {
+        expect(Number(m[1]!.replace(/_/g, "")), `${f}: ${m[0]}`).toBeLessThanOrEqual(20_000);
+      }
+    }
   });
 
   it("never branch on the host OS", () => {
